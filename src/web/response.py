@@ -1,13 +1,13 @@
-"""统一 API 响应格式中间件"""
+"""統一 API 回應格式中介軟體"""
 import json
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 class ResponseWrapperMiddleware:
-    """将所有 /api/ 响应包装为标准格式: {code, success, data, message}
+    """將所有 /api/ 回應包裝為標準格式: {code, success, data, message}
 
-    使用纯 ASGI 实现，避免 BaseHTTPMiddleware 的已知 streaming hang 问题。
+    使用純 ASGI 實現，避免 BaseHTTPMiddleware 的已知 streaming hang 問題。
     """
 
     def __init__(self, app: ASGIApp):
@@ -21,8 +21,8 @@ class ResponseWrapperMiddleware:
         status_code = 200
         response_headers: list[tuple[bytes, bytes]] = []
         body_parts: list[bytes] = []
-        # SSE（text/event-stream）响应必须逐块直通：
-        # 缓冲会把流式打成一次性返回，导致前端收不到增量事件
+        # SSE（text/event-stream）回應必須逐塊直通：
+        # 緩衝會把流式打成一次性返回，導致前端收不到增量事件
         passthrough = False
 
         async def capture_send(message):
@@ -45,10 +45,10 @@ class ResponseWrapperMiddleware:
         await self.app(scope, receive, capture_send)
 
         if passthrough:
-            # 流式响应已经边生成边转发完毕
+            # 流式回應已經邊生成邊轉發完畢
             return
 
-        # 检查是否 JSON 响应
+        # 檢查是否 JSON 回應
         content_type = ""
         for key, value in response_headers:
             if key.lower() == b"content-type":
@@ -58,7 +58,7 @@ class ResponseWrapperMiddleware:
         body = b"".join(body_parts)
 
         if "application/json" not in content_type:
-            # 非 JSON 响应，原样返回
+            # 非 JSON 回應，原樣返回
             await send({"type": "http.response.start", "status": status_code, "headers": response_headers})
             await send({"type": "http.response.body", "body": body})
             return
@@ -71,7 +71,7 @@ class ResponseWrapperMiddleware:
             return
 
         if 200 <= status_code < 300:
-            # 允许业务层在 2xx 中显式返回 success/code/message
+            # 允許業務層在 2xx 中顯式返回 success/code/message
             if isinstance(original_data, dict) and "success" in original_data:
                 success = bool(original_data.get("success"))
                 raw_code = original_data.get("code")
@@ -85,7 +85,7 @@ class ResponseWrapperMiddleware:
                     code = 1
 
                 if success:
-                    # 统一成功返回：message 为空
+                    # 統一成功返回：message 為空
                     message = ""
                     data = original_data.get("data")
                     if data is None:
@@ -95,7 +95,7 @@ class ResponseWrapperMiddleware:
                             if k not in ("code", "success", "message")
                         }
                 else:
-                    # 统一失败返回：data 为空
+                    # 統一失敗返回：data 為空
                     message = str(original_data.get("message") or "failed")
                     data = None
 
@@ -106,7 +106,7 @@ class ResponseWrapperMiddleware:
                     "message": message,
                 }
             else:
-                # 默认 2xx 视为成功
+                # 預設 2xx 視為成功
                 wrapped = {"code": 0, "success": True, "data": original_data, "message": ""}
         else:
             detail = original_data.get("detail", original_data) if isinstance(original_data, dict) else original_data

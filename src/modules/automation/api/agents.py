@@ -57,9 +57,9 @@ def _set_scan_cache(key: str, payload: dict) -> None:
 
 
 def _format_datetime(dt, tz: str | None = None) -> str:
-    """格式化时间为当前时区的 ISO 格式。
+    """格式化時間為當前時區的 ISO 格式。
 
-    说明：SQLite 存储的时间通常没有 tzinfo，按 UTC 解释后再转换到 app_timezone。
+    說明：SQLite 儲存的時間通常沒有 tzinfo，按 UTC 解釋後再轉換到 app_timezone。
     """
 
     if not dt:
@@ -84,7 +84,7 @@ def _spawn_async_run(fn, *args, name: str) -> None:
         try:
             asyncio.run(fn(*args))
         except Exception:
-            logger.exception(f"后台任务失败: {name}")
+            logger.exception(f"後臺任務失敗: {name}")
 
     t = threading.Thread(target=_runner, name=name, daemon=True)
     t.start()
@@ -98,7 +98,7 @@ def agents_health(
     include_internal: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
-    """调度健康概览（用于排查调度/时区/触发问题）"""
+    """排程健康概覽（用於排查排程/時區/觸發問題）"""
     tz = Settings().app_timezone or "UTC"
     try:
         tzinfo = ZoneInfo(tz)
@@ -279,7 +279,7 @@ def update_agent(
     for key, value in update.model_dump(exclude_unset=True).items():
         setattr(agent, key, value)
 
-    # capability 仅支持手动调用，不参与调度。
+    # capability 僅支援手動呼叫，不參與排程。
     kind = (agent.kind or "").strip() or infer_agent_kind(agent.name)
     if kind == AGENT_KIND_CAPABILITY:
         agent.enabled = False
@@ -292,7 +292,7 @@ def update_agent(
 
 @router.get("/schedule/preview")
 def preview_schedule_expr(schedule: str, count: int = 5):
-    """预览某个 schedule 表达式接下来几次触发时间（按调度时区）"""
+    """預覽某個 schedule 表示式接下來幾次觸發時間（按排程時區）"""
     tz = Settings().app_timezone or "UTC"
     if not schedule:
         return {"schedule": "", "timezone": tz, "next_runs": []}
@@ -300,7 +300,7 @@ def preview_schedule_expr(schedule: str, count: int = 5):
     try:
         runs = preview_schedule(schedule, count=count, timezone=tz)
     except Exception as e:
-        raise HTTPException(400, f"schedule 无法解析: {e}")
+        raise HTTPException(400, f"schedule 無法解析: {e}")
 
     return {
         "schedule": schedule,
@@ -313,7 +313,7 @@ def preview_schedule_expr(schedule: str, count: int = 5):
 def preview_agent_schedule(
     agent_name: str, count: int = 5, db: Session = Depends(get_db)
 ):
-    """预览某个 Agent 接下来几次的触发时间（按调度时区）"""
+    """預覽某個 Agent 接下來幾次的觸發時間（按排程時區）"""
     tz = Settings().app_timezone or "UTC"
     agent = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
     if not agent:
@@ -324,7 +324,7 @@ def preview_agent_schedule(
     try:
         runs = preview_schedule(agent.schedule, count=count, timezone=tz)
     except Exception as e:
-        raise HTTPException(400, f"schedule 无法解析: {e}")
+        raise HTTPException(400, f"schedule 無法解析: {e}")
 
     return {
         "schedule": agent.schedule,
@@ -335,19 +335,19 @@ def preview_agent_schedule(
 
 @router.delete("/{agent_name}")
 def delete_agent(agent_name: str, db: Session = Depends(get_db)):
-    """删除 Agent 配置"""
+    """刪除 Agent 配置"""
     agent = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
     if not agent:
         raise HTTPException(404, f"Agent {agent_name} 不存在")
 
-    # 删除关联的 stock_agents 记录
+    # 刪除關聯的 stock_agents 記錄
     from src.platform.persistence.models import StockAgent
 
     db.query(StockAgent).filter(StockAgent.agent_name == agent_name).delete()
 
     db.delete(agent)
     db.commit()
-    return {"ok": True, "message": f"Agent {agent_name} 已删除"}
+    return {"ok": True, "message": f"Agent {agent_name} 已刪除"}
 
 
 @router.post("/{agent_name}/trigger")
@@ -355,17 +355,17 @@ async def trigger_agent_endpoint(
     agent_name: str,
     wait: bool = Query(
         default=False,
-        description="是否同步等待执行完成；batch agent 默认异步排队",
+        description="是否同步等待執行完成；batch agent 預設非同步排隊",
     ),
     db: Session = Depends(get_db),
 ):
-    """手动触发 Agent 执行"""
+    """手動觸發 Agent 執行"""
     agent = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
     if not agent:
         raise HTTPException(404, f"Agent {agent_name} 不存在")
     agent_kind = (agent.kind or "").strip() or infer_agent_kind(agent.name)
     if agent_kind == AGENT_KIND_WORKFLOW and not agent.enabled:
-        raise HTTPException(400, f"Agent {agent_name} 未启用")
+        raise HTTPException(400, f"Agent {agent_name} 未啟用")
 
     from server import trigger_agent
 
@@ -379,40 +379,40 @@ async def trigger_agent_endpoint(
             _spawn_async_run(
                 trigger_agent, agent_name, name=f"trigger_agent:{agent_name}"
             )
-            return {"ok": True, "queued": True, "message": "已提交后台执行"}
+            return {"ok": True, "queued": True, "message": "已提交後臺執行"}
 
         result = await trigger_agent(agent_name)
         return {"ok": True, "queued": False, "message": result}
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
-        raise HTTPException(500, f"Agent 执行失败: {e}")
+        raise HTTPException(500, f"Agent 執行失敗: {e}")
 
 
 @router.get("/tradingagents/running")
 def find_running_for_stock(
-    stock_symbol: str = Query(..., description="股票代码"),
+    stock_symbol: str = Query(..., description="股票程式碼"),
     lookback_minutes: int = Query(default=30, ge=1, le=120),
     db: Session = Depends(get_db),
 ):
-    """查找某只股票最近 N 分钟内是否有 TradingAgents 运行任务。
+    """查詢某隻股票最近 N 分鐘內是否有 TradingAgents 執行任務。
 
-    用于 DeepAnalysisModal 重新打开时,**后端权威源**判断是否有正在跑或刚完成的任务,
-    比 localStorage 更可靠(跨浏览器/无痕/换设备都能查到)。
+    用於 DeepAnalysisModal 重新開啟時,**後端權威源**判斷是否有正在跑或剛完成的任務,
+    比 localStorage 更可靠(跨瀏覽器/無痕/換裝置都能查到)。
 
-    判断逻辑:
-    1. 优先查 agent_runs 中未过期的 running 记录（覆盖数据采集阶段）
-    2. 再查 log_entries 中 event=ta_progress + trace_id 含 -{symbol}- 的最新一条
-    3. 看对应 trace_id 在 agent_runs 表是否有完成记录
-       - 有完成记录 + status=success → 已完成 (前端可拉 latest 结果显示)
-       - 有完成记录 + status=failed → 已失败
-       - 无完成记录 + 日志在 30 分钟内 → running
-        - 无任何生命周期记录或日志 → none
+    判斷邏輯:
+    1. 優先查 agent_runs 中未過期的 running 記錄（覆蓋資料採集階段）
+    2. 再查 log_entries 中 event=ta_progress + trace_id 含 -{symbol}- 的最新一條
+    3. 看對應 trace_id 在 agent_runs 表是否有完成記錄
+       - 有完成記錄 + status=success → 已完成 (前端可拉 latest 結果顯示)
+       - 有完成記錄 + status=failed → 已失敗
+       - 無完成記錄 + 日誌在 30 分鐘內 → running
+        - 無任何生命週期記錄或日誌 → none
 
     Returns:
         {"trace_id": str|None, "status": "running"|"success"|"failed"|"none"}
     """
-    # 先读持久化生命周期记录：采集阶段没有 ta_progress 时也能恢复。
+    # 先讀持久化生命週期記錄：採集階段沒有 ta_progress 時也能恢復。
     from src.modules.automation.agent_runs import find_active_tradingagents_trace
 
     active_trace = find_active_tradingagents_trace(db, stock_symbol)
@@ -442,7 +442,7 @@ def find_running_for_stock(
 
     trace_id = latest_log.trace_id
 
-    # 检查该 trace 是否已有完成记录
+    # 檢查該 trace 是否已有完成記錄
     run = (
         db.query(AgentRun)
         .filter(AgentRun.trace_id == trace_id)
@@ -450,8 +450,8 @@ def find_running_for_stock(
         .first()
     )
 
-    # 没有 run 记录时,看最后日志距今 — 超过 STALE_THRESHOLD 视为僵尸 running
-    # (server 重启 / 工作线程死掉),前端可据此 reset 到 idle 允许重新分析
+    # 沒有 run 記錄時,看最後日誌距今 — 超過 STALE_THRESHOLD 視為殭屍 running
+    # (server 重啟 / 工作執行緒死掉),前端可據此 reset 到 idle 允許重新分析
     status = run.status if run else "running"
     if status == "running":
         created_at = _as_utc(run.created_at) if run else None
@@ -462,7 +462,7 @@ def find_running_for_stock(
             last_ts = last_ts.replace(tzinfo=timezone.utc)
         if status == "running" and last_ts:
             idle_sec = (datetime.now(timezone.utc) - last_ts).total_seconds()
-            if idle_sec > 300:  # 5 分钟无新进度 → stale
+            if idle_sec > 300:  # 5 分鐘無新進度 → stale
                 status = "stale"
 
     return {
@@ -474,13 +474,13 @@ def find_running_for_stock(
 
 @router.get("/tradingagents/latest")
 def get_tradingagents_latest(
-    stock_symbol: str = Query(..., description="股票代码,如 300418"),
+    stock_symbol: str = Query(..., description="股票程式碼,如 300418"),
     db: Session = Depends(get_db),
 ):
-    """获取某只股票最近一次 TradingAgents 深度分析的完整结果(含 raw_data)。
+    """獲取某隻股票最近一次 TradingAgents 深度分析的完整結果(含 raw_data)。
 
-    /history 端点 cherry-pick 字段不含 raw_data,这里专门为深度分析弹窗
-    暴露完整字段(suggestion / debate_history / analyst_reports / cost_usd 等)。
+    /history 端點 cherry-pick 欄位不含 raw_data,這裡專門為深度分析彈跳視窗
+    暴露完整欄位(suggestion / debate_history / analyst_reports / cost_usd 等)。
     """
     from src.platform.persistence.models import AnalysisHistory
 
@@ -515,11 +515,11 @@ def get_tradingagents_latest(
 
 @router.get("/tradingagents/analysis")
 def get_tradingagents_analysis(
-    stock_symbol: str = Query(..., description="股票代码"),
+    stock_symbol: str = Query(..., description="股票程式碼"),
     analysis_date: str = Query(..., description="分析日期 YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
-    """按 symbol + date 查某次 TradingAgents 深度分析完整结果(详细阅读页用)。"""
+    """按 symbol + date 查某次 TradingAgents 深度分析完整結果(詳細閱讀頁用)。"""
     from src.platform.persistence.models import AnalysisHistory
 
     record = (
@@ -550,13 +550,13 @@ def get_tradingagents_analysis(
 
 @router.get("/tradingagents/analysis/pdf")
 def export_tradingagents_analysis_pdf(
-    stock_symbol: str = Query(..., description="股票代码"),
+    stock_symbol: str = Query(..., description="股票程式碼"),
     analysis_date: str = Query(..., description="分析日期 YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
-    """把某次 TradingAgents 深度分析报告导出为 PDF 文件(后台直出,不依赖 Chromium)。
+    """把某次 TradingAgents 深度分析報告匯出為 PDF 檔案(後臺直出,不依賴 Chromium)。
 
-    返回 application/pdf(ResponseWrapperMiddleware 对非 JSON 原样放行,不会包裹)。
+    返回 application/pdf(ResponseWrapperMiddleware 對非 JSON 原樣放行,不會包裹)。
     """
     from urllib.parse import quote
 
@@ -577,9 +577,9 @@ def export_tradingagents_analysis_pdf(
         .first()
     )
     if not record:
-        raise HTTPException(status_code=404, detail="未找到该深度分析记录")
+        raise HTTPException(status_code=404, detail="未找到該深度分析記錄")
 
-    # 用 raw_data 拼详情页同款完整分节(含 4 分析师全文 + 辩论全文);raw_data 缺失时回退 content
+    # 用 raw_data 拼詳細資訊頁同款完整分節(含 4 分析師全文 + 辯論全文);raw_data 缺失時回退 content
     report_md = assemble_report_markdown(record.raw_data or {}) or (record.content or "")
     pdf_bytes = render_analysis_pdf(record.title or "深度分析", report_md)
     base = (record.title or f"{stock_symbol} 深度分析").replace("/", "-").replace("\\", "-").strip()
@@ -593,14 +593,14 @@ def export_tradingagents_analysis_pdf(
 
 @router.get("/tradingagents/history-comparison")
 def get_tradingagents_history_comparison(
-    stock_symbol: str = Query(..., description="股票代码,如 300418"),
-    market: str = Query("CN", description="市场:CN/US/HK"),
-    days: int = Query(90, ge=7, le=365, description="回溯天数"),
+    stock_symbol: str = Query(..., description="股票程式碼,如 300418"),
+    market: str = Query("CN", description="市場:CN/US/HK"),
+    days: int = Query(90, ge=7, le=365, description="回溯天數"),
 ):
-    """某只股票的 TradingAgents 历史决策 vs 实际涨跌对比。
+    """某隻股票的 TradingAgents 歷史決策 vs 實際漲跌對比。
 
-    返回 items(每条决策 + 1d/5d/20d 后涨跌)+ stats(命中率/平均收益)。
-    "命中" 定义:buy→后续上涨 / sell→后续下跌 / hold→|涨跌| < 2%(横盘)。
+    返回 items(每條決策 + 1d/5d/20d 後漲跌)+ stats(命中率/平均收益)。
+    "命中" 定義:buy→後續上漲 / sell→後續下跌 / hold→|漲跌| < 2%(橫盤)。
     """
     from src.modules.automation.tradingagents.operations import build_history_comparison
 
@@ -609,25 +609,25 @@ def get_tradingagents_history_comparison(
 
 @router.get("/tradingagents/budget")
 def get_tradingagents_budget(db: Session = Depends(get_db)):
-    """读取 TradingAgents 本月预算使用情况。
+    """讀取 TradingAgents 本月預算使用情況。
 
-    用于 UI 在「设置」+「DeepAnalysisModal」展示「已用 $X / 预算 $Y」。
+    用於 UI 在「設定」+「DeepAnalysisModal」展示「已用 $X / 預算 $Y」。
     """
     agent = (
         db.query(AgentConfig).filter(AgentConfig.name == "tradingagents").first()
     )
     if not agent:
-        raise HTTPException(404, "tradingagents agent 未注册")
+        raise HTTPException(404, "tradingagents agent 未註冊")
 
     cfg = agent.config or {}
     monthly_budget = float(cfg.get("monthly_budget_usd", 10.0))
 
-    # 复用 cost_tracker 的 SQL 聚合
+    # 複用 cost_tracker 的 SQL 聚合
     from src.modules.automation.tradingagents.observability import check_budget, estimate_cost
 
     budget = check_budget(monthly_budget, "tradingagents")
 
-    # 单次估算(给前端确认弹窗显示)
+    # 單次估算(給前端確認彈跳視窗顯示)
     est = estimate_cost(
         debate_rounds=int(cfg.get("debate_rounds", 1)),
         selected_analysts=list(
@@ -650,10 +650,10 @@ def get_tradingagents_budget(db: Session = Depends(get_db)):
 
 @router.get("/runs/{trace_id}/progress")
 def get_run_progress(trace_id: str, db: Session = Depends(get_db)):
-    """读取一次 agent 运行的进度。
+    """讀取一次 agent 執行的進度。
 
-    适用 TradingAgents 等长耗时(3-5 分钟)的 agent。从 log_entries 表里
-    查 event=ta_progress + 同 trace_id 的日志,聚合成阶段进度。
+    適用 TradingAgents 等長耗時(3-5 分鐘)的 agent。從 log_entries 表裡
+    查 event=ta_progress + 同 trace_id 的日誌,聚合成階段進度。
 
     返回:
     {
@@ -664,7 +664,7 @@ def get_run_progress(trace_id: str, db: Session = Depends(get_db)):
         "elapsed_sec": float,
         "total_cost_usd": float,
         "stages": [{"name": ..., "status": "pending"|"running"|"done"}, ...],
-        "run": {  # 最终 AgentRun(已完成时)
+        "run": {  # 最終 AgentRun(已完成時)
             "status": ..., "result": ..., "error": ..., "duration_ms": ...
         }
     }
@@ -672,7 +672,7 @@ def get_run_progress(trace_id: str, db: Session = Depends(get_db)):
     from src.modules.automation.tradingagents.observability import aggregate_progress
 
     if not trace_id or len(trace_id) > 64:
-        raise HTTPException(400, "无效的 trace_id")
+        raise HTTPException(400, "無效的 trace_id")
 
     logs = (
         db.query(LogEntry)
@@ -698,9 +698,9 @@ def get_run_progress(trace_id: str, db: Session = Depends(get_db)):
     progress_logs = [d for d in log_dicts if d.get("event") == "ta_progress"]
     progress = aggregate_progress(progress_logs)
 
-    # 工具调用诊断:汇总 5 类 action 次数 + 最近 50 条详情
-    # 港股转格式/兜底等场景归到对应基础类(HIT/PASSTHROUGH/ERROR),
-    # source 字段区分具体来源(yfinance/panwatch HK fallback/...)
+    # 工具呼叫診斷:彙總 5 類 action 次數 + 最近 50 條詳細資訊
+    # 港股轉格式/兜底等場景歸到對應基礎類(HIT/PASSTHROUGH/ERROR),
+    # source 欄位區分具體來源(yfinance/panwatch HK fallback/...)
     toolkit_logs = [d for d in log_dicts if d.get("event") == "ta_toolkit"]
     toolkit_summary = {"hit": 0, "miss": 0, "passthrough": 0, "fallthrough": 0, "error": 0}
     toolkit_recent = []
@@ -751,9 +751,9 @@ def get_run_progress(trace_id: str, db: Session = Depends(get_db)):
                 if progress["elapsed_sec"] > ACTIVE_RUN_TTL_SEC:
                     status = "stale"
     elif log_dicts:
-        # 检测"僵尸 running":server 重启 / 工作线程死掉时,日志还在但任务已不在跑。
-        # 最后一条进度日志距今 > STALE_THRESHOLD 视为中断,前端可据此 reset 回 idle。
-        STALE_THRESHOLD_SEC = 300  # 5 分钟
+        # 檢測"殭屍 running":server 重啟 / 工作執行緒死掉時,日誌還在但任務已不在跑。
+        # 最後一條進度日誌距今 > STALE_THRESHOLD 視為中斷,前端可據此 reset 回 idle。
+        STALE_THRESHOLD_SEC = 300  # 5 分鐘
         last_log = logs[-1]  # logs 已 order_by id.asc(),末尾是最新
         last_ts = last_log.timestamp
         if last_ts is not None:
@@ -771,23 +771,23 @@ def get_run_progress(trace_id: str, db: Session = Depends(get_db)):
     return progress
 
 
-# 进度 SSE 轮询/推送节奏与终态判定
+# 進度 SSE 輪詢/推送節奏與終態判定
 PROGRESS_SSE_POLL_SEC = 1.0
 PROGRESS_SSE_MAX_DURATION_SEC = 30 * 60
-PROGRESS_SSE_NOT_FOUND_GRACE_SEC = 60  # trigger 刚发出时日志可能尚未写入
+PROGRESS_SSE_NOT_FOUND_GRACE_SEC = 60  # trigger 剛發出時日誌可能尚未寫入
 PROGRESS_TERMINAL_STATUSES = ("success", "failed", "stale")
 
 
 @router.get("/runs/{trace_id}/progress/stream")
 async def stream_run_progress(trace_id: str):
-    """进度 SSE：服务端聚合进度，快照有变化即推送（替代前端 2s 轮询）。
+    """進度 SSE：伺服器端聚合進度，快照有變化即推送（替代前端 2s 輪詢）。
 
     事件分型：
-    - progress: 完整进度快照（结构同 GET .../progress），带自增 id；
-      快照类事件重连后拿最新一条即可，无需按 Last-Event-ID 严格续推；
-    - done: 运行到达终态（success/failed/stale）或 not_found 超过宽限期，随后关流。
+    - progress: 完整進度快照（結構同 GET .../progress），帶自增 id；
+      快照類事件重連後拿最新一條即可，無需按 Last-Event-ID 嚴格續推；
+    - done: 執行到達終態（success/failed/stale）或 not_found 超過寬限期，隨後關流。
 
-    轮询端点 GET .../progress 保留不动，前端 SSE 失败时降级使用。
+    輪詢端點 GET .../progress 保留不動，前端 SSE 失敗時降級使用。
     """
     import json as _json
 
@@ -795,10 +795,10 @@ async def stream_run_progress(trace_id: str):
     from src.platform.persistence.database import SessionLocal
 
     if not trace_id or len(trace_id) > 64:
-        raise HTTPException(400, "无效的 trace_id")
+        raise HTTPException(400, "無效的 trace_id")
 
     def _snapshot() -> dict:
-        """开独立会话取一次进度快照（复用轮询端点的聚合逻辑）。"""
+        """開獨立會話取一次進度快照（複用輪詢端點的聚合邏輯）。"""
         db = SessionLocal()
         try:
             return get_run_progress(trace_id, db)
@@ -814,7 +814,7 @@ async def stream_run_progress(trace_id: str):
             try:
                 progress = await asyncio.to_thread(_snapshot)
             except Exception as e:
-                logger.warning(f"进度 SSE 快照失败: {e}")
+                logger.warning(f"進度 SSE 快照失敗: {e}")
                 await asyncio.sleep(PROGRESS_SSE_POLL_SEC)
                 continue
 
@@ -827,7 +827,7 @@ async def stream_run_progress(trace_id: str):
             else:
                 ticks_since_push += 1
                 if ticks_since_push >= 15:
-                    # 无变化时发心跳注释，防止代理断开空闲连接
+                    # 無變化時發心跳註釋，防止代理斷開空閒連線
                     ticks_since_push = 0
                     yield format_sse_comment()
 
@@ -843,7 +843,7 @@ async def stream_run_progress(trace_id: str):
 
             await asyncio.sleep(PROGRESS_SSE_POLL_SEC)
 
-        # 超时兜底：关流，前端可重连或降级轮询
+        # 超時兜底：關流，前端可重連或降級輪詢
         seq += 1
         yield format_sse_event(seq, "done", {"status": "timeout"})
 
@@ -889,15 +889,15 @@ def get_agent_history(agent_name: str, limit: int = 20, db: Session = Depends(ge
 @router.post("/intraday/scan")
 async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
     """
-    实时扫描盘中监测 Agent 关联的股票
+    即時掃描盤中監測 Agent 關聯的股票
 
-    设计说明：
-    - 只扫描启用了「盘中监测」Agent 的股票
-    - 返回所有股票的实时行情和技术分析
-    - analyze=True 时调用 AI 分析，返回结构化建议
+    設計說明：
+    - 只掃描啟用了「盤中監測」Agent 的股票
+    - 返回所有股票的即時行情和技術分析
+    - analyze=True 時呼叫 AI 分析，返回結構化建議
 
     Args:
-        analyze: 是否调用 AI 分析生成操作建议（默认 False）
+        analyze: 是否呼叫 AI 分析生成操作建議（預設 False）
     """
     from server import (
         load_watchlist_for_agent,
@@ -917,25 +917,25 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
     agent_cfg = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
     agent_kwargs = agent_cfg.config if agent_cfg and agent_cfg.config else {}
 
-    # 只获取关联了盘中监测 Agent 的股票
+    # 只獲取關聯了盤中監測 Agent 的股票
     watchlist = load_watchlist_for_agent(agent_name)
 
     if not watchlist:
         return {
             "stocks": [],
-            "message": "请先为股票启用「盘中监测」Agent",
+            "message": "請先為股票啟用「盤中監測」Agent",
             "scanned_count": 0,
             "has_watchlist": False,
         }
 
-    # 按股票所属市场过滤：只扫描当前开市市场的股票（避免全局门禁误判）
+    # 按股票所屬市場過濾：只掃描當前開市市場的股票（避免全域性門禁誤判）
     active_watchlist = [
         s for s in watchlist if MARKETS.get(s.market) and MARKETS[s.market].is_trading_time()
     ]
     if not active_watchlist:
         return {
             "stocks": [],
-            "message": "当前非交易时段",
+            "message": "當前非交易時段",
             "scanned_count": len(watchlist),
             "total_watchlist_count": len(watchlist),
             "skipped_not_trading_count": len(watchlist),
@@ -948,10 +948,10 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
     if cached is not None:
         return cached
 
-    # 获取持仓信息
+    # 獲取持倉資訊
     portfolio = load_portfolio_for_agent(agent_name)
 
-    # 按市场分组采集行情
+    # 按市場分組採集行情
     market_symbols: dict[MarketCode, list] = {}
     stock_market_map: dict[str, MarketCode] = {}
     for stock in active_watchlist:
@@ -962,7 +962,7 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
         try:
             return await asyncio.to_thread(md_stock_data, symbols, market_code.value)
         except Exception as e:
-            logger.error(f"采集 {market_code.value} 行情失败: {e}")
+            logger.error(f"採集 {market_code.value} 行情失敗: {e}")
             return []
 
     quote_batches = await asyncio.gather(
@@ -974,11 +974,11 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
     all_quotes = [q for batch in quote_batches for q in (batch or [])]
     quote_by_symbol = {q.symbol: q for q in all_quotes}
 
-    # 解析 Agent 阈值配置（用于异动标记与提示 AI）
+    # 解析 Agent 閾值配置（用於異動標記與提示 AI）
     try:
         monitor_agent = IntradayMonitorAgent(bypass_throttle=True, **agent_kwargs)
     except TypeError:
-        # 兼容旧配置（字段不匹配时回退）
+        # 相容舊配置（欄位不匹配時回退）
         monitor_agent = IntradayMonitorAgent(bypass_throttle=True)
 
     daily_analysis = None
@@ -988,7 +988,7 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
     quality_overview: dict = {}
     signal_packs: dict = {}
     if analyze:
-        # 获取历史分析（给 AI 作为上下文）
+        # 獲取歷史分析（給 AI 作為上下文）
         try:
             daily_analysis = get_latest_analysis(
                 agent_name="daily_report",
@@ -1030,7 +1030,7 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
             symbol_contexts = context_pack.get("symbols", {}) or {}
             quality_overview = context_pack.get("quality_overview", {}) or {}
         except Exception as e:
-            logger.warning(f"构建盘中扫描上下文失败，回退基础分析: {e}")
+            logger.warning(f"構建盤中掃描上下文失敗，回退基礎分析: {e}")
         finally:
             try:
                 if scan_context:
@@ -1038,7 +1038,7 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
             except Exception:
                 pass
 
-    # 构建返回数据
+    # 構建返回資料
     kline_sem = asyncio.Semaphore(6)
 
     async def _load_kline_summary(symbol: str, market: MarketCode):
@@ -1048,14 +1048,14 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
                     lambda: KlineCollector(market).get_kline_summary(symbol)
                 )
         except Exception as e:
-            logger.warning(f"获取 {symbol} K线失败: {e}")
+            logger.warning(f"獲取 {symbol} K線失敗: {e}")
             return None
 
     async def _build_result_item(quote):
         change_pct = quote.change_pct or 0
         market = stock_market_map.get(quote.symbol, MarketCode.CN)
 
-        # 获取持仓信息
+        # 獲取持倉資訊
         positions = portfolio.get_positions_for_stock(quote.symbol)
         has_position = len(positions) > 0
         cost_price = positions[0].cost_price if positions else None
@@ -1064,13 +1064,13 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
         if cost_price and quote.current_price:
             pnl_pct = (quote.current_price - cost_price) / cost_price * 100
 
-        # 获取技术分析（并发）
+        # 獲取技術分析（併發）
         kline_summary = await _load_kline_summary(quote.symbol, market)
 
-        # 判断异动类型
+        # 判斷異動型別
         alert_type = None
         if abs(change_pct) >= getattr(monitor_agent, "price_alert_threshold", 3.0):
-            alert_type = "急涨" if change_pct > 0 else "急跌"
+            alert_type = "急漲" if change_pct > 0 else "急跌"
 
         return {
             "symbol": quote.symbol,
@@ -1091,7 +1091,7 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
             "pnl_pct": pnl_pct,
             "trading_style": trading_style,
             "kline": kline_summary,
-            "suggestion": None,  # AI 建议
+            "suggestion": None,  # AI 建議
             "context_quality": (
                 (symbol_contexts.get(quote.symbol, {}) or {}).get("data_quality")
                 if analyze
@@ -1135,8 +1135,8 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
                             else None,
                         }
 
-                        # 事件门禁仅保留为上下文信息，不阻断 AI 分析。
-                        # 产品策略：建议持续更新，通知层再做去重与降噪。
+                        # 事件門禁僅保留為上下文資訊，不阻斷 AI 分析。
+                        # 產品策略：建議持續更新，通知層再做去重與降噪。
                         try:
                             if getattr(agent, "event_only", False):
                                 from src.modules.strategy.intraday_event_gate import check_and_update
@@ -1167,18 +1167,18 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
                             system_prompt, user_content
                         )
 
-                        # 解析结构化建议
+                        # 解析結構化建議
                         suggestion = agent._parse_suggestion(response)
                         suggestion["raw"] = response.strip()[:200]
 
                         item["suggestion"] = suggestion
-                        # 写入建议池（用于持仓页展示），盘中建议固定 6 小时有效
+                        # 寫入建議池（用於持倉頁展示），盤中建議固定 6 小時有效
                         expires_hours = 6
                         save_suggestion(
                             stock_symbol=item["symbol"],
                             stock_name=item["name"] or "",
                             action=suggestion.get("action", "watch"),
-                            action_label=suggestion.get("action_label", "观望"),
+                            action_label=suggestion.get("action_label", "觀望"),
                             signal=suggestion.get("signal", ""),
                             reason=suggestion.get("reason", ""),
                             agent_name=agent_name,
@@ -1210,17 +1210,17 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
                 except Exception as e:
                     item["suggestion"] = {
                         "action": "watch",
-                        "action_label": "观望",
+                        "action_label": "觀望",
                         "signal": "",
-                        "reason": f"分析失败: {e}",
+                        "reason": f"分析失敗: {e}",
                         "should_alert": False,
                     }
-                    logger.error(f"AI 分析失败 {item['symbol']}: {e}")
+                    logger.error(f"AI 分析失敗 {item['symbol']}: {e}")
 
             await asyncio.gather(*[_analyze_item(item) for item in results])
 
         except Exception as e:
-            logger.error(f"构建 Agent 上下文失败: {e}")
+            logger.error(f"構建 Agent 上下文失敗: {e}")
 
     payload = {
         "stocks": results,

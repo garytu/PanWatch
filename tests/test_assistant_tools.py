@@ -29,7 +29,7 @@ def _session():
 
 def _request() -> RunRequest:
     return RunRequest(
-        run_id="tools-test", messages=[ModelMessage(role="user", content="测试工具")]
+        run_id="tools-test", messages=[ModelMessage(role="user", content="測試工具")]
     )
 
 
@@ -55,8 +55,8 @@ def test_panwatch_registry_keeps_core_tools_direct_and_defers_specialized_tools(
 
 def test_portfolio_tool_is_read_only_and_includes_provenance():
     engine, session = _session()
-    stock = Stock(symbol="600519", name="贵州茅台", market="CN")
-    account = Account(name="默认账户")
+    stock = Stock(symbol="600519", name="貴州茅臺", market="CN")
+    account = Account(name="預設帳戶")
     session.add_all([stock, account])
     session.commit()
     session.add(
@@ -68,8 +68,8 @@ def test_portfolio_tool_is_read_only_and_includes_provenance():
     result = asyncio.run(registry.execute("get_portfolio", _request(), {}))
 
     assert result.ok is True
-    assert "贵州茅台" in result.summary
-    assert result.sources[0].name == "PanWatch 持仓"
+    assert "貴州茅臺" in result.summary
+    assert result.sources[0].name == "PanWatch 持倉"
     session.close()
     engine.dispose()
 
@@ -82,7 +82,7 @@ def test_quote_tool_returns_compact_fact_summary(monkeypatch):
         lambda *_: [
             {
                 "symbol": "600519",
-                "name": "贵州茅台",
+                "name": "貴州茅臺",
                 "market": "CN",
                 "current_price": 1800.0,
                 "change_pct": 1.2,
@@ -143,16 +143,16 @@ def test_research_candidates_tool_reuses_strategy_signals_and_returns_compact_ca
                 {
                     "stock_symbol": "600519",
                     "stock_market": "CN",
-                    "stock_name": "贵州茅台",
+                    "stock_name": "貴州茅臺",
                     "rank_score": 88.5,
                     "action": "buy",
-                    "action_label": "建仓",
+                    "action_label": "建倉",
                     "risk_level": "medium",
-                    "risk_level_label": "中风险",
+                    "risk_level_label": "中風險",
                     "source_pool": "market_scan",
-                    "source_pool_label": "市场池",
-                    "signal": "趋势改善",
-                    "reason": "均线与量价结构同步改善",
+                    "source_pool_label": "市場池",
+                    "signal": "趨勢改善",
+                    "reason": "均線與量價結構同步改善",
                     "entry_low": 1780,
                     "entry_high": 1820,
                     "target_price": 1950,
@@ -198,13 +198,13 @@ def test_research_candidates_tool_reuses_strategy_signals_and_returns_compact_ca
             {
                 "symbol": "600519",
                 "market": "CN",
-                "name": "贵州茅台",
+                "name": "貴州茅臺",
                 "score": 88.5,
-                "action": "建仓",
-                "risk": "中风险",
-                "source": "市场池",
-                "signal": "趋势改善",
-                "reason": "均线与量价结构同步改善",
+                "action": "建倉",
+                "risk": "中風險",
+                "source": "市場池",
+                "signal": "趨勢改善",
+                "reason": "均線與量價結構同步改善",
                 "entry_range": "1780 ~ 1820",
                 "target_price": 1950,
                 "stop_loss": 1710,
@@ -214,7 +214,7 @@ def test_research_candidates_tool_reuses_strategy_signals_and_returns_compact_ca
             }
         ],
     }
-    assert "贵州茅台" in result.summary
+    assert "貴州茅臺" in result.summary
     session.close()
     engine.dispose()
 
@@ -248,7 +248,7 @@ def test_market_discovery_tools_return_compact_read_only_data(monkeypatch):
                 SimpleNamespace(
                     symbol="600519",
                     market="CN",
-                    name="贵州茅台",
+                    name="貴州茅臺",
                     price=1800.0,
                     change_pct=1.2,
                     turnover=123.0,
@@ -272,7 +272,7 @@ def test_market_discovery_tools_return_compact_read_only_data(monkeypatch):
                 SimpleNamespace(
                     symbol="000858",
                     market="CN",
-                    name="五粮液",
+                    name="五糧液",
                     price=150.0,
                     change_pct=3.3,
                     turnover=555.0,
@@ -284,12 +284,12 @@ def test_market_discovery_tools_return_compact_read_only_data(monkeypatch):
     monkeypatch.setattr(
         assistant_tools,
         "search_stocks",
-        lambda *_args: [{"symbol": "600519", "name": "贵州茅台", "market": "CN"}],
+        lambda *_args: [{"symbol": "600519", "name": "貴州茅臺", "market": "CN"}],
     )
     registry = assistant_tools.build_panwatch_tool_registry(session)
 
     search = asyncio.run(
-        registry.execute("search_stocks", _request(), {"query": "茅台"})
+        registry.execute("search_stocks", _request(), {"query": "茅臺"})
     )
     hot_stocks = asyncio.run(
         registry.execute("get_hot_stocks", _request(), {"market": "CN"})
@@ -304,7 +304,7 @@ def test_market_discovery_tools_return_compact_read_only_data(monkeypatch):
     )
 
     assert search.data["items"] == [
-        {"symbol": "600519", "name": "贵州茅台", "market": "CN"}
+        {"symbol": "600519", "name": "貴州茅臺", "market": "CN"}
     ]
     assert hot_stocks.data["items"][0]["symbol"] == "600519"
     assert hot_boards.data["items"][0]["code"] == "BK0500"
@@ -321,11 +321,11 @@ def test_market_research_tools_use_marketdata_contracts(monkeypatch):
     class _MarketData:
         def fundamentals(self, _symbols, *, market):
             assert market == "CN"
-            return [Fundamentals(symbol="600519", market="CN", name="贵州茅台", pe_ttm=20.5)]
+            return [Fundamentals(symbol="600519", market="CN", name="貴州茅臺", pe_ttm=20.5)]
 
         def capital_flow(self, symbol, *, market):
             assert (symbol, market) == ("600519", "CN")
-            return CapitalFlow(symbol="600519", name="贵州茅台", main_net_inflow=123.4)
+            return CapitalFlow(symbol="600519", name="貴州茅臺", main_net_inflow=123.4)
 
         def dragon_tiger(self, *, date, market):
             assert (date, market) == ("2026-09-15", "CN")
@@ -333,8 +333,8 @@ def test_market_research_tools_use_marketdata_contracts(monkeypatch):
                 DragonTigerItem(
                     trade_date=date,
                     symbol="600519",
-                    name="贵州茅台",
-                    reason="日涨幅偏离值达 7%",
+                    name="貴州茅臺",
+                    reason="日漲幅偏離值達 7%",
                     net_buy=1000000,
                 )
             ]
@@ -403,14 +403,14 @@ def test_news_tool_limits_compact_items(monkeypatch):
         "md_news",
         lambda *_args, **_kwargs: [
             SimpleNamespace(
-                title="贵州茅台发布公告",
+                title="貴州茅臺釋出公告",
                 source="eastmoney",
                 publish_time="2026-09-12T08:00:00Z",
                 url="https://example.test/1",
                 importance=2,
             ),
             SimpleNamespace(
-                title="行业动态",
+                title="行業動態",
                 source="xueqiu",
                 publish_time="2026-09-12T07:00:00Z",
                 url="https://example.test/2",
@@ -431,7 +431,7 @@ def test_news_tool_limits_compact_items(monkeypatch):
     assert result.ok is True
     assert result.data["items"] == [
         {
-            "title": "贵州茅台发布公告",
+            "title": "貴州茅臺釋出公告",
             "source": "eastmoney",
             "published_at": "2026-09-12T08:00:00Z",
             "url": "https://example.test/1",
@@ -444,7 +444,7 @@ def test_news_tool_limits_compact_items(monkeypatch):
 
 def test_create_price_alert_validates_and_persists_rule():
     engine, session = _session()
-    session.add(Stock(symbol="600519", name="贵州茅台", market="CN"))
+    session.add(Stock(symbol="600519", name="貴州茅臺", market="CN"))
     session.commit()
 
     result = asyncio.run(
@@ -466,7 +466,7 @@ def test_create_price_alert_validates_and_persists_rule():
         "op": "and",
         "items": [{"type": "price", "op": ">=", "value": 1800.0}],
     }
-    assert "价格 ≥ 1800" in result.summary
+    assert "價格 ≥ 1800" in result.summary
     session.close()
     engine.dispose()
 
@@ -476,7 +476,7 @@ def test_create_price_alert_registers_a_known_quote_before_writing_rule(monkeypa
     monkeypatch.setattr(
         assistant_tools,
         "md_quote_rows",
-        lambda *_: [{"symbol": "02269", "name": "药明生物", "market": "HK"}],
+        lambda *_: [{"symbol": "02269", "name": "藥明生物", "market": "HK"}],
         raising=False,
     )
 
@@ -499,7 +499,7 @@ def test_create_price_alert_registers_a_known_quote_before_writing_rule(monkeypa
     assert result.data["stock_registered"] is True
     assert stock.symbol == "02269"
     assert stock.market == "HK"
-    assert stock.name == "药明生物"
+    assert stock.name == "藥明生物"
     assert rule.stock_id == stock.id
     session.close()
     engine.dispose()
@@ -531,22 +531,22 @@ def test_create_price_alert_does_not_write_for_unknown_stock(monkeypatch):
 
 def test_get_price_alerts_returns_compact_rules_and_supports_symbol_filter():
     engine, session = _session()
-    stock = Stock(symbol="600519", name="贵州茅台", market="CN")
-    other = Stock(symbol="601238", name="广汽集团", market="CN")
+    stock = Stock(symbol="600519", name="貴州茅臺", market="CN")
+    other = Stock(symbol="601238", name="廣汽集團", market="CN")
     session.add_all([stock, other])
     session.flush()
     session.add_all(
         [
             PriceAlertRule(
                 stock_id=stock.id,
-                name="茅台突破",
+                name="茅臺突破",
                 enabled=True,
                 condition_group={"op": "and", "items": [{"type": "price", "op": ">=", "value": 1800}]},
                 cooldown_minutes=30,
             ),
             PriceAlertRule(
                 stock_id=other.id,
-                name="广汽回落",
+                name="廣汽回落",
                 enabled=False,
                 condition_group={"op": "and", "items": [{"type": "price", "op": "<=", "value": 10}]},
             ),
@@ -567,9 +567,9 @@ def test_get_price_alerts_returns_compact_rules_and_supports_symbol_filter():
     assert result.data["items"] == [
         {
             "rule_id": 1,
-            "name": "茅台突破",
+            "name": "茅臺突破",
             "symbol": "600519",
-            "stock_name": "贵州茅台",
+            "stock_name": "貴州茅臺",
             "market": "CN",
             "enabled": True,
             "direction": "above",
@@ -585,12 +585,12 @@ def test_get_price_alerts_returns_compact_rules_and_supports_symbol_filter():
 
 def test_update_price_alert_changes_rule_and_resets_trigger_state():
     engine, session = _session()
-    stock = Stock(symbol="600519", name="贵州茅台", market="CN")
+    stock = Stock(symbol="600519", name="貴州茅臺", market="CN")
     session.add(stock)
     session.flush()
     rule = PriceAlertRule(
         stock_id=stock.id,
-        name="旧提醒",
+        name="舊提醒",
         enabled=True,
         condition_group={"op": "and", "items": [{"type": "price", "op": ">=", "value": 1800}]},
         trigger_count_today=2,
@@ -605,7 +605,7 @@ def test_update_price_alert_changes_rule_and_resets_trigger_state():
             _request(),
             {
                 "rule_id": rule.id,
-                "name": "茅台回落提醒",
+                "name": "茅臺回落提醒",
                 "enabled": False,
                 "direction": "below",
                 "target_price": 1700,
@@ -616,7 +616,7 @@ def test_update_price_alert_changes_rule_and_resets_trigger_state():
 
     session.refresh(rule)
     assert result.ok is True
-    assert rule.name == "茅台回落提醒"
+    assert rule.name == "茅臺回落提醒"
     assert rule.enabled is False
     assert rule.condition_group == {
         "op": "and",
@@ -646,10 +646,10 @@ def test_update_price_alert_returns_controlled_failure_for_unknown_rule():
 
 def test_delete_price_alert_removes_rule_and_its_hits():
     engine, session = _session()
-    stock = Stock(symbol="600519", name="贵州茅台", market="CN")
+    stock = Stock(symbol="600519", name="貴州茅臺", market="CN")
     session.add(stock)
     session.flush()
-    rule = PriceAlertRule(stock_id=stock.id, name="删除我")
+    rule = PriceAlertRule(stock_id=stock.id, name="刪除我")
     session.add(rule)
     session.flush()
     session.add(

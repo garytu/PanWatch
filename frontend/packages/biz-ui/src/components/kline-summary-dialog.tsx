@@ -100,29 +100,29 @@ export function KlineSummaryDialog({
 
     const add = (text: string, delta: number) => { items.push({ text, delta }); localScore += delta }
 
-    if (s.trend?.includes('多头')) add('均线多头排列，趋势偏强', 2)
-    else if (s.trend?.includes('空头')) add('均线空头排列，趋势偏弱', -2)
+    if (s.trend?.includes('多頭')) add('均線多頭排列，趨勢偏強', 2)
+    else if (s.trend?.includes('空頭')) add('均線空頭排列，趨勢偏弱', -2)
 
-    if (s.macd_status?.includes('金叉')) add('MACD 金叉，短线动能偏强', 2)
-    if (s.macd_status?.includes('死叉')) add('MACD 死叉，短线动能转弱', -2)
-    if (typeof s.macd_hist === 'number') add(`MACD 柱体${s.macd_hist > 0 ? '为正' : s.macd_hist < 0 ? '为负' : '接近0'}`, s.macd_hist > 0 ? 1 : s.macd_hist < 0 ? -1 : 0)
+    if (s.macd_status?.includes('金叉')) add('MACD 金叉，短線動能偏強', 2)
+    if (s.macd_status?.includes('死叉')) add('MACD 死叉，短線動能轉弱', -2)
+    if (typeof s.macd_hist === 'number') add(`MACD 柱體${s.macd_hist > 0 ? '為正' : s.macd_hist < 0 ? '為負' : '接近0'}`, s.macd_hist > 0 ? 1 : s.macd_hist < 0 ? -1 : 0)
 
-    if (s.rsi_status?.includes('超卖')) add('RSI 超卖，可能存在反弹', 1)
-    else if (s.rsi_status?.includes('偏强')) add('RSI 偏强，买盘占优', 1)
-    else if (s.rsi_status?.includes('超买')) add('RSI 超买，注意回调风险', -1)
-    else if (s.rsi_status?.includes('偏弱')) add('RSI 偏弱，短线承压', -1)
+    if (s.rsi_status?.includes('超賣')) add('RSI 超賣，可能存在反彈', 1)
+    else if (s.rsi_status?.includes('偏強')) add('RSI 偏強，買盤佔優', 1)
+    else if (s.rsi_status?.includes('超買')) add('RSI 超買，注意回撥風險', -1)
+    else if (s.rsi_status?.includes('偏弱')) add('RSI 偏弱，短線承壓', -1)
 
-    if (s.kdj_status?.includes('金叉')) add('KDJ 金叉，短线转强', 1)
-    if (s.kdj_status?.includes('死叉')) add('KDJ 死叉，短线转弱', -1)
+    if (s.kdj_status?.includes('金叉')) add('KDJ 金叉，短線轉強', 1)
+    if (s.kdj_status?.includes('死叉')) add('KDJ 死叉，短線轉弱', -1)
 
-    if (s.boll_status?.includes('突破上轨')) add('突破布林上轨，趋势强势', 1)
-    else if (s.boll_status?.includes('跌破下轨')) add('跌破布林下轨，走势偏弱', -1)
+    if (s.boll_status?.includes('突破上軌')) add('突破布林上軌，趨勢強勢', 1)
+    else if (s.boll_status?.includes('跌破下軌')) add('跌破布林下軌，走勢偏弱', -1)
 
-    if (s.volume_trend?.includes('放量')) add('放量配合，资金参与度提升', 1)
-    else if (s.volume_trend?.includes('缩量')) add('缩量，动能不足', -1)
+    if (s.volume_trend?.includes('放量')) add('放量配合，資金參與度提升', 1)
+    else if (s.volume_trend?.includes('縮量')) add('縮量，動能不足', -1)
 
-    if (s.last_close != null && s.support != null && s.support > 0 && s.last_close <= s.support * 1.02) add('价格接近支撑位，止跌反弹概率提升', 1)
-    if (s.last_close != null && s.resistance != null && s.resistance > 0 && s.last_close >= s.resistance * 0.98) add('价格接近压力位，上行空间受限', -1)
+    if (s.last_close != null && s.support != null && s.support > 0 && s.last_close <= s.support * 1.02) add('價格接近支撐位，止跌反彈機率提升', 1)
+    if (s.last_close != null && s.resistance != null && s.resistance > 0 && s.last_close >= s.resistance * 0.98) add('價格接近壓力位，上行空間受限', -1)
 
     return { ...scored, score: localScore, items }
   }
@@ -157,23 +157,23 @@ export function KlineSummaryDialog({
     const s = effectiveSummary
     const parts: string[] = []
     const items = []
-    if (s.trend) items.push(`趋势${s.trend}`)
+    if (s.trend) items.push(`趨勢${s.trend}`)
     if (s.macd_status) items.push(`MACD${s.macd_status}${s.macd_hist != null ? `(hist=${s.macd_hist.toFixed(3)})` : ''}`)
     if (s.rsi_status) items.push(`RSI${s.rsi_status}${s.rsi6 != null ? `(${s.rsi6.toFixed(0)})` : ''}`)
     if (s.kdj_status) items.push(`KDJ${s.kdj_status}${s.kdj_k != null ? `(K=${s.kdj_k.toFixed(1)},D=${s.kdj_d?.toFixed(1)},J=${s.kdj_j?.toFixed(1)})` : ''}`)
-    if (s.boll_status) items.push(`布林${s.boll_status}${s.boll_width != null ? `(带宽${s.boll_width.toFixed(1)}%)` : ''}`)
+    if (s.boll_status) items.push(`布林${s.boll_status}${s.boll_width != null ? `(頻寬${s.boll_width.toFixed(1)}%)` : ''}`)
     if (s.volume_trend) items.push(`量能${s.volume_trend}${s.volume_ratio != null ? `(${s.volume_ratio.toFixed(1)}x)` : ''}`)
-    if (items.length) parts.push(`技术指标：${items.join('，')}`)
-    if (s.support != null) parts.push(`支撑位：${s.support.toFixed(2)}`)
-    if (s.resistance != null) parts.push(`压力位：${s.resistance.toFixed(2)}`)
-    if (s.last_close != null) parts.push(`收盘价：${s.last_close.toFixed(2)}`)
-    if (s.change_5d != null) parts.push(`5日涨跌：${s.change_5d.toFixed(2)}%`)
-    if (s.change_20d != null) parts.push(`20日涨跌：${s.change_20d.toFixed(2)}%`)
-    if (s.ma5 != null) parts.push(`均线：MA5=${s.ma5.toFixed(2)} MA10=${s.ma10?.toFixed(2)} MA20=${s.ma20?.toFixed(2)} MA60=${s.ma60?.toFixed(2)}`)
+    if (items.length) parts.push(`技術指標：${items.join('，')}`)
+    if (s.support != null) parts.push(`支撐位：${s.support.toFixed(2)}`)
+    if (s.resistance != null) parts.push(`壓力位：${s.resistance.toFixed(2)}`)
+    if (s.last_close != null) parts.push(`收盤價：${s.last_close.toFixed(2)}`)
+    if (s.change_5d != null) parts.push(`5日漲跌：${s.change_5d.toFixed(2)}%`)
+    if (s.change_20d != null) parts.push(`20日漲跌：${s.change_20d.toFixed(2)}%`)
+    if (s.ma5 != null) parts.push(`均線：MA5=${s.ma5.toFixed(2)} MA10=${s.ma10?.toFixed(2)} MA20=${s.ma20?.toFixed(2)} MA60=${s.ma60?.toFixed(2)}`)
     if (suggestion) {
-      parts.push(`技术评分：${suggestion.action_label}(score=${suggestion.score})，信号：${suggestion.signal || '中性'}`)
+      parts.push(`技術評分：${suggestion.action_label}(score=${suggestion.score})，訊號：${suggestion.signal || '中性'}`)
       if (suggestion.items.length) {
-        parts.push(`评分依据：${suggestion.items.map(e => `${e.text}(${e.delta > 0 ? '+' : ''}${e.delta})`).join('；')}`)
+        parts.push(`評分依據：${suggestion.items.map(e => `${e.text}(${e.delta > 0 ? '+' : ''}${e.delta})`).join('；')}`)
       }
     }
     window.dispatchEvent(new CustomEvent('panwatch-open-chat', {
@@ -189,15 +189,15 @@ export function KlineSummaryDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader>
-          <DialogTitle>K线 / 技术指标</DialogTitle>
+          <DialogTitle>K線 / 技術指標</DialogTitle>
           <DialogDescription>
             <div className="space-y-0.5">
               <div>{stockName ? `${stockName} (${symbol})` : symbol}</div>
               {(effectiveSummary?.timeframe || effectiveSummary?.computed_at || effectiveSummary?.asof) && (
                 <div className="text-[11px] text-muted-foreground/70">
-                  {effectiveSummary?.timeframe ? `周期: ${effectiveSummary.timeframe}` : '周期: 1d'}
-                  {effectiveSummary?.asof ? ` · 数据截至: ${effectiveSummary.asof}` : ''}
-                  {effectiveSummary?.computed_at ? ` · 计算时间: ${formatLocalDateTime(effectiveSummary.computed_at)}` : ''}
+                  {effectiveSummary?.timeframe ? `週期: ${effectiveSummary.timeframe}` : '週期: 1d'}
+                  {effectiveSummary?.asof ? ` · 資料截至: ${effectiveSummary.asof}` : ''}
+                  {effectiveSummary?.computed_at ? ` · 計算時間: ${formatLocalDateTime(effectiveSummary.computed_at)}` : ''}
                 </div>
               )}
             </div>
@@ -205,11 +205,11 @@ export function KlineSummaryDialog({
         </DialogHeader>
 
         {!initialSummary && loading ? (
-          <div className="text-[12px] text-muted-foreground">加载中...</div>
+          <div className="text-[12px] text-muted-foreground">載入中...</div>
         ) : error ? (
           <div className="text-[12px] text-rose-500">{error}</div>
         ) : !effectiveSummary ? (
-          <div className="text-[12px] text-muted-foreground">暂无数据</div>
+          <div className="text-[12px] text-muted-foreground">暫無資料</div>
         ) : (
           <div className="space-y-3">
             {suggestion && (
@@ -221,7 +221,7 @@ export function KlineSummaryDialog({
                     size="sm"
                   />
                   <span className="text-[10px] text-muted-foreground">
-                    {hasPosition ? '已持仓' : '未持仓'} · score {suggestion.score}
+                    {hasPosition ? '已持倉' : '未持倉'} · score {suggestion.score}
                   </span>
                 </div>
                 <div className="mt-2 text-[12px] text-foreground font-medium">
@@ -248,41 +248,41 @@ export function KlineSummaryDialog({
                 )}
 
                 <div className="mt-2 text-[10px] text-muted-foreground/70">
-                  仅基于技术指标规则生成，非投资建议
+                  僅基於技術指標規則生成，非投資建議
                 </div>
               </div>
             )}
 
             <div className="text-[10px] text-muted-foreground/60">
-              提示：悬停指标标签可查看详细说明
+              提示：懸停指標標籤可檢視詳細說明
             </div>
 
             <div className="flex flex-wrap gap-2 text-[11px]">
               {effectiveSummary.trend && (
                 <HoverPopover
-                  title="趋势（均线排列）"
+                  title="趨勢（均線排列）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        趋势标签来自均线（MA5/MA10/MA20）的相对位置，基于日K收盘价计算。MA越短越敏感，越长越平滑。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        趨勢標籤來自均線（MA5/MA10/MA20）的相對位置，基於日K收盤價計算。MA越短越敏感，越長越平滑。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">常见解读：</span>
+                        <span className="font-medium text-foreground">常見解讀：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li><span className="font-medium text-foreground">多头排列</span>（MA5 &gt; MA10 &gt; MA20）：上升趋势更“顺”，回调通常先看 MA5/MA10 的支撑。</li>
-                          <li><span className="font-medium text-foreground">空头排列</span>（MA5 &lt; MA10 &lt; MA20）：下降趋势占优，反弹到 MA10/MA20 往往遇到压力。</li>
-                          <li><span className="font-medium text-foreground">均线交织</span>：震荡/换手期，信号更依赖成交量与关键价位。</li>
+                          <li><span className="font-medium text-foreground">多頭排列</span>（MA5 &gt; MA10 &gt; MA20）：上升趨勢更“順”，回撥通常先看 MA5/MA10 的支撐。</li>
+                          <li><span className="font-medium text-foreground">空頭排列</span>（MA5 &lt; MA10 &lt; MA20）：下降趨勢佔優，反彈到 MA10/MA20 往往遇到壓力。</li>
+                          <li><span className="font-medium text-foreground">均線交織</span>：震盪/周轉期，訊號更依賴成交量與關鍵價位。</li>
                         </ul>
                       </div>
-                      <div className="text-[10px] text-muted-foreground/70">当前：{effectiveSummary.trend}</div>
+                      <div className="text-[10px] text-muted-foreground/70">當前：{effectiveSummary.trend}</div>
                       {(effectiveSummary.ma5 != null || effectiveSummary.ma10 != null || effectiveSummary.ma20 != null || effectiveSummary.ma60 != null) && (
                         <div className="text-[10px] text-muted-foreground/70">
-                          均线：MA5≈{effectiveSummary.ma5 != null ? effectiveSummary.ma5.toFixed(2) : '—'}；MA10≈{effectiveSummary.ma10 != null ? effectiveSummary.ma10.toFixed(2) : '—'}；MA20≈{effectiveSummary.ma20 != null ? effectiveSummary.ma20.toFixed(2) : '—'}；MA60≈{effectiveSummary.ma60 != null ? effectiveSummary.ma60.toFixed(2) : '—'}
+                          均線：MA5≈{effectiveSummary.ma5 != null ? effectiveSummary.ma5.toFixed(2) : '—'}；MA10≈{effectiveSummary.ma10 != null ? effectiveSummary.ma10.toFixed(2) : '—'}；MA20≈{effectiveSummary.ma20 != null ? effectiveSummary.ma20.toFixed(2) : '—'}；MA60≈{effectiveSummary.ma60 != null ? effectiveSummary.ma60.toFixed(2) : '—'}
                         </div>
                       )}
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：均线属于滞后指标，更适合“过滤趋势”，不建议单独作为进出场依据。
+                        注意：均線屬於滯後指標，更適合“過濾趨勢”，不建議單獨作為進出場依據。
                       </div>
                     </div>
                   }
@@ -294,26 +294,26 @@ export function KlineSummaryDialog({
 
               {effectiveSummary.macd_status && (
                 <HoverPopover
-                  title="MACD（趋势/动能）"
+                  title="MACD（趨勢/動能）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        MACD 由两条线（DIF/DEA）与柱体（hist）组成。常见口径：DIF=EMA12-EMA26，DEA=EMA(DIF,9)，hist≈(DIF-DEA)*2。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        MACD 由兩條線（DIF/DEA）與柱體（hist）組成。常見口徑：DIF=EMA12-EMA26，DEA=EMA(DIF,9)，hist≈(DIF-DEA)*2。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">代表什么：</span>
+                        <span className="font-medium text-foreground">代表什麼：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li><span className="font-medium text-foreground">金叉</span>：DIF 上穿 DEA，短线动能由弱转强。</li>
-                          <li><span className="font-medium text-foreground">死叉</span>：DIF 下穿 DEA，短线动能由强转弱。</li>
-                          <li><span className="font-medium text-foreground">柱体正/负</span>：正值通常表示多头动能占优；负值通常表示空头动能占优。</li>
+                          <li><span className="font-medium text-foreground">金叉</span>：DIF 上穿 DEA，短線動能由弱轉強。</li>
+                          <li><span className="font-medium text-foreground">死叉</span>：DIF 下穿 DEA，短線動能由強轉弱。</li>
+                          <li><span className="font-medium text-foreground">柱體正/負</span>：正值通常表示多頭動能佔優；負值通常表示空頭動能佔優。</li>
                         </ul>
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        当前：{effectiveSummary.macd_status}{effectiveSummary.macd_hist != null ? `，柱体${effectiveSummary.macd_hist > 0 ? '为正' : effectiveSummary.macd_hist < 0 ? '为负' : '接近0'} (hist≈${effectiveSummary.macd_hist.toFixed(3)})` : ''}
+                        當前：{effectiveSummary.macd_status}{effectiveSummary.macd_hist != null ? `，柱體${effectiveSummary.macd_hist > 0 ? '為正' : effectiveSummary.macd_hist < 0 ? '為負' : '接近0'} (hist≈${effectiveSummary.macd_hist.toFixed(3)})` : ''}
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：MACD 在震荡区间容易频繁“假交叉”，通常需要结合趋势（均线）与量价确认。
+                        注意：MACD 在震盪區間容易頻繁“假交叉”，通常需要結合趨勢（均線）與量價確認。
                       </div>
                     </div>
                   }
@@ -325,34 +325,34 @@ export function KlineSummaryDialog({
 
               {effectiveSummary.rsi_status && (
                 <HoverPopover
-                  title="RSI（相对强弱）"
+                  title="RSI（相對強弱）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        RSI 用于衡量一段时间内上涨与下跌力度的相对强弱（0-100）。这里展示的是 RSI6（近6个交易日）。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        RSI 用於衡量一段時間內上漲與下跌力度的相對強弱（0-100）。這裡展示的是 RSI6（近6個交易日）。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">项目内阈值：</span>
+                        <span className="font-medium text-foreground">專案內閾值：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li>RSI6 &gt; 80：超买（回撤风险更高）</li>
-                          <li>RSI6 70-80：偏强（动能偏多）</li>
-                          <li>RSI6 &lt; 20：超卖（可能反弹，但下跌趋势中可长期超卖）</li>
-                          <li>RSI6 20-30：偏弱（动能偏空）</li>
+                          <li>RSI6 &gt; 80：超買（回檔風險更高）</li>
+                          <li>RSI6 70-80：偏強（動能偏多）</li>
+                          <li>RSI6 &lt; 20：超賣（可能反彈，但下跌趨勢中可長期超賣）</li>
+                          <li>RSI6 20-30：偏弱（動能偏空）</li>
                         </ul>
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        当前：{effectiveSummary.rsi_status}{effectiveSummary.rsi6 != null ? `，RSI6≈${effectiveSummary.rsi6.toFixed(0)}` : ''}
+                        當前：{effectiveSummary.rsi_status}{effectiveSummary.rsi6 != null ? `，RSI6≈${effectiveSummary.rsi6.toFixed(0)}` : ''}
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：超买不等于立刻下跌、超卖不等于立刻反弹；更可靠的用法是结合趋势和关键位看“背离/衰竭”。
+                        注意：超買不等於立刻下跌、超賣不等於立刻反彈；更可靠的用法是結合趨勢和關鍵位看“背離/衰竭”。
                       </div>
                     </div>
                   }
                   trigger={
                     <TechnicalBadge
                       label={`RSI ${effectiveSummary.rsi_status}${effectiveSummary.rsi6 != null ? ` (${effectiveSummary.rsi6.toFixed(0)})` : ''}`}
-                      tone={effectiveSummary.rsi_status === '超买' ? 'bullish' : effectiveSummary.rsi_status === '超卖' ? 'bearish' : 'neutral'}
+                      tone={effectiveSummary.rsi_status === '超買' ? 'bullish' : effectiveSummary.rsi_status === '超賣' ? 'bearish' : 'neutral'}
                       help
                     />
                   }
@@ -361,23 +361,23 @@ export function KlineSummaryDialog({
 
               {effectiveSummary?.kdj_status && (
                 <HoverPopover
-                  title="KDJ（随机指标）"
+                  title="KDJ（隨機指標）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        KDJ 属于动量类指标，反映价格在一段区间内所处位置（类似随机振荡器）。常用信号是 K 与 D 的金叉/死叉。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        KDJ 屬於動量類指標，反映價格在一段區間內所處位置（類似隨機振盪器）。常用訊號是 K 與 D 的金叉/死叉。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">代表什么：</span>
+                        <span className="font-medium text-foreground">代表什麼：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li><span className="font-medium text-foreground">金叉</span>：短线转强的提示，配合上升趋势更有效。</li>
-                          <li><span className="font-medium text-foreground">死叉</span>：短线转弱的提示，配合下降趋势更有效。</li>
-                          <li>J 值极端（&gt;100 或 &lt;0）时，常被视为“超买/超卖”，但在强趋势里可能失真。</li>
+                          <li><span className="font-medium text-foreground">金叉</span>：短線轉強的提示，配合上升趨勢更有效。</li>
+                          <li><span className="font-medium text-foreground">死叉</span>：短線轉弱的提示，配合下降趨勢更有效。</li>
+                          <li>J 值極端（&gt;100 或 &lt;0）時，常被視為“超買/超賣”，但在強趨勢裡可能失真。</li>
                         </ul>
                       </div>
                       <div className="text-[10px] text-muted-foreground/70 space-y-1">
-                        <div>当前：{effectiveSummary.kdj_status}</div>
+                        <div>當前：{effectiveSummary.kdj_status}</div>
                         {(effectiveSummary.kdj_k != null || effectiveSummary.kdj_d != null || effectiveSummary.kdj_j != null) && (
                           <div>
                             K≈{effectiveSummary.kdj_k != null ? effectiveSummary.kdj_k.toFixed(1) : '—'}{' '}
@@ -387,7 +387,7 @@ export function KlineSummaryDialog({
                         )}
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：震荡行情里 KDJ 可能频繁反复，建议与支撑/压力位结合使用。
+                        注意：震盪行情裡 KDJ 可能頻繁反覆，建議與支撐/壓力位結合使用。
                       </div>
                     </div>
                   }
@@ -399,32 +399,32 @@ export function KlineSummaryDialog({
 
               {effectiveSummary?.volume_trend && (
                 <HoverPopover
-                  title="量能（放量/缩量）"
+                  title="量能（放量/縮量）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        量能用于判断行情“是否有成交支撑”。这里的量能趋势来自 volume_ratio（当日量 / 近5日均量）。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        量能用於判斷行情“是否有成交支撐”。這裡的量能趨勢來自 volume_ratio（當日量 / 近5日均量）。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">怎么解读：</span>
+                        <span className="font-medium text-foreground">怎麼解讀：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li><span className="font-medium text-foreground">放量</span>：通常表示参与度提升；若上涨放量更利于趋势延续。</li>
-                          <li><span className="font-medium text-foreground">缩量</span>：可能表示观望/衰竭；若下跌缩量，有时是抛压减弱的信号。</li>
+                          <li><span className="font-medium text-foreground">放量</span>：通常表示參與度提升；若上漲放量更利於趨勢延續。</li>
+                          <li><span className="font-medium text-foreground">縮量</span>：可能表示觀望/衰竭；若下跌縮量，有時是拋壓減弱的訊號。</li>
                         </ul>
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        当前：{effectiveSummary.volume_trend}{effectiveSummary.volume_ratio != null ? `，量比≈${effectiveSummary.volume_ratio.toFixed(1)}x` : ''}
+                        當前：{effectiveSummary.volume_trend}{effectiveSummary.volume_ratio != null ? `，量比≈${effectiveSummary.volume_ratio.toFixed(1)}x` : ''}
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：量能的意义需要结合价格方向（价涨量增/价涨量缩/价跌量增/价跌量缩）综合判断。
+                        注意：量能的意義需要結合價格方向（價漲量增/價漲量縮/價跌量增/價跌量縮）綜合判斷。
                       </div>
                     </div>
                   }
                   trigger={
                     <TechnicalBadge
                       label={`${effectiveSummary.volume_trend}${effectiveSummary.volume_ratio != null ? ` (${effectiveSummary.volume_ratio.toFixed(1)}x)` : ''}`}
-                      tone={effectiveSummary.volume_trend === '放量' ? 'warning' : effectiveSummary.volume_trend === '缩量' ? 'info' : 'neutral'}
+                      tone={effectiveSummary.volume_trend === '放量' ? 'warning' : effectiveSummary.volume_trend === '縮量' ? 'info' : 'neutral'}
                       help
                     />
                   }
@@ -433,36 +433,36 @@ export function KlineSummaryDialog({
 
               {effectiveSummary?.boll_status && (
                 <HoverPopover
-                  title="布林带（波动/通道）"
+                  title="布林帶（波動/通道）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        布林带由中轨（通常是 MA20）和上下轨（中轨±2倍标准差）组成，用于刻画价格通道与波动变化。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        布林帶由中軌（通常是 MA20）和上下軌（中軌±2倍標準差）組成，用於刻畫價格通道與波動變化。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">代表什么：</span>
+                        <span className="font-medium text-foreground">代表什麼：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li><span className="font-medium text-foreground">突破上轨</span>：短期偏强，但也可能“冲高回落”，需结合量能确认。</li>
-                          <li><span className="font-medium text-foreground">跌破下轨</span>：短期偏弱，但在恐慌下跌时也可能出现超跌反弹。</li>
-                          <li>带宽收口常见于波动收敛，之后容易出现方向选择；带宽开口表示波动放大。</li>
+                          <li><span className="font-medium text-foreground">突破上軌</span>：短期偏強，但也可能“衝高回落”，需結合量能確認。</li>
+                          <li><span className="font-medium text-foreground">跌破下軌</span>：短期偏弱，但在恐慌下跌時也可能出現超跌反彈。</li>
+                          <li>頻寬收口常見於波動收斂，之後容易出現方向選擇；頻寬開口表示波動放大。</li>
                         </ul>
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">项目内带宽阈值：</span>
+                        <span className="font-medium text-foreground">專案內頻寬閾值：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li>带宽 &lt; 5：收口窄幅（更偏盘整/酝酿）</li>
-                          <li>带宽 &gt; 15：开口放大（波动扩张）</li>
-                          <li>其他：正常波动</li>
+                          <li>頻寬 &lt; 5：收口窄幅（更偏盤整/醞釀）</li>
+                          <li>頻寬 &gt; 15：開口放大（波動擴張）</li>
+                          <li>其他：正常波動</li>
                         </ul>
                       </div>
                       <div className="text-[10px] text-muted-foreground/70 space-y-1">
                         <div>
-                          当前：{effectiveSummary.boll_status}{effectiveSummary.boll_width != null ? `，带宽≈${effectiveSummary.boll_width.toFixed(1)}%` : ''}
+                          當前：{effectiveSummary.boll_status}{effectiveSummary.boll_width != null ? `，頻寬≈${effectiveSummary.boll_width.toFixed(1)}%` : ''}
                         </div>
                         {(effectiveSummary.boll_upper != null || effectiveSummary.boll_mid != null || effectiveSummary.boll_lower != null) && (
                           <div>
-                            上轨≈{effectiveSummary.boll_upper != null ? effectiveSummary.boll_upper.toFixed(2) : '—'}；中轨≈{effectiveSummary.boll_mid != null ? effectiveSummary.boll_mid.toFixed(2) : '—'}；下轨≈{effectiveSummary.boll_lower != null ? effectiveSummary.boll_lower.toFixed(2) : '—'}
+                            上軌≈{effectiveSummary.boll_upper != null ? effectiveSummary.boll_upper.toFixed(2) : '—'}；中軌≈{effectiveSummary.boll_mid != null ? effectiveSummary.boll_mid.toFixed(2) : '—'}；下軌≈{effectiveSummary.boll_lower != null ? effectiveSummary.boll_lower.toFixed(2) : '—'}
                           </div>
                         )}
                       </div>
@@ -471,7 +471,7 @@ export function KlineSummaryDialog({
                   trigger={
                     <TechnicalBadge
                       label={`布林 ${effectiveSummary.boll_status}`}
-                      tone={effectiveSummary.boll_status === '突破上轨' ? 'bullish' : effectiveSummary.boll_status === '跌破下轨' ? 'bearish' : 'neutral'}
+                      tone={effectiveSummary.boll_status === '突破上軌' ? 'bullish' : effectiveSummary.boll_status === '跌破下軌' ? 'bearish' : 'neutral'}
                       help
                     />
                   }
@@ -480,20 +480,20 @@ export function KlineSummaryDialog({
 
               {effectiveSummary?.kline_pattern && (
                 <HoverPopover
-                  title="K线形态（局部结构）"
+                  title="K線形態（區域性結構）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        形态来自对最近1-2根K线的形状识别（如十字星、锤子线、吞没等），属于“局部信号”。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        形態來自對最近1-2根K線的形狀識別（如十字星、錘子線、吞沒等），屬於“區域性訊號”。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">代表什么：</span>
-                        多数形态需要结合趋势、量能与关键位确认。比如锤子线出现在下跌末端更有意义；吞没形态更看重“前后两根K线对比”。
+                        <span className="font-medium text-foreground">代表什麼：</span>
+                        多數形態需要結合趨勢、量能與關鍵位確認。比如錘子線出現在下跌末端更有意義；吞沒形態更看重“前後兩根K線對比”。
                       </div>
-                      <div className="text-[10px] text-muted-foreground/70">当前：{effectiveSummary.kline_pattern}</div>
+                      <div className="text-[10px] text-muted-foreground/70">當前：{effectiveSummary.kline_pattern}</div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：单根K线形态误判率较高，建议仅作提示，不建议孤立决策。
+                        注意：單根K線形態誤判率較高，建議僅作提示，不建議孤立決策。
                       </div>
                     </div>
                   }
@@ -507,48 +507,48 @@ export function KlineSummaryDialog({
             <div className="flex flex-wrap gap-2 text-[11px]">
               {effectiveSummary && effectiveSummary.support != null && (
                 <HoverPopover
-                  title="支撑位（关键支撑区）"
+                  title="支撐位（關鍵支撐區）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        支撑位可以理解为“买盘更容易出现”的价格区域。接近支撑时，价格更可能出现止跌、反弹或盘整。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        支撐位可以理解為“買盤更容易出現”的價格區域。接近支撐時，價格更可能出現止跌、反彈或盤整。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">本项目如何算：</span>
-                        当前弹窗里的支撑（support）来自最近20个交易日区间内的最低价（min low），属于中期级别的参考位。
+                        <span className="font-medium text-foreground">本專案如何算：</span>
+                        當前彈跳視窗裡的支撐（support）來自最近20個交易日區間內的最低價（min low），屬於中期級別的參考位。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">怎么用：</span>
+                        <span className="font-medium text-foreground">怎麼用：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li>更偏向“区域”而不是精确到1分钱的一条线，常见做法是允许一定误差（例如±1%~2%）。</li>
-                          <li>接近支撑时，若出现缩量止跌/放量反弹，信号通常更可靠；若放量跌破，则支撑可能失效并转为压力。</li>
-                          <li>适合用于设置止损/止盈/加减仓区间：用关键位去约束风险，而不是预测最高点最低点。</li>
+                          <li>更偏向“區域”而不是精確到1分錢的一條線，常見做法是允許一定誤差（例如±1%~2%）。</li>
+                          <li>接近支撐時，若出現縮量止跌/放量反彈，訊號通常更可靠；若放量跌破，則支撐可能失效並轉為壓力。</li>
+                          <li>適合用於設定停損/停利/加減碼區間：用關鍵位去約束風險，而不是預測最高點最低點。</li>
                         </ul>
                       </div>
                       <div className="text-[10px] text-muted-foreground/70 space-y-1">
-                        <div>当前：支撑≈{effectiveSummary.support.toFixed(2)}</div>
+                        <div>當前：支撐≈{effectiveSummary.support.toFixed(2)}</div>
                         {effectiveSummary.last_close != null && effectiveSummary.support > 0 && (
                           <div>
-                            距离（以收盘价计）≈{(((effectiveSummary.last_close - effectiveSummary.support) / effectiveSummary.support) * 100).toFixed(2)}%
+                            距離（以收盤價計）≈{(((effectiveSummary.last_close - effectiveSummary.support) / effectiveSummary.support) * 100).toFixed(2)}%
                             {' '}
-                            {effectiveSummary.last_close <= effectiveSummary.support * 1.02 ? '（接近支撑，评分规则会加分）' : ''}
+                            {effectiveSummary.last_close <= effectiveSummary.support * 1.02 ? '（接近支撐，評分規則會加分）' : ''}
                           </div>
                         )}
                         {(effectiveSummary.support_s != null || effectiveSummary.support_m != null || effectiveSummary.support_l != null) && (
                           <div>
-                            多级别：短期(5日)≈{effectiveSummary.support_s != null ? effectiveSummary.support_s.toFixed(2) : '—'}；中期(20日)≈{effectiveSummary.support_m != null ? effectiveSummary.support_m.toFixed(2) : '—'}；长期(60日)≈{effectiveSummary.support_l != null ? effectiveSummary.support_l.toFixed(2) : '—'}
+                            多級別：短期(5日)≈{effectiveSummary.support_s != null ? effectiveSummary.support_s.toFixed(2) : '—'}；中期(20日)≈{effectiveSummary.support_m != null ? effectiveSummary.support_m.toFixed(2) : '—'}；長期(60日)≈{effectiveSummary.support_l != null ? effectiveSummary.support_l.toFixed(2) : '—'}
                           </div>
                         )}
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：支撑/压力是“统计出的关键位”，不是必然会反转的点位；趋势很强时可直接击穿。
+                        注意：支撐/壓力是“統計出的關鍵位”，不是必然會反轉的點位；趨勢很強時可直接擊穿。
                       </div>
                     </div>
                   }
                   trigger={
                     <TechnicalBadge
-                      label={`支撑 ${effectiveSummary.support.toFixed(2)}`}
+                      label={`支撐 ${effectiveSummary.support.toFixed(2)}`}
                       tone="bearish"
                       help
                     />
@@ -557,48 +557,48 @@ export function KlineSummaryDialog({
               )}
               {effectiveSummary && effectiveSummary.resistance != null && (
                 <HoverPopover
-                  title="压力位（关键压力区）"
+                  title="壓力位（關鍵壓力區）"
                   content={
                     <div className="space-y-2">
                       <div>
-                        <span className="font-medium text-foreground">是什么：</span>
-                        压力位可以理解为“卖盘更容易出现”的价格区域。接近压力时，上行更容易受阻、回落或进入震荡。
+                        <span className="font-medium text-foreground">是什麼：</span>
+                        壓力位可以理解為“賣盤更容易出現”的價格區域。接近壓力時，上行更容易受阻、回落或進入震盪。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">本项目如何算：</span>
-                        当前弹窗里的压力（resistance）来自最近20个交易日区间内的最高价（max high），属于中期级别的参考位。
+                        <span className="font-medium text-foreground">本專案如何算：</span>
+                        當前彈跳視窗裡的壓力（resistance）來自最近20個交易日區間內的最高價（max high），屬於中期級別的參考位。
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">怎么用：</span>
+                        <span className="font-medium text-foreground">怎麼用：</span>
                         <ul className="list-disc pl-4 mt-1 space-y-1">
-                          <li>越接近压力，追涨的性价比越低；更常见的策略是等“放量突破后回踩不破”再考虑。</li>
-                          <li>若放量突破压力并站稳，原压力往往会“角色互换”变成新的支撑。</li>
-                          <li>压力附近可用来规划分批止盈/减仓，或观察是否出现量价背离、冲高回落等风险信号。</li>
+                          <li>越接近壓力，追漲的價效比越低；更常見的策略是等“放量突破後回踩不破”再考慮。</li>
+                          <li>若放量突破壓力並站穩，原壓力往往會“角色互換”變成新的支撐。</li>
+                          <li>壓力附近可用來規劃分批停利/減碼，或觀察是否出現量價背離、衝高回落等風險訊號。</li>
                         </ul>
                       </div>
                       <div className="text-[10px] text-muted-foreground/70 space-y-1">
-                        <div>当前：压力≈{effectiveSummary.resistance.toFixed(2)}</div>
+                        <div>當前：壓力≈{effectiveSummary.resistance.toFixed(2)}</div>
                         {effectiveSummary.last_close != null && effectiveSummary.resistance > 0 && (
                           <div>
-                            距离（以收盘价计）≈{(((effectiveSummary.resistance - effectiveSummary.last_close) / effectiveSummary.resistance) * 100).toFixed(2)}%
+                            距離（以收盤價計）≈{(((effectiveSummary.resistance - effectiveSummary.last_close) / effectiveSummary.resistance) * 100).toFixed(2)}%
                             {' '}
-                            {effectiveSummary.last_close >= effectiveSummary.resistance * 0.98 ? '（接近压力，评分规则会扣分）' : ''}
+                            {effectiveSummary.last_close >= effectiveSummary.resistance * 0.98 ? '（接近壓力，評分規則會扣分）' : ''}
                           </div>
                         )}
                         {(effectiveSummary.resistance_s != null || effectiveSummary.resistance_m != null || effectiveSummary.resistance_l != null) && (
                           <div>
-                            多级别：短期(5日)≈{effectiveSummary.resistance_s != null ? effectiveSummary.resistance_s.toFixed(2) : '—'}；中期(20日)≈{effectiveSummary.resistance_m != null ? effectiveSummary.resistance_m.toFixed(2) : '—'}；长期(60日)≈{effectiveSummary.resistance_l != null ? effectiveSummary.resistance_l.toFixed(2) : '—'}
+                            多級別：短期(5日)≈{effectiveSummary.resistance_s != null ? effectiveSummary.resistance_s.toFixed(2) : '—'}；中期(20日)≈{effectiveSummary.resistance_m != null ? effectiveSummary.resistance_m.toFixed(2) : '—'}；長期(60日)≈{effectiveSummary.resistance_l != null ? effectiveSummary.resistance_l.toFixed(2) : '—'}
                           </div>
                         )}
                       </div>
                       <div className="text-[10px] text-muted-foreground/70">
-                        注意：突破是否有效，往往取决于“是否放量 + 是否能站稳/回踩确认”。单靠刺穿一瞬间容易假突破。
+                        注意：突破是否有效，往往取決於“是否放量 + 是否能站穩/回踩確認”。單靠刺穿一瞬間容易假突破。
                       </div>
                     </div>
                   }
                   trigger={
                     <TechnicalBadge
-                      label={`压力 ${effectiveSummary.resistance.toFixed(2)}`}
+                      label={`壓力 ${effectiveSummary.resistance.toFixed(2)}`}
                       tone="bullish"
                       help
                     />
@@ -611,27 +611,27 @@ export function KlineSummaryDialog({
               <div className="flex gap-4 text-[11px] text-muted-foreground">
                 {effectiveSummary.change_5d != null && (
                   <HoverPopover
-                    title="5日涨跌幅（短期动量）"
+                    title="5日漲跌幅（短期動量）"
                     content={
                       <div className="space-y-2">
                         <div>
-                          <span className="font-medium text-foreground">是什么：</span>
-                          5日涨跌幅表示最近5个交易日的整体收益率，用来快速观察短期动量强弱。
+                          <span className="font-medium text-foreground">是什麼：</span>
+                          5日漲跌幅表示最近5個交易日的整體報酬率，用來快速觀察短期動量強弱。
                         </div>
                         <div>
-                          <span className="font-medium text-foreground">本项目如何算：</span>
-                          使用“今日收盘”对比“5个交易日前收盘”的变化：（Close[t]-Close[t-5]) / Close[t-5]。
+                          <span className="font-medium text-foreground">本專案如何算：</span>
+                          使用“今日收盤”對比“5個交易日前收盤”的變化：（Close[t]-Close[t-5]) / Close[t-5]。
                         </div>
                         <div>
-                          <span className="font-medium text-foreground">怎么解读：</span>
+                          <span className="font-medium text-foreground">怎麼解讀：</span>
                           <ul className="list-disc pl-4 mt-1 space-y-1">
-                            <li>正值：短期偏强；配合放量/多头趋势时，更可能延续。</li>
-                            <li>负值：短期偏弱；若同时均线空头、MACD死叉，风险更大。</li>
-                            <li>过大的正涨幅也可能意味着“短期过热”，要防回撤；更建议结合支撑/压力位设定风控。</li>
+                            <li>正值：短期偏強；配合放量/多頭趨勢時，更可能延續。</li>
+                            <li>負值：短期偏弱；若同時均線空頭、MACD死叉，風險更大。</li>
+                            <li>過大的正漲幅也可能意味著“短期過熱”，要防回檔；更建議結合支撐/壓力位設定風控。</li>
                           </ul>
                         </div>
                         <div className="text-[10px] text-muted-foreground/70">
-                          当前：{effectiveSummary.change_5d >= 0 ? '+' : ''}{effectiveSummary.change_5d.toFixed(2)}%
+                          當前：{effectiveSummary.change_5d >= 0 ? '+' : ''}{effectiveSummary.change_5d.toFixed(2)}%
                         </div>
                       </div>
                     }
@@ -647,27 +647,27 @@ export function KlineSummaryDialog({
                 )}
                 {effectiveSummary.change_20d != null && (
                   <HoverPopover
-                    title="20日涨跌幅（波段/一月动量）"
+                    title="20日漲跌幅（波段/一月動量）"
                     content={
                       <div className="space-y-2">
                         <div>
-                          <span className="font-medium text-foreground">是什么：</span>
-                          20日涨跌幅接近一个交易月的整体收益率，更偏向“波段趋势”的表现。
+                          <span className="font-medium text-foreground">是什麼：</span>
+                          20日漲跌幅接近一個交易月的整體報酬率，更偏向“波段趨勢”的表現。
                         </div>
                         <div>
-                          <span className="font-medium text-foreground">本项目如何算：</span>
-                          使用“今日收盘”对比“20个交易日前收盘”的变化：（Close[t]-Close[t-20]) / Close[t-20]。
+                          <span className="font-medium text-foreground">本專案如何算：</span>
+                          使用“今日收盤”對比“20個交易日前收盤”的變化：（Close[t]-Close[t-20]) / Close[t-20]。
                         </div>
                         <div>
-                          <span className="font-medium text-foreground">怎么解读：</span>
+                          <span className="font-medium text-foreground">怎麼解讀：</span>
                           <ul className="list-disc pl-4 mt-1 space-y-1">
-                            <li>正值且趋势多头：通常更偏顺势；回调时更关注支撑位与成交量。</li>
-                            <li>负值且趋势空头：通常更偏逆风；反弹到压力位附近更容易受阻。</li>
-                            <li>5日与20日分歧：可能代表“短期反弹/回调”发生在更大的趋势里，需谨慎辨别是否反转。</li>
+                            <li>正值且趨勢多頭：通常更偏順勢；回撥時更關注支撐位與成交量。</li>
+                            <li>負值且趨勢空頭：通常更偏逆風；反彈到壓力位附近更容易受阻。</li>
+                            <li>5日與20日分歧：可能代表“短期反彈/回撥”發生在更大的趨勢裡，需謹慎辨別是否反轉。</li>
                           </ul>
                         </div>
                         <div className="text-[10px] text-muted-foreground/70">
-                          当前：{effectiveSummary.change_20d >= 0 ? '+' : ''}{effectiveSummary.change_20d.toFixed(2)}%
+                          當前：{effectiveSummary.change_20d >= 0 ? '+' : ''}{effectiveSummary.change_20d.toFixed(2)}%
                         </div>
                       </div>
                     }
@@ -683,27 +683,27 @@ export function KlineSummaryDialog({
                 )}
                 {effectiveSummary.amplitude != null && (
                   <HoverPopover
-                    title="振幅（波动强度）"
+                    title="振幅（波動強度）"
                     content={
                       <div className="space-y-2">
                         <div>
-                          <span className="font-medium text-foreground">是什么：</span>
-                          振幅描述当天高低价之间的波动范围，用来衡量“波动有多大”。
+                          <span className="font-medium text-foreground">是什麼：</span>
+                          振幅描述當天高低價之間的波動範圍，用來衡量“波動有多大”。
                         </div>
                         <div>
-                          <span className="font-medium text-foreground">本项目如何算：</span>
-                          今日振幅≈(High-Low)/Low。数值越大，表示盘中波动越剧烈、风险与机会都更大。
+                          <span className="font-medium text-foreground">本專案如何算：</span>
+                          今日振幅≈(High-Low)/Low。數值越大，表示盤中波動越劇烈、風險與機會都更大。
                         </div>
                         <div>
-                          <span className="font-medium text-foreground">怎么解读：</span>
+                          <span className="font-medium text-foreground">怎麼解讀：</span>
                           <ul className="list-disc pl-4 mt-1 space-y-1">
-                            <li>高振幅常见于放量突破、恐慌下跌、消息驱动等；需要配合量能和趋势判断“是扩张还是崩盘”。</li>
-                            <li>低振幅常见于盘整/收敛期；若布林带同时收口，后续更可能出现方向选择。</li>
-                            <li>振幅高时更建议降低仓位/更严格止损；避免用“同一套止损距离”应对不同波动。</li>
+                            <li>高振幅常見於放量突破、恐慌下跌、訊息驅動等；需要配合量能和趨勢判斷“是擴張還是崩盤”。</li>
+                            <li>低振幅常見於盤整/收斂期；若布林帶同時收口，後續更可能出現方向選擇。</li>
+                            <li>振幅高時更建議降低倉位/更嚴格停損；避免用“同一套停損距離”應對不同波動。</li>
                           </ul>
                         </div>
                         <div className="text-[10px] text-muted-foreground/70 space-y-1">
-                          <div>当前：{effectiveSummary.amplitude.toFixed(2)}%</div>
+                          <div>當前：{effectiveSummary.amplitude.toFixed(2)}%</div>
                           {effectiveSummary.amplitude_avg5 != null && (
                             <div>近5日均值：{effectiveSummary.amplitude_avg5.toFixed(2)}%</div>
                           )}
@@ -722,29 +722,29 @@ export function KlineSummaryDialog({
 
             <details className="group">
               <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground">
-                建议/评分规则说明 <span className="text-[10px]">(点击展开)</span>
+                建議/評分規則說明 <span className="text-[10px]">(點選展開)</span>
               </summary>
               <div className="mt-2 text-[11px] text-muted-foreground whitespace-pre-wrap bg-accent/20 rounded p-2 space-y-2">
-                <div className="font-medium text-foreground">建议规则（按是否持仓）</div>
+                <div className="font-medium text-foreground">建議規則（按是否持倉）</div>
                 <div className="space-y-1">
-                  <div>未持仓：score ≥ 3 → 买入；score ≤ -2 → 回避；其他 → 观望</div>
-                  <div>已持仓：score ≥ 3 → 加仓；score ≥ 1 → 持有；score ≤ -3 → 卖出；score ≤ -1 → 减仓；其他 → 观望</div>
+                  <div>未持倉：score ≥ 3 → 買入；score ≤ -2 → 迴避；其他 → 觀望</div>
+                  <div>已持倉：score ≥ 3 → 加碼；score ≥ 1 → 持有；score ≤ -3 → 賣出；score ≤ -1 → 減碼；其他 → 觀望</div>
                 </div>
-                <div className="font-medium text-foreground">评分规则（各项累加，0 为中性）</div>
+                <div className="font-medium text-foreground">評分規則（各項累加，0 為中性）</div>
                 <div className="space-y-1">
-                  <div>趋势（均线）：多头排列 +2；空头排列 -2</div>
-                  <div>MACD：金叉 +2；死叉 -2；柱体为正 +1；柱体为负 -1</div>
-                  <div>RSI：超卖 +1；偏强 +1；超买 -1；偏弱 -1</div>
+                  <div>趨勢（均線）：多頭排列 +2；空頭排列 -2</div>
+                  <div>MACD：金叉 +2；死叉 -2；柱體為正 +1；柱體為負 -1</div>
+                  <div>RSI：超賣 +1；偏強 +1；超買 -1；偏弱 -1</div>
                   <div>KDJ：金叉 +1；死叉 -1</div>
-                  <div>布林：突破上轨 +1；跌破下轨 -1</div>
-                  <div>量能：放量 +1；缩量 -1</div>
-                  <div>支撑/压力：收盘价 ≤ 支撑×1.02 → +1；收盘价 ≥ 压力×0.98 → -1</div>
+                  <div>布林：突破上軌 +1；跌破下軌 -1</div>
+                  <div>量能：放量 +1；縮量 -1</div>
+                  <div>支撐/壓力：收盤價 ≤ 支撐×1.02 → +1；收盤價 ≥ 壓力×0.98 → -1</div>
                 </div>
               </div>
             </details>
 
             <Button variant="secondary" size="sm" className="w-full mt-1" onClick={handleAskAI}>
-              <Sparkles className="w-3.5 h-3.5 mr-1" /> 问 AI 分析这些指标
+              <Sparkles className="w-3.5 h-3.5 mr-1" /> 問 AI 分析這些指標
             </Button>
 
           </div>

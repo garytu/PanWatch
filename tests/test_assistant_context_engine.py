@@ -60,20 +60,20 @@ def test_service_prepares_context_and_persists_snapshot_without_mutating_message
     from src.modules.assistant.schemas import CreateConversationCommand
 
     engine, session, service = _service(_settings())
-    conversation = service.create_conversation(CreateConversationCommand(initial_context="详情页上下文"))
+    conversation = service.create_conversation(CreateConversationCommand(initial_context="詳細資訊頁上下文"))
     for index in range(3):
-        service.record_user_message(conversation.id, f"目标和约束 {index} " + "x" * 500)
+        service.record_user_message(conversation.id, f"目標和約束 {index} " + "x" * 500)
     before = [message.content for message in service._repository.list_messages(conversation.id)]
 
     class FakeClient:
         async def chat_multi(self, messages, temperature=0.4):
-            return '{"goal":["保留目标"],"constraints":["保留约束"],"decisions":[],"facts":[],"current_state":"继续","open_items":["下一步"],"tool_findings":[]}'
+            return '{"goal":["保留目標"],"constraints":["保留約束"],"decisions":[],"facts":[],"current_state":"繼續","open_items":["下一步"],"tool_findings":[]}'
 
     monkeypatch.setattr(service, "build_context_compression_client", lambda: FakeClient())
     result = asyncio.run(service.prepare_context(conversation.id))
 
     assert result.compressed is True
-    assert result.summary.goal == ["保留目标"]
+    assert result.summary.goal == ["保留目標"]
     snapshot = service._repository.get_latest_context_snapshot(conversation.id)
     assert snapshot is not None
     assert snapshot.version == 1
@@ -91,7 +91,7 @@ def test_model_failure_still_creates_extractive_snapshot(monkeypatch):
     for index in range(10):
         service.record_user_message(
             conversation.id,
-            f"目标是继续跟踪这个标的，当前需要保留未完成事项 {index} " + "x" * 600,
+            f"目標是繼續跟蹤這個標的，當前需要保留未完成事項 {index} " + "x" * 600,
         )
 
     class BrokenClient:
@@ -113,7 +113,7 @@ def test_service_exposes_context_usage_and_latest_summary_for_the_ui():
 
     engine, session, service = _service(_settings())
     conversation = service.create_conversation(CreateConversationCommand())
-    service.record_user_message(conversation.id, "当前问题")
+    service.record_user_message(conversation.id, "當前問題")
 
     detail = service.get_context_detail(conversation.id)
 
@@ -134,13 +134,13 @@ def test_prepare_context_includes_durable_tool_findings_as_trusted_facts(monkeyp
         lambda: ExtractiveContextSummarizer(),
     )
     conversation = service.create_conversation(CreateConversationCommand())
-    service.record_user_message(conversation.id, "删除它")
+    service.record_user_message(conversation.id, "刪除它")
     task = service.create_task(conversation.id, 1)
     service._repository.record_tool_completed(
         task.id,
         call_id="call-1",
         tool_name="get_price_alerts",
-        summary="找到 1 条价格提醒：#3 浪潮信息，突破 76，启用",
+        summary="找到 1 條價格提醒：#3 浪潮資訊，突破 76，啟用",
     )
 
     result = asyncio.run(service.prepare_context(conversation.id))
@@ -148,12 +148,12 @@ def test_prepare_context_includes_durable_tool_findings_as_trusted_facts(monkeyp
     trusted_messages = [
         message
         for message in result.messages
-        if message.role == "system" and "可信工具执行记录" in message.content
+        if message.role == "system" and "可信工具執行記錄" in message.content
     ]
     assert len(trusted_messages) == 1
     assert "get_price_alerts" in trusted_messages[0].content
-    assert "#3 浪潮信息" in trusted_messages[0].content
-    assert "历史助手文本的完成声明不作为工具证据" in trusted_messages[0].content
+    assert "#3 浪潮資訊" in trusted_messages[0].content
+    assert "歷史助手文本的完成宣告不作為工具證據" in trusted_messages[0].content
     session.close()
     engine.dispose()
 

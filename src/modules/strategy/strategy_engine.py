@@ -1,4 +1,4 @@
-"""策略层：信号生成、后验评估、调权与统计。"""
+"""策略層：訊號生成、後驗評估、調權與統計。"""
 
 from __future__ import annotations
 
@@ -37,9 +37,9 @@ logger = logging.getLogger(__name__)
 
 
 SOURCE_POOL_LABELS = {
-    "watchlist": "关注池",
-    "market_scan": "市场池",
-    "mixed": "市场+关注",
+    "watchlist": "關注池",
+    "market_scan": "市場池",
+    "mixed": "市場+關注",
 }
 
 
@@ -124,31 +124,31 @@ def _normalize_action_view(
     if is_holding:
         if act == "buy":
             act = "add"
-            label = "准备加仓"
+            label = "準備加碼"
     else:
         if act == "add":
             act = "buy"
-            label = "建仓"
+            label = "建倉"
         elif act == "hold":
             act = "watch"
-            label = "观望"
-        if label in ("持有", "继续持有"):
+            label = "觀望"
+        if label in ("持有", "繼續持有"):
             act = "watch"
-            label = "观望"
+            label = "觀望"
 
     if act in ("watch", "hold"):
         score = min(score, 78.0 if is_holding else 65.0)
         if not label:
-            label = "持有" if is_holding else "观望"
+            label = "持有" if is_holding else "觀望"
     elif act == "buy":
         if not label:
-            label = "建仓"
+            label = "建倉"
     elif act == "add":
         if not label:
-            label = "准备加仓"
+            label = "準備加碼"
     else:
         if not label:
-            label = "观望"
+            label = "觀望"
 
     if act in ("buy", "add") and not has_entry_plan:
         score = min(score, 66.0)
@@ -156,27 +156,27 @@ def _normalize_action_view(
     return act, label, _clamp(score, 0.0, 100.0)
 
 RISK_LEVEL_LABELS = {
-    "low": "低风险",
-    "medium": "中风险",
-    "high": "高风险",
+    "low": "低風險",
+    "medium": "中風險",
+    "high": "高風險",
 }
 
 REGIME_LABELS = {
-    "bullish": "多头",
-    "neutral": "震荡",
-    "bearish": "空头",
+    "bullish": "多頭",
+    "neutral": "震盪",
+    "bearish": "空頭",
 }
 
 POSITIVE_EVENT_KEYWORDS = (
     "增持",
-    "中标",
+    "中標",
     "合作",
-    "回购",
+    "回購",
     "盈利",
-    "订单",
+    "訂單",
     "突破",
-    "上调",
-    "增长",
+    "上調",
+    "增長",
     "利好",
     "buyback",
     "contract",
@@ -185,15 +185,15 @@ POSITIVE_EVENT_KEYWORDS = (
 )
 
 NEGATIVE_EVENT_KEYWORDS = (
-    "减持",
-    "诉讼",
-    "亏损",
-    "下调",
-    "违约",
-    "处罚",
+    "減持",
+    "訴訟",
+    "虧損",
+    "下調",
+    "違約",
+    "處罰",
     "暴跌",
     "利空",
-    "预警",
+    "預警",
     "st",
     "downgrade",
     "miss",
@@ -685,7 +685,7 @@ def _build_cross_section_features(candidates: list[EntryCandidate]) -> dict[int,
 def _demote_signal(row: StrategySignalRun, *, reason: str) -> None:
     row.status = "inactive"
     row.action = "watch"
-    row.action_label = "观望"
+    row.action_label = "觀望"
     payload = row.payload if isinstance(row.payload, dict) else {}
     demoted_cap = 69.0 if bool(row.is_holding_snapshot) else 65.0
     row.rank_score = min(float(row.rank_score or 0.0), demoted_cap)
@@ -733,7 +733,7 @@ def _apply_portfolio_constraints(*, rows: list[StrategySignalRun]) -> dict:
         for idx, row in enumerate(active_unheld):
             if idx < max_unheld:
                 continue
-            _demote_signal(row, reason=f"组合约束: {market} 未持仓机会超限({max_unheld})")
+            _demote_signal(row, reason=f"組合約束: {market} 未持倉機會超限({max_unheld})")
             demoted += 1
             by_reason["cap_unheld"] = by_reason.get("cap_unheld", 0) + 1
 
@@ -752,7 +752,7 @@ def _apply_portfolio_constraints(*, rows: list[StrategySignalRun]) -> dict:
         for idx, row in enumerate(high_rows):
             if idx < allow_high:
                 continue
-            _demote_signal(row, reason=f"组合约束: {market} 高风险占比超限({int(max_ratio*100)}%)")
+            _demote_signal(row, reason=f"組合約束: {market} 高風險佔比超限({int(max_ratio*100)}%)")
             demoted += 1
             by_reason["cap_high_risk"] = by_reason.get("cap_high_risk", 0) + 1
 
@@ -770,7 +770,7 @@ def _apply_portfolio_constraints(*, rows: list[StrategySignalRun]) -> dict:
             for idx, row in enumerate(srows):
                 if idx < cap_per_strategy:
                     continue
-                _demote_signal(row, reason=f"组合约束: {market} 策略{code}集中度过高")
+                _demote_signal(row, reason=f"組合約束: {market} 策略{code}集中度過高")
                 demoted += 1
                 by_reason["cap_strategy_concentration"] = by_reason.get(
                     "cap_strategy_concentration", 0
@@ -875,15 +875,15 @@ def _compute_factor_breakdown(
     regime_multiplier += _clamp((regime_confidence - 0.5) * 0.06, -0.03, 0.03)
     regime_multiplier = _clamp(regime_multiplier, 0.85, 1.12)
 
-    # 每因子外置权重(默认 1.0 → 行为 = 现状,零回归)。snapshot 仍存 raw 因子分,
-    # 权重只作用于合成,确保 IC 测在原始因子上(见 factor_calibration 设计要点)。
+    # 每因子外接權重(預設 1.0 → 行為 = 現狀,零迴歸)。snapshot 仍存 raw 因子分,
+    # 權重只作用於合成,確保 IC 測在原始因子上(見 factor_calibration 設計要點)。
     fw = factor_weights or {}
     raw_score = (
         base_score
         + fw.get("alpha_score", 1.0) * alpha_score
         + fw.get("catalyst_score", 1.0) * catalyst_score
         + fw.get("quality_score", 1.0) * quality_score
-        + source_bonus  # v1: source_bonus 权重固定 1.0
+        + source_bonus  # v1: source_bonus 權重固定 1.0
     )
     raw_score -= fw.get("risk_penalty", 1.0) * risk_penalty
     raw_score -= fw.get("crowd_penalty", 1.0) * crowd_penalty
@@ -1310,17 +1310,17 @@ def refresh_strategy_signals(
                 context_quality_score = _safe_float(source_meta.get("context_quality_score"))
                 compact_source_meta = _compact_source_meta(source_meta)
                 action = (c.action or "watch").strip().lower() or "watch"
-                action_label = (c.action_label or "观望").strip() or "观望"
+                action_label = (c.action_label or "觀望").strip() or "觀望"
                 if bool(c.is_holding_snapshot):
                     if action == "buy":
                         action = "add"
-                        action_label = "准备加仓"
+                        action_label = "準備加碼"
                 else:
                     if action == "add":
                         action = "buy"
-                        action_label = "建仓"
+                        action_label = "建倉"
                     elif action == "hold":
-                        action_label = "观望"
+                        action_label = "觀望"
                 payload = {
                     "entry_candidate_id": c.id,
                     "entry_candidate_snapshot": c.snapshot_date,
@@ -1384,7 +1384,7 @@ def refresh_strategy_signals(
         constraint_stats = _apply_portfolio_constraints(rows=touched_rows)
         if constraint_stats.get("demoted", 0) > 0:
             logger.info(
-                "[策略层] 组合约束生效: snapshot=%s demoted=%s details=%s",
+                "[策略層] 組合約束生效: snapshot=%s demoted=%s details=%s",
                 snapshot,
                 constraint_stats.get("demoted", 0),
                 constraint_stats.get("by_reason", {}),
@@ -1547,7 +1547,7 @@ def _pending_due_horizons(
     horizons: tuple[int, ...] | list[int],
     existing: set[tuple[int, int]],
 ) -> tuple[list[int], int]:
-    """筛出尚未落库且已经到期的 horizon，避免无意义加载 K 线。"""
+    """篩出尚未落庫且已經到期的 horizon，避免無意義載入 K 線。"""
     pending: list[int] = []
     skipped_not_due = 0
     for horizon in horizons:
@@ -1606,7 +1606,7 @@ def evaluate_strategy_outcomes(
 
         today = date.today()
         kline_cache: dict[tuple[str, str], list] = {}
-        pending = 0  # 分批提交计数,缩短写事务窗口
+        pending = 0  # 分批提交計數,縮短寫事務視窗
 
         for s in signals:
             snap_day = _parse_day(s.snapshot_date)
@@ -1620,7 +1620,7 @@ def evaluate_strategy_outcomes(
                 existing=existing,
             )
             stats["skipped_not_due"] += skipped_not_due
-            # 所有 horizon 都已评估或尚未到期时，不需要联网取该标的 K 线。
+            # 所有 horizon 都已評估或尚未到期時，不需要聯網取該標的 K 線。
             if not pending_horizons:
                 continue
             key = (
@@ -1710,7 +1710,7 @@ def evaluate_strategy_outcomes(
                 existing.add((s.id, horizon))
                 pending += 1
 
-            # 分批提交:累计到阈值即落盘,缩短写事务,避免与 60s 调度器并发写长时间持锁
+            # 分批提交:累計到閾值即落盤,縮短寫事務,避免與 60s 排程器併發寫長時間持鎖
             if pending >= 50:
                 db.commit()
                 pending = 0
@@ -1719,7 +1719,7 @@ def evaluate_strategy_outcomes(
         return stats
     except Exception as e:
         db.rollback()
-        logger.warning(f"策略后验评估失败: {e}")
+        logger.warning(f"策略後驗評估失敗: {e}")
         return stats
     finally:
         db.close()
@@ -1888,7 +1888,7 @@ def rebalance_strategy_weights(
         }
     except Exception as e:
         db.rollback()
-        logger.warning(f"策略调权失败: {e}")
+        logger.warning(f"策略調權失敗: {e}")
         return {
             "window_days": window_days,
             "min_samples": min_samples,

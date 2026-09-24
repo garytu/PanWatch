@@ -25,14 +25,14 @@ class HotBoard:
 
 
 def get_market_data():
-    """惰性导入,避免模块加载时的循环依赖(便于测试 monkeypatch)。"""
+    """惰性匯入,避免模組載入時的迴圈依賴(便於測試 monkeypatch)。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
 
     return _g()
 
 
 class EastMoneyDiscoveryCollector:
-    """Discovery ranks (CN/HK/US),经 marketdata 包统一取数。"""
+    """Discovery ranks (CN/HK/US),經 marketdata 包統一取數。"""
 
     def __init__(self, *, proxy: str | None = None):
         self.proxy = proxy

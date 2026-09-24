@@ -1,8 +1,8 @@
 # pytest 配置
-# 运行全部单测：        python -m pytest tests/ -v
-# 运行单个文件：        python -m pytest tests/test_notify_policy.py -v
-# 实际发送通知：        python -m pytest tests/ -v --notify （默认不发通知）
-# 安装 pre-push hook： bash scripts/install-hooks.sh
+# 執行全部單測：        python -m pytest tests/ -v
+# 執行單個檔案：        python -m pytest tests/test_notify_policy.py -v
+# 實際傳送通知：        python -m pytest tests/ -v --notify （預設不發通知）
+# 安裝 pre-push hook： bash scripts/install-hooks.sh
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

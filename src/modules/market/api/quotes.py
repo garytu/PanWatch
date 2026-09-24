@@ -10,8 +10,8 @@ router = APIRouter()
 
 
 class QuoteItem(BaseModel):
-    symbol: str = Field(..., description="股票代码")
-    market: str = Field(..., description="市场: CN/HK/US")
+    symbol: str = Field(..., description="股票程式碼")
+    market: str = Field(..., description="市場: CN/HK/US")
 
 
 class QuoteBatchRequest(BaseModel):
@@ -22,7 +22,7 @@ def _parse_market(market: str) -> MarketCode:
     try:
         return MarketCode(market)
     except ValueError:
-        raise HTTPException(400, f"不支持的市场: {market}")
+        raise HTTPException(400, f"不支援的市場: {market}")
 
 
 def _quote_to_response(symbol: str, market: MarketCode, quote: dict | None) -> dict:
@@ -68,7 +68,7 @@ def _quote_to_response(symbol: str, market: MarketCode, quote: dict | None) -> d
 
 @router.get("/{symbol}")
 async def get_quote(symbol: str, market: str = "CN"):
-    """获取单只股票实时行情"""
+    """獲取單隻股票即時行情"""
     market_code = _parse_market(market)
     rows = await asyncio.to_thread(md_quote_rows, [symbol], market_code.value)
     if not rows:
@@ -82,7 +82,7 @@ async def get_quote(symbol: str, market: str = "CN"):
 
 @router.post("/batch")
 async def get_quotes_batch(payload: QuoteBatchRequest):
-    """批量获取股票实时行情"""
+    """批次獲取股票即時行情"""
     if not payload.items:
         return []
 

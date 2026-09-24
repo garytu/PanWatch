@@ -1,7 +1,7 @@
-"""组合诊断(Phase 4):只读分析模拟盘持仓的集中度 / 分布 / 风险。
+"""組合診斷(Phase 4):只讀分析模擬交易持倉的集中度 / 分佈 / 風險。
 
-对标 PortfolioPilot 的「只读不下单」诊断 —— 纯读取持仓,**绝不下单**,只产出诊断与提示。
-纯函数 diagnose_positions 可单测;diagnose_paper_portfolio 读 DB。
+對標 PortfolioPilot 的「只讀不下單」診斷 —— 純讀取持倉,**絕不下單**,只產出診斷與提示。
+純函式 diagnose_positions 可單測;diagnose_paper_portfolio 讀 DB。
 """
 
 from __future__ import annotations
@@ -13,15 +13,15 @@ from src.platform.persistence.models import PaperTradingPosition
 
 logger = logging.getLogger(__name__)
 
-# 风险阈值(可后续配置化)
-MAX_SINGLE_WEIGHT = 0.40   # 单仓占比上限
-HIGH_HHI = 0.50            # HHI 集中度高线
-MAX_MARKET_WEIGHT = 0.70   # 单市场占比上限
-MIN_POSITIONS = 3          # 最少分散持仓数
+# 風險閾值(可後續配置化)
+MAX_SINGLE_WEIGHT = 0.40   # 單倉佔比上限
+HIGH_HHI = 0.50            # HHI 集中度高線
+MAX_MARKET_WEIGHT = 0.70   # 單市場佔比上限
+MIN_POSITIONS = 3          # 最少分散持倉數
 
 
 def herfindahl(values: list[float]) -> float:
-    """HHI 集中度 = Σ(w_i)²(w 为归一化权重)。范围 [1/n, 1],越大越集中。"""
+    """HHI 集中度 = Σ(w_i)²(w 為歸一化權重)。範圍 [1/n, 1],越大越集中。"""
     total = sum(values)
     if total <= 0:
         return 0.0
@@ -29,7 +29,7 @@ def herfindahl(values: list[float]) -> float:
 
 
 def diagnose_positions(positions: list[dict]) -> dict:
-    """纯函数诊断。
+    """純函式診斷。
 
     positions: [{symbol, market, strategy_code, market_value, unrealized_pnl}]
     """
@@ -62,15 +62,15 @@ def diagnose_positions(positions: list[dict]) -> dict:
 
     alerts: list[str] = []
     if max_w >= MAX_SINGLE_WEIGHT:
-        alerts.append(f"单仓集中度过高:最大持仓占 {max_w * 100:.0f}%")
+        alerts.append(f"單倉集中度過高:最大持倉佔 {max_w * 100:.0f}%")
     if hhi >= HIGH_HHI:
-        alerts.append(f"组合高度集中(HHI={hhi:.2f})")
+        alerts.append(f"組合高度集中(HHI={hhi:.2f})")
     if len(positions) < MIN_POSITIONS and total > 0:
-        alerts.append(f"持仓数过少({len(positions)}),分散不足")
+        alerts.append(f"持倉數過少({len(positions)}),分散不足")
     if total > 0:
         for m, v in by_market.items():
             if v / total >= MAX_MARKET_WEIGHT:
-                alerts.append(f"{m} 市场占比过高({v / total * 100:.0f}%)")
+                alerts.append(f"{m} 市場佔比過高({v / total * 100:.0f}%)")
 
     return {
         "position_count": len(positions),
@@ -85,7 +85,7 @@ def diagnose_positions(positions: list[dict]) -> dict:
 
 
 def diagnose_paper_portfolio() -> dict:
-    """读模拟盘 open 持仓 → 组合诊断(只读)。"""
+    """讀模擬交易 open 持倉 → 組合診斷(只讀)。"""
     db = SessionLocal()
     try:
         rows = (

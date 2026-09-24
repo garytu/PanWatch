@@ -1,4 +1,4 @@
-"""模拟盘 API 端点。"""
+"""模擬交易 API 端點。"""
 
 import logging
 from datetime import datetime, timezone
@@ -49,9 +49,9 @@ class ToggleBody(BaseModel):
 
 
 class UpdateSettingsBody(BaseModel):
-    excluded_markets: list[str] | None = None  # 兼容旧字段
-    market_allocations: dict[str, float] | None = None  # {"CN":0.5,...}，合计 ≤ 1
-    initial_capital: float | None = None  # 总资金（>0 时按差额增/减资）
+    excluded_markets: list[str] | None = None  # 相容舊欄位
+    market_allocations: dict[str, float] | None = None  # {"CN":0.5,...}，合計 ≤ 1
+    initial_capital: float | None = None  # 總資金（>0 時按差額增/減資）
 
 
 def _serialize_account_dict(
@@ -97,7 +97,7 @@ def _serialize_account_dict(
 def _build_equity_curve(
     db: Session, acc: PaperTradingAccount, market: str | None
 ) -> tuple[list[dict], float, float]:
-    """构建收益曲线，返回 (curve, peak, max_drawdown_pct)。market=None 为全市场。"""
+    """構建收益曲線，返回 (curve, peak, max_drawdown_pct)。market=None 為全市場。"""
     ratio = market_allocations_or_default(acc).get(market, 0.0) if market else 1.0
     base = acc.initial_capital * ratio if market else acc.initial_capital
 
@@ -169,7 +169,7 @@ def _build_equity_curve(
 
 
 def _account_summary(db: Session, acc: PaperTradingAccount, market: str | None) -> dict:
-    """账户汇总。market=None 为全账户（沿用引擎维护的回撤）；否则按该市场子池口径。"""
+    """帳戶彙總。market=None 為全帳戶（沿用引擎維護的回檔）；否則按該市場子池口徑。"""
     if not market or market not in ALL_MARKETS:
         open_positions = (
             db.query(PaperTradingPosition)
@@ -234,7 +234,7 @@ def _account_summary(db: Session, acc: PaperTradingAccount, market: str | None) 
 
 
 def _strategy_performance(db: Session, market: str | None) -> list[dict]:
-    """按策略聚合绩效（已平仓 + 持仓中），可按市场过滤。"""
+    """按策略聚合績效（已平倉 + 持倉中），可按市場過濾。"""
     tq = db.query(PaperTradingTrade)
     if market:
         tq = tq.filter(PaperTradingTrade.stock_market == market)
@@ -418,13 +418,13 @@ def get_metrics(market: str | None = None, db: Session = Depends(get_db)):
 
 @router.get("/diagnostics")
 def get_diagnostics():
-    """组合诊断(只读):集中度/市场与策略分布/风险提示。"""
+    """組合診斷(只讀):集中度/市場與策略分佈/風險提示。"""
     return diagnose_paper_portfolio()
 
 
 @router.get("/backends")
 def get_backends():
-    """可用回测后端探测(builtin 永远可用;vectorbt/rqalpha/qlib 视安装情况)。"""
+    """可用回測後端探測(builtin 永遠可用;vectorbt/rqalpha/qlib 視安裝情況)。"""
     return available_backends()
 
 
@@ -432,7 +432,7 @@ def get_backends():
 def toggle_account(body: ToggleBody, db: Session = Depends(get_db)):
     acc = db.query(PaperTradingAccount).first()
     if not acc:
-        raise HTTPException(404, "模拟盘账户不存在")
+        raise HTTPException(404, "模擬交易帳戶不存在")
     acc.enabled = body.enabled
     db.commit()
     db.refresh(acc)
@@ -443,7 +443,7 @@ def toggle_account(body: ToggleBody, db: Session = Depends(get_db)):
 def reset_account():
     result = ENGINE.reset_account()
     if not result.get("ok"):
-        raise HTTPException(500, "重置失败")
+        raise HTTPException(500, "重置失敗")
     return {"ok": True}
 
 
@@ -451,7 +451,7 @@ def reset_account():
 async def close_position(position_id: int):
     result = await ENGINE.close_position_manual_async(position_id)
     if not result.get("ok"):
-        raise HTTPException(400, result.get("error", "平仓失败"))
+        raise HTTPException(400, result.get("error", "平倉失敗"))
     return {"ok": True}
 
 
@@ -459,15 +459,15 @@ async def close_position(position_id: int):
 def update_settings(body: UpdateSettingsBody, db: Session = Depends(get_db)):
     acc = db.query(PaperTradingAccount).first()
     if not acc:
-        raise HTTPException(404, "模拟盘账户不存在")
+        raise HTTPException(404, "模擬交易帳戶不存在")
 
     if body.market_allocations is not None:
         alloc = normalize_allocations(body.market_allocations)
         total = sum(alloc.values())
         if total > 1.0 + 1e-9:
-            raise HTTPException(400, f"投资比例合计不能超过 100%（当前 {round(total * 100)}%）")
+            raise HTTPException(400, f"投資比例合計不能超過 100%（當前 {round(total * 100)}%）")
         acc.market_allocations = alloc
-        # 同步派生 excluded_markets（比例 0 即排除），兼容旧读取
+        # 同步派生 excluded_markets（比例 0 即排除），相容舊讀取
         acc.excluded_markets = [m for m in ALL_MARKETS if alloc.get(m, 0.0) <= 0]
     elif body.excluded_markets is not None:
         valid = {"CN", "HK", "US"}
@@ -487,13 +487,13 @@ def update_settings(body: UpdateSettingsBody, db: Session = Depends(get_db)):
 
 @router.post("/scan")
 async def manual_scan():
-    """手动触发一次模拟盘扫描（建仓 + 平仓检查）。"""
+    """手動觸發一次模擬交易掃描（建倉 + 平倉檢查）。"""
     result = await ENGINE.scan_once()
     return result
 
 
 # ---------------------------------------------------------------------------
-# 跟单通知设置
+# 跟單通知設定
 # ---------------------------------------------------------------------------
 
 _NOTIFY_KEYS = [
@@ -515,7 +515,7 @@ _NOTIFY_DEFAULTS = {
 
 @router.get("/notify-settings")
 def get_notify_settings(db: Session = Depends(get_db)):
-    """返回当前通知配置 + 可用渠道列表。"""
+    """返回當前通知配置 + 可用管道列表。"""
     rows = db.query(AppSettings).filter(AppSettings.key.in_(_NOTIFY_KEYS)).all()
     settings = dict(_NOTIFY_DEFAULTS)
     for r in rows:
@@ -547,24 +547,24 @@ def update_notify_settings(body: NotifySettingsBody, db: Session = Depends(get_d
         if row:
             row.value = value
         else:
-            db.add(AppSettings(key=key, value=value, description=f"模拟盘通知配置: {key}"))
+            db.add(AppSettings(key=key, value=value, description=f"模擬交易通知配置: {key}"))
     db.commit()
     return get_notify_settings(db)
 
 
 @router.post("/notify-test")
 async def test_notify():
-    """发送测试通知。"""
+    """傳送測試通知。"""
     from src.modules.paper_trading.paper_trading_notifier import send_test_notification
     result = await send_test_notification()
     if not result.get("success"):
-        raise HTTPException(400, result.get("error", "发送失败"))
+        raise HTTPException(400, result.get("error", "傳送失敗"))
     return {"ok": True}
 
 
 @router.post("/premarket-plan")
 async def trigger_premarket_plan():
-    """手动触发盘前计划通知。"""
+    """手動觸發盤前計劃通知。"""
     from src.modules.paper_trading.paper_trading_notifier import send_premarket_plan
     await send_premarket_plan()
     return {"ok": True}
@@ -572,7 +572,7 @@ async def trigger_premarket_plan():
 
 @router.post("/daily-summary")
 async def trigger_daily_summary():
-    """手动触发日终摘要通知。"""
+    """手動觸發日終摘要通知。"""
     from src.modules.paper_trading.paper_trading_notifier import send_daily_summary
     await send_daily_summary()
     return {"ok": True}

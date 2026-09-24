@@ -1,4 +1,4 @@
-"""因子自校准闭环(M4):calibrate_all_markets 端到端接通评分。"""
+"""因子自校準閉環(M4):calibrate_all_markets 端到端接通評分。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-import src.platform.persistence.models  # noqa: F401  注册 ORM 模型
+import src.platform.persistence.models  # noqa: F401  註冊 ORM 模型
 from src.platform.persistence.database import Base
 
 
@@ -33,7 +33,7 @@ def _seed_pair(db, sid, *, market, snapshot_date, alpha, ret, horizon=5):
 
 
 def test_calibrate_all_markets_closes_loop_into_scoring():
-    """端到端:快照+outcome → calibrate_all_markets → CN alpha 权重上调 → 评分 raw_score 提升。"""
+    """端到端:快照+outcome → calibrate_all_markets → CN alpha 權重上調 → 評分 raw_score 提升。"""
     from src.modules.strategy.factor_calibration import calibrate_all_markets
     from src.modules.strategy.factor_weights import get_factor_weights
     from src.modules.strategy.strategy_engine import _compute_factor_breakdown
@@ -42,7 +42,7 @@ def test_calibrate_all_markets_closes_loop_into_scoring():
     db = _mem_db()
     try:
         d = (date.today() - timedelta(days=30)).strftime("%Y-%m-%d")
-        for i in range(1, 7):  # CN:alpha 与 ret 完全正相关
+        for i in range(1, 7):  # CN:alpha 與 ret 完全正相關
             _seed_pair(db, i, market="CN", snapshot_date=d, alpha=float(i), ret=float(i))
         db.commit()
 
@@ -50,7 +50,7 @@ def test_calibrate_all_markets_closes_loop_into_scoring():
         assert set(res) == {"CN", "HK", "US"}
 
         w = get_factor_weights("CN", db=db)
-        assert w["alpha_score"] > 1.0  # IC 闭环把权重抬高
+        assert w["alpha_score"] > 1.0  # IC 閉環把權重抬高
 
         row = EntryCandidate(
             score=80.0, action="watch", status="active", plan_quality=80,

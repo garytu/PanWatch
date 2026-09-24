@@ -9,7 +9,7 @@ export interface AssistantStockContext {
 }
 
 /**
- * Keeps page-level “问 AI” actions working after the assistant moved to a
+ * Keeps page-level “問 AI” actions working after the assistant moved to a
  * route.  The event is translated to router state while the source modal is
  * still mounted; AssistantPage consumes that state after it mounts.
  */

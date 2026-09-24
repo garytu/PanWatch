@@ -1,4 +1,4 @@
-"""价格提醒引擎：规则评估、命中落库与通知发送。"""
+"""價格提醒引擎：規則評估、命中落庫與通知傳送。"""
 
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ class RuleEvalResult:
 
 
 class PriceAlertEngine:
-    """价格提醒扫描执行引擎（支持小规模缓存和去重）。"""
+    """價格提醒掃描執行引擎（支援小規模快取和去重）。"""
 
     def __init__(self):
         self._quote_cache: dict[str, tuple[float, dict]] = {}
@@ -111,7 +111,7 @@ class PriceAlertEngine:
         self.kline_ttl_sec = 60.0
 
     async def _fetch_quotes_map(self, stocks: list[Stock]) -> dict[tuple[str, str], dict]:
-        """走 QuoteOrchestrator,支持多 provider 主备故障转移。"""
+        """走 QuoteOrchestrator,支援多 provider 主備故障轉移。"""
         grouped: dict[MarketCode, list[Stock]] = {}
         for s in stocks:
             grouped.setdefault(_to_market(s.market), []).append(s)
@@ -164,8 +164,8 @@ class PriceAlertEngine:
         elif ctype == "volume":
             left = _safe_float(quote.get("volume"))
         elif ctype == "volume_ratio":
-            # 优先用报价里的量比(腾讯 parts[49]),免拉 K线;
-            # 仅当报价缺量比(如美股 yfinance)才回退 K线摘要。
+            # 優先用報價裡的量比(騰訊 parts[49]),免拉 K線;
+            # 僅當報價缺量比(如美股 yfinance)才回退 K線摘要。
             left = _safe_float(quote.get("volume_ratio"))
             if left is None:
                 summary = await self._get_kline_summary_cached(market, symbol)
@@ -286,20 +286,20 @@ class PriceAlertEngine:
         quote = snapshot.get("quote") or {}
         price = _safe_float(quote.get("current_price"))
         chg = _safe_float(quote.get("change_pct"))
-        title = f"【价格提醒】{name} ({symbol})"
+        title = f"【價格提醒】{name} ({symbol})"
         lines = [
-            f"规则: {rule.name or f'提醒#{rule.id}'}",
-            f"现价: {price:.2f}" if price is not None else "现价: --",
-            f"涨跌幅: {chg:+.2f}%" if chg is not None else "涨跌幅: --",
+            f"規則: {rule.name or f'提醒#{rule.id}'}",
+            f"現價: {price:.2f}" if price is not None else "現價: --",
+            f"漲跌幅: {chg:+.2f}%" if chg is not None else "漲跌幅: --",
         ]
         hit_lines = []
         for h in snapshot.get("conditions") or []:
             if h.get("matched"):
                 hit_lines.append(
-                    f"- {h.get('type')} {h.get('op')} {h.get('target')} (当前: {h.get('actual')})"
+                    f"- {h.get('type')} {h.get('op')} {h.get('target')} (當前: {h.get('actual')})"
                 )
         if hit_lines:
-            lines.append("命中条件:")
+            lines.append("命中條件:")
             lines.extend(hit_lines[:4])
         content = "\n".join(lines)
 

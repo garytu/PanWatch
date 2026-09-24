@@ -14,24 +14,24 @@ export interface AccountNavItem {
 const THEME_OPTIONS: { value: ThemeMode; icon: LucideIcon; label: string }[] = [
   { value: 'light', icon: Sun, label: '亮色' },
   { value: 'dark', icon: Moon, label: '暗色' },
-  { value: 'system', icon: Monitor, label: '跟随系统' },
+  { value: 'system', icon: Monitor, label: '跟隨系統' },
 ]
 
 interface AccountMenuProps {
-  /** 原“更多”里折叠的导航项(Agent / 历史 / 数据源 / 设置)。 */
+  /** 原“更多”裡摺疊的導航項(Agent / 歷史 / 資料來源 / 設定)。 */
   navItems: AccountNavItem[]
   mode: ThemeMode
   onSetMode: (m: ThemeMode) => void
-  /** 打开「系统自检」弹窗(状态由上层 App 托管,避免桌面/移动两个实例重复)。 */
+  /** 開啟「系統自檢」彈跳視窗(狀態由上層 App 託管,避免桌面/移動兩個例項重複)。 */
   onOpenSelfCheck: () => void
-  /** 头像尺寸:桌面 md,移动端 sm。 */
+  /** 頭像尺寸:桌面 md,移動端 sm。 */
   size?: 'sm' | 'md'
 }
 
 /**
- * 右上角头像区域 + 下拉菜单(参考 beecount-cloud):
- * 把原“更多”导航、主题色(亮/暗/跟随系统)、退出登录收进头像下拉
- * (查看日志 / GitHub 仍在外侧)。
+ * 右上角頭像區域 + 下拉選單(參考 beecount-cloud):
+ * 把原“更多”導航、主題色(亮/暗/跟隨系統)、退出登入收進頭像下拉
+ * (檢視日誌 / GitHub 仍在外側)。
  */
 export default function AccountMenu({
   navItems,
@@ -44,12 +44,12 @@ export default function AccountMenu({
   const ref = useRef<HTMLDivElement | null>(null)
   const location = useLocation()
   const avatar = useAvatar()
-  // 仅在支持 hover 的设备(PC)启用悬停展开;触屏维持点击
+  // 僅在支援 hover 的裝置(PC)啟用懸停展開;觸屏維持點選
   const [canHover] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches,
   )
 
-  // 点击外部关闭
+  // 點選外部關閉
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
       if (open && ref.current && !ref.current.contains(e.target as Node)) {
@@ -60,7 +60,7 @@ export default function AccountMenu({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
-  // 路由变化时关闭
+  // 路由變化時關閉
   useEffect(() => {
     setOpen(false)
   }, [location.pathname])
@@ -80,21 +80,21 @@ export default function AccountMenu({
         className={`${avatarSize} rounded-full overflow-hidden bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-sm ring-1 transition-all ${
           open ? 'ring-primary/50' : 'ring-border/40 hover:ring-primary/40'
         }`}
-        title="账户与设置"
-        aria-label="账户与设置"
+        title="帳戶與設定"
+        aria-label="帳戶與設定"
       >
         {avatar ? (
-          <img src={avatar} alt="头像" className="w-full h-full object-cover" />
+          <img src={avatar} alt="頭像" className="w-full h-full object-cover" />
         ) : (
           <User className={`${iconSize} text-white`} />
         )}
       </button>
 
       {open && (
-        // top-full + pt-2:用透明内边距桥接头像与菜单,hover 移入不断开
+        // top-full + pt-2:用透明內邊距橋接頭像與選單,hover 移入不斷開
         <div className="absolute right-0 top-full pt-2 z-50">
           <div className="w-48 rounded-xl border border-border/60 bg-card/95 backdrop-blur p-1.5 shadow-xl">
-          {/* 原“更多”导航 */}
+          {/* 原“更多”導航 */}
           {navItems.map(({ to, icon: Icon, label }) => {
             const isActive = location.pathname.startsWith(to)
             return (
@@ -116,8 +116,8 @@ export default function AccountMenu({
 
           <div className="my-1 h-px bg-border/50" />
 
-          {/* 主题色:亮 / 暗 / 跟随系统 */}
-          <div className="px-2.5 pt-0.5 pb-1 text-[11px] text-muted-foreground">主题</div>
+          {/* 主題色:亮 / 暗 / 跟隨系統 */}
+          <div className="px-2.5 pt-0.5 pb-1 text-[11px] text-muted-foreground">主題</div>
           {THEME_OPTIONS.map(({ value, icon: Icon, label }) => {
             const active = mode === value
             return (
@@ -138,7 +138,7 @@ export default function AccountMenu({
           })}
 
           <div className="my-1 h-px bg-border/50" />
-          {/* 系统自检:打开弹窗(逐项检查数据源/AI/通知连通性) */}
+          {/* 系統自檢:開啟彈跳視窗(逐項檢查資料來源/AI/通知連通性) */}
           <button
             onClick={() => {
               setOpen(false)
@@ -147,7 +147,7 @@ export default function AccountMenu({
             className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
           >
             <Stethoscope className="w-3.5 h-3.5" />
-            系统自检
+            系統自檢
           </button>
 
           {isAuthenticated() && (
@@ -158,7 +158,7 @@ export default function AccountMenu({
                 className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-lg text-[12px] text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                退出登录
+                退出登入
               </button>
             </>
           )}

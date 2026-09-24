@@ -1,10 +1,10 @@
-"""TradingAgentsAgent — PanWatch 的 BaseAgent 子类,集成 TauricResearch/TradingAgents。
+"""TradingAgentsAgent — PanWatch 的 BaseAgent 子類,整合 TauricResearch/TradingAgents。
 
-设计要点(详见 .docs/tradingagents/02-technical-design.md):
-1. collect() 走 PanWatch Provider Orchestrator,4 类数据并发拉
-2. analyze() 重写,不走单次 ai_client.chat,而是调 TradingAgentsGraph
-3. monkeypatch route_to_vendor 让 TradingAgents 拿到 PanWatch 数据(A 股专用)
-4. progress callback + cost tracker + 月度预算 + 同日缓存
+設計要點(詳見 .docs/tradingagents/02-technical-design.md):
+1. collect() 走 PanWatch Provider Orchestrator,4 類資料併發拉
+2. analyze() 重寫,不走單次 ai_client.chat,而是調 TradingAgentsGraph
+3. monkeypatch route_to_vendor 讓 TradingAgents 拿到 PanWatch 資料(A 股專用)
+4. progress callback + cost tracker + 月度預算 + 同日快取
 """
 
 from __future__ import annotations
@@ -47,22 +47,22 @@ __all__ = ["TradingAgentsAgent", "TradingAgentsUnavailable"]
 
 
 def get_market_data():
-    """lazy import,便于测试 monkeypatch(module 级)。"""
+    """lazy import,便於測試 monkeypatch(module 級)。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
 
     return _g()
 
 
 class TradingAgentsUnavailable(RuntimeError):
-    """tradingagents 库未安装或上游 API 变更导致不可用。"""
+    """tradingagents 庫未安裝或上游 API 變更導致不可用。"""
 
 
 def _bounded_graph_class(graph_cls):
-    """让 TradingAgentsGraph 把请求边界传给 LangChain LLM 客户端。
+    """讓 TradingAgentsGraph 把請求邊界傳給 LangChain LLM 使用者端。
 
-    TradingAgents 0.5.0 已支持 ``llm_max_retries``/``max_tokens``，但当前
-    版本的 ``_get_provider_kwargs`` 尚未读取自定义 timeout。通过一个很小的
-    子类适配该差异，避免直接修改 site-packages，也兼容后续上游自行支持
+    TradingAgents 0.5.0 已支援 ``llm_max_retries``/``max_tokens``，但當前
+    版本的 ``_get_provider_kwargs`` 尚未讀取自定義 timeout。透過一個很小的
+    子類適配該差異，避免直接修改 site-packages，也相容後續上游自行支援
     timeout 的版本。
     """
 
@@ -83,7 +83,7 @@ def _bounded_graph_class(graph_cls):
 class TradingAgentsAgent(BaseAgent):
     name = "tradingagents"
     display_name = "TradingAgents 深度分析"
-    description = "多 Agent 投资决策框架,3-5 分钟,~$0.05/次 (deepseek-chat)"
+    description = "多 Agent 投資決策框架,3-5 分鐘,~$0.05/次 (deepseek-chat)"
 
     def __init__(
         self,
@@ -93,18 +93,18 @@ class TradingAgentsAgent(BaseAgent):
         over_budget_action: str = "reject",  # reject / warn / continue
         cache_ttl_hours: int = 12,
         output_language: str = "Chinese",
-        deep_model: str | None = None,    # 推理/辩论/PM 用的强模型 (留空走默认)
-        quick_model: str | None = None,   # 分析师工具调用用的快模型 (留空 = deep_model)
-        timeout_minutes: int = 30,        # 整个流程硬超时;0.3.0 工具链更重,默认提到 30 min
-        collection_timeout_seconds: int = 45,  # 单个外部数据源采集硬超时
-        emit_paper_trading_signal: bool = False,  # 是否把 BUY 决策写入 StrategySignalRun 驱动模拟盘
-        enable_sec_edgar: bool = False,   # 美股财报可显式优先使用 SEC EDGAR
-        holding_period_days: int = 5,     # 上游决策质量回测/持仓期限语义
-        llm_timeout_seconds: int = 120,   # 单次 LLM 请求硬超时,避免图卡死
-        llm_max_retries: int = 0,         # 深度分析不在图内重复重试供应商请求
-        llm_max_tokens: int = 4096,       # 限制推理/报告输出,避免网关空闲超时
+        deep_model: str | None = None,    # 推理/辯論/PM 用的強模型 (留空走預設)
+        quick_model: str | None = None,   # 分析師工具呼叫用的快模型 (留空 = deep_model)
+        timeout_minutes: int = 30,        # 整個流程硬超時;0.3.0 工具鏈更重,預設提到 30 min
+        collection_timeout_seconds: int = 45,  # 單個外部資料來源採集硬超時
+        emit_paper_trading_signal: bool = False,  # 是否把 BUY 決策寫入 StrategySignalRun 驅動模擬交易
+        enable_sec_edgar: bool = False,   # 美股財報可顯式優先使用 SEC EDGAR
+        holding_period_days: int = 5,     # 上游決策質量回測/持倉期限語義
+        llm_timeout_seconds: int = 120,   # 單次 LLM 請求硬超時,避免圖卡死
+        llm_max_retries: int = 0,         # 深度分析不在圖內重複重試供應商請求
+        llm_max_tokens: int = 4096,       # 限制推理/報告輸出,避免閘道器空閒超時
     ):
-        # 校验分析师配置
+        # 校驗分析師配置
         analysts = list(analyst_types or sorted(VALID_ANALYSTS))
         invalid = [a for a in analysts if a not in VALID_ANALYSTS]
         if invalid:
@@ -130,16 +130,16 @@ class TradingAgentsAgent(BaseAgent):
         self.llm_max_retries = max(0, int(llm_max_retries))
         self.llm_max_tokens = max(256, int(llm_max_tokens))
 
-        # 软依赖检测
+        # 軟依賴檢測
         self._available, self._import_error = self._check_availability()
 
     # ---- BaseAgent 抽象方法 ----
 
     async def collect(self, context: AgentContext) -> dict:
-        """从 PanWatch 数据体系收集数据,并发拉 4 类(走 marketdata 包)。"""
+        """從 PanWatch 資料體系收集資料,併發拉 4 類(走 marketdata 包)。"""
         if not context.watchlist:
             raise ValueError("TradingAgents 需要至少 1 只股票")
-        # 单只标的为粒度;若 watchlist 多只,取第一只
+        # 單隻標的為粒度;若 watchlist 多隻,取第一隻
         stock = context.watchlist[0]
 
         from src.platform.marketdata.marketdata_client import _quote_to_row
@@ -169,8 +169,8 @@ class TradingAgentsAgent(BaseAgent):
                     progress_handler.emit("data_collection", "source_end", source=name)
                 return value
             except Exception as e:
-                # 429、网络超时和单源解析错误都只影响该源，不阻塞整个分析。
-                logger.warning(f"[TA] 数据源 {name} 失败,使用空结果: {e}")
+                # 429、網路超時和單源解析錯誤都隻影響該源，不阻塞整個分析。
+                logger.warning(f"[TA] 資料來源 {name} 失敗,使用空結果: {e}")
                 progress_handler.emit(
                     "data_collection",
                     "source_error",
@@ -187,23 +187,23 @@ class TradingAgentsAgent(BaseAgent):
             with kline_source(f"tradingagents:{trace_id}"):
                 quotes, klines_list, cf, events_list = await asyncio.gather(
                     _source("quote", lambda: md.quotes([sym], market=mkt), []),
-                    # 一次准备足够验证快照和 200 日均线使用的历史，后续 analyst
-                    # 直接复用这份缓存，不再重复请求 750 日 K 线。
+                    # 一次準備足夠驗證快照和 200 日均線使用的歷史，後續 analyst
+                    # 直接複用這份快取，不再重複請求 750 日 K 線。
                     _source("klines", lambda: md.klines(sym, market=mkt, days=750), []),
                     _source("capital_flow", lambda: md.capital_flow(sym, market=mkt), None),
                     _source("events", lambda: md.events([sym], market=mkt, since_days=30), []),
                 )
         except Exception as e:
-            logger.warning(f"[TA] 初始化数据源失败,使用空结果: {e}")
+            logger.warning(f"[TA] 初始化資料來源失敗,使用空結果: {e}")
             quotes, klines_list, cf, events_list = [], [], None, []
         try:
             quote_dict = _quote_to_row(quotes[0]) if quotes else {}
         except Exception as e:
-            logger.warning(f"[TA] 行情结果解析失败,使用空结果: {e}")
+            logger.warning(f"[TA] 行情結果解析失敗,使用空結果: {e}")
             quote_dict = {}
         capital_list = [cf] if cf else []
 
-        # A 股 fetch 真实财报(akshare),非 A 股留空
+        # A 股 fetch 真實財報(akshare),非 A 股留空
         financial: dict | None = None
         if stock.market.value == "CN" and stock.symbol.isdigit() and len(stock.symbol) == 6:
             try:
@@ -214,9 +214,9 @@ class TradingAgentsAgent(BaseAgent):
                     None,
                 )
             except Exception as e:
-                logger.debug(f"[TA] 财报模块不可用,跳过: {e}")
+                logger.debug(f"[TA] 財報模組不可用,跳過: {e}")
 
-        # 预算技术指标(MA/MACD/RSI/KDJ/BOLL),给 get_indicators 工具用
+        # 預算技術指標(MA/MACD/RSI/KDJ/BOLL),給 get_indicators 工具用
         technical = None
         try:
             from src.platform.marketdata.collectors.kline_collector import KlineCollector
@@ -229,7 +229,7 @@ class TradingAgentsAgent(BaseAgent):
                 None,
             )
         except Exception as e:
-            logger.debug(f"[TA] 技术指标模块不可用,跳过: {e}")
+            logger.debug(f"[TA] 技術指標模組不可用,跳過: {e}")
         progress_handler.emit("data_collection", "stage_end", symbol=stock.symbol)
 
         return {
@@ -244,23 +244,23 @@ class TradingAgentsAgent(BaseAgent):
         }
 
     def build_prompt(self, data: dict, context: AgentContext) -> tuple[str, str]:
-        # BaseAgent 抽象要求,但本 agent 不走单次 prompt
+        # BaseAgent 抽象要求,但本 agent 不走單次 prompt
         return "", ""
 
     async def run_single(self, context: AgentContext, symbol: str) -> AnalysisResult:
-        """单只股票模式入口 — 供 AgentScheduler 调度时按股票迭代调用。
+        """單隻股票模式入口 — 供 AgentScheduler 排程時按股票迭代呼叫。
 
-        典型场景:盘前自动跑用户绑定到 tradingagents 的核心仓位股票。
-        实现:过滤 watchlist 到指定 symbol,然后走标准 run() 流程。
+        典型場景:盤前自動跑使用者繫結到 tradingagents 的核心倉位股票。
+        實現:過濾 watchlist 到指定 symbol,然後走標準 run() 流程。
         """
-        # 找到目标 stock
+        # 找到目標 stock
         targets = [s for s in context.watchlist if s.symbol == symbol]
         if not targets:
             raise ValueError(
-                f"run_single: symbol={symbol} 不在 watchlist 中,跳过"
+                f"run_single: symbol={symbol} 不在 watchlist 中,跳過"
             )
 
-        # 浅克隆 context.config 让 watchlist 只剩目标股票,其他字段不变
+        # 淺克隆 context.config 讓 watchlist 只剩目標股票,其他欄位不變
         from copy import copy
         from src.platform.runtime.config import AppConfig
 
@@ -272,7 +272,7 @@ class TradingAgentsAgent(BaseAgent):
         narrow_context.config = narrow_config
         return await self.run(narrow_context)
 
-    # ---- 重写 analyze:走 TradingAgents 多 Agent 流 ----
+    # ---- 重寫 analyze:走 TradingAgents 多 Agent 流 ----
 
     async def analyze(self, context: AgentContext, data: dict) -> AnalysisResult:
         if not self._available:
@@ -282,32 +282,32 @@ class TradingAgentsAgent(BaseAgent):
         trace_id = getattr(context, "_trace_id", "") or self._make_trace_id(stock.symbol)
         force_refresh = bool(getattr(context, "_force_refresh", False))
 
-        # 0) 同日缓存命中(force_refresh=True 时跳过)
+        # 0) 同日快取命中(force_refresh=True 時跳過)
         if not force_refresh:
             cached = self._try_cache_hit(stock)
             if cached is not None:
                 logger.info(
-                    f"[TA] 命中同日缓存 (agent=tradingagents symbol={stock.symbol})"
+                    f"[TA] 命中同日快取 (agent=tradingagents symbol={stock.symbol})"
                 )
                 cached.raw_data["from_cache"] = True
                 return cached
 
-        # 1) 预算检查
+        # 1) 預算檢查
         budget = check_budget(self.monthly_budget_usd, self.name)
         if budget["exceeded"]:
             if self.over_budget_action == "reject":
                 raise RuntimeError(
-                    f"本月 TradingAgents 预算已用尽 "
+                    f"本月 TradingAgents 預算已用盡 "
                     f"(${budget['used']:.2f} / ${self.monthly_budget_usd:.2f})。"
-                    f"如需继续使用,请在「设置」中调高预算上限。"
+                    f"如需繼續使用,請在「設定」中調高預算上限。"
                 )
             elif self.over_budget_action == "warn":
                 logger.warning(
-                    f"[TA] 预算已超,但策略=warn,继续执行 "
+                    f"[TA] 預算已超,但策略=warn,繼續執行 "
                     f"(${budget['used']:.2f} / ${self.monthly_budget_usd:.2f})"
                 )
 
-        # 2) 构造 TradingAgents config (支持 deep / quick 双模型)
+        # 2) 構造 TradingAgents config (支援 deep / quick 雙模型)
         from src.platform.persistence.database import DB_PATH
         ta_runtime_dir = Path(DB_PATH).resolve().parent / "tradingagents"
         ta_config = build_ta_llm_config(
@@ -326,14 +326,14 @@ class TradingAgentsAgent(BaseAgent):
             llm_max_tokens=self.llm_max_tokens,
         )
 
-        # 3) 进度回调
+        # 3) 進度回撥
         progress_handler = getattr(context, "_progress_handler", None)
         if not isinstance(progress_handler, PanWatchProgressHandler):
             progress_handler = PanWatchProgressHandler(trace_id, self.name)
         cancel_event = threading.Event()
         progress_handler.cancel_event = cancel_event
 
-        # 4) 标的元信息走 instrument_context；用户持仓走 TradingAgents 0.5.0 原生 portfolio。
+        # 4) 標的元資訊走 instrument_context；使用者持倉走 TradingAgents 0.5.0 原生 portfolio。
         current_price = (data.get("quote") or {}).get("current_price")
         cur_price_num = current_price if isinstance(current_price, (int, float)) else None
         quote_data = data.get("quote") or {}
@@ -345,7 +345,7 @@ class TradingAgentsAgent(BaseAgent):
             current_price=cur_price_num,
             industry=quote_data.get("industry", "") if isinstance(quote_data, dict) else "",
         )
-        # 5) 同步阻塞,丢到线程池;加硬超时防卡死
+        # 5) 同步阻塞,丟到執行緒池;加硬超時防卡死
         try:
             ta_result = await asyncio.wait_for(
                 asyncio.to_thread(
@@ -364,18 +364,18 @@ class TradingAgentsAgent(BaseAgent):
             )
         except asyncio.TimeoutError:
             cancel_event.set()
-            # 超时:尝试落库部分进度供后续查看
+            # 超時:嘗試落庫部分進度供後續檢視
             partial_cost = getattr(progress_handler, "_total_cost", 0.0)
             partial_stages = list(getattr(progress_handler, "_completed_stages", set()))
             logger.warning(
-                f"[TA] 执行超时 (>{self.timeout_minutes} 分钟). "
-                f"已完成阶段: {partial_stages}, 累计成本 ${partial_cost:.4f}"
+                f"[TA] 執行超時 (>{self.timeout_minutes} 分鐘). "
+                f"已完成階段: {partial_stages}, 累計成本 ${partial_cost:.4f}"
             )
             partial_msg = (
-                f"分析超时(>{self.timeout_minutes} 分钟)。"
-                f"已完成 {len(partial_stages)} 个阶段,累计成本 ${partial_cost:.4f}。"
-                f"建议:① 缩短 debate_rounds;② 换更快的模型(如 deepseek-chat);"
-                f"③ 调高 timeout_minutes。"
+                f"分析超時(>{self.timeout_minutes} 分鐘)。"
+                f"已完成 {len(partial_stages)} 個階段,累計成本 ${partial_cost:.4f}。"
+                f"建議:① 縮短 debate_rounds;② 換更快的模型(如 deepseek-chat);"
+                f"③ 調高 timeout_minutes。"
             )
             raise RuntimeError(partial_msg)
         except asyncio.CancelledError:
@@ -385,30 +385,30 @@ class TradingAgentsAgent(BaseAgent):
             cancel_event.set()
             raise
 
-        # 5) 映射成 AnalysisResult
+        # 5) 對映成 AnalysisResult
         result = map_state_to_result(
             stock=stock,
             ta_result=ta_result,
             model_label=context.model_label,
         )
 
-        # 存分析时实时价 → 历史决策表"分析价"立即显示(不必等当日 K线收盘回填)
+        # 存分析時即時價 → 歷史決策表"分析價"立即顯示(不必等當日 K線收盤迴填)
         _quote = data.get("quote") or {}
         _cp = _quote.get("current_price")
         if isinstance(_cp, (int, float)):
             result.raw_data["price_at_analysis"] = float(_cp)
 
-        # 5b) 把本次 trace_id 的 toolkit 诊断聚合,持久化进 raw_data,
-        # 让历史报告 DoneView 也能展示数据注入情况。
+        # 5b) 把本次 trace_id 的 toolkit 診斷聚合,持久化進 raw_data,
+        # 讓歷史報告 DoneView 也能展示資料注入情況。
         try:
             tid = getattr(progress_handler, "trace_id", "") if progress_handler else ""
             if tid:
                 result.raw_data["toolkit_diagnostic"] = self._collect_toolkit_diagnostic(tid)
         except Exception as e:
-            logger.warning(f"[TA] 收集 toolkit 诊断失败,忽略: {e}")
+            logger.warning(f"[TA] 收集 toolkit 診斷失敗,忽略: {e}")
 
-        # 6) 落库到 AnalysisHistory:供 UI 查最近一次结果 (DeepAnalysisModal 弹窗) +
-        # 月度成本预算聚合。同标的同日复跑会覆盖 (analysis_history.save_analysis 语义)。
+        # 6) 落庫到 AnalysisHistory:供 UI 查最近一次結果 (DeepAnalysisModal 彈跳視窗) +
+        # 月度成本預算聚合。同標的同日復跑會覆蓋 (analysis_history.save_analysis 語義)。
         try:
             save_analysis(
                 agent_name=self.name,
@@ -418,10 +418,10 @@ class TradingAgentsAgent(BaseAgent):
                 raw_data=result.raw_data,
             )
         except Exception as e:
-            logger.warning(f"[TA] save_analysis 失败,不影响主流程: {e}")
+            logger.warning(f"[TA] save_analysis 失敗,不影響主流程: {e}")
 
-        # 6b) 落库到 StockSuggestion(建议池) — 让持仓页/关注列表上的建议徽章
-        # 显示 TradingAgents 的 BUY/HOLD/SELL 决策(跟「盘前分析」「收盘复盘」并列)。
+        # 6b) 落庫到 StockSuggestion(建議池) — 讓持倉頁/關注列表上的建議徽章
+        # 顯示 TradingAgents 的 BUY/HOLD/SELL 決策(跟「盤前分析」「收盤覆盤」並列)。
         try:
             from src.modules.automation.suggestion_pool import save_suggestion
 
@@ -445,7 +445,7 @@ class TradingAgentsAgent(BaseAgent):
                 agent_label="TradingAgents 深度",
                 signal=signal_text,
                 reason=reason_text,
-                expires_hours=24,  # 深度分析结果 24 小时内有效
+                expires_hours=24,  # 深度分析結果 24 小時內有效
                 ai_response=result.content[:2000],
                 meta={
                     "cost_usd": result.raw_data.get("cost_usd", 0),
@@ -454,9 +454,9 @@ class TradingAgentsAgent(BaseAgent):
                 },
             )
         except Exception as e:
-            logger.warning(f"[TA] save_suggestion 失败,不影响主流程: {e}")
+            logger.warning(f"[TA] save_suggestion 失敗,不影響主流程: {e}")
 
-        # 7) 可选:把 BUY/SELL 决策写入 StrategySignalRun 驱动模拟盘
+        # 7) 可選:把 BUY/SELL 決策寫入 StrategySignalRun 驅動模擬交易
         if self.emit_paper_trading_signal:
             try:
                 from src.modules.automation.tradingagents.decision import (
@@ -477,33 +477,33 @@ class TradingAgentsAgent(BaseAgent):
                     enabled=True,
                 )
             except Exception as e:
-                logger.warning(f"[TA] 写模拟盘信号失败,不影响主流程: {e}")
+                logger.warning(f"[TA] 寫模擬交易訊號失敗,不影響主流程: {e}")
 
         return result
 
     # ---- 私有方法 ----
 
     def _check_availability(self) -> tuple[bool, str]:
-        """检测 tradingagents 是否可用。"""
+        """檢測 tradingagents 是否可用。"""
         try:
             import tradingagents  # noqa: F401
             from tradingagents.graph.trading_graph import TradingAgentsGraph  # noqa: F401
         except ImportError as e:
             return False, (
-                "tradingagents 未安装。运行 `pip install -r requirements.txt` "
-                "(或单独 `pip install \"tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git\"`)。"
-                "公司代理下若失败,临时 `env -u HTTP_PROXY -u HTTPS_PROXY pip install -r requirements.txt`。"
-                f"原始错误: {e}"
+                "tradingagents 未安裝。執行 `pip install -r requirements.txt` "
+                "(或單獨 `pip install \"tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git\"`)。"
+                "公司代理下若失敗,臨時 `env -u HTTP_PROXY -u HTTPS_PROXY pip install -r requirements.txt`。"
+                f"原始錯誤: {e}"
             )
         except Exception as e:
-            return False, f"tradingagents 加载失败: {e}"
+            return False, f"tradingagents 載入失敗: {e}"
         return True, ""
 
     def _make_trace_id(self, symbol: str) -> str:
         return f"ta-{symbol}-{int(datetime.now().timestamp())}"
 
     def _try_cache_hit(self, stock) -> AnalysisResult | None:
-        """同标的同日是否已分析过 → 返回缓存的 AnalysisResult。"""
+        """同標的同日是否已分析過 → 返回快取的 AnalysisResult。"""
         if self.cache_ttl_hours <= 0:
             return None
         try:
@@ -518,7 +518,7 @@ class TradingAgentsAgent(BaseAgent):
             return None
         return AnalysisResult(
             agent_name=self.name,
-            title=history.title or f"【深度·缓存】{stock.name}({stock.symbol})",
+            title=history.title or f"【深度·快取】{stock.name}({stock.symbol})",
             content=history.content,
             raw_data=dict(history.raw_data),
         )
@@ -536,23 +536,23 @@ class TradingAgentsAgent(BaseAgent):
         portfolio: Any | None = None,
         cancel_event: threading.Event | None = None,
     ) -> dict[str, Any]:
-        """在 worker 线程跑同步 TradingAgents 流程。
+        """在 worker 執行緒跑同步 TradingAgents 流程。
 
-        步骤:
-        1. inject_api_key_env 注入 API key 到环境变量
-        2. patch_route_to_vendor 让 A 股请求路由到 PanWatch 数据
-        3. TradingAgentsGraph.propagate 跑 3-5 分钟
+        步驟:
+        1. inject_api_key_env 注入 API key 到環境變數
+        2. patch_route_to_vendor 讓 A 股請求路由到 PanWatch 資料
+        3. TradingAgentsGraph.propagate 跑 3-5 分鐘
         4. 返回 decision + final_state + cost_usd
         """
-        # 关键依赖延迟 import,确保 _check_availability 失败时这里不被调用
+        # 關鍵依賴延遲 import,確保 _check_availability 失敗時這裡不被呼叫
         from tradingagents.graph.trading_graph import TradingAgentsGraph
 
-        # 应用 LangChain 兼容性补丁:让小模型 (Qwen 7B 等) 返回的
-        # tool_calls.args 字符串被自动转 dict。
+        # 應用 LangChain 相容性補丁:讓小模型 (Qwen 7B 等) 返回的
+        # tool_calls.args 字串被自動轉 dict。
         apply_compat_patches()
         inject_api_key_env(ai_client)
 
-        # patch + 数据上下文,确保 TradingAgents 调 route_to_vendor 时拿到 PanWatch 数据
+        # patch + 資料上下文,確保 TradingAgents 調 route_to_vendor 時拿到 PanWatch 資料
         trace_id_for_ctx = getattr(progress_handler, "trace_id", "") if progress_handler else ""
         with patch_route_to_vendor(), panwatch_data_context(
             panwatch_data,
@@ -563,16 +563,16 @@ class TradingAgentsAgent(BaseAgent):
                 selected_analysts=ta_config["selected_analysts"],
                 debug=False,
                 config=ta_config,
-                # callbacks 接受 langchain BaseCallbackHandler 列表;LLM 级别用
+                # callbacks 接受 langchain BaseCallbackHandler 列表;LLM 級別用
                 callbacks=[progress_handler] if progress_handler else None,
             )
 
-            # 注入 LangGraph 节点级 callbacks(propagator.get_graph_args 默认 callbacks=None,
-            # 不会触发 on_chain_start/end → 进度条永远卡 pending)
+            # 注入 LangGraph 節點級 callbacks(propagator.get_graph_args 預設 callbacks=None,
+            # 不會觸發 on_chain_start/end → 進度條永遠卡 pending)
             if progress_handler is not None:
                 self._inject_graph_callbacks(graph, progress_handler)
 
-            # 0.5.0 原生提供 instrument_context；标的元数据不应污染 past_context。
+            # 0.5.0 原生提供 instrument_context；標的後設資料不應汙染 past_context。
             if stock_metadata_context:
                 patch_instrument_context(graph, stock_metadata_context)
 
@@ -583,7 +583,7 @@ class TradingAgentsAgent(BaseAgent):
                 portfolio=to_tradingagents_portfolio(portfolio),
             )
 
-        # 成本提取(TradingAgents 内部 token 统计;若上游未暴露,fallback 用 estimate)
+        # 成本提取(TradingAgents 內部 token 統計;若上游未暴露,fallback 用 estimate)
         cost_usd = self._extract_cost_from_graph(graph) or self._fallback_cost_estimate(
             ta_config
         )
@@ -596,9 +596,9 @@ class TradingAgentsAgent(BaseAgent):
 
     @staticmethod
     def _inject_graph_callbacks(graph, handler):
-        """Monkey-patch graph.propagator.get_graph_args 让 LangGraph 节点级 callbacks 也注入。
+        """Monkey-patch graph.propagator.get_graph_args 讓 LangGraph 節點級 callbacks 也注入。
 
-        否则只有 on_llm_start/end 会触发,on_chain_start/end (节点切换) 不会,进度条卡死。
+        否則只有 on_llm_start/end 會觸發,on_chain_start/end (節點切換) 不會,進度條卡死。
         """
         try:
             propagator = getattr(graph, "propagator", None)
@@ -614,11 +614,11 @@ class TradingAgentsAgent(BaseAgent):
 
             propagator.get_graph_args = _patched  # type: ignore[method-assign]
         except Exception as e:
-            logger.warning(f"[TA] 注入 LangGraph callbacks 失败: {e}")
+            logger.warning(f"[TA] 注入 LangGraph callbacks 失敗: {e}")
 
     @staticmethod
     def _collect_toolkit_diagnostic(trace_id: str) -> dict:
-        """查同 trace_id 的 ta_toolkit 日志,聚合成 {summary, recent}。"""
+        """查同 trace_id 的 ta_toolkit 日誌,聚合成 {summary, recent}。"""
         from src.platform.persistence.database import SessionLocal
         from src.platform.persistence.models import LogEntry
 
@@ -653,7 +653,7 @@ class TradingAgentsAgent(BaseAgent):
 
     @staticmethod
     def _extract_cost_from_graph(graph) -> float:
-        """尝试从 TradingAgentsGraph 实例提取累计成本。上游未必暴露字段,容错。"""
+        """嘗試從 TradingAgentsGraph 例項提取累計成本。上游未必暴露欄位,容錯。"""
         for attr in ("total_cost", "total_cost_usd", "_total_cost"):
             v = getattr(graph, attr, None)
             if v is not None:

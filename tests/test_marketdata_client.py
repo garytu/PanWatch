@@ -5,13 +5,13 @@ import src.platform.marketdata.marketdata_client as mc
 
 
 def test_quote_to_row_keys():
-    q = Quote(symbol="600519", market="CN", current_price=1700.0, name="贵州茅台",
+    q = Quote(symbol="600519", market="CN", current_price=1700.0, name="貴州茅臺",
               change_pct=1.2, volume_ratio=1.1, pe_ratio=35.0)
     row = mc._quote_to_row(q)
-    assert row["symbol"] == "600519" and row["name"] == "贵州茅台"
+    assert row["symbol"] == "600519" and row["name"] == "貴州茅臺"
     assert row["current_price"] == 1700.0 and row["change_pct"] == 1.2
     assert row["volume_ratio"] == 1.1 and row["pe_ratio"] == 35.0
-    # 兼容旧 orchestrator dict 的关键键都在
+    # 相容舊 orchestrator dict 的關鍵鍵都在
     for k in ("symbol", "name", "market", "current_price", "change_pct",
               "change_amount", "prev_close", "open_price", "high_price",
               "low_price", "volume", "turnover", "turnover_rate",
@@ -45,7 +45,7 @@ def test_db_config_provider_maps_rows(monkeypatch):
 
 
 def test_db_config_provider_skips_tencent_us_kline(monkeypatch):
-    """美股 K 线跳过腾讯探测，避免每只股票固定产生 501 后再回退。"""
+    """美股 K 線跳過騰訊探測，避免每隻股票固定產生 501 後再回退。"""
     rows = [
         SimpleNamespace(provider="tencent", priority=0, config={}, supports_batch=False),
         SimpleNamespace(provider="stooq", priority=15, config={}, supports_batch=False),

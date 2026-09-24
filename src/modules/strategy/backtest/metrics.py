@@ -1,8 +1,8 @@
-"""回测绩效指标 —— 纯函数,仅依赖标准库。
+"""回測績效指標 —— 純函式,僅依賴標準庫。
 
-约定:
-- equity_curve: list[float],逐(交易日)净值序列(含浮动盈亏),首元素为期初资金。
-- trade_pnls: list[float],每笔已平仓交易的净盈亏(已扣成本)。
+約定:
+- equity_curve: list[float],逐(交易日)淨值序列(含未實現損益),首元素為期初資金。
+- trade_pnls: list[float],每筆已平倉交易的淨損益(已扣成本)。
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ TRADING_DAYS_PER_YEAR = 252
 
 
 def daily_returns(equity_curve: list[float]) -> list[float]:
-    """由净值序列推日收益率。"""
+    """由淨值序列推日報酬率。"""
     out: list[float] = []
     for i in range(1, len(equity_curve)):
         prev = equity_curve[i - 1]
@@ -42,7 +42,7 @@ def annualized_return(
 
 
 def max_drawdown(equity_curve: list[float]) -> float:
-    """最大回撤(正数,如 0.23 表示 -23%)。"""
+    """最大回檔(正數,如 0.23 表示 -23%)。"""
     if len(equity_curve) < 2:
         return 0.0
     peak = equity_curve[0]
@@ -62,7 +62,7 @@ def sharpe(
     risk_free: float = 0.0,
     periods_per_year: int = TRADING_DAYS_PER_YEAR,
 ) -> float:
-    """年化夏普(样本标准差)。returns 为周期收益率序列。"""
+    """年化夏普(樣本標準差)。returns 為週期報酬率序列。"""
     if len(returns) < 2:
         return 0.0
     rf_per_period = risk_free / periods_per_year
@@ -82,7 +82,7 @@ def win_rate(trade_pnls: list[float]) -> float:
 
 
 def profit_factor(trade_pnls: list[float]) -> float:
-    """盈亏比 = 总盈利 / 总亏损(绝对值)。无亏损时返回 inf。"""
+    """賺賠比 = 總盈利 / 總虧損(絕對值)。無虧損時返回 inf。"""
     gains = sum(p for p in trade_pnls if p > 0)
     losses = -sum(p for p in trade_pnls if p < 0)
     if losses == 0:
@@ -99,7 +99,7 @@ def avg_win_loss(trade_pnls: list[float]) -> tuple[float, float]:
 
 
 def summarize(equity_curve: list[float], trade_pnls: list[float]) -> dict:
-    """汇总所有绩效指标为一个 dict。"""
+    """彙總所有績效指標為一個 dict。"""
     rets = daily_returns(equity_curve)
     avg_w, avg_l = avg_win_loss(trade_pnls)
     return {

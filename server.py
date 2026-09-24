@@ -1,4 +1,4 @@
-"""PanWatch 统一服务入口 - Web 后台 + Agent 调度"""
+"""PanWatch 統一服務入口 - Web 後臺 + Agent 排程"""
 
 import asyncio
 import logging
@@ -47,7 +47,7 @@ from src.modules.market.data_collector import DEFAULT_TEST_SYMBOLS
 
 logger = logging.getLogger(__name__)
 
-# 全局 scheduler 实例，供 agents API 调用
+# 全域性 scheduler 例項，供 agents API 呼叫
 scheduler: AgentScheduler | None = None
 price_alert_scheduler: PriceAlertScheduler | None = None
 paper_trading_scheduler: PaperTradingScheduler | None = None
@@ -55,17 +55,17 @@ context_maintenance_scheduler: ContextMaintenanceScheduler | None = None
 
 
 def apply_proxy_env(proxy: str | None) -> None:
-    """统一更新进程环境变量代理,让所有 httpx 默认 Client (trust_env=True) 走该代理。
+    """統一更新程式環境變數代理,讓所有 httpx 預設 Client (trust_env=True) 走該代理。
 
-    传空字符串 / None 时清除环境变量(取消代理)。
-    NO_PROXY 默认含 localhost / 回环地址,避免本地访问绕一圈。
+    傳空字串 / None 時清除環境變數(取消代理)。
+    NO_PROXY 預設含 localhost / 迴環地址,避免本地訪問繞一圈。
     """
     p = (proxy or "").strip()
     if p:
         os.environ["HTTP_PROXY"] = p
         os.environ["HTTPS_PROXY"] = p
         os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1,::1,0.0.0.0")
-        logger.info(f"HTTP/HTTPS 代理已应用: {p}")
+        logger.info(f"HTTP/HTTPS 代理已應用: {p}")
     else:
         for key in ("HTTP_PROXY", "HTTPS_PROXY"):
             os.environ.pop(key, None)
@@ -73,16 +73,16 @@ def apply_proxy_env(proxy: str | None) -> None:
 
 
 def setup_proxy():
-    """启动时把已配置的 HTTP 代理桥接到环境变量。
+    """啟動時把已配置的 HTTP 代理橋接到環境變數。
 
-    优先级:
-    1. 已存在的 HTTP_PROXY / HTTPS_PROXY 环境变量(用户显式覆盖,不动)
+    優先順序:
+    1. 已存在的 HTTP_PROXY / HTTPS_PROXY 環境變數(使用者顯式覆蓋,不動)
     2. app_settings.http_proxy(UI 配置)
     3. .env 中的 http_proxy(Settings.http_proxy)
     """
     if os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY"):
         logger.info(
-            f"沿用现有环境变量代理: HTTP_PROXY={os.environ.get('HTTP_PROXY', '')} "
+            f"沿用現有環境變數代理: HTTP_PROXY={os.environ.get('HTTP_PROXY', '')} "
             f"HTTPS_PROXY={os.environ.get('HTTPS_PROXY', '')}"
         )
         os.environ.setdefault("NO_PROXY", "localhost,127.0.0.1,::1,0.0.0.0")
@@ -110,7 +110,7 @@ def setup_proxy():
 
 
 def setup_ssl():
-    """设置 SSL 证书环境（企业代理环境）"""
+    """設定 SSL 證書環境（企業代理環境）"""
     settings = Settings()
     ca_cert = settings.ca_cert_file
     if not ca_cert or not os.path.exists(ca_cert):
@@ -135,16 +135,16 @@ def setup_ssl():
 
     os.environ["SSL_CERT_FILE"] = bundle_path
     os.environ["REQUESTS_CA_BUNDLE"] = bundle_path
-    logger.info(f"SSL 证书已加载: {bundle_path}")
+    logger.info(f"SSL 證書已載入: {bundle_path}")
 
 
 def setup_logging():
-    """配置日志: 控制台 + 数据库
+    """配置日誌: 主控台 + 資料庫
 
-    分级策略:
-    - root logger 始终 DEBUG,所有日志都会传播到 handler
-    - 控制台 handler 按 LOG_LEVEL 过滤(默认 INFO),并丢弃 httpx 等三方库的 < WARNING 噪音
-    - DB handler 始终 DEBUG 全量收录,UI 日志板永远可以看到包括心跳/httpx 请求在内的完整记录
+    分級策略:
+    - root logger 始終 DEBUG,所有日誌都會傳播到 handler
+    - 主控台 handler 按 LOG_LEVEL 過濾(預設 INFO),並丟棄 httpx 等三方庫的 < WARNING 噪音
+    - DB handler 始終 DEBUG 全量收錄,UI 日誌板永遠可以看到包括心跳/httpx 請求在內的完整記錄
     """
     console_level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     console_level = getattr(logging, console_level_name, logging.INFO)
@@ -153,7 +153,7 @@ def setup_logging():
     root.setLevel(logging.DEBUG)
     install_log_record_factory()
 
-    # reload/server restart 时避免重复 handler 导致日志放大。
+    # reload/server restart 時避免重複 handler 導致日誌放大。
     for h in list(root.handlers):
         if isinstance(h, DBLogHandler) or getattr(h, "_panwatch_console", False):
             root.removeHandler(h)
@@ -162,7 +162,7 @@ def setup_logging():
             except Exception:
                 pass
 
-    # 控制台输出: 按 LOG_LEVEL 过滤,且丢弃三方库的低级别噪音
+    # 主控台輸出: 按 LOG_LEVEL 過濾,且丟棄三方庫的低階別噪音
     console = logging.StreamHandler()
     console._panwatch_console = True  # type: ignore[attr-defined]
     console.setLevel(console_level)
@@ -174,14 +174,14 @@ def setup_logging():
     )
     root.addHandler(console)
 
-    # 数据库持久化: 始终全量收录,UI 日志板可查 DEBUG
+    # 資料庫持久化: 始終全量收錄,UI 日誌板可查 DEBUG
     db_handler = DBLogHandler(level=logging.DEBUG)
     db_handler.setFormatter(logging.Formatter("%(message)s"))
     root.addHandler(db_handler)
 
-    # uvicorn 默认给自己挂了 stderr handler 并且 propagate=False,导致 access log
-    # 走自己的链路(`INFO: 127.0.0.1 - "GET /api/..."`)不被我们的 filter 拦截。
-    # 改成清空自己的 handler + propagate 到 root,让 _ConsoleNoiseFilter 生效。
+    # uvicorn 預設給自己掛了 stderr handler 並且 propagate=False,導致 access log
+    # 走自己的鏈路(`INFO: 127.0.0.1 - "GET /api/..."`)不被我們的 filter 攔截。
+    # 改成清空自己的 handler + propagate 到 root,讓 _ConsoleNoiseFilter 生效。
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
         lg = logging.getLogger(name)
         lg.handlers = []
@@ -190,11 +190,11 @@ def setup_logging():
 
 
 class _ConsoleNoiseFilter(logging.Filter):
-    """控制台 handler 过滤器: 三方库的 INFO/DEBUG 不进 stdout,WARNING+ 仍然显示。
-    DB handler 不挂这个过滤器,UI 日志板能看到完整请求记录。
+    """主控台 handler 過濾器: 三方庫的 INFO/DEBUG 不進 stdout,WARNING+ 仍然顯示。
+    DB handler 不掛這個過濾器,UI 日誌板能看到完整請求記錄。
 
-    uvicorn.access 是每条请求的 access log(`INFO: 127.0.0.1 - "GET /api/..." 200 OK`),
-    属于底层心跳;uvicorn / uvicorn.error 是应用级日志(启动、报错),保留。"""
+    uvicorn.access 是每條請求的 access log(`INFO: 127.0.0.1 - "GET /api/..." 200 OK`),
+    屬於底層心跳;uvicorn / uvicorn.error 是應用級日誌(啟動、報錯),保留。"""
 
     _NOISY_PREFIXES = ("httpx", "httpcore", "urllib3", "apscheduler", "uvicorn.access")
 
@@ -209,36 +209,36 @@ class _ConsoleNoiseFilter(logging.Filter):
 
 
 def setup_playwright():
-    """检查并安装 Playwright 浏览器
+    """檢查並安裝 Playwright 瀏覽器
 
-    本地开发时使用系统安装的 Playwright，Docker 环境下安装到 data 目录。
-    通过 DOCKER 环境变量或显式设置的 PLAYWRIGHT_BROWSERS_PATH 来判断。
+    本地開發時使用系統安裝的 Playwright，Docker 環境下安裝到 data 目錄。
+    透過 DOCKER 環境變數或顯式設定的 PLAYWRIGHT_BROWSERS_PATH 來判斷。
     """
     import subprocess
 
-    # 允许通过环境变量跳过首次安装（例如不需要截图功能时）
+    # 允許透過環境變數跳過首次安裝（例如不需要截圖功能時）
     if os.environ.get("PLAYWRIGHT_SKIP_BROWSER_INSTALL") == "1":
         logger.info(
-            "已设置 PLAYWRIGHT_SKIP_BROWSER_INSTALL=1，跳过 Playwright 浏览器安装"
+            "已設定 PLAYWRIGHT_SKIP_BROWSER_INSTALL=1，跳過 Playwright 瀏覽器安裝"
         )
         return
 
-    # 如果用户已显式设置 PLAYWRIGHT_BROWSERS_PATH，尊重该设置
+    # 如果使用者已顯式設定 PLAYWRIGHT_BROWSERS_PATH，尊重該設定
     if "PLAYWRIGHT_BROWSERS_PATH" in os.environ:
         browser_dir = os.environ["PLAYWRIGHT_BROWSERS_PATH"]
-        logger.info(f"使用自定义 Playwright 路径: {browser_dir}")
-    # Docker 环境下安装到 data 目录
+        logger.info(f"使用自定義 Playwright 路徑: {browser_dir}")
+    # Docker 環境下安裝到 data 目錄
     elif os.environ.get("DOCKER") == "1":
         data_dir = os.environ.get("DATA_DIR", "./data")
         browser_dir = os.path.join(data_dir, "playwright")
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = browser_dir
-        logger.info(f"Docker 环境，Playwright 路径: {browser_dir}")
+        logger.info(f"Docker 環境，Playwright 路徑: {browser_dir}")
     else:
-        # 本地开发，使用系统默认路径，不做任何安装
-        logger.info("本地开发环境，使用系统 Playwright")
+        # 本地開發，使用系統預設路徑，不做任何安裝
+        logger.info("本地開發環境，使用系統 Playwright")
         return
 
-    # 检查是否已安装
+    # 檢查是否已安裝
     if os.path.exists(browser_dir):
         try:
             dirs = os.listdir(browser_dir)
@@ -247,13 +247,13 @@ def setup_playwright():
                 for d in dirs
                 if os.path.isdir(os.path.join(browser_dir, d))
             ):
-                logger.info(f"Playwright 浏览器已就绪: {browser_dir}")
+                logger.info(f"Playwright 瀏覽器已就緒: {browser_dir}")
                 return
         except Exception:
             pass
 
-    # 首次安装
-    logger.info("首次启动，正在安装 Playwright 浏览器（可能需要几分钟）...")
+    # 首次安裝
+    logger.info("首次啟動，正在安裝 Playwright 瀏覽器（可能需要幾分鐘）...")
     os.makedirs(browser_dir, exist_ok=True)
 
     try:
@@ -262,45 +262,45 @@ def setup_playwright():
             env={**os.environ, "PLAYWRIGHT_BROWSERS_PATH": browser_dir},
             capture_output=True,
             text=True,
-            timeout=600,  # 10 分钟超时
+            timeout=600,  # 10 分鐘超時
         )
         if result.returncode == 0:
-            logger.info("Playwright 浏览器安装完成")
+            logger.info("Playwright 瀏覽器安裝完成")
         else:
-            logger.error(f"Playwright 安装失败: {result.stderr}")
+            logger.error(f"Playwright 安裝失敗: {result.stderr}")
     except subprocess.TimeoutExpired:
-        logger.error("Playwright 安装超时（网络问题？）")
+        logger.error("Playwright 安裝超時（網路問題？）")
     except FileNotFoundError:
-        logger.warning("Playwright 命令不可用，K线截图功能不可用")
+        logger.warning("Playwright 命令不可用，K線截圖功能不可用")
     except Exception as e:
-        logger.error(f"Playwright 安装失败: {e}")
+        logger.error(f"Playwright 安裝失敗: {e}")
 
 
 def seed_sample_stocks():
-    """首次启动时添加示例股票"""
+    """首次啟動時新增示例股票"""
     db = SessionLocal()
     try:
-        # 只在没有任何股票时才添加示例
+        # 只在沒有任何股票時才新增示例
         if db.query(Stock).count() > 0:
             return
 
         samples = [
-            {"symbol": "600519", "name": "贵州茅台", "market": "CN"},
-            {"symbol": "002594", "name": "比亚迪", "market": "CN"},
-            {"symbol": "300750", "name": "宁德时代", "market": "CN"},
-            {"symbol": "00700", "name": "腾讯控股", "market": "HK"},
-            {"symbol": "AAPL", "name": "苹果", "market": "US"},
+            {"symbol": "600519", "name": "貴州茅臺", "market": "CN"},
+            {"symbol": "002594", "name": "比亞迪", "market": "CN"},
+            {"symbol": "300750", "name": "寧德時代", "market": "CN"},
+            {"symbol": "00700", "name": "騰訊控股", "market": "HK"},
+            {"symbol": "AAPL", "name": "蘋果", "market": "US"},
         ]
         for s in samples:
             db.add(Stock(**s))
         db.commit()
-        logger.info("已添加 5 只示例股票（首次启动）")
+        logger.info("已新增 5 只示例股票（首次啟動）")
     finally:
         db.close()
 
 
 def seed_agents():
-    """初始化内置 Agent 配置"""
+    """初始化內建 Agent 配置"""
     db = SessionLocal()
     for spec in AGENT_SEED_SPECS:
         existing = db.query(AgentConfig).filter(AgentConfig.name == spec.name).first()
@@ -322,7 +322,7 @@ def seed_agents():
                 )
             )
         else:
-            # 始终同步 execution_mode（确保代码中的定义生效）
+            # 始終同步 execution_mode（確保程式碼中的定義生效）
             existing.execution_mode = spec.execution_mode or "batch"
             # 同步 display_name 和 description
             existing.display_name = spec.display_name or existing.display_name
@@ -333,15 +333,15 @@ def seed_agents():
             existing.replaced_by = spec.replaced_by or ""
             existing.display_order = int(spec.display_order or 0)
 
-            # capability 强制不参与调度，避免旧配置继续触发。
+            # capability 強制不參與排程，避免舊配置繼續觸發。
             if spec.kind != AGENT_KIND_WORKFLOW:
                 existing.enabled = False
                 existing.schedule = ""
 
-            # 仅在用户未配置时补齐默认 config
+            # 僅在使用者未配置時補齊預設 config
             if spec.config and (not existing.config):
                 existing.config = spec.config
-            # 对已存在配置做“向前兼容”的字段补齐（不覆盖用户已有值）
+            # 對已存在配置做“向前相容”的欄位補齊（不覆蓋使用者已有值）
             if existing.name == "intraday_monitor":
                 cfg = existing.config or {}
                 if isinstance(cfg, dict) and "event_only" not in cfg:
@@ -352,17 +352,17 @@ def seed_agents():
     db.close()
 
 
-# 预置数据源种子(供 seed_data_sources / reconcile_data_sources 复用)。
-# 只增不删的 upsert 目标;删孤儿的对账逻辑见 reconcile_data_sources。
+# 預置資料來源種子(供 seed_data_sources / reconcile_data_sources 複用)。
+# 只增不刪的 upsert 目標;刪孤兒的對帳邏輯見 reconcile_data_sources。
 DATA_SOURCE_SEEDS: list[dict] = [
-        # 新闻类数据源
+        # 新聞類資料來源
         {
-            "name": "雪球资讯",
+            "name": "雪球資訊",
             "type": "news",
             "provider": "xueqiu",
             "config": {
                 "cookies": "",
-                "description": "雪球个股新闻聚合，需要登录 cookie",
+                "description": "雪球個股新聞聚合，需要登入 cookie",
             },
             "enabled": False,
             "priority": 0,
@@ -370,28 +370,28 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东方财富资讯",
+            "name": "東方財富資訊",
             "type": "news",
             "provider": "eastmoney_news",
             "config": {},
             "enabled": True,
             "priority": 1,
-            "supports_batch": False,  # 每只股票单独请求
+            "supports_batch": False,  # 每隻股票單獨請求
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东方财富公告",
+            "name": "東方財富公告",
             "type": "news",
             "provider": "eastmoney",
             "config": {},
             "enabled": True,
             "priority": 2,
-            "supports_batch": True,  # 支持批量查询
+            "supports_batch": True,  # 支援批次查詢
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
-        # K线数据源
+        # K線資料來源
         {
-            "name": "腾讯K线",
+            "name": "騰訊K線",
             "type": "kline",
             "provider": "tencent",
             "config": {},
@@ -401,42 +401,42 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东方财富 K线",
+            "name": "東方財富 K線",
             "type": "kline",
             "provider": "eastmoney",
-            "config": {"description": "东方财富日线,A股/港股长历史兜底(免 key)。"},
+            "config": {"description": "東方財富日線,A股/港股長曆史兜底(免 key)。"},
             "enabled": True,
-            "priority": 5,   # 腾讯(0)之后、Tushare(10)之前 → CN/HK 兜底
+            "priority": 5,   # 騰訊(0)之後、Tushare(10)之前 → CN/HK 兜底
             "supports_batch": False,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "Stooq K线",
+            "name": "Stooq K線",
             "type": "kline",
             "provider": "stooq",
-            "config": {"description": "Stooq 美股日线兜底(免 key)。"},
+            "config": {"description": "Stooq 美股日線兜底(免 key)。"},
             "enabled": True,
-            "priority": 15,  # US 兜底(腾讯 0 之后)
+            "priority": 15,  # US 兜底(騰訊 0 之後)
             "supports_batch": False,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "Yahoo K线",
+            "name": "Yahoo K線",
             "type": "kline",
             "provider": "yahoo",
             "config": {
-                "description": "Yahoo chart v8 日线(US/HK,免 key 免 crumb)。国内访问通常需代理,"
-                "在 config.proxy 填写代理地址后启用,作港股 K线第二源/美股更稳兜底。",
+                "description": "Yahoo chart v8 日線(US/HK,免 key 免 crumb)。國內訪問通常需代理,"
+                "在 config.proxy 填寫代理地址後啟用,作港股 K線第二源/美股更穩兜底。",
                 "proxy": "",
             },
-            "enabled": False,  # 需代理,默认关(同 YFinance 口径),用户配好 proxy 再开
-            "priority": 20,  # US/HK 最后兜底
+            "enabled": False,  # 需代理,預設關(同 YFinance 口徑),使用者配好 proxy 再開
+            "priority": 20,  # US/HK 最後兜底
             "supports_batch": False,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
-        # 资金流向数据源
+        # 資金流向資料來源
         {
-            "name": "东方财富资金流",
+            "name": "東方財富資金流",
             "type": "capital_flow",
             "provider": "eastmoney",
             "config": {},
@@ -446,21 +446,21 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "新浪资金流",
+            "name": "新浪資金流",
             "type": "capital_flow",
             "provider": "sina",
             "config": {
-                "description": "新浪资金流入趋势(CN,免 key)。作东财之后的第二源,"
-                "仅含主力/超大单净额(无大/中/小单细分)。",
+                "description": "新浪資金流入趨勢(CN,免 key)。作東財之後的第二源,"
+                "僅含主力/超大單淨額(無大/中/小單細分)。",
             },
             "enabled": True,
-            "priority": 5,  # 东财(0)之后的 CN 第二源
+            "priority": 5,  # 東財(0)之後的 CN 第二源
             "supports_batch": False,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
-        # 实时行情数据源
+        # 即時行情資料來源
         {
-            "name": "腾讯行情",
+            "name": "騰訊行情",
             "type": "quote",
             "provider": "tencent",
             "config": {},
@@ -470,22 +470,22 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东方财富行情",
+            "name": "東方財富行情",
             "type": "quote",
             "provider": "eastmoney",
-            "config": {"description": "东方财富 push2 实时行情(CN,免 key)。作腾讯之后的 A 股第二源。"},
+            "config": {"description": "東方財富 push2 即時行情(CN,免 key)。作騰訊之後的 A 股第二源。"},
             "enabled": True,
-            "priority": 3,  # 腾讯(0)之后的 CN 第二源(sina/yfinance 不支持 CN)
-            "supports_batch": False,  # push2 stock/get 单只查询,逐只
+            "priority": 3,  # 騰訊(0)之後的 CN 第二源(sina/yfinance 不支援 CN)
+            "supports_batch": False,  # push2 stock/get 單隻查詢,逐只
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
             "name": "Sina 行情",
             "type": "quote",
             "provider": "sina",
-            "config": {"description": "新浪美股/港股实时行情,免 key 免代理,作腾讯之后的 US/HK 备源。"},
+            "config": {"description": "新浪美股/港股即時行情,免 key 免代理,作騰訊之後的 US/HK 備源。"},
             "enabled": True,
-            "priority": 5,   # 腾讯(0)之后
+            "priority": 5,   # 騰訊(0)之後
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
@@ -494,16 +494,16 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "type": "quote",
             "provider": "yfinance",
             "config": {
-                "description": "Yahoo Finance,需 pip install yfinance。适用 HK/US,A 股不可用。",
+                "description": "Yahoo Finance,需 pip install yfinance。適用 HK/US,A 股不可用。",
             },
             "enabled": False,
             "priority": 10,
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
-        # 事件日历数据源（基于公告结构化）
+        # 事件日曆資料來源（基於公告結構化）
         {
-            "name": "东方财富事件日历",
+            "name": "東方財富事件日曆",
             "type": "events",
             "provider": "eastmoney",
             "config": {},
@@ -512,67 +512,67 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
-        # 快讯数据源（7×24 电报，市场级，不按 symbols 过滤）
+        # 快訊資料來源（7×24 電報，市場級，不按 symbols 過濾）
         {
-            "name": "财联社快讯",
+            "name": "財聯社快訊",
             "type": "flash_news",
             "provider": "cls",
-            "config": {"description": "财联社 7×24 电报(免 key,本地签名)。"},
+            "config": {"description": "財聯社 7×24 電報(免 key,本地簽名)。"},
             "enabled": True,
             "priority": 0,
             "supports_batch": False,
             "test_symbols": [],
         },
         {
-            "name": "新浪7x24快讯",
+            "name": "新浪7x24快訊",
             "type": "flash_news",
             "provider": "sina",
-            "config": {"description": "新浪财经 7×24 直播,带关联个股。"},
+            "config": {"description": "新浪財經 7×24 直播,帶關聯個股。"},
             "enabled": True,
             "priority": 5,
             "supports_batch": False,
             "test_symbols": [],
         },
         {
-            "name": "东方财富7x24快讯",
+            "name": "東方財富7x24快訊",
             "type": "flash_news",
             "provider": "eastmoney",
-            "config": {"description": "东财 np-weblist 7×24 资讯,与财联社互备。"},
+            "config": {"description": "東財 np-weblist 7×24 資訊,與財聯社互備。"},
             "enabled": True,
             "priority": 10,
             "supports_batch": False,
             "test_symbols": [],
         },
-        # 基本面数据源（按 symbol，估值/股本/财报指标）
+        # 基本面資料來源（按 symbol，估值/股本/財報指標）
         {
-            "name": "腾讯基本面",
+            "name": "騰訊基本面",
             "type": "fundamentals",
             "provider": "tencent",
-            "config": {"description": "腾讯 qt.gtimg 估值快照(CN,免 key):PE/PB/市值。"},
+            "config": {"description": "騰訊 qt.gtimg 估值快照(CN,免 key):PE/PB/市值。"},
             "enabled": True,
             "priority": 0,
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东方财富基本面",
+            "name": "東方財富基本面",
             "type": "fundamentals",
             "provider": "eastmoney",
             "config": {
-                "description": "东财基本面:CN 股本/市值(push2),US/HK 财报指标(GMAININDICATOR)。"
+                "description": "東財基本面:CN 股本/市值(push2),US/HK 財報指標(GMAININDICATOR)。"
             },
             "enabled": True,
             "priority": 5,
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
-        # 市场资金面数据源（龙虎榜/融资融券/股东户数/分红/北向资金）
+        # 市場資金面資料來源（龍虎榜/融資融券/股東戶數/分紅/北向資金）
         {
-            "name": "东财龙虎榜",
+            "name": "東財龍虎榜",
             "type": "dragon_tiger",
             "provider": "eastmoney",
             "config": {
-                "description": "东财每日龙虎榜(市场级,需配 test_date 测试)。",
+                "description": "東財每日龍虎榜(市場級,需配 test_date 測試)。",
                 "test_date": "",
             },
             "enabled": True,
@@ -581,50 +581,50 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "test_symbols": [],
         },
         {
-            "name": "东财融资融券",
+            "name": "東財融資融券",
             "type": "margin",
             "provider": "eastmoney",
-            "config": {"description": "东财个股融资融券明细(按 symbol)。"},
+            "config": {"description": "東財個股融資融券明細(按 symbol)。"},
             "enabled": True,
             "priority": 0,
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东财股东户数",
+            "name": "東財股東戶數",
             "type": "shareholders",
             "provider": "eastmoney",
-            "config": {"description": "东财股东户数变化(按 symbol,季度)。"},
+            "config": {"description": "東財股東戶數變化(按 symbol,季度)。"},
             "enabled": True,
             "priority": 0,
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东财分红",
+            "name": "東財分紅",
             "type": "dividend",
             "provider": "eastmoney",
-            "config": {"description": "东财分红送转历史(按 symbol)。"},
+            "config": {"description": "東財分紅送轉歷史(按 symbol)。"},
             "enabled": True,
             "priority": 0,
             "supports_batch": True,
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "同花顺北向资金",
+            "name": "同花順北向資金",
             "type": "northbound",
             "provider": "ths",
             "config": {
-                "description": "同花顺北向资金实时(东财已断供;深股通近期不可靠)。"
+                "description": "同花順北向資金即時(東財已斷供;深股通近期不可靠)。"
             },
             "enabled": True,
             "priority": 0,
             "supports_batch": False,
             "test_symbols": [],
         },
-        # K线截图数据源
+        # K線截圖資料來源
         {
-            "name": "雪球K线截图",
+            "name": "雪球K線截圖",
             "type": "chart",
             "provider": "xueqiu",
             "config": {
@@ -637,7 +637,7 @@ DATA_SOURCE_SEEDS: list[dict] = [
             "test_symbols": list(DEFAULT_TEST_SYMBOLS),
         },
         {
-            "name": "东方财富K线截图",
+            "name": "東方財富K線截圖",
             "type": "chart",
             "provider": "eastmoney",
             "config": {
@@ -653,14 +653,14 @@ DATA_SOURCE_SEEDS: list[dict] = [
 
 
 def seed_data_sources(db=None, *, reset_test_symbols: bool = False) -> list[dict]:
-    """初始化预置数据源(按 name+provider 只增不删的 upsert)。
+    """初始化預置資料來源(按 name+provider 只增不刪的 upsert)。
 
-    db 为 None 时自建独立 session 并自行 commit/close(兼容旧调用方式);
-    传入 db 时复用调用方 session,不 commit/close,交由调用方统一处理
-    (供 reconcile_data_sources 在同一事务里接着做删孤儿)。
+    db 為 None 時自建獨立 session 並自行 commit/close(相容舊呼叫方式);
+    傳入 db 時複用呼叫方 session,不 commit/close,交由呼叫方統一處理
+    (供 reconcile_data_sources 在同一事務裡接著做刪孤兒)。
 
-    reset_test_symbols 仅由“恢复默认”入口传入,用于重置内置源测试股票；普通启动对账不覆盖用户配置。
-    返回本次新增(缺失被补齐)的种子记录摘要列表 [{"name","type","provider"}, ...]。
+    reset_test_symbols 僅由“恢復預設”入口傳入,用於重置內建源測試股票；普通啟動對帳不覆蓋使用者配置。
+    返回本次新增(缺失被補齊)的種子記錄摘要列表 [{"name","type","provider"}, ...]。
     """
     owns_session = db is None
     if owns_session:
@@ -677,12 +677,12 @@ def seed_data_sources(db=None, *, reset_test_symbols: bool = False) -> list[dict
             .first()
         )
         if existing:
-            # 恢复默认时只重置测试代码；配置、启用状态、优先级等用户设置仍保留。
+            # 恢復預設時只重置測試程式碼；配置、啟用狀態、優先順序等使用者設定仍保留。
             if existing.supports_batch != source_data.get("supports_batch", False):
                 existing.supports_batch = source_data.get("supports_batch", False)
             if reset_test_symbols:
                 existing.test_symbols = list(source_data.get("test_symbols", []))
-            elif not existing.test_symbols:  # 启动对账只补空值,不覆盖用户配置
+            elif not existing.test_symbols:  # 啟動對帳只補空值,不覆蓋使用者配置
                 existing.test_symbols = source_data.get("test_symbols", [])
         else:
             db.add(DataSource(**source_data))
@@ -702,7 +702,7 @@ def seed_data_sources(db=None, *, reset_test_symbols: bool = False) -> list[dict
 
 
 def _seed_providers_by_type() -> dict[str, set[str]]:
-    """从 DATA_SOURCE_SEEDS 推导每个 type 当前合法的 provider 集合。"""
+    """從 DATA_SOURCE_SEEDS 推導每個 type 當前合法的 provider 集合。"""
     result: dict[str, set[str]] = {}
     for source_data in DATA_SOURCE_SEEDS:
         result.setdefault(source_data["type"], set()).add(source_data["provider"])
@@ -710,13 +710,13 @@ def _seed_providers_by_type() -> dict[str, set[str]]:
 
 
 def reconcile_data_sources(db, *, reset_test_symbols: bool = False) -> dict:
-    """数据源表温和对账:补缺失默认 + 删孤儿,保留用户有效自定义/凭证。
+    """資料來源表溫和對帳:補缺失預設 + 刪孤兒,保留使用者有效自定義/憑證。
 
-    孤儿判定: legal(type) = PACKAGE_VENDORS_BY_TYPE.get(type, frozenset()) | seed 内该 type 的 provider 集合;
-    DB 行 (type, provider) 不在 legal(type) 内即孤儿。news/chart 等非引擎类型(包内集合为空)的合法性完全由 seed 决定。
+    孤兒判定: legal(type) = PACKAGE_VENDORS_BY_TYPE.get(type, frozenset()) | seed 內該 type 的 provider 集合;
+    DB 行 (type, provider) 不在 legal(type) 內即孤兒。news/chart 等非引擎型別(包內集合為空)的合法性完全由 seed 決定。
 
-    只删孤儿行,其余行(含用户改过 config/priority/enabled 的自定义行)原样保留。
-    reset_test_symbols=True 时,仅覆盖内置种子的 test_symbols,供“恢复默认”使用。
+    只刪孤兒行,其餘行(含使用者改過 config/priority/enabled 的自定義行)原樣保留。
+    reset_test_symbols=True 時,僅覆蓋內建種子的 test_symbols,供“恢復預設”使用。
     """
     from marketdata import PACKAGE_VENDORS_BY_TYPE
 
@@ -733,22 +733,22 @@ def reconcile_data_sources(db, *, reset_test_symbols: bool = False) -> dict:
             db.delete(row)
 
     if seeded_missing:
-        logger.info(f"数据源对账: 补齐缺失默认 {len(seeded_missing)} 条: {seeded_missing}")
+        logger.info(f"資料來源對帳: 補齊缺失預設 {len(seeded_missing)} 條: {seeded_missing}")
     if deleted:
-        logger.info(f"数据源对账: 删除孤儿数据源 {len(deleted)} 条: {deleted}")
+        logger.info(f"資料來源對帳: 刪除孤兒資料來源 {len(deleted)} 條: {deleted}")
 
     db.commit()
     return {"deleted": deleted, "seeded_missing": seeded_missing}
 
 
 def seed_strategies():
-    """初始化策略目录。"""
+    """初始化策略目錄。"""
     ensure_strategy_catalog()
-    logger.info("策略目录初始化完成")
+    logger.info("策略目錄初始化完成")
 
 
 def load_watchlist_for_agent(agent_name: str) -> list[StockConfig]:
-    """从数据库加载某个 Agent 关联的自选股"""
+    """從資料庫載入某個 Agent 關聯的自選股"""
     db = SessionLocal()
     try:
         stock_agents = (
@@ -758,7 +758,7 @@ def load_watchlist_for_agent(agent_name: str) -> list[StockConfig]:
         if not stock_ids:
             return []
 
-        # 绑定优先：只要绑定了 Agent，就纳入执行范围
+        # 繫結優先：只要綁定了 Agent，就納入執行範圍
         stocks = db.query(Stock).filter(Stock.id.in_(stock_ids)).all()
         result = []
         for s in stocks:
@@ -779,12 +779,12 @@ def load_watchlist_for_agent(agent_name: str) -> list[StockConfig]:
 
 
 def load_portfolio_for_agent(agent_name: str) -> PortfolioInfo:
-    """从数据库加载某个 Agent 关联股票的持仓信息（包括多账户）"""
+    """從資料庫載入某個 Agent 關聯股票的持倉資訊（包括多帳戶）"""
     from src.platform.persistence.models import Account, Position
 
     db = SessionLocal()
     try:
-        # 获取 Agent 关联的股票 ID
+        # 獲取 Agent 關聯的股票 ID
         stock_agents = (
             db.query(StockAgent).filter(StockAgent.agent_name == agent_name).all()
         )
@@ -792,12 +792,12 @@ def load_portfolio_for_agent(agent_name: str) -> PortfolioInfo:
         if not stock_ids:
             return PortfolioInfo()
 
-        # 获取所有启用的账户
+        # 獲取所有啟用的帳戶
         accounts = db.query(Account).filter(Account.enabled == True).all()
 
         account_infos = []
         for acc in accounts:
-            # 获取该账户中属于关联股票的持仓
+            # 獲取該帳戶中屬於關聯股票的持倉
             positions = (
                 db.query(Position)
                 .filter(
@@ -847,7 +847,7 @@ def load_portfolio_for_agent(agent_name: str) -> PortfolioInfo:
 
 
 def load_portfolio_for_stock(stock_id: int) -> PortfolioInfo:
-    """从数据库加载单只股票的持仓信息"""
+    """從資料庫載入單隻股票的持倉資訊"""
     from src.platform.persistence.models import Account, Position
 
     db = SessionLocal()
@@ -906,7 +906,7 @@ def load_portfolio_for_stock(stock_id: int) -> PortfolioInfo:
 
 
 def _get_proxy() -> str:
-    """从 app_settings 获取 http_proxy"""
+    """從 app_settings 獲取 http_proxy"""
     db = SessionLocal()
     try:
         setting = db.query(AppSettings).filter(AppSettings.key == "http_proxy").first()
@@ -916,7 +916,7 @@ def _get_proxy() -> str:
 
 
 def _get_app_setting(key: str) -> str:
-    """从 app_settings 获取配置（不存在返回空字符串）"""
+    """從 app_settings 獲取配置（不存在返回空字串）"""
     db = SessionLocal()
     try:
         setting = db.query(AppSettings).filter(AppSettings.key == key).first()
@@ -928,31 +928,31 @@ def _get_app_setting(key: str) -> str:
 def resolve_ai_model(
     agent_name: str, stock_agent_id: int | None = None
 ) -> tuple[AIModel | None, AIService | None]:
-    """解析 AI 模型: stock_agent 覆盖 → agent 默认 → 系统默认(is_default=True)
-    返回 (model, service) 元组"""
+    """解析 AI 模型: stock_agent 覆蓋 → agent 預設 → 系統預設(is_default=True)
+    返回 (model, service) 元組"""
     db = SessionLocal()
     try:
         model_id = None
 
-        # 1. stock_agent 级别覆盖
+        # 1. stock_agent 級別覆蓋
         if stock_agent_id:
             sa = db.query(StockAgent).filter(StockAgent.id == stock_agent_id).first()
             if sa and sa.ai_model_id:
                 model_id = sa.ai_model_id
 
-        # 2. agent 级别默认
+        # 2. agent 級別預設
         if not model_id:
             agent = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
             if agent and agent.ai_model_id:
                 model_id = agent.ai_model_id
 
-        # 3. 系统默认
+        # 3. 系統預設
         if not model_id:
             default_model = db.query(AIModel).filter(AIModel.is_default == True).first()
             if default_model:
                 model_id = default_model.id
 
-        # 4. 回退：取第一个
+        # 4. 回退：取第一個
         if not model_id:
             first_model = db.query(AIModel).first()
             if first_model:
@@ -978,24 +978,24 @@ def resolve_ai_model(
 def resolve_notify_channels(
     agent_name: str, stock_agent_id: int | None = None
 ) -> list[NotifyChannel]:
-    """解析通知渠道: stock_agent 覆盖 → agent 默认 → 系统默认(is_default=True)"""
+    """解析通知管道: stock_agent 覆蓋 → agent 預設 → 系統預設(is_default=True)"""
     db = SessionLocal()
     try:
         channel_ids = None
 
-        # 1. stock_agent 级别覆盖
+        # 1. stock_agent 級別覆蓋
         if stock_agent_id:
             sa = db.query(StockAgent).filter(StockAgent.id == stock_agent_id).first()
             if sa and sa.notify_channel_ids:
                 channel_ids = sa.notify_channel_ids
 
-        # 2. agent 级别默认
+        # 2. agent 級別預設
         if channel_ids is None:
             agent = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
             if agent and agent.notify_channel_ids:
                 channel_ids = agent.notify_channel_ids
 
-        # 3. 按 id 列表查询或取系统默认
+        # 3. 按 id 列表查詢或取系統預設
         if channel_ids:
             channels = (
                 db.query(NotifyChannel)
@@ -1023,7 +1023,7 @@ def resolve_notify_channels(
 
 
 def _build_notifier(channels: list[NotifyChannel]) -> NotifierManager:
-    """根据解析后的渠道列表构建 NotifierManager"""
+    """根據解析後的管道列表構建 NotifierManager"""
     settings = Settings()
     # allow UI override via app_settings
     quiet_hours = _get_app_setting("notify_quiet_hours") or settings.notify_quiet_hours
@@ -1066,16 +1066,16 @@ def _build_notifier(channels: list[NotifyChannel]) -> NotifierManager:
 
 
 def _build_ai_client(model: AIModel | None, service: AIService | None, proxy: str):
-    """根据解析后的 model+service 构建带 failover 的 AI 客户端。
+    """根據解析後的 model+service 構建帶 failover 的 AI 使用者端。
 
-    主候选沿用四级路由选定的 model+service;备选由 build_failover_client 从库里
-    其余模型按优先级补齐。返回的 FailoverAIClient 与 AIClient 接口兼容,可原地替换。
+    主候選沿用四級路由選定的 model+service;備選由 build_failover_client 從庫裡
+    其餘模型按優先順序補齊。返回的 FailoverAIClient 與 AIClient 介面相容,可原地替換。
     """
     return build_failover_client(model, service, proxy)
 
 
 def build_context(agent_name: str, stock_agent_id: int | None = None) -> AgentContext:
-    """为指定 Agent 构建运行上下文"""
+    """為指定 Agent 構建執行上下文"""
     settings = Settings()
     watchlist = load_watchlist_for_agent(agent_name)
     portfolio = load_portfolio_for_agent(agent_name)
@@ -1098,7 +1098,7 @@ def build_context(agent_name: str, stock_agent_id: int | None = None) -> AgentCo
     )
 
 
-# Agent 注册表
+# Agent 登入檔
 AGENT_REGISTRY: dict[str, type] = {
     "daily_report": DailyReportAgent,
     "premarket_outlook": PremarketOutlookAgent,
@@ -1110,11 +1110,11 @@ AGENT_REGISTRY: dict[str, type] = {
 
 
 def build_scheduler() -> AgentScheduler:
-    """构建调度器并注册已启用的 Agent"""
+    """構建排程器並註冊已啟用的 Agent"""
     settings = Settings()
     sched = AgentScheduler(timezone=settings.app_timezone)
 
-    # 设置 context 构建函数（每次执行时动态获取最新配置）
+    # 設定 context 構建函式（每次執行時動態獲取最新配置）
     sched.set_context_builder(build_context)
 
     db = SessionLocal()
@@ -1130,10 +1130,10 @@ def build_scheduler() -> AgentScheduler:
         for cfg in agent_configs:
             agent_cls = AGENT_REGISTRY.get(cfg.name)
             if not agent_cls:
-                logger.warning(f"Agent {cfg.name} 未在 AGENT_REGISTRY 中注册")
+                logger.warning(f"Agent {cfg.name} 未在 AGENT_REGISTRY 中註冊")
                 continue
             if not cfg.schedule:
-                logger.info(f"Agent {cfg.name} 未设置调度计划，跳过")
+                logger.info(f"Agent {cfg.name} 未設定排程計劃，跳過")
                 continue
 
             agent_kwargs = cfg.config or {}
@@ -1171,11 +1171,11 @@ def register_mcp_log_cleanup(sched: AgentScheduler) -> None:
         id="mcp_log_retention",
         replace_existing=True,
     )
-    logger.info("MCP 日志保留期清理任务已注册")
+    logger.info("MCP 日誌保留期清理任務已註冊")
 
 
 def reload_scheduler() -> bool:
-    """重载调度器（用于配置导入/批量修改后立即生效）"""
+    """過載排程器（用於配置匯入/批次修改後立即生效）"""
     global scheduler
     try:
         current = globals().get("scheduler")
@@ -1186,10 +1186,10 @@ def reload_scheduler() -> bool:
                 pass
         scheduler = build_scheduler()
         scheduler.start()
-        logger.info("Agent 调度器已重载")
+        logger.info("Agent 排程器已過載")
         return True
     except Exception as e:
-        logger.error(f"Agent 调度器重载失败: {e}")
+        logger.error(f"Agent 排程器過載失敗: {e}")
         return False
 
 
@@ -1200,19 +1200,19 @@ def _log_trigger_info(
     service: AIService | None,
     channels: list[NotifyChannel],
 ):
-    """打印 Agent 触发时的上下文信息"""
+    """列印 Agent 觸發時的上下文資訊"""
     stock_names = ", ".join(
         f"{s.name}({s.symbol})" if hasattr(s, "symbol") else str(s) for s in stocks
     )
     ai_info = f"{service.name}/{model.model}" if model and service else "未配置"
-    channel_info = ", ".join(ch.name for ch in channels) if channels else "无"
+    channel_info = ", ".join(ch.name for ch in channels) if channels else "無"
     logger.info(
-        f"[触发] Agent={agent_name} | 股票=[{stock_names}] | AI={ai_info} | 通知=[{channel_info}]"
+        f"[觸發] Agent={agent_name} | 股票=[{stock_names}] | AI={ai_info} | 通知=[{channel_info}]"
     )
 
 
 def get_agent_execution_mode(agent_name: str) -> str:
-    """获取 Agent 的执行模式"""
+    """獲取 Agent 的執行模式"""
     db = SessionLocal()
     try:
         agent = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
@@ -1222,7 +1222,7 @@ def get_agent_execution_mode(agent_name: str) -> str:
 
 
 def get_agent_config(agent_name: str) -> dict:
-    """获取 Agent 的配置参数"""
+    """獲取 Agent 的配置引數"""
     db = SessionLocal()
     try:
         agent = db.query(AgentConfig).filter(AgentConfig.name == agent_name).first()
@@ -1232,12 +1232,12 @@ def get_agent_config(agent_name: str) -> dict:
 
 
 async def trigger_agent(agent_name: str) -> str:
-    """手动触发 Agent 执行（根据执行模式处理）"""
+    """手動觸發 Agent 執行（根據執行模式處理）"""
     start = time.monotonic()
     trace_id = f"man-{agent_name}-{int(time.time() * 1000)}"
     agent_cls = AGENT_REGISTRY.get(agent_name)
     if not agent_cls:
-        raise ValueError(f"Agent {agent_name} 未注册实际实现")
+        raise ValueError(f"Agent {agent_name} 未註冊實際實現")
 
     with log_context(
         trace_id=trace_id,
@@ -1251,7 +1251,7 @@ async def trigger_agent(agent_name: str) -> str:
             f"[watchlist] Agent={agent_name} count={len(watchlist)} symbols={[s.symbol for s in watchlist]}"
         )
         if not watchlist:
-            return f"Agent {agent_name} 没有关联的自选股"
+            return f"Agent {agent_name} 沒有關聯的自選股"
 
         model, service = resolve_ai_model(agent_name)
         channels = resolve_notify_channels(agent_name)
@@ -1261,7 +1261,7 @@ async def trigger_agent(agent_name: str) -> str:
         execution_mode = get_agent_execution_mode(agent_name)
         agent_config = get_agent_config(agent_name)
 
-        # 根据配置初始化 Agent
+        # 根據配置初始化 Agent
         if agent_config:
             agent = agent_cls(**agent_config)
         else:
@@ -1269,13 +1269,13 @@ async def trigger_agent(agent_name: str) -> str:
 
         try:
             if execution_mode == "single" and hasattr(agent, "run_single"):
-                # 单只模式：逐只股票分析
+                # 單隻模式：逐只股票分析
                 results = []
                 for stock in watchlist:
                     result = await agent.run_single(context, stock.symbol)
                     if result:
                         results.append(f"{stock.name}: {result.content[:100]}...")
-                msg = "\n\n".join(results) if results else "无异动"
+                msg = "\n\n".join(results) if results else "無異動"
                 record_agent_run(
                     agent_name=agent_name,
                     status="success",
@@ -1287,7 +1287,7 @@ async def trigger_agent(agent_name: str) -> str:
                 )
                 return msg
             else:
-                # 批量模式：所有股票一起分析
+                # 批次模式：所有股票一起分析
                 result = await agent.run(context)
                 raw = result.raw_data or {}
                 record_agent_run(
@@ -1329,14 +1329,14 @@ async def trigger_agent_for_stock(
     trace_id: str | None = None,
     force_refresh: bool = False,
 ) -> dict:
-    """手动触发 Agent 执行（单只股票）"""
+    """手動觸發 Agent 執行（單隻股票）"""
     start = time.monotonic()
     trace_id = trace_id or f"man-{agent_name}-{stock.symbol}-{int(time.time() * 1000)}"
     agent_cls = AGENT_REGISTRY.get(agent_name)
     if not agent_cls:
-        raise ValueError(f"Agent {agent_name} 未注册实际实现")
-    # 自动调度等不经过 stocks.trigger API 的入口也要拥有同样的生命周期记录；
-    # 手动入口已提前写入，这里幂等调用可避免重复 AgentRun。
+        raise ValueError(f"Agent {agent_name} 未註冊實際實現")
+    # 自動排程等不經過 stocks.trigger API 的入口也要擁有同樣的生命週期記錄；
+    # 手動入口已提前寫入，這裡冪等呼叫可避免重複 AgentRun。
     try:
         from src.modules.automation.agent_runs import start_agent_run
         start_agent_run(
@@ -1345,7 +1345,7 @@ async def trigger_agent_for_stock(
             trigger_source="manual",
         )
     except Exception as e:
-        logger.warning(f"写 AgentRun running 状态失败,不影响主流程: {e}")
+        logger.warning(f"寫 AgentRun running 狀態失敗,不影響主流程: {e}")
 
     settings = Settings()
     proxy = _get_proxy() or settings.http_proxy
@@ -1361,7 +1361,7 @@ async def trigger_agent_for_stock(
         market=market,
     )
 
-    # 加载该股票的持仓信息
+    # 載入該股票的持倉資訊
     portfolio = load_portfolio_for_stock(stock.id)
 
     model, service = resolve_ai_model(agent_name, stock_agent_id)
@@ -1381,19 +1381,19 @@ async def trigger_agent_for_stock(
         model_label=model_label,
         suppress_notify=suppress_notify,
     )
-    # 暴露 trace_id / force_refresh 给 agent(供 TradingAgents 进度反馈 + 缓存控制使用)。
-    # AgentContext 不强制声明此字段,通过 setattr 注入,其他 agent 不受影响。
+    # 暴露 trace_id / force_refresh 給 agent(供 TradingAgents 進度回饋 + 快取控制使用)。
+    # AgentContext 不強制宣告此欄位,透過 setattr 注入,其他 agent 不受影響。
     setattr(context, "_trace_id", trace_id)
     setattr(context, "_force_refresh", force_refresh)
 
-    # 创建 agent，支持手动触发参数。TradingAgents 等新 agent 从 AgentConfig 读 config。
+    # 建立 agent，支援手動觸發引數。TradingAgents 等新 agent 從 AgentConfig 讀 config。
     if agent_name == "intraday_monitor":
         agent = agent_cls(
             bypass_throttle=bypass_throttle,
             bypass_market_hours=bypass_market_hours,
         )
     elif agent_name == "tradingagents":
-        # 从 AgentConfig.config 读取实例化参数
+        # 從 AgentConfig.config 讀取例項化引數
         agent_kwargs = get_agent_config(agent_name) or {}
         try:
             agent = agent_cls(**agent_kwargs)
@@ -1439,7 +1439,7 @@ async def trigger_agent_for_stock(
             )
             raise
 
-    # 返回详细结果
+    # 返回詳細結果
     skipped = bool(result.raw_data.get("skipped", False))
     should_alert = bool(
         result.raw_data.get("should_alert", False if skipped else True)
@@ -1458,28 +1458,28 @@ async def trigger_agent_for_stock(
 
 @asynccontextmanager
 async def lifespan(app):
-    """应用生命周期: 初始化 + 启动调度器"""
+    """應用生命週期: 初始化 + 啟動排程器"""
     init_db()
     setup_logging()
-    # OTel 导出(可选,默认关闭):仅当配置了 OTEL_EXPORTER_OTLP_ENDPOINT 且装了
-    # opentelemetry SDK 时启用,否则静默 no-op,不影响现有部署。
+    # OTel 匯出(可選,預設關閉):僅當配置了 OTEL_EXPORTER_OTLP_ENDPOINT 且裝了
+    # opentelemetry SDK 時啟用,否則靜默 no-op,不影響現有部署。
     try:
         from src.platform.observability.otel import init_otel
 
         init_otel()
-    except Exception as e:  # 兜底:OTel 初始化异常绝不阻断服务启动
-        logger.warning(f"OTel 初始化跳过: {e}")
-    setup_proxy()  # 设置进程 env 代理(HTTP_PROXY/NO_PROXY);所有 httpx(trust_env=True)据此走代理
+    except Exception as e:  # 兜底:OTel 初始化異常絕不阻斷服務啟動
+        logger.warning(f"OTel 初始化跳過: {e}")
+    setup_proxy()  # 設定程式 env 代理(HTTP_PROXY/NO_PROXY);所有 httpx(trust_env=True)據此走代理
     setup_ssl()
     setup_playwright()
 
-    # 从环境变量初始化认证（Docker 部署用）
+    # 從環境變數初始化認證（Docker 部署用）
     from src.modules.administration.api.auth import init_auth_from_env
 
     db = SessionLocal()
     try:
         if init_auth_from_env(db):
-            logger.info("已从环境变量初始化认证账号")
+            logger.info("已從環境變數初始化認證帳號")
     finally:
         db.close()
 
@@ -1491,44 +1491,44 @@ async def lifespan(app):
         finally:
             db.close()
     except Exception as e:
-        logger.warning(f"数据源对账失败,跳过(不阻断启动): {e}")
+        logger.warning(f"資料來源對帳失敗,跳過(不阻斷啟動): {e}")
     seed_strategies()
     seed_sample_stocks()
 
-    # 启动时回填历史 TradingAgents 决策到建议池(stock_suggestions)
-    # 早期 TA 运行没写建议池,这次启动一次性补齐,让「AI 建议」面板能看到。
-    # 幂等:已存在不重复写;每次启动重跑代价极低(只查最近 7 天 + dedupe)。
+    # 啟動時回填歷史 TradingAgents 決策到建議池(stock_suggestions)
+    # 早期 TA 執行沒寫建議池,這次啟動一次性補齊,讓「AI 建議」面板能看到。
+    # 冪等:已存在不重複寫;每次啟動重跑代價極低(只查最近 7 天 + dedupe)。
     try:
         from src.modules.automation.tradingagents.operations import backfill_tradingagents_suggestions
         backfill_tradingagents_suggestions(days=7)
     except Exception as e:
-        logger.warning(f"TradingAgents 建议回填失败,跳过: {e}")
+        logger.warning(f"TradingAgents 建議回填失敗,跳過: {e}")
 
-    # 后台刷新股票列表缓存
+    # 後臺重新整理股票列表快取
     import threading
     from src.platform.marketdata.stock_list import get_stock_list, refresh_stock_list
 
     def refresh_stock_cache():
         stocks = get_stock_list()
         if not stocks or len([s for s in stocks if s["market"] == "CN"]) == 0:
-            logger.info("股票列表缓存为空或缺少 A 股，后台刷新中...")
+            logger.info("股票列表快取為空或缺少 A 股，後臺重新整理中...")
             refresh_stock_list()
 
     threading.Thread(target=refresh_stock_cache, daemon=True).start()
 
-    # 交易日历预热(判断周末/法定节假日是否开市)。拉取失败会自动降级为只判周末,
-    # 因此这里不阻塞启动,交给后台任务;之后每日 03:00 由上下文维护调度器刷新。
+    # 交易日曆預熱(判斷週末/法定節假日是否開市)。拉取失敗會自動降級為只判週末,
+    # 因此這裡不阻塞啟動,交給後臺任務;之後每日 03:00 由上下文維護排程器重新整理。
     try:
         from src.platform.scheduling.trading_calendar import refresh as refresh_trading_calendar
 
         asyncio.create_task(refresh_trading_calendar())
     except Exception as e:
-        logger.warning(f"交易日历预热调度失败(降级为只判周末): {e}")
+        logger.warning(f"交易日曆預熱排程失敗(降級為只判週末): {e}")
 
     global scheduler, price_alert_scheduler, paper_trading_scheduler, context_maintenance_scheduler
     scheduler = build_scheduler()
     scheduler.start()
-    logger.info("Agent 调度器已启动")
+    logger.info("Agent 排程器已啟動")
     try:
         settings = Settings()
         price_alert_scheduler = PriceAlertScheduler(
@@ -1536,9 +1536,9 @@ async def lifespan(app):
             interval_seconds=60,
         )
         price_alert_scheduler.start()
-        logger.info("价格提醒调度器已启动")
+        logger.info("價格提醒排程器已啟動")
     except Exception as e:
-        logger.error(f"价格提醒调度器启动失败: {e}")
+        logger.error(f"價格提醒排程器啟動失敗: {e}")
     try:
         settings = Settings()
         paper_trading_scheduler = PaperTradingScheduler(
@@ -1546,9 +1546,9 @@ async def lifespan(app):
             interval_seconds=60,
         )
         paper_trading_scheduler.start()
-        logger.info("模拟盘调度器已启动")
+        logger.info("模擬交易排程器已啟動")
     except Exception as e:
-        logger.error(f"模拟盘调度器启动失败: {e}")
+        logger.error(f"模擬交易排程器啟動失敗: {e}")
     try:
         settings = Settings()
         context_maintenance_scheduler = ContextMaintenanceScheduler(
@@ -1558,41 +1558,41 @@ async def lifespan(app):
             outcome_retention_days=365,
         )
         context_maintenance_scheduler.start()
-        logger.info("上下文维护调度器已启动")
+        logger.info("上下文維護排程器已啟動")
     except Exception as e:
-        logger.error(f"上下文维护调度器启动失败: {e}")
-    # MCP 调用日志保留期清理:每日 04:00 清理超期审计记录
+        logger.error(f"上下文維護排程器啟動失敗: {e}")
+    # MCP 呼叫日誌保留期清理:每日 04:00 清理超期審計記錄
     try:
         register_mcp_log_cleanup(scheduler)
     except Exception as e:
-        logger.error(f"MCP 日志清理任务注册失败: {e}")
+        logger.error(f"MCP 日誌清理任務註冊失敗: {e}")
     yield
     if scheduler:
         scheduler.shutdown()
-        logger.info("Agent 调度器已关闭")
+        logger.info("Agent 排程器已關閉")
     if price_alert_scheduler:
         price_alert_scheduler.shutdown()
-        logger.info("价格提醒调度器已关闭")
+        logger.info("價格提醒排程器已關閉")
     if paper_trading_scheduler:
         paper_trading_scheduler.shutdown()
-        logger.info("模拟盘调度器已关闭")
+        logger.info("模擬交易排程器已關閉")
     if context_maintenance_scheduler:
         context_maintenance_scheduler.shutdown()
-        logger.info("上下文维护调度器已关闭")
+        logger.info("上下文維護排程器已關閉")
 
 
-# 模块级 app 实例，供 uvicorn reload 使用
+# 模組級 app 例項，供 uvicorn reload 使用
 from src.bootstrap.application import app  # noqa: E402
 
 app.router.lifespan_context = lifespan
 
-# 生产环境静态文件服务
+# 生產環境靜態檔案服務
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse
 
-    # SPA 路由：所有非 API 请求返回 index.html
+    # SPA 路由：所有非 API 請求返回 index.html
     @app.get("/{path:path}")
     async def serve_spa(path: str):
         file_path = os.path.join(static_dir, path)
@@ -1600,15 +1600,15 @@ if os.path.exists(static_dir):
             return FileResponse(file_path)
         return FileResponse(os.path.join(static_dir, "index.html"))
 
-    logger.info(f"静态文件服务已启用: {static_dir}")
+    logger.info(f"靜態檔案服務已啟用: {static_dir}")
 
 
 if __name__ == "__main__":
-    print("盯盘侠启动: http://127.0.0.1:8000")
-    print("API 文档: http://127.0.0.1:8000/docs")
-    # 生产(Docker `python server.py`)不应开 reload:uvicorn 文件监听会多起一个 reloader
-    # 子进程、浪费资源,且监听 data/ 写入易误触发重启。本地热重载用 `make dev-api`
-    # (uvicorn --reload),或显式设 DEV_RELOAD=1。
+    print("盯盤俠啟動: http://127.0.0.1:8000")
+    print("API 檔案: http://127.0.0.1:8000/docs")
+    # 生產(Docker `python server.py`)不應開 reload:uvicorn 檔案監聽會多起一個 reloader
+    # 子程式、浪費資源,且監聽 data/ 寫入易誤觸發重啟。本地熱過載用 `make dev-api`
+    # (uvicorn --reload),或顯式設 DEV_RELOAD=1。
     _dev_reload = os.environ.get("DEV_RELOAD", "").lower() in ("1", "true", "yes")
     uvicorn.run(
         "server:app",

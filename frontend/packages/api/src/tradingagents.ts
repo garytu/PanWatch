@@ -1,7 +1,7 @@
 /**
  * TradingAgents 深度分析 API。
- * 复用现有 /api/stocks/:id/agents/:name/trigger,只是 agent_name = "tradingagents"。
- * 进度走新增的 /api/agents/runs/:trace_id/progress。
+ * 複用現有 /api/stocks/:id/agents/:name/trigger,只是 agent_name = "tradingagents"。
+ * 進度走新增的 /api/agents/runs/:trace_id/progress。
  */
 import { fetchAPI, getToken } from './client'
 
@@ -10,7 +10,7 @@ export interface TradingAgentsTriggerResult {
   queued?: boolean
   trace_id?: string
   message?: string
-  /** 后端幂等命中:已有在跑任务,trace_id 是现有任务的,不是新启的 */
+  /** 後端冪等命中:已有在跑任務,trace_id 是現有任務的,不是新啟的 */
   deduplicated?: boolean
 }
 
@@ -30,10 +30,10 @@ export interface DebateHistory {
 export interface DeepAnalysisSuggestion {
   action: 'buy' | 'hold' | 'sell'
   action_label: string
-  /** 上游五档评级；review 表示无法安全解析，需要人工复核而不是普通持有。 */
+  /** 上游五檔評級；review 表示無法安全解析，需要人工複核而不是普通持有。 */
   rating_raw?: 'buy' | 'overweight' | 'hold' | 'underweight' | 'sell' | 'review'
   review_required?: boolean
-  /** 上游 propagate 的原始输出，便于展示与排查映射差异。 */
+  /** 上游 propagate 的原始輸出，便於展示與排查對映差異。 */
   upstream_decision?: string
   signal: string
   reason: string
@@ -95,7 +95,7 @@ export interface ProgressDataSource {
 export interface ProgressActiveOperation {
   kind: 'llm' | 'tool'
   name: string
-  /** TradingAgents LangGraph 节点名；旧后端快照可能没有该字段。 */
+  /** TradingAgents LangGraph 節點名；舊後端快照可能沒有該欄位。 */
   agent?: string
 }
 
@@ -179,8 +179,8 @@ export interface HistoryComparisonResponse {
 }
 
 export const tradingAgentsApi = {
-  /** 触发深度分析(异步排队)。force=true 跳过同日缓存。
-   *  TradingAgents 不要求 StockAgent 绑定 — 始终带 allow_unbound=true。 */
+  /** 觸發深度分析(非同步排隊)。force=true 跳過同日快取。
+   *  TradingAgents 不要求 StockAgent 繫結 — 始終帶 allow_unbound=true。 */
   trigger(stockId: number, opts: { force?: boolean } = {}): Promise<TradingAgentsTriggerResult> {
     const qsParts = ['allow_unbound=true']
     if (opts.force) qsParts.push('force_refresh=true')
@@ -193,12 +193,12 @@ export const tradingAgentsApi = {
     )
   },
 
-  /** 读取本月预算 + 单次预估成本(用于触发前确认弹窗)。 */
+  /** 讀取本月預算 + 單次預估成本(用於觸發前確認彈跳視窗)。 */
   getBudget(): Promise<BudgetInfo> {
     return fetchAPI('/agents/tradingagents/budget')
   },
 
-  /** 把某次深度分析报告导出为 PDF 文件并触发下载(后台直出,不走打印对话框)。 */
+  /** 把某次深度分析報告匯出為 PDF 檔案並觸發下載(後臺直出,不走列印對話方塊)。 */
   async downloadAnalysisPdf(symbol: string, date: string): Promise<void> {
     const token = getToken()
     const qs = new URLSearchParams({ stock_symbol: symbol, analysis_date: date })
@@ -206,12 +206,12 @@ export const tradingAgentsApi = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (!resp.ok) {
-      let msg = `导出失败 (${resp.status})`
+      let msg = `匯出失敗 (${resp.status})`
       try {
         const j = await resp.json()
         msg = (j && (j.message || j.detail)) || msg
       } catch {
-        /* 非 JSON 错误体,用默认提示 */
+        /* 非 JSON 錯誤體,用預設提示 */
       }
       throw new Error(msg)
     }
@@ -223,7 +223,7 @@ export const tradingAgentsApi = {
       try {
         filename = decodeURIComponent(m[1])
       } catch {
-        /* 保留默认文件名 */
+        /* 保留預設檔名 */
       }
     }
     const url = URL.createObjectURL(blob)
@@ -236,9 +236,9 @@ export const tradingAgentsApi = {
     URL.revokeObjectURL(url)
   },
 
-  /** 查某只股票最近 30 分钟有没有在跑或刚完成的 TA 任务(后端权威源)。
+  /** 查某隻股票最近 30 分鐘有沒有在跑或剛完成的 TA 任務(後端權威源)。
    *  返回 status: running | success | failed | stale | none
-   *  stale = 5 分钟无新进度日志,前端可据此 reset 到 idle 允许重新触发 */
+   *  stale = 5 分鐘無新進度日誌,前端可據此 reset 到 idle 允許重新觸發 */
   findRunning(symbol: string): Promise<{
     trace_id: string | null
     status: 'running' | 'success' | 'failed' | 'stale' | 'none'
@@ -247,12 +247,12 @@ export const tradingAgentsApi = {
     return fetchAPI(`/agents/tradingagents/running?stock_symbol=${encodeURIComponent(symbol)}`)
   },
 
-  /** 拉取进度(前端轮询)。 */
+  /** 拉取進度(前端輪詢)。 */
   getProgress(traceId: string): Promise<ProgressResponse> {
     return fetchAPI(`/agents/runs/${encodeURIComponent(traceId)}/progress`)
   },
 
-  /** 历史决策 vs 实际涨跌对比。 */
+  /** 歷史決策 vs 實際漲跌對比。 */
   getHistoryComparison(
     symbol: string,
     market: string,
@@ -266,7 +266,7 @@ export const tradingAgentsApi = {
     return fetchAPI(`/agents/tradingagents/history-comparison?${qs.toString()}`)
   },
 
-  /** 拉取某只股票最近一次深度分析结果(含完整 raw_data)。 */
+  /** 拉取某隻股票最近一次深度分析結果(含完整 raw_data)。 */
   getLatestForStock(symbol: string): Promise<DeepAnalysisResult | null> {
     return fetchAPI(
       `/agents/tradingagents/latest?stock_symbol=${encodeURIComponent(symbol)}`,
@@ -284,7 +284,7 @@ export const tradingAgentsApi = {
     })
   },
 
-  /** 按 symbol + date 拉某次深度分析完整结果(详细阅读页用)。 */
+  /** 按 symbol + date 拉某次深度分析完整結果(詳細閱讀頁用)。 */
   getAnalysisByDate(symbol: string, date: string): Promise<DeepAnalysisResult | null> {
     const qs = new URLSearchParams({ stock_symbol: symbol, analysis_date: date })
     return fetchAPI(`/agents/tradingagents/analysis?${qs.toString()}`).then((item: unknown) => {

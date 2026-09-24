@@ -1,11 +1,11 @@
-"""TradingAgentsAgent 单元测试 — 不依赖 tradingagents 上游库安装。
+"""TradingAgentsAgent 單元測試 — 不依賴 tradingagents 上游庫安裝。
 
-覆盖:
-- collect() 从 Provider 体系收集数据
-- _check_availability 软依赖检测
-- llm_adapter 配置桥接
-- result_mapper 状态映射
-- cost_tracker 预算估算
+覆蓋:
+- collect() 從 Provider 體系收集資料
+- _check_availability 軟依賴檢測
+- llm_adapter 配置橋接
+- result_mapper 狀態對映
+- cost_tracker 預算估算
 - toolkit_adapter monkeypatch 上下文
 - progress 聚合
 """
@@ -50,11 +50,11 @@ from src.modules.automation.tradingagents.toolkit_adapter import (
 
 class TestLLMAdapter(unittest.TestCase):
     def test_valid_analysts_set(self):
-        """合法分析师集合包含 4 个上游期望值"""
+        """合法分析師集合包含 4 個上游期望值"""
         self.assertEqual(VALID_ANALYSTS, {"market", "social", "news", "fundamentals"})
 
     def test_build_ta_llm_config_basic(self):
-        """生成 TradingAgents config dict — 关键字段齐全"""
+        """生成 TradingAgents config dict — 關鍵欄位齊全"""
         ai_client = MagicMock()
         ai_client.base_url = "https://api.deepseek.com"
         ai_client.model = "deepseek-chat"
@@ -63,7 +63,7 @@ class TestLLMAdapter(unittest.TestCase):
         config = build_ta_llm_config(
             ai_client, debate_rounds=2, selected_analysts=["market", "news"]
         )
-        # 用 openrouter 走标准 chat completions,避开 OpenAI Responses API 的兼容性问题
+        # 用 openrouter 走標準 chat completions,避開 OpenAI Responses API 的相容性問題
         self.assertEqual(config["llm_provider"], "openrouter")
         self.assertEqual(config["backend_url"], "https://api.deepseek.com")
         self.assertEqual(config["deep_think_llm"], "deepseek-chat")
@@ -73,7 +73,7 @@ class TestLLMAdapter(unittest.TestCase):
         self.assertFalse(config["checkpoint_enabled"])
 
     def test_build_ta_llm_config_bounds_provider_calls(self):
-        """LLM 请求必须有明确超时、重试和输出上限，避免图永远卡在单次调用。"""
+        """LLM 請求必須有明確超時、重試和輸出上限，避免圖永遠卡在單次呼叫。"""
         ai_client = MagicMock()
         ai_client.base_url = "https://api.example.com"
         ai_client.model = "test-model"
@@ -86,7 +86,7 @@ class TestLLMAdapter(unittest.TestCase):
         self.assertEqual(config["max_tokens"], 4096)
 
     def test_build_ta_llm_config_rejects_invalid_analyst(self):
-        """非法分析师名 — 抛 ValueError"""
+        """非法分析師名 — 拋 ValueError"""
         ai_client = MagicMock()
         with self.assertRaises(ValueError):
             build_ta_llm_config(
@@ -94,13 +94,13 @@ class TestLLMAdapter(unittest.TestCase):
             )
 
     def test_build_ta_llm_config_uses_panwatch_runtime_and_opt_in_sec_edgar(self):
-        """美股显式启用时才把三张报表路由到 SEC EDGAR，并隔离上游运行文件。"""
+        """美股顯式啟用時才把三張報表路由到 SEC EDGAR，並隔離上游執行檔案。"""
         from pathlib import Path
         from tempfile import TemporaryDirectory
 
         ai_client = MagicMock(base_url="https://api.example.com", model="test-model", api_key="sk-test")
         with TemporaryDirectory() as temp_dir:
-            runtime_dir = Path(temp_dir) / "tradingagents"
+            runtime_dir = (Path(temp_dir) / "tradingagents").resolve()
             config = build_ta_llm_config(
                 ai_client,
                 market="US",
@@ -125,7 +125,7 @@ class TestLLMAdapter(unittest.TestCase):
         )
 
     def test_build_ta_llm_config_keeps_sec_edgar_disabled_for_non_us_market(self):
-        """SEC EDGAR 仅适用于美股；即使误启用也不能影响 A/HK 路由。"""
+        """SEC EDGAR 僅適用於美股；即使誤啟用也不能影響 A/HK 路由。"""
         ai_client = MagicMock(base_url="https://api.example.com", model="test-model", api_key="sk-test")
         config = build_ta_llm_config(ai_client, market="CN", enable_sec_edgar=True)
         self.assertEqual(
@@ -138,7 +138,7 @@ class TestLLMAdapter(unittest.TestCase):
         )
 
     def test_non_us_config_overrides_previous_global_sec_edgar_routes(self):
-        """上游合并嵌套 config 时，A/HK 运行必须清除前一美股运行的 EDGAR 覆盖。"""
+        """上游合併巢狀 config 時，A/HK 執行必須清除前一美股執行的 EDGAR 覆蓋。"""
         from copy import deepcopy
 
         from tradingagents.dataflows import config as upstream_config
@@ -166,7 +166,7 @@ class TestLLMAdapter(unittest.TestCase):
             upstream_config._config = original_config
 
     def test_inject_api_key_env(self):
-        """API key 注入到环境变量 — OPENAI_API_KEY 被设置"""
+        """API key 注入到環境變數 — OPENAI_API_KEY 被設定"""
         import os
         ai_client = MagicMock(api_key="sk-test-key")
         previous = {
@@ -193,45 +193,45 @@ class TestResultMapper(unittest.TestCase):
     def _mock_stock(self):
         stock = MagicMock()
         stock.symbol = "600519"
-        stock.name = "贵州茅台"
+        stock.name = "貴州茅臺"
         return stock
 
     def test_decision_buy_maps_to_chinese_label(self):
-        """BUY 决策 — 映射成 「买入」"""
+        """BUY 決策 — 對映成 「買入」"""
         stock = self._mock_stock()
         ta_result = {
             "decision": "BUY",
             "final_state": {
-                "final_trade_decision": "估值修复 + 资金流持续净流入",
-                "trader_investment_plan": "建议加仓",
+                "final_trade_decision": "估值修復 + 資金流持續淨流入",
+                "trader_investment_plan": "建議加碼",
             },
             "cost_usd": 0.05,
         }
         result = map_state_to_result(stock=stock, ta_result=ta_result, model_label="deepseek/deepseek-chat")
         self.assertEqual(result.agent_name, "tradingagents")
-        self.assertIn("买入", result.title)
+        self.assertIn("買入", result.title)
         sug = result.raw_data["suggestion"]
         self.assertEqual(sug["action"], "buy")
-        self.assertEqual(sug["action_label"], "买入")
+        self.assertEqual(sug["action_label"], "買入")
         self.assertTrue(sug["should_alert"])
         self.assertEqual(result.raw_data["cost_usd"], 0.05)
 
     def test_decision_hold_no_alert(self):
-        """HOLD 决策 — should_alert=False"""
+        """HOLD 決策 — should_alert=False"""
         stock = self._mock_stock()
         ta_result = {"decision": "HOLD", "final_state": {}, "cost_usd": 0.01}
         result = map_state_to_result(stock=stock, ta_result=ta_result, model_label="")
         self.assertFalse(result.raw_data["suggestion"]["should_alert"])
 
     def test_unknown_decision_falls_back_to_hold(self):
-        """未知决策值 — 兜底成 hold,不抛异常"""
+        """未知決策值 — 兜底成 hold,不拋異常"""
         stock = self._mock_stock()
         ta_result = {"decision": "STRONG_BUY", "final_state": {}, "cost_usd": 0}
         result = map_state_to_result(stock=stock, ta_result=ta_result, model_label="")
         self.assertEqual(result.raw_data["suggestion"]["action"], "hold")
 
     def test_extract_confidence_from_text(self):
-        """从文本提取 confidence — 「confidence: 7/10」匹配到 7.0"""
+        """從文本提取 confidence — 「confidence: 7/10」匹配到 7.0"""
         stock = self._mock_stock()
         ta_result = {
             "decision": "BUY",
@@ -244,21 +244,21 @@ class TestResultMapper(unittest.TestCase):
         self.assertEqual(result.raw_data["confidence"], 7.0)
 
     def test_analyst_reports_preserved(self):
-        """4 分析师报告 — 全部保留到 raw_data"""
+        """4 分析師報告 — 全部保留到 raw_data"""
         stock = self._mock_stock()
         ta_result = {
             "decision": "SELL",
             "final_state": {
-                "market_report": "技术面看跌",
-                "social_report": "社交情绪偏空",
-                "news_report": "近期无重大利好",
+                "market_report": "技術面看跌",
+                "social_report": "社交情緒偏空",
+                "news_report": "近期無重大利好",
                 "fundamentals_report": "估值偏高",
             },
             "cost_usd": 0.03,
         }
         result = map_state_to_result(stock=stock, ta_result=ta_result, model_label="")
         reports = result.raw_data["analyst_reports"]
-        self.assertEqual(reports["market"], "技术面看跌")
+        self.assertEqual(reports["market"], "技術面看跌")
         self.assertEqual(reports["fundamentals"], "估值偏高")
 
 
@@ -269,7 +269,7 @@ class TestResultMapper(unittest.TestCase):
 
 class TestCostTracker(unittest.TestCase):
     def test_estimate_cost_deepseek_shallow(self):
-        """deepseek-chat shallow — 单次估算应在 $0.02-$0.06 范围"""
+        """deepseek-chat shallow — 單次估算應在 $0.02-$0.06 範圍"""
         est = estimate_cost(
             debate_rounds=1,
             selected_analysts=["market", "social", "news", "fundamentals"],
@@ -281,12 +281,12 @@ class TestCostTracker(unittest.TestCase):
         self.assertGreater(est["cost_high_usd"], est["cost_low_usd"])
 
     def test_estimate_cost_unknown_model_falls_back(self):
-        """未知模型 — 不抛异常,fallback 到 deepseek 单价"""
+        """未知模型 — 不拋異常,fallback 到 deepseek 單價"""
         est = estimate_cost(debate_rounds=1, selected_analysts=["market"], model="my-custom-llm")
         self.assertGreater(est["cost_low_usd"], 0)
 
     def test_get_today_cache_key_includes_today(self):
-        """缓存键 — 含日期 + symbol + market + debate_rounds + model"""
+        """快取鍵 — 含日期 + symbol + market + debate_rounds + model"""
         key = get_today_cache_key("600519", "CN", 1, "deepseek-chat")
         today_str = datetime.now().strftime("%Y-%m-%d")
         self.assertIn(today_str, key)
@@ -303,7 +303,7 @@ class TestCostTracker(unittest.TestCase):
 
 class TestToolkitAdapter(unittest.TestCase):
     def test_is_a_share_six_digits(self):
-        """A 股识别 — 6 位纯数字才算"""
+        """A 股識別 — 6 位純數字才算"""
         self.assertTrue(is_a_share("600519"))
         self.assertTrue(is_a_share("000001"))
         self.assertFalse(is_a_share("AAPL"))
@@ -312,7 +312,7 @@ class TestToolkitAdapter(unittest.TestCase):
         self.assertFalse(is_a_share(""))
 
     def test_panwatch_data_context_isolation(self):
-        """数据上下文 — 进入/退出时不污染外部(基于 ContextVar)"""
+        """資料上下文 — 進入/退出時不汙染外部(基於 ContextVar)"""
         from src.modules.automation.tradingagents import toolkit_adapter
         self.assertEqual(toolkit_adapter._cache(), {})
         with panwatch_data_context({"klines": [1, 2, 3]}):
@@ -320,10 +320,10 @@ class TestToolkitAdapter(unittest.TestCase):
         self.assertEqual(toolkit_adapter._cache(), {})
 
     def test_patch_route_to_vendor_noop_when_lib_absent(self):
-        """tradingagents 未安装 — patch 上下文 no-op,不抛异常"""
-        # 当 import 失败时,patch 应该静默 yield
+        """tradingagents 未安裝 — patch 上下文 no-op,不拋異常"""
+        # 當 import 失敗時,patch 應該靜默 yield
         with patch_route_to_vendor():
-            pass  # 不应抛异常
+            pass  # 不應拋異常
 
 
 # ============================================================================
@@ -340,14 +340,14 @@ class TestProgress(unittest.TestCase):
         self.assertAlmostEqual(handler._total_cost, 0.03)
 
     def test_aggregate_progress_empty(self):
-        """聚合空日志 — 所有阶段 pending"""
+        """聚合空日誌 — 所有階段 pending"""
         result = aggregate_progress([])
         self.assertEqual(len(result["stages"]), len(STAGES_ORDER))
         for stage in result["stages"]:
             self.assertEqual(stage["status"], "pending")
 
     def test_aggregate_progress_with_stages(self):
-        """聚合日志 — stage_start/stage_end 正确标记状态"""
+        """聚合日誌 — stage_start/stage_end 正確標記狀態"""
         logs = [
             {
                 "timestamp": "2026-05-16T09:00:00",
@@ -375,19 +375,19 @@ class TestProgress(unittest.TestCase):
 
 class TestTradingAgentsAgent(unittest.TestCase):
     def test_agent_init_defaults(self):
-        """默认实例化 — 4 个分析师,1 轮辩论"""
+        """預設例項化 — 4 個分析師,1 輪辯論"""
         agent = TradingAgentsAgent()
         self.assertEqual(set(agent.analyst_types), VALID_ANALYSTS)
         self.assertEqual(agent.debate_rounds, 1)
         self.assertEqual(agent.monthly_budget_usd, 10.0)
 
     def test_agent_init_rejects_invalid_analyst(self):
-        """初始化时校验 analyst 类型 — 非法值抛 ValueError"""
+        """初始化時校驗 analyst 型別 — 非法值拋 ValueError"""
         with self.assertRaises(ValueError):
             TradingAgentsAgent(analyst_types=["market", "technical"])
 
     def test_agent_availability_reflects_library_install(self):
-        """tradingagents 软依赖 — 库在则 _available=True,否则 False + import_error 非空"""
+        """tradingagents 軟依賴 — 庫在則 _available=True,否則 False + import_error 非空"""
         agent = TradingAgentsAgent()
         try:
             import tradingagents  # noqa: F401
@@ -399,7 +399,7 @@ class TestTradingAgentsAgent(unittest.TestCase):
 
     async def _run_analyze_unavailable(self):
         agent = TradingAgentsAgent()
-        # 强制标记不可用,验证 analyze 立即抛错而不会进入 propagate
+        # 強制標記不可用,驗證 analyze 立即拋錯而不會進入 propagate
         agent._available = False
         agent._import_error = "mocked unavailable"
         context = MagicMock()
@@ -407,7 +407,7 @@ class TestTradingAgentsAgent(unittest.TestCase):
             await agent.analyze(context, {"stock": MagicMock(symbol="600519", name="X")})
 
     def test_analyze_raises_when_unavailable(self):
-        """库未安装时 analyze() 抛 TradingAgentsUnavailable(强制标记验证)"""
+        """庫未安裝時 analyze() 拋 TradingAgentsUnavailable(強制標記驗證)"""
         import asyncio
         asyncio.run(self._run_analyze_unavailable())
 
@@ -418,10 +418,10 @@ class TestTradingAgentsAgent(unittest.TestCase):
 
 
 class TestPhaseBFeatures(unittest.TestCase):
-    """Phase B 新增功能 — 双模型 / 超时 / 模拟盘 / 缓存绕过 / run_single。"""
+    """Phase B 新增功能 — 雙模型 / 超時 / 模擬交易 / 快取繞過 / run_single。"""
 
     def test_dual_model_config(self):
-        """双模型 — deep_model + quick_model 分别注入 TA config"""
+        """雙模型 — deep_model + quick_model 分別注入 TA config"""
         ai_client = MagicMock()
         ai_client.base_url = "https://api.deepseek.com"
         ai_client.model = "default-model"
@@ -443,14 +443,14 @@ class TestPhaseBFeatures(unittest.TestCase):
         self.assertEqual(cfg["quick_think_llm"], "claude-sonnet-4")
 
     def test_both_default_to_ai_client_model(self):
-        """两个模型都未指定 — 都用 ai_client.model"""
+        """兩個模型都未指定 — 都用 ai_client.model"""
         ai_client = MagicMock(base_url="x", model="default", api_key="k")
         cfg = build_ta_llm_config(ai_client)
         self.assertEqual(cfg["deep_think_llm"], "default")
         self.assertEqual(cfg["quick_think_llm"], "default")
 
     def test_agent_init_has_new_phase_b_fields(self):
-        """Agent 实例化 — Phase B 新增字段都正确暴露"""
+        """Agent 例項化 — Phase B 新增欄位都正確暴露"""
         agent = TradingAgentsAgent(
             deep_model="claude-sonnet-4",
             quick_model="claude-haiku",
@@ -467,14 +467,14 @@ class TestPhaseBFeatures(unittest.TestCase):
         self.assertEqual(agent.holding_period_days, 10)
 
     def test_agent_init_has_bounded_llm_defaults(self):
-        """TradingAgents 默认不能把供应商请求无限期挂起。"""
+        """TradingAgents 預設不能把供應商請求無限期掛起。"""
         agent = TradingAgentsAgent()
         self.assertEqual(agent.llm_timeout_seconds, 120)
         self.assertEqual(agent.llm_max_retries, 0)
         self.assertEqual(agent.llm_max_tokens, 4096)
 
     def test_graph_class_forwards_request_timeout_to_langchain(self):
-        """上游未读取 timeout 配置时，适配类仍需把它传给 ChatOpenAI。"""
+        """上游未讀取 timeout 配置時，適配類仍需把它傳給 ChatOpenAI。"""
         from src.modules.automation.tradingagents.agent import _bounded_graph_class
 
         class BaseGraph:
@@ -489,14 +489,14 @@ class TestPhaseBFeatures(unittest.TestCase):
         self.assertEqual(graph._get_provider_kwargs(), {"max_retries": 0, "timeout": 7.0})
 
     def test_paper_trading_bridge_disabled_skips(self):
-        """模拟盘 bridge — enabled=False 直接 skip,不写库"""
+        """模擬交易 bridge — enabled=False 直接 skip,不寫庫"""
         from src.modules.automation.tradingagents.decision import (
             maybe_emit_paper_trading_signal,
         )
         result = maybe_emit_paper_trading_signal(
             stock_symbol="600519",
             stock_market="CN",
-            stock_name="贵州茅台",
+            stock_name="貴州茅臺",
             decision="buy",
             confidence=7.0,
             signal_text="...",
@@ -507,7 +507,7 @@ class TestPhaseBFeatures(unittest.TestCase):
         self.assertFalse(result)
 
     def test_paper_trading_bridge_sell_skipped(self):
-        """模拟盘 bridge — SELL 不开新仓 (不会写 buy 信号)"""
+        """模擬交易 bridge — SELL 不開新倉 (不會寫 buy 訊號)"""
         from src.modules.automation.tradingagents.decision import (
             maybe_emit_paper_trading_signal,
         )
@@ -525,7 +525,7 @@ class TestPhaseBFeatures(unittest.TestCase):
         self.assertFalse(result)
 
     def test_paper_trading_bridge_no_price_skipped(self):
-        """模拟盘 bridge — 当前价缺失时不写信号(避免错价)"""
+        """模擬交易 bridge — 當前價缺失時不寫訊號(避免錯價)"""
         from src.modules.automation.tradingagents.decision import (
             maybe_emit_paper_trading_signal,
         )
@@ -544,7 +544,7 @@ class TestPhaseBFeatures(unittest.TestCase):
 
 
 class TestPortfolioContext(unittest.TestCase):
-    """0.5.0 持仓应走原生 PortfolioContext，而不是提示词注入。"""
+    """0.5.0 持倉應走原生 PortfolioContext，而不是提示詞注入。"""
 
     def _portfolio(self):
         from src.modules.automation.base import AccountInfo, PortfolioInfo, PositionInfo
@@ -553,15 +553,15 @@ class TestPortfolioContext(unittest.TestCase):
         return PortfolioInfo(accounts=[
             AccountInfo(
                 id=1,
-                name="主账户",
+                name="主帳戶",
                 available_funds=280000.0,
                 positions=[
                     PositionInfo(
                         account_id=1,
-                        account_name="主账户",
+                        account_name="主帳戶",
                         stock_id=1,
                         symbol="600519",
-                        name="贵州茅台",
+                        name="貴州茅臺",
                         market=MarketCode.CN,
                         cost_price=1280.0,
                         quantity=100,
@@ -569,7 +569,7 @@ class TestPortfolioContext(unittest.TestCase):
                     ),
                     PositionInfo(
                         account_id=1,
-                        account_name="主账户",
+                        account_name="主帳戶",
                         stock_id=2,
                         symbol="AAPL",
                         name="Apple",
@@ -582,7 +582,7 @@ class TestPortfolioContext(unittest.TestCase):
         ])
 
     def test_to_tradingagents_portfolio_preserves_cash_and_positions(self):
-        """PanWatch 持仓聚合为 0.5.0 的结构化现金、标的、数量和均价。"""
+        """PanWatch 持倉聚合為 0.5.0 的結構化現金、標的、數量和均價。"""
         from tradingagents.portfolio import PortfolioContext
         from src.modules.automation.tradingagents.data_context import to_tradingagents_portfolio
 
@@ -596,14 +596,14 @@ class TestPortfolioContext(unittest.TestCase):
         )
 
     def test_to_tradingagents_portfolio_returns_none_without_accounts(self):
-        """没有账户快照时不伪造现金为零的用户持仓。"""
+        """沒有帳戶快照時不偽造現金為零的使用者持倉。"""
         from src.modules.automation.base import PortfolioInfo
         from src.modules.automation.tradingagents.data_context import to_tradingagents_portfolio
 
         self.assertIsNone(to_tradingagents_portfolio(PortfolioInfo()))
 
     def test_to_tradingagents_portfolio_preserves_short_positions(self):
-        """0.5.0 Position.quantity 允许负数，空头不能在适配层被静默丢弃。"""
+        """0.5.0 Position.quantity 允許負數，空頭不能在適配層被靜默丟棄。"""
         from src.modules.automation.base import AccountInfo, PortfolioInfo, PositionInfo
         from src.platform.marketdata.models import MarketCode
         from src.modules.automation.tradingagents.data_context import to_tradingagents_portfolio
@@ -611,11 +611,11 @@ class TestPortfolioContext(unittest.TestCase):
         portfolio = PortfolioInfo(accounts=[
             AccountInfo(
                 id=1,
-                name="主账户",
+                name="主帳戶",
                 available_funds=1000.0,
                 positions=[PositionInfo(
                     account_id=1,
-                    account_name="主账户",
+                    account_name="主帳戶",
                     stock_id=1,
                     symbol="AAPL",
                     name="Apple",
@@ -633,7 +633,7 @@ class TestPortfolioContext(unittest.TestCase):
         ]
 
     def test_patch_instrument_context_preserves_past_and_portfolio_context(self):
-        """标的元数据进入 0.5.0 instrument_context，不污染历史上下文和持仓上下文。"""
+        """標的後設資料進入 0.5.0 instrument_context，不汙染歷史上下文和持倉上下文。"""
         from src.modules.automation.tradingagents.data_context import patch_instrument_context
 
         captured = {}
@@ -673,7 +673,7 @@ class TestPortfolioContext(unittest.TestCase):
         self.assertEqual(captured["portfolio_context"], "native holdings")
 
     def test_patch_instrument_context_no_context_skips(self):
-        """没有元数据时不替换上游方法。"""
+        """沒有後設資料時不替換上游方法。"""
         from src.modules.automation.tradingagents.data_context import patch_instrument_context
 
         graph = MagicMock()
@@ -682,7 +682,7 @@ class TestPortfolioContext(unittest.TestCase):
         self.assertEqual(graph.propagator.create_initial_state, original)
 
     def test_run_sync_passes_native_portfolio_to_v050_propagate(self):
-        """运行入口必须把转换后的 portfolio 传给 0.5.0 propagate，而非提示词。"""
+        """執行入口必須把轉換後的 portfolio 傳給 0.5.0 propagate，而非提示詞。"""
         from contextlib import nullcontext
 
         from tradingagents.graph import trading_graph
@@ -748,18 +748,18 @@ class TestAgentCollect(unittest.IsolatedAsyncioTestCase):
 
         stock = MagicMock()
         stock.symbol = "600519"
-        stock.name = "贵州茅台"
+        stock.name = "貴州茅臺"
         stock.market = MagicMock()
         stock.market.value = "CN"
 
         context = MagicMock()
         context.watchlist = [stock]
 
-        fake_quote = Quote(symbol="600519", market="CN", current_price=1332.95, name="贵州茅台")
+        fake_quote = Quote(symbol="600519", market="CN", current_price=1332.95, name="貴州茅臺")
         fake_bar = Bar(date="2026-05-15", open=1300.0, close=1332.95, high=1340.0, low=1290.0, volume=1000.0)
-        fake_flow = CapitalFlow(symbol="600519", name="贵州茅台", main_net_inflow=1000000.0)
+        fake_flow = CapitalFlow(symbol="600519", name="貴州茅臺", main_net_inflow=1000000.0)
         fake_event = EventItem(
-            source="em", external_id="1", event_type="announcement", title="测试公告",
+            source="em", external_id="1", event_type="announcement", title="測試公告",
             publish_time=_dt.now(), symbols=["600519"], importance=1, url="",
         )
 

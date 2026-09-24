@@ -82,32 +82,32 @@ const CHANNEL_TYPE_FIELDS: Record<string, { label: string; fields: ChannelFieldD
     label: 'Bark',
     fields: [
       { key: 'device_key', label: 'Device Key', placeholder: '你的 Bark Device Key', required: true },
-      { key: 'server_url', label: '服务器地址', placeholder: '默认 api.day.app，自建可填' },
+      { key: 'server_url', label: '伺服器地址', placeholder: '預設 api.day.app，自建可填' },
     ],
   },
   dingtalk: {
-    label: '钉钉机器人',
+    label: '釘釘機器人',
     fields: [
       { key: 'token', label: 'Webhook Token', placeholder: 'access_token 值', secret: true, required: true },
-      { key: 'secret', label: '加签密钥', placeholder: 'SEC... (选填)', secret: true },
-      { key: 'phones', label: '@手机号', placeholder: '逗号分隔，如 13800138000,13900139000' },
-      { key: 'keyword', label: '关键字', placeholder: '若群机器人启用“关键字”，填入以自动附加' },
+      { key: 'secret', label: '加簽金鑰', placeholder: 'SEC... (選填)', secret: true },
+      { key: 'phones', label: '@手機號', placeholder: '逗號分隔，如 13800138000,13900139000' },
+      { key: 'keyword', label: '關鍵字', placeholder: '若群機器人啟用“關鍵字”，填入以自動附加' },
     ],
   },
   wecom: {
-    label: '企业微信机器人',
+    label: '企業微信機器人',
     fields: [
-      { key: 'webhook_key', label: 'Webhook Key', placeholder: 'Webhook URL 中 key= 后的值', secret: true, required: true },
+      { key: 'webhook_key', label: 'Webhook Key', placeholder: 'Webhook URL 中 key= 後的值', secret: true, required: true },
     ],
   },
   lark: {
-    label: '飞书机器人',
+    label: '飛書機器人',
     fields: [
-      { key: 'webhook_token', label: 'Webhook Token', placeholder: 'hook/ 后面的 token', secret: true, required: true },
+      { key: 'webhook_token', label: 'Webhook Token', placeholder: 'hook/ 後面的 token', secret: true, required: true },
     ],
   },
   serverchan: {
-    label: 'Server酱',
+    label: 'Server醬',
     fields: [
       { key: 'sendkey', label: 'SendKey', placeholder: 'SCT...', secret: true, required: true },
     ],
@@ -116,7 +116,7 @@ const CHANNEL_TYPE_FIELDS: Record<string, { label: string; fields: ChannelFieldD
     label: 'PushPlus',
     fields: [
       { key: 'token', label: 'Token', placeholder: '你的 PushPlus Token', secret: true, required: true },
-      { key: 'topic', label: '群组编码', placeholder: '选填，群组推送时填写' },
+      { key: 'topic', label: '群組編碼', placeholder: '選填，群組推送時填寫' },
     ],
   },
   discord: {
@@ -129,8 +129,8 @@ const CHANNEL_TYPE_FIELDS: Record<string, { label: string; fields: ChannelFieldD
   pushover: {
     label: 'Pushover',
     fields: [
-      { key: 'user_key', label: 'User Key', placeholder: '用户 Key', required: true },
-      { key: 'app_token', label: 'App Token', placeholder: '应用 Token', secret: true, required: true },
+      { key: 'user_key', label: 'User Key', placeholder: '使用者 Key', required: true },
+      { key: 'app_token', label: 'App Token', placeholder: '應用 Token', secret: true, required: true },
     ],
   },
 }
@@ -163,7 +163,7 @@ export default function SettingsPage() {
   const [modelForm, setModelForm] = useState<ModelForm>(emptyModelForm)
   const [editModelId, setEditModelId] = useState<number | null>(null)
 
-  // 批量选择嗅探到的模型
+  // 批次選擇嗅探到的模型
   const [batchOpen, setBatchOpen] = useState(false)
   const [batchServiceId, setBatchServiceId] = useState<number | null>(null)
   const [batchCandidates, setBatchCandidates] = useState<string[]>([])
@@ -180,7 +180,7 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState<number | null>(null)
   const [testingModel, setTestingModel] = useState<number | null>(null)
 
-  // 头像
+  // 頭像
   const avatar = useAvatar()
   const avatarFileRef = useRef<HTMLInputElement | null>(null)
   const [avatarSaving, setAvatarSaving] = useState(false)
@@ -201,7 +201,7 @@ export default function SettingsPage() {
   const builtinTemplates: Array<{ name: string; desc: string; payload: TemplatePayload }> = [
     {
       name: '保守',
-      desc: '低打扰：盘中更严格触发，静默时段建议开启',
+      desc: '低打擾：盤中更嚴格觸發，靜默時段建議開啟',
       payload: {
         version: 1,
         settings: {
@@ -218,7 +218,7 @@ export default function SettingsPage() {
     },
     {
       name: '均衡',
-      desc: '默认推荐：兼顾覆盖与打扰',
+      desc: '預設推薦：兼顧覆蓋與打擾',
       payload: {
         version: 1,
         settings: {
@@ -233,8 +233,8 @@ export default function SettingsPage() {
       },
     },
     {
-      name: '激进',
-      desc: '更高频：更早捕捉变化，适合短线盯盘',
+      name: '激進',
+      desc: '更高頻：更早捕捉變化，適合短線盯盤',
       payload: {
         version: 1,
         settings: {
@@ -293,9 +293,9 @@ export default function SettingsPage() {
       const data = await fetchAPI<TemplatePayload>('/templates/export')
       const date = new Date().toISOString().slice(0, 10)
       downloadJson(`panwatch-config-${date}.json`, data)
-      toast('配置包已导出', 'success')
+      toast('配置包已匯出', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '导出失败', 'error')
+      toast(e instanceof Error ? e.message : '匯出失敗', 'error')
     } finally {
       setExporting(false)
     }
@@ -308,12 +308,12 @@ export default function SettingsPage() {
         method: 'POST',
         body: JSON.stringify(payload),
       })
-      toast('配置包已导入', 'success')
+      toast('配置包已匯入', 'success')
       // refresh
       await load()
       return resp
     } catch (e) {
-      toast(e instanceof Error ? e.message : '导入失败', 'error')
+      toast(e instanceof Error ? e.message : '匯入失敗', 'error')
       return null
     } finally {
       setImporting(false)
@@ -337,15 +337,15 @@ export default function SettingsPage() {
 
   const onPickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    e.target.value = '' // 允许重复选择同一文件
+    e.target.value = '' // 允許重複選擇同一檔案
     if (!file) return
     setAvatarSaving(true)
     try {
       const dataUrl = await fileToAvatarDataUrl(file)
       await saveAvatar(dataUrl)
-      toast('头像已更新', 'success')
+      toast('頭像已更新', 'success')
     } catch (err) {
-      toast(err instanceof Error ? err.message : '头像保存失败', 'error')
+      toast(err instanceof Error ? err.message : '頭像儲存失敗', 'error')
     } finally {
       setAvatarSaving(false)
     }
@@ -366,7 +366,7 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(null), 2000)
       load()
     } catch {
-      toast('保存失败', 'error')
+      toast('儲存失敗', 'error')
     } finally {
       setSaving(null)
     }
@@ -410,23 +410,23 @@ export default function SettingsPage() {
             setBatchDefault('')
             setBatchOpen(true)
           } else {
-            toast('服务商已保存，未自动发现模型，可手动添加', 'info')
+            toast('服務商已儲存，未自動發現模型，可手動新增', 'info')
           }
         } catch (e) {
           toast(
             e instanceof Error
-              ? `服务商已保存，自动嗅探失败：${e.message}，可手动添加模型`
-              : '服务商已保存，该服务商暂不支持自动嗅探，可手动添加模型',
+              ? `服務商已儲存，自動嗅探失敗：${e.message}，可手動新增模型`
+              : '服務商已儲存，該服務商暫不支援自動嗅探，可手動新增模型',
             'info',
           )
         }
       }
     } catch (e) {
-      toast(e instanceof Error ? e.message : '保存失败', 'error')
+      toast(e instanceof Error ? e.message : '儲存失敗', 'error')
     }
   }
 
-  // 手动对某服务商嗅探并打开批量选择框(排除已添加的模型)
+  // 手動對某服務商嗅探並開啟批次選擇框(排除已新增的模型)
   const discoverForService = async (serviceId: number) => {
     setDiscoveringService(serviceId)
     try {
@@ -438,7 +438,7 @@ export default function SettingsPage() {
       const added = new Set((svc?.models || []).map(m => m.model))
       const found = res.models.filter(Boolean).filter(id => !added.has(id))
       if (found.length === 0) {
-        toast('未发现可新增的模型', 'info')
+        toast('未發現可新增的模型', 'info')
         return
       }
       setBatchServiceId(serviceId)
@@ -447,7 +447,7 @@ export default function SettingsPage() {
       setBatchDefault('')
       setBatchOpen(true)
     } catch (e) {
-      toast(e instanceof Error ? e.message : '该服务商暂不支持自动嗅探', 'error')
+      toast(e instanceof Error ? e.message : '該服務商暫不支援自動嗅探', 'error')
     } finally {
       setDiscoveringService(null)
     }
@@ -468,22 +468,22 @@ export default function SettingsPage() {
         body: JSON.stringify({ models }),
       })
       setBatchOpen(false)
-      toast(`已添加 ${models.length} 个模型`, 'success')
+      toast(`已新增 ${models.length} 個模型`, 'success')
       load()
     } catch (e) {
-      toast(e instanceof Error ? e.message : '批量添加失败', 'error')
+      toast(e instanceof Error ? e.message : '批次新增失敗', 'error')
     } finally {
       setSubmittingBatch(false)
     }
   }
 
   const deleteService = async (id: number) => {
-    if (!confirm('删除服务商将同时删除其下所有模型，确定？')) return
+    if (!confirm('刪除服務商將同時刪除其下所有模型，確定？')) return
     try {
       await fetchAPI(`/providers/services/${id}`, { method: 'DELETE' })
       load()
     } catch (e) {
-      toast(e instanceof Error ? e.message : '删除失败', 'error')
+      toast(e instanceof Error ? e.message : '刪除失敗', 'error')
     }
   }
 
@@ -509,17 +509,17 @@ export default function SettingsPage() {
       setModelDialogOpen(false)
       load()
     } catch (e) {
-      toast(e instanceof Error ? e.message : '保存失败', 'error')
+      toast(e instanceof Error ? e.message : '儲存失敗', 'error')
     }
   }
 
   const deleteModel = async (id: number) => {
-    if (!confirm('确定删除此模型？')) return
+    if (!confirm('確定刪除此模型？')) return
     try {
       await fetchAPI(`/providers/models/${id}`, { method: 'DELETE' })
       load()
     } catch (e) {
-      toast(e instanceof Error ? e.message : '删除失败', 'error')
+      toast(e instanceof Error ? e.message : '刪除失敗', 'error')
     }
   }
 
@@ -528,7 +528,7 @@ export default function SettingsPage() {
       await fetchAPI(`/providers/models/${id}`, { method: 'PUT', body: JSON.stringify({ is_default: true }) })
       load()
     } catch {
-      toast('设置失败', 'error')
+      toast('設定失敗', 'error')
     }
   }
 
@@ -536,9 +536,9 @@ export default function SettingsPage() {
     setTestingModel(id)
     try {
       await fetchAPI(`/providers/models/${id}/test`, { method: 'POST' })
-      toast('模型测试成功', 'success')
+      toast('模型測試成功', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '测试失败', 'error')
+      toast(e instanceof Error ? e.message : '測試失敗', 'error')
     } finally {
       setTestingModel(null)
     }
@@ -576,7 +576,7 @@ export default function SettingsPage() {
       setChannelDialogOpen(false)
       load()
     } catch (e) {
-      toast(e instanceof Error ? e.message : '保存失败', 'error')
+      toast(e instanceof Error ? e.message : '儲存失敗', 'error')
     }
   }
 
@@ -590,12 +590,12 @@ export default function SettingsPage() {
   }
 
   const deleteChannel = async (id: number) => {
-    if (!confirm('确定删除此通知渠道？')) return
+    if (!confirm('確定刪除此通知管道？')) return
     try {
       await fetchAPI(`/channels/${id}`, { method: 'DELETE' })
       load()
     } catch (e) {
-      toast(e instanceof Error ? e.message : '删除失败', 'error')
+      toast(e instanceof Error ? e.message : '刪除失敗', 'error')
     }
   }
 
@@ -604,7 +604,7 @@ export default function SettingsPage() {
       await fetchAPI(`/channels/${id}`, { method: 'PUT', body: JSON.stringify({ is_default: true }) })
       load()
     } catch {
-      toast('设置失败', 'error')
+      toast('設定失敗', 'error')
     }
   }
 
@@ -613,7 +613,7 @@ export default function SettingsPage() {
       await fetchAPI(`/channels/${channel.id}`, { method: 'PUT', body: JSON.stringify({ enabled: !channel.enabled }) })
       load()
     } catch {
-      toast('操作失败', 'error')
+      toast('操作失敗', 'error')
     }
   }
 
@@ -621,9 +621,9 @@ export default function SettingsPage() {
     setTesting(id)
     try {
       await fetchAPI(`/channels/${id}/test`, { method: 'POST' })
-      toast('测试通知已发送', 'success')
+      toast('測試通知已傳送', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '测试失败', 'error')
+      toast(e instanceof Error ? e.message : '測試失敗', 'error')
     } finally {
       setTesting(null)
     }
@@ -648,13 +648,13 @@ export default function SettingsPage() {
     return (s.description || '').toLowerCase().includes(q) || (s.key || '').toLowerCase().includes(q)
   })
 
-  // 按“重要性”排序：常用优先，低频靠后
+  // 按“重要性”排序：常用優先，低頻靠後
   const jumpItems: Array<{ id: string; label: string; hint?: string }> = [
-    { id: 'sec-ai', label: 'AI', hint: `${services.length} 服务 / ${allModels.length} 模型` },
-    { id: 'sec-notify', label: '通知', hint: `${enabledChannels.length}/${channels.length} 启用` },
-    { id: 'sec-system', label: '系统', hint: health?.timezone ? `TZ ${health.timezone}` : undefined },
+    { id: 'sec-ai', label: 'AI', hint: `${services.length} 服務 / ${allModels.length} 模型` },
+    { id: 'sec-notify', label: '通知', hint: `${enabledChannels.length}/${channels.length} 啟用` },
+    { id: 'sec-system', label: '系統', hint: health?.timezone ? `TZ ${health.timezone}` : undefined },
     { id: 'sec-pack', label: '配置包' },
-    { id: 'sec-feedback', label: '反馈' },
+    { id: 'sec-feedback', label: '回饋' },
     { id: 'sec-pat', label: 'MCP 令牌' },
   ]
 
@@ -677,11 +677,11 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => avatarFileRef.current?.click()}
                 disabled={avatarSaving}
-                title="点击上传头像"
+                title="點選上傳頭像"
                 className="group relative h-9 w-9 rounded-full overflow-hidden bg-gradient-to-br from-primary to-primary/70 text-white shadow-sm flex items-center justify-center ring-1 ring-border/40 hover:ring-primary/40 transition-all shrink-0"
               >
                 {avatar ? (
-                  <img src={avatar} alt="头像" className="w-full h-full object-cover" />
+                  <img src={avatar} alt="頭像" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-4 h-4" />
                 )}
@@ -691,22 +691,22 @@ export default function SettingsPage() {
               </button>
               <span className="mx-1 hidden h-4 w-px bg-border/50 sm:block" />
               <div className="px-2.5 py-1 rounded-full bg-background/70 border border-border/50 text-[11px] text-muted-foreground">
-                <span className="font-mono text-foreground/90">{services.length}</span> 服务商
+                <span className="font-mono text-foreground/90">{services.length}</span> 服務商
               </div>
               <div className="px-2.5 py-1 rounded-full bg-background/70 border border-border/50 text-[11px] text-muted-foreground">
                 <span className="font-mono text-foreground/90">{allModels.length}</span> 模型
               </div>
               <div className="px-2.5 py-1 rounded-full bg-background/70 border border-border/50 text-[11px] text-muted-foreground">
-                <span className="font-mono text-foreground/90">{enabledChannels.length}</span>/<span className="font-mono">{channels.length}</span> 渠道启用
+                <span className="font-mono text-foreground/90">{enabledChannels.length}</span>/<span className="font-mono">{channels.length}</span> 管道啟用
               </div>
               {defaultModel ? (
                 <div className="px-2.5 py-1 rounded-full bg-background/70 border border-border/50 text-[11px] text-muted-foreground">
-                  默认模型 <span className="font-mono text-foreground/90">{defaultModel.model}</span>
+                  預設模型 <span className="font-mono text-foreground/90">{defaultModel.model}</span>
                 </div>
               ) : null}
               {defaultChannel ? (
                 <div className="px-2.5 py-1 rounded-full bg-background/70 border border-border/50 text-[11px] text-muted-foreground">
-                  默认通知 <span className="text-foreground/90">{defaultChannel.name}</span>
+                  預設通知 <span className="text-foreground/90">{defaultChannel.name}</span>
                 </div>
               ) : null}
             </div>
@@ -714,7 +714,7 @@ export default function SettingsPage() {
 
           <div className="flex flex-col sm:flex-row gap-2">
             <Button variant="secondary" size="sm" className="h-9" onClick={exportTemplate} disabled={exporting}>
-              <Download className="w-3.5 h-3.5" /> 导出配置包
+              <Download className="w-3.5 h-3.5" /> 匯出配置包
             </Button>
             <Button size="sm" className="h-9" onClick={() => scrollTo('sec-ai')}>
               <Cpu className="w-3.5 h-3.5" /> 配置 AI
@@ -742,16 +742,16 @@ export default function SettingsPage() {
         <section id="sec-ai" className="card p-4 md:p-6 lg:col-span-7">
           <div className="flex items-start justify-between mb-4 md:mb-5 gap-3">
             <div>
-              <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">AI 服务商 & 模型</h3>
-              <p className="text-[11px] text-muted-foreground mt-1">连接你的 AI 服务并设置默认模型</p>
+              <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">AI 服務商 & 模型</h3>
+              <p className="text-[11px] text-muted-foreground mt-1">連線你的 AI 服務並設定預設模型</p>
             </div>
             <Button size="sm" className="h-8" onClick={() => openServiceDialog()}>
               <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">添加服务商</span>
+              <span className="hidden sm:inline">新增服務商</span>
             </Button>
           </div>
           {services.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground text-center py-6">暂无 AI 服务商，点击"添加服务商"创建</p>
+            <p className="text-[13px] text-muted-foreground text-center py-6">暫無 AI 服務商，點選"新增服務商"建立</p>
           ) : (
             <div className="space-y-4">
               {services.map(svc => (
@@ -768,7 +768,7 @@ export default function SettingsPage() {
                       </Button>
                       <Button
                         variant="ghost" size="icon" className="h-7 w-7"
-                        title="嗅探模型（自动发现可用模型）"
+                        title="嗅探模型（自動發現可用模型）"
                         disabled={discoveringService === svc.id}
                         onClick={() => discoverForService(svc.id)}
                       >
@@ -798,7 +798,7 @@ export default function SettingsPage() {
                               variant="ghost" size="icon" className="h-6 w-6"
                               onClick={() => testModel(m.id)}
                               disabled={testingModel === m.id}
-                              title="测试模型"
+                              title="測試模型"
                             >
                               {testingModel === m.id ? (
                                 <span className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
@@ -807,7 +807,7 @@ export default function SettingsPage() {
                               )}
                             </Button>
                             {!m.is_default && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDefaultModel(m.id)} title="设为默认">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDefaultModel(m.id)} title="設為預設">
                                 <Star className="w-3 h-3" />
                               </Button>
                             )}
@@ -832,16 +832,16 @@ export default function SettingsPage() {
         <section id="sec-notify" className="card p-4 md:p-6 lg:col-span-5">
           <div className="flex items-start justify-between mb-4 md:mb-5 gap-3">
             <div>
-              <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">通知渠道</h3>
-              <p className="text-[11px] text-muted-foreground mt-1">推送到 Telegram/Bark 等渠道</p>
+              <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">通知管道</h3>
+              <p className="text-[11px] text-muted-foreground mt-1">推送到 Telegram/Bark 等管道</p>
             </div>
             <Button size="sm" className="h-8" onClick={() => openChannelDialog()}>
               <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">添加</span>
+              <span className="hidden sm:inline">新增</span>
             </Button>
           </div>
           {channels.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground text-center py-6">暂无通知渠道，点击"添加"创建</p>
+            <p className="text-[13px] text-muted-foreground text-center py-6">暫無通知管道，點選"新增"建立</p>
           ) : (
             <div className="space-y-3">
               {channels.map(ch => (
@@ -858,7 +858,7 @@ export default function SettingsPage() {
                       variant="ghost" size="icon" className="h-7 w-7"
                       onClick={() => testChannel(ch.id)}
                       disabled={testing === ch.id || !ch.enabled}
-                      title="发送测试"
+                      title="傳送測試"
                     >
                       {testing === ch.id ? (
                         <span className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
@@ -867,7 +867,7 @@ export default function SettingsPage() {
                       )}
                     </Button>
                     {!ch.is_default && (
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDefaultChannel(ch.id)} title="设为默认">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDefaultChannel(ch.id)} title="設為預設">
                         <Star className="w-3.5 h-3.5" />
                       </Button>
                     )}
@@ -890,14 +890,14 @@ export default function SettingsPage() {
           <section id="sec-system" className="card p-4 md:p-6 lg:col-span-12">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4 md:mb-5">
               <div>
-                <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">系统</h3>
-                <p className="text-[11px] text-muted-foreground mt-1">偏好与高级选项。修改后立即生效。</p>
+                <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">系統</h3>
+                <p className="text-[11px] text-muted-foreground mt-1">偏好與進階選項。修改後立即生效。</p>
               </div>
               <div className="flex items-center gap-2">
                 <Input
                   value={systemQuery}
                   onChange={e => setSystemQuery(e.target.value)}
-                  placeholder="搜索设置项（描述 / key）"
+                  placeholder="搜尋設定項（描述 / key）"
                   className="h-9 w-full md:w-[320px]"
                 />
                 {health?.timezone ? (
@@ -969,12 +969,12 @@ export default function SettingsPage() {
           <div className="flex items-start justify-between mb-4 gap-3">
             <div>
               <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">配置包</h3>
-              <p className="text-[11px] text-muted-foreground mt-1">一键导入/导出 Agent、关注列表与系统设置</p>
+              <p className="text-[11px] text-muted-foreground mt-1">一鍵匯入/匯出 Agent、關注列表與系統設定</p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" size="sm" className="h-8" onClick={exportTemplate} disabled={exporting}>
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">导出</span>
+                <span className="hidden sm:inline">匯出</span>
               </Button>
               <Button
                 variant="secondary"
@@ -984,20 +984,20 @@ export default function SettingsPage() {
                 disabled={importing}
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">导入</span>
+                <span className="hidden sm:inline">匯入</span>
               </Button>
             </div>
           </div>
 
           <div className="flex items-center gap-2 mb-4">
-            <div className="text-[11px] text-muted-foreground">导入模式</div>
+            <div className="text-[11px] text-muted-foreground">匯入模式</div>
             <Select value={importMode} onValueChange={(v) => setImportMode(v as any)}>
               <SelectTrigger className="h-8 w-[160px] text-[12px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="merge">合并更新（推荐）</SelectItem>
-                <SelectItem value="replace">替换（仅覆盖配置包包含项）</SelectItem>
+                <SelectItem value="merge">合併更新（推薦）</SelectItem>
+                <SelectItem value="replace">替換（僅覆蓋配置包包含項）</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1016,7 +1016,7 @@ export default function SettingsPage() {
                 const payload = JSON.parse(text)
                 await importTemplate(payload)
               } catch (err) {
-                toast('配置包解析失败', 'error')
+                toast('配置包解析失敗', 'error')
               }
             }}
           />
@@ -1037,7 +1037,7 @@ export default function SettingsPage() {
                       onClick={() => importTemplate(t.payload)}
                       disabled={importing}
                     >
-                      <span className="text-[12px]">应用</span>
+                      <span className="text-[12px]">應用</span>
                     </Button>
                   </div>
                   <div className="mt-1 text-[11px] text-muted-foreground">{t.desc}</div>
@@ -1051,12 +1051,12 @@ export default function SettingsPage() {
         <section id="sec-feedback" className="card p-4 md:p-6 lg:col-span-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">建议反馈</h3>
-              <p className="text-[11px] text-muted-foreground mt-1">用于评估推送质量与策略迭代</p>
+              <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground">建議回饋</h3>
+              <p className="text-[11px] text-muted-foreground mt-1">用於評估推送質量與策略迭代</p>
             </div>
             <Button variant="secondary" size="sm" className="h-8" onClick={loadFeedbackStats} disabled={fbLoading}>
               <BarChart3 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">刷新</span>
+              <span className="hidden sm:inline">重新整理</span>
             </Button>
           </div>
 
@@ -1065,11 +1065,11 @@ export default function SettingsPage() {
               <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
                 <span>近 {fbStats.range_days} 天</span>
                 <span className="opacity-50">|</span>
-                <span>反馈: <span className="font-mono text-foreground/90">{fbStats.total}</span></span>
+                <span>回饋: <span className="font-mono text-foreground/90">{fbStats.total}</span></span>
                 <span className="opacity-50">|</span>
                 <span>有用: <span className="font-mono text-emerald-600">{fbStats.useful}</span></span>
                 <span className="opacity-50">|</span>
-                <span>没用: <span className="font-mono text-rose-600">{fbStats.useless}</span></span>
+                <span>沒用: <span className="font-mono text-rose-600">{fbStats.useless}</span></span>
                 <span className="opacity-50">|</span>
                 <span>有用率: <span className="font-mono text-foreground/90">{Math.round(fbStats.useful_rate * 100)}%</span></span>
               </div>
@@ -1089,15 +1089,15 @@ export default function SettingsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="text-[12px] text-muted-foreground">暂无反馈数据</div>
+                <div className="text-[12px] text-muted-foreground">暫無回饋資料</div>
               )}
             </div>
           ) : (
-            <div className="text-[12px] text-muted-foreground">暂无反馈数据</div>
+            <div className="text-[12px] text-muted-foreground">暫無回饋資料</div>
           )}
         </section>
 
-        {/* MCP 访问令牌 */}
+        {/* MCP 訪問令牌 */}
         <PatSection />
 
       </div>
@@ -1106,16 +1106,16 @@ export default function SettingsPage() {
       <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editServiceId ? '编辑 AI 服务商' : '添加 AI 服务商'}</DialogTitle>
-            <DialogDescription>配置 AI 服务商的 API 连接信息</DialogDescription>
+            <DialogTitle>{editServiceId ? '編輯 AI 服務商' : '新增 AI 服務商'}</DialogTitle>
+            <DialogDescription>配置 AI 服務商的 API 連線資訊</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <Label>名称</Label>
+              <Label>名稱</Label>
               <Input
                 value={serviceForm.name}
                 onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })}
-                placeholder="如 OpenAI、智谱、DeepSeek"
+                placeholder="如 OpenAI、智譜、DeepSeek"
               />
             </div>
             <div>
@@ -1149,7 +1149,7 @@ export default function SettingsPage() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setServiceDialogOpen(false)}>取消</Button>
               <Button onClick={saveService} disabled={!serviceForm.name || !serviceForm.base_url}>
-                {editServiceId ? '保存' : '创建'}
+                {editServiceId ? '儲存' : '建立'}
               </Button>
             </div>
           </div>
@@ -1160,18 +1160,18 @@ export default function SettingsPage() {
       <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editModelId ? '编辑模型' : '添加模型'}</DialogTitle>
+            <DialogTitle>{editModelId ? '編輯模型' : '新增模型'}</DialogTitle>
             <DialogDescription>配置 AI 模型</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <Label>所属服务商</Label>
+              <Label>所屬服務商</Label>
               <Select
                 value={modelForm.service_id?.toString() ?? ''}
                 onValueChange={val => setModelForm({ ...modelForm, service_id: val ? parseInt(val) : null })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择服务商" />
+                  <SelectValue placeholder="選擇服務商" />
                 </SelectTrigger>
                 <SelectContent>
                   {services.map(s => (
@@ -1181,42 +1181,42 @@ export default function SettingsPage() {
               </Select>
             </div>
             <div>
-              <Label>显示名称 <span className="text-muted-foreground font-normal">(选填，默认同模型标识)</span></Label>
+              <Label>顯示名稱 <span className="text-muted-foreground font-normal">(選填，預設同模型標識)</span></Label>
               <Input
                 value={modelForm.name}
                 onChange={e => setModelForm({ ...modelForm, name: e.target.value })}
-                placeholder="不填则使用模型标识"
+                placeholder="不填則使用模型標識"
               />
             </div>
             <div>
-              <Label>模型标识 <span className="text-muted-foreground font-normal">(可用服务商上的「嗅探」批量发现)</span></Label>
+              <Label>模型標識 <span className="text-muted-foreground font-normal">(可用服務商上的「嗅探」批次發現)</span></Label>
               <Input
                 value={modelForm.model}
                 disabled={!modelForm.service_id}
                 onChange={e => setModelForm({ ...modelForm, model: e.target.value })}
-                placeholder={modelForm.service_id ? 'gpt-4o / glm-4-flash' : '请先选择服务商'}
+                placeholder={modelForm.service_id ? 'gpt-4o / glm-4-flash' : '請先選擇服務商'}
                 className="font-mono"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setModelDialogOpen(false)}>取消</Button>
               <Button onClick={saveModel} disabled={!modelForm.model || !modelForm.service_id}>
-                {editModelId ? '保存' : '创建'}
+                {editModelId ? '儲存' : '建立'}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 批量选择嗅探到的模型 */}
+      {/* 批次選擇嗅探到的模型 */}
       <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>发现 {batchCandidates.length} 个模型</DialogTitle>
-            <DialogDescription>勾选要添加的模型，并可指定一个默认模型</DialogDescription>
+            <DialogTitle>發現 {batchCandidates.length} 個模型</DialogTitle>
+            <DialogDescription>勾選要新增的模型，並可指定一個預設模型</DialogDescription>
           </DialogHeader>
           <div className="mt-3 flex items-center justify-between px-0.5 text-xs text-muted-foreground">
-            <span>已选 <span className="font-mono text-foreground">{batchChecked.size}</span> / {batchCandidates.length}</span>
+            <span>已選 <span className="font-mono text-foreground">{batchChecked.size}</span> / {batchCandidates.length}</span>
             <button
               type="button"
               className="hover:text-foreground"
@@ -1224,7 +1224,7 @@ export default function SettingsPage() {
                 batchChecked.size === batchCandidates.length ? new Set() : new Set(batchCandidates),
               )}
             >
-              {batchChecked.size === batchCandidates.length ? '取消全选' : '全选'}
+              {batchChecked.size === batchCandidates.length ? '取消全選' : '全選'}
             </button>
           </div>
           <div className="mt-1.5 max-h-80 space-y-1.5 overflow-y-auto scrollbar pr-1">
@@ -1267,16 +1267,16 @@ export default function SettingsPage() {
                     }`}
                   >
                     <Star className={`h-3 w-3 ${isDefault ? 'fill-current' : ''}`} />
-                    {isDefault ? '默认' : '设默认'}
+                    {isDefault ? '預設' : '設預設'}
                   </button>
                 </div>
               )
             })}
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => setBatchOpen(false)}>跳过</Button>
+            <Button variant="ghost" onClick={() => setBatchOpen(false)}>跳過</Button>
             <Button onClick={submitBatchModels} disabled={batchChecked.size === 0 || submittingBatch}>
-              {submittingBatch ? '添加中…' : `添加 ${batchChecked.size} 个`}
+              {submittingBatch ? '新增中…' : `新增 ${batchChecked.size} 個`}
             </Button>
           </div>
         </DialogContent>
@@ -1286,12 +1286,12 @@ export default function SettingsPage() {
       <Dialog open={channelDialogOpen} onOpenChange={setChannelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editChannelId ? '编辑通知渠道' : '添加通知渠道'}</DialogTitle>
+            <DialogTitle>{editChannelId ? '編輯通知管道' : '新增通知管道'}</DialogTitle>
             <DialogDescription>配置通知推送方式</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <Label>名称</Label>
+              <Label>名稱</Label>
               <Input
                 value={channelForm.name}
                 onChange={e => setChannelForm({ ...channelForm, name: e.target.value })}
@@ -1299,7 +1299,7 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <Label>类型</Label>
+              <Label>型別</Label>
               <Select
                 value={channelForm.type}
                 onValueChange={val => setChannelForm({ ...channelForm, type: val, config: {} })}
@@ -1316,7 +1316,7 @@ export default function SettingsPage() {
             </div>
             {CHANNEL_TYPE_FIELDS[channelForm.type]?.fields.map(field => (
               <div key={field.key}>
-                <Label>{field.label}{!field.required && <span className="text-muted-foreground font-normal"> (选填)</span>}</Label>
+                <Label>{field.label}{!field.required && <span className="text-muted-foreground font-normal"> (選填)</span>}</Label>
                 <div className="relative">
                   <Input
                     type={field.secret && !channelKeyVisible ? 'password' : 'text'}
@@ -1343,7 +1343,7 @@ export default function SettingsPage() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => setChannelDialogOpen(false)}>取消</Button>
               <Button onClick={saveChannel} disabled={!isChannelFormValid()}>
-                {editChannelId ? '保存' : '创建'}
+                {editChannelId ? '儲存' : '建立'}
               </Button>
             </div>
           </div>

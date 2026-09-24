@@ -1,8 +1,8 @@
-"""基本面/财务 vendor:腾讯(CN,~数组)+ 东财(CN push2 / US·HK datacenter GMAININDICATOR)。
+"""基本面/財務 vendor:騰訊(CN,~陣列)+ 東財(CN push2 / US·HK datacenter GMAININDICATOR)。
 
-字段索引/键名按 a-stock/global SKILL 记录 + 现有 vendor(tencent.py/eastmoney.py)取数骨架校准,
-未在沙箱内实抓验证——标"待实抓校准"的字段上线前需用真实响应复核。拿不到的字段一律 None,
-不伪造、不用无参 now()/random 填充数值。
+欄位索引/鍵名按 a-stock/global SKILL 記錄 + 現有 vendor(tencent.py/eastmoney.py)取數骨架校準,
+未在沙箱內實抓驗證——標"待實抓校準"的欄位上線前需用真實回應複核。拿不到的欄位一律 None,
+不偽造、不用無參 now()/random 填充數值。
 """
 
 from __future__ import annotations
@@ -27,15 +27,15 @@ def _to_float(value) -> float | None:
         return None
 
 
-# ============================== 腾讯(CN) ==============================
+# ============================== 騰訊(CN) ==============================
 
 def _parse_fundamentals_line(line: str, market: str) -> Fundamentals | None:
-    """解析腾讯 qt.gtimg `~` 数组行为 Fundamentals。
+    """解析騰訊 qt.gtimg `~` 陣列行為 Fundamentals。
 
-    索引:idx1=name、idx39=pe_ttm、idx44=circulating_market_value(亿)、
-    idx45=total_market_value(亿)、idx46=pb、idx52=pe_static。
-    注:44/45(流通/总市值)顺序对齐本包 tencent.py Quote 解析的既有约定
-    (44=流通、45=总),保证包内一致;两处均未经真实响应交叉核对,待实抓校准。
+    索引:idx1=name、idx39=pe_ttm、idx44=circulating_market_value(億)、
+    idx45=total_market_value(億)、idx46=pb、idx52=pe_static。
+    注:44/45(流通/總市值)順序對齊本包 tencent.py Quote 解析的既有約定
+    (44=流通、45=總),保證包內一致;兩處均未經真實回應交叉核對,待實抓校準。
     """
     if '=""' in line or not line.strip():
         return None
@@ -67,7 +67,7 @@ def _parse_fundamentals_line(line: str, market: str) -> Fundamentals | None:
             circulating_market_value=circulating_market_value,
         )
     except (ValueError, IndexError) as e:
-        logger.debug(f"解析腾讯基本面失败: {e}")
+        logger.debug(f"解析騰訊基本面失敗: {e}")
         return None
 
 
@@ -89,7 +89,7 @@ class TencentFundamentalsVendor(FundamentalsVendor):
         return out
 
 
-# ============================== 东财 ==============================
+# ============================== 東財 ==============================
 
 _PUSH2_URL = "https://push2.eastmoney.com/api/qt/stock/get"
 _PUSH2_HOST = "push2.eastmoney.com"
@@ -110,7 +110,7 @@ _REPORT_NAME_HK = "RPT_HKF10_FN_GMAININDICATOR"
 
 
 def _fetch_cn(sym: Symbol) -> Fundamentals | None:
-    """CN:push2 stock/get。PE/PB 该端点未提供,留 None(quote 端另有源,这里不重复取)。"""
+    """CN:push2 stock/get。PE/PB 該端點未提供,留 None(quote 端另有源,這裡不重複取)。"""
     payload = market_get(
         _PUSH2_URL,
         host_key=_PUSH2_HOST,
@@ -120,7 +120,7 @@ def _fetch_cn(sym: Symbol) -> Fundamentals | None:
         timeout=8,
         retries=2,
         parse="json",
-        log_label="东财基本面",
+        log_label="東財基本面",
         symbol=sym.code,
     )
     if not payload:
@@ -143,8 +143,8 @@ def _fetch_cn(sym: Symbol) -> Fundamentals | None:
 
 
 def _hk_secucode(code: str) -> str:
-    """HK SECUCODE:补零到 5 位 + .HK(参考 symbol.py to_yfinance 的补零惯例,该处补 4 位是 yfinance
-    专用格式,SECUCODE 按东财 F10 惯例补 5 位)。"""
+    """HK SECUCODE:補零到 5 位 + .HK(參考 symbol.py to_yfinance 的補零慣例,該處補 4 位是 yfinance
+    專用格式,SECUCODE 按東財 F10 慣例補 5 位)。"""
     if code.isdigit():
         return f"{int(code):05d}.HK"
     return f"{code}.HK"
@@ -168,7 +168,7 @@ def _fetch_gmainindicator(report_name: str, secucode: str, sym: Symbol) -> dict 
         timeout=8,
         retries=2,
         parse="json",
-        log_label="东财财务指标",
+        log_label="東財財務指標",
         symbol=sym.code,
     )
     if not payload or not isinstance(payload, dict):
@@ -183,8 +183,8 @@ def _fetch_gmainindicator(report_name: str, secucode: str, sym: Symbol) -> dict 
 
 
 def _row_to_fundamentals(row: dict, sym: Symbol, *, is_hk: bool) -> Fundamentals:
-    """GMAININDICATOR 一行 → Fundamentals。字段名待实抓校准(尤其 net_profit_yoy 的具体列名未确认,
-    这里防御性尝试常见候选列名,取不到则 None)。"""
+    """GMAININDICATOR 一行 → Fundamentals。欄位名待實抓校準(尤其 net_profit_yoy 的具體列名未確認,
+    這裡防禦性嘗試常見候選列名,取不到則 None)。"""
     report_date = str(row.get("REPORT_DATE") or "")[:10]
     net_profit_yoy = _to_float(
         row.get("PARENT_NETPROFIT_YOY")
@@ -211,7 +211,7 @@ def _row_to_fundamentals(row: dict, sym: Symbol, *, is_hk: bool) -> Fundamentals
 
 
 def _fetch_us(sym: Symbol) -> Fundamentals | None:
-    """US:SECUCODE 前缀未知,先试 NASDAQ(.O),空则再试 NYSE(.N),都空则该只 None。"""
+    """US:SECUCODE 字首未知,先試 NASDAQ(.O),空則再試 NYSE(.N),都空則該只 None。"""
     for suffix in ("O", "N"):
         secucode = f"{sym.code}.{suffix}"
         row = _fetch_gmainindicator(_REPORT_NAME_US, secucode, sym)
@@ -247,7 +247,7 @@ class EastmoneyFundamentalsVendor(FundamentalsVendor):
                 else:
                     continue
             except Exception as e:
-                logger.debug(f"东财基本面取数异常 symbol={sym.code}: {e}")
+                logger.debug(f"東財基本面取數異常 symbol={sym.code}: {e}")
                 continue
             if f:
                 out.append(f)

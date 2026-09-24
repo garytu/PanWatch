@@ -1,10 +1,10 @@
-"""资金流取数路由测试(经 marketdata 包统一接入)"""
+"""資金流取數路由測試(經 marketdata 包統一接入)"""
 import src.platform.marketdata.collectors.capital_flow_collector as cf
 from src.platform.marketdata.models import MarketCode
 
 
 def test_get_capital_flow_uses_marketdata(monkeypatch):
-    """走 marketdata 包的 capital_flow,转换为 PanWatch CapitalFlow"""
+    """走 marketdata 包的 capital_flow,轉換為 PanWatch CapitalFlow"""
     from marketdata.types import CapitalFlow as MdCF
 
     class _MD:

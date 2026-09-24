@@ -55,9 +55,9 @@ def _symbol_and_market(arguments: dict[str, Any]) -> tuple[str, MarketCode] | No
 def _failure_for_symbol(arguments: dict[str, Any]) -> ToolResult:
     if not str(arguments.get("symbol") or "").strip():
         return ToolResult.failure(
-            summary="请提供要查询的股票代码。", error_code="symbol_required"
+            summary="請提供要查詢的股票程式碼。", error_code="symbol_required"
         )
-    return ToolResult.failure(summary="不支持的市场代码。", error_code="market_invalid")
+    return ToolResult.failure(summary="不支援的市場程式碼。", error_code="market_invalid")
 
 
 def _optional_market(arguments: dict[str, Any]) -> MarketCode | None:
@@ -75,8 +75,8 @@ def _alert_condition_summary(item: dict[str, Any]) -> str:
     direction = "≥" if item.get("direction") == "above" else "≤"
     target = item.get("target_price")
     if target is None:
-        return "条件未知"
-    return f"价格 {direction} {target:g}"
+        return "條件未知"
+    return f"價格 {direction} {target:g}"
 
 
 def _published_at(value: object) -> str:
@@ -158,7 +158,7 @@ def _compact_research_candidate(item: dict[str, Any]) -> dict[str, Any]:
         "market": str(item.get("stock_market") or "CN"),
         "name": str(item.get("stock_name") or item.get("stock_symbol") or ""),
         "score": item.get("rank_score", item.get("score")),
-        "action": item.get("action_label") or item.get("action") or "观望",
+        "action": item.get("action_label") or item.get("action") or "觀望",
         "risk": item.get("risk_level_label") or item.get("risk_level") or "未知",
         "source": item.get("source_pool_label") or item.get("source_pool") or "未知",
         "signal": item.get("signal") or "",
@@ -178,11 +178,11 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     portfolio_service = build_portfolio_service(session)
 
     async def get_portfolio(_request: RunRequest, _arguments: dict) -> ToolResult:
-        summary = portfolio_service.build_assistant_summary() or "用户暂无持仓。"
+        summary = portfolio_service.build_assistant_summary() or "使用者暫無持倉。"
         return ToolResult.success(
             summary=summary,
-            data={"has_positions": summary != "用户暂无持仓。"},
-            sources=[{"name": "PanWatch 持仓"}],
+            data={"has_positions": summary != "使用者暫無持倉。"},
+            sources=[{"name": "PanWatch 持倉"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -195,7 +195,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             limit = int(arguments.get("limit", 5))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="机会筛选参数无效。",
+                summary="機會篩選引數無效。",
                 error_code="candidate_filter_invalid",
             )
         if (
@@ -206,7 +206,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             or not 1 <= limit <= 10
         ):
             return ToolResult.failure(
-                summary="机会筛选参数无效。",
+                summary="機會篩選引數無效。",
                 error_code="candidate_filter_invalid",
             )
 
@@ -224,16 +224,16 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - provider/database failures become controlled tool results
             return ToolResult.failure(
-                summary="机会数据暂时不可用。",
+                summary="機會資料暫時不可用。",
                 error_code="candidate_data_unavailable",
             )
 
         items = [_compact_research_candidate(item) for item in result.get("items", [])]
         names = "、".join(item["name"] for item in items[:3])
         summary = (
-            f"找到 {len(items)} 个研究候选：{names}。"
+            f"找到 {len(items)} 個研究候選：{names}。"
             if items
-            else "暂无符合条件的研究候选。"
+            else "暫無符合條件的研究候選。"
         )
         return ToolResult.success(
             summary=summary,
@@ -242,7 +242,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "count": len(items),
                 "items": items,
             },
-            sources=[{"name": "PanWatch 机会信号"}],
+            sources=[{"name": "PanWatch 機會訊號"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -255,7 +255,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             rows = await asyncio.to_thread(md_quote_rows, [symbol], market.value)
         except Exception:  # noqa: BLE001 - provider failures become controlled tool results
             return ToolResult.failure(
-                summary="行情数据暂时不可用。", error_code="quote_unavailable"
+                summary="行情資料暫時不可用。", error_code="quote_unavailable"
             )
         quote = next(
             (row for row in rows if str(row.get("symbol") or "") == symbol), None
@@ -289,11 +289,11 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         name = data.get("name") or symbol
         return ToolResult.success(
             summary=(
-                f"{name}（{market.value}:{symbol}）最新价 {data.get('current_price')}，"
-                f"涨跌幅 {data.get('change_pct')}%。"
+                f"{name}（{market.value}:{symbol}）最新價 {data.get('current_price')}，"
+                f"漲跌幅 {data.get('change_pct')}%。"
             ),
             data=data,
-            sources=[{"name": "PanWatch 行情数据"}],
+            sources=[{"name": "PanWatch 行情資料"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -308,17 +308,17 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - source issues must not abort an agent run
             return ToolResult.failure(
-                summary="K 线数据暂时不可用。", error_code="kline_unavailable"
+                summary="K 線資料暫時不可用。", error_code="kline_unavailable"
             )
         if not isinstance(summary, dict) or not summary:
             return ToolResult.failure(
-                summary=f"未找到 {market.value}:{symbol} 的 K 线摘要。",
+                summary=f"未找到 {market.value}:{symbol} 的 K 線摘要。",
                 error_code="kline_unavailable",
             )
         return ToolResult.success(
-            summary=f"{market.value}:{symbol} 的 K 线摘要已就绪：{summary}",
+            summary=f"{market.value}:{symbol} 的 K 線摘要已就緒：{summary}",
             data=summary,
-            sources=[{"name": "PanWatch K 线数据"}],
+            sources=[{"name": "PanWatch K 線資料"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -331,7 +331,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             limit = max(1, min(int(arguments.get("limit") or 5), 10))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="新闻条数必须是数字。", error_code="limit_invalid"
+                summary="新聞條數必須是數字。", error_code="limit_invalid"
             )
         try:
             articles = await asyncio.to_thread(
@@ -339,7 +339,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - data-source failures stay within the tool result
             return ToolResult.failure(
-                summary="新闻数据暂时不可用。", error_code="news_unavailable"
+                summary="新聞資料暫時不可用。", error_code="news_unavailable"
             )
         items = [
             {
@@ -352,9 +352,9 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             for article in articles[:limit]
         ]
         return ToolResult.success(
-            summary=f"{market.value}:{symbol} 近 7 天相关新闻 {len(items)} 条。",
+            summary=f"{market.value}:{symbol} 近 7 天相關新聞 {len(items)} 條。",
             data={"symbol": symbol, "market": market.value, "items": items},
-            sources=[{"name": "PanWatch 新闻数据"}],
+            sources=[{"name": "PanWatch 新聞資料"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -362,7 +362,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         query = str(arguments.get("query") or "").strip()
         if not query:
             return ToolResult.failure(
-                summary="请提供股票代码或名称。", error_code="search_query_required"
+                summary="請提供股票程式碼或名稱。", error_code="search_query_required"
             )
         raw_market = str(arguments.get("market") or "").strip().upper()
         if raw_market:
@@ -370,7 +370,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 market = MarketCode(raw_market)
             except ValueError:
                 return ToolResult.failure(
-                    summary="不支持的市场代码。", error_code="market_invalid"
+                    summary="不支援的市場程式碼。", error_code="market_invalid"
                 )
             market_value = market.value
         else:
@@ -379,13 +379,13 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             limit = max(1, min(int(arguments.get("limit") or 10), 20))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="搜索条数必须是数字。", error_code="limit_invalid"
+                summary="搜尋條數必須是數字。", error_code="limit_invalid"
             )
         try:
             items = await asyncio.to_thread(search_stocks, query, market_value, limit)
         except Exception:  # noqa: BLE001 - search providers become controlled results
             return ToolResult.failure(
-                summary="股票搜索暂时不可用。", error_code="stock_search_unavailable"
+                summary="股票搜尋暫時不可用。", error_code="stock_search_unavailable"
             )
         data = [
             {
@@ -396,9 +396,9 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             for item in items
         ]
         return ToolResult.success(
-            summary=(f"找到 {len(data)} 个股票标的。" if data else "没有找到匹配的股票标的。"),
+            summary=(f"找到 {len(data)} 個股票標的。" if data else "沒有找到匹配的股票標的。"),
             data={"query": query, "count": len(data), "items": data},
-            sources=[{"name": "PanWatch 股票清单"}],
+            sources=[{"name": "PanWatch 股票清單"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -432,11 +432,11 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         return ToolResult.success(
             summary="；".join(
                 f"{item['name']}"
-                f"{'交易中' if item['is_trading'] is True else '已休市' if item['is_trading'] is False else '状态未知'}"
+                f"{'交易中' if item['is_trading'] is True else '已休市' if item['is_trading'] is False else '狀態未知'}"
                 for item in markets
             ),
             data={"markets": markets},
-            sources=[{"name": "PanWatch 市场日历"}],
+            sources=[{"name": "PanWatch 市場日曆"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -444,19 +444,19 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         market = _market_argument(arguments)
         if market is None:
             return ToolResult.failure(
-                summary="不支持的市场代码。", error_code="market_invalid"
+                summary="不支援的市場程式碼。", error_code="market_invalid"
             )
         mode = str(arguments.get("mode") or "turnover").strip().lower()
         if mode not in {"turnover", "gainers"}:
             return ToolResult.failure(
-                summary="热门股票排序只能是 turnover 或 gainers。",
+                summary="熱門股票排序只能是 turnover 或 gainers。",
                 error_code="discovery_mode_invalid",
             )
         try:
             limit = max(1, min(int(arguments.get("limit") or 10), 30))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="热门股票条数必须是数字。", error_code="limit_invalid"
+                summary="熱門股票條數必須是數字。", error_code="limit_invalid"
             )
         try:
             items = await _discovery_collector().fetch_hot_stocks(
@@ -464,13 +464,13 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - provider failures become controlled results
             return ToolResult.failure(
-                summary="热门股票数据暂时不可用。", error_code="hot_stocks_unavailable"
+                summary="熱門股票資料暫時不可用。", error_code="hot_stocks_unavailable"
             )
         data = [_hot_stock_payload(item) for item in items]
         return ToolResult.success(
-            summary=f"找到 {len(data)} 个热门股票。",
+            summary=f"找到 {len(data)} 個熱門股票。",
             data={"market": market.value, "mode": mode, "count": len(data), "items": data},
-            sources=[{"name": "PanWatch 热门股票"}],
+            sources=[{"name": "PanWatch 熱門股票"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -478,19 +478,19 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         market = _market_argument(arguments)
         if market is None:
             return ToolResult.failure(
-                summary="不支持的市场代码。", error_code="market_invalid"
+                summary="不支援的市場程式碼。", error_code="market_invalid"
             )
         mode = str(arguments.get("mode") or "gainers").strip().lower()
         if mode not in {"gainers", "turnover", "hot"}:
             return ToolResult.failure(
-                summary="热门板块排序只能是 gainers、turnover 或 hot。",
+                summary="熱門板塊排序只能是 gainers、turnover 或 hot。",
                 error_code="discovery_mode_invalid",
             )
         try:
             limit = max(1, min(int(arguments.get("limit") or 10), 20))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="热门板块条数必须是数字。", error_code="limit_invalid"
+                summary="熱門板塊條數必須是數字。", error_code="limit_invalid"
             )
         try:
             items = await _discovery_collector().fetch_hot_boards(
@@ -498,13 +498,13 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - provider failures become controlled results
             return ToolResult.failure(
-                summary="热门板块数据暂时不可用。", error_code="hot_boards_unavailable"
+                summary="熱門板塊資料暫時不可用。", error_code="hot_boards_unavailable"
             )
         data = [_hot_board_payload(item) for item in items]
         return ToolResult.success(
-            summary=f"找到 {len(data)} 个热门板块。",
+            summary=f"找到 {len(data)} 個熱門板塊。",
             data={"market": market.value, "mode": mode, "count": len(data), "items": data},
-            sources=[{"name": "PanWatch 热门板块"}],
+            sources=[{"name": "PanWatch 熱門板塊"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -512,19 +512,19 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         board_code = str(arguments.get("board_code") or "").strip()
         if not board_code:
             return ToolResult.failure(
-                summary="请提供板块代码。", error_code="board_code_required"
+                summary="請提供板塊程式碼。", error_code="board_code_required"
             )
         mode = str(arguments.get("mode") or "gainers").strip().lower()
         if mode not in {"gainers", "turnover", "hot"}:
             return ToolResult.failure(
-                summary="板块股票排序只能是 gainers、turnover 或 hot。",
+                summary="板塊股票排序只能是 gainers、turnover 或 hot。",
                 error_code="discovery_mode_invalid",
             )
         try:
             limit = max(1, min(int(arguments.get("limit") or 10), 50))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="板块股票条数必须是数字。", error_code="limit_invalid"
+                summary="板塊股票條數必須是數字。", error_code="limit_invalid"
             )
         try:
             items = await _discovery_collector().fetch_board_stocks(
@@ -532,13 +532,13 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - provider failures become controlled results
             return ToolResult.failure(
-                summary="板块成分股数据暂时不可用。", error_code="board_stocks_unavailable"
+                summary="板塊成分股資料暫時不可用。", error_code="board_stocks_unavailable"
             )
         data = [_hot_stock_payload(item) for item in items]
         return ToolResult.success(
-            summary=f"找到 {len(data)} 个板块成分股。",
+            summary=f"找到 {len(data)} 個板塊成分股。",
             data={"board_code": board_code, "mode": mode, "count": len(data), "items": data},
-            sources=[{"name": "PanWatch 板块成分股"}],
+            sources=[{"name": "PanWatch 板塊成分股"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -553,18 +553,18 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - provider failures become controlled results
             return ToolResult.failure(
-                summary="基本面数据暂时不可用。", error_code="fundamentals_unavailable"
+                summary="基本面資料暫時不可用。", error_code="fundamentals_unavailable"
             )
         if not items:
             return ToolResult.failure(
-                summary=f"未找到 {market.value}:{symbol} 的基本面数据。",
+                summary=f"未找到 {market.value}:{symbol} 的基本面資料。",
                 error_code="fundamentals_unavailable",
             )
         data = _json_safe(items[0])
         return ToolResult.success(
-            summary=f"已获取 {market.value}:{symbol} 的基本面摘要。",
+            summary=f"已獲取 {market.value}:{symbol} 的基本面摘要。",
             data=data,
-            sources=[{"name": "PanWatch 基本面数据"}],
+            sources=[{"name": "PanWatch 基本面資料"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -579,17 +579,17 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - provider failures become controlled results
             return ToolResult.failure(
-                summary="资金流向数据暂时不可用。", error_code="capital_flow_unavailable"
+                summary="資金流向資料暫時不可用。", error_code="capital_flow_unavailable"
             )
         if item is None:
             return ToolResult.failure(
-                summary=f"未找到 {market.value}:{symbol} 的资金流向数据。",
+                summary=f"未找到 {market.value}:{symbol} 的資金流向資料。",
                 error_code="capital_flow_unavailable",
             )
         return ToolResult.success(
-            summary=f"已获取 {market.value}:{symbol} 的资金流向摘要。",
+            summary=f"已獲取 {market.value}:{symbol} 的資金流向摘要。",
             data=_json_safe(item),
-            sources=[{"name": "PanWatch 资金流向"}],
+            sources=[{"name": "PanWatch 資金流向"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -597,20 +597,20 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         trade_date = str(arguments.get("date") or "").strip()
         if not trade_date:
             return ToolResult.failure(
-                summary="请提供龙虎榜日期，格式为 YYYY-MM-DD。",
+                summary="請提供龍虎榜日期，格式為 YYYY-MM-DD。",
                 error_code="trade_date_required",
             )
         try:
             datetime.strptime(trade_date, "%Y-%m-%d").replace(tzinfo=UTC)
         except ValueError:
             return ToolResult.failure(
-                summary="龙虎榜日期格式必须是 YYYY-MM-DD。",
+                summary="龍虎榜日期格式必須是 YYYY-MM-DD。",
                 error_code="trade_date_invalid",
             )
         market = _market_argument(arguments)
         if market is None:
             return ToolResult.failure(
-                summary="不支持的市场代码。", error_code="market_invalid"
+                summary="不支援的市場程式碼。", error_code="market_invalid"
             )
         try:
             items = await asyncio.to_thread(
@@ -620,13 +620,13 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             )
         except Exception:  # noqa: BLE001 - provider failures become controlled results
             return ToolResult.failure(
-                summary="龙虎榜数据暂时不可用。", error_code="dragon_tiger_unavailable"
+                summary="龍虎榜資料暫時不可用。", error_code="dragon_tiger_unavailable"
             )
         data = [_json_safe(item) for item in items]
         return ToolResult.success(
-            summary=f"{trade_date} 找到 {len(data)} 条龙虎榜记录。",
+            summary=f"{trade_date} 找到 {len(data)} 條龍虎榜記錄。",
             data={"market": market.value, "date": trade_date, "count": len(data), "items": data},
-            sources=[{"name": "PanWatch 龙虎榜"}],
+            sources=[{"name": "PanWatch 龍虎榜"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -670,8 +670,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             market=market.value,
         )
         session.add(stock)
-        # 规则通过外键引用新登记的股票；先 flush 获取主键，仍由下方
-        # 的单次 commit 保证股票目录和提醒规则一起成功或一起回滚。
+        # 規則透過外部索引鍵引用新登記的股票；先 flush 獲取主鍵，仍由下方
+        # 的單次 commit 保證股票目錄和提醒規則一起成功或一起回滾。
         session.flush()
         return stock, True
 
@@ -690,31 +690,31 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             target_price = float(arguments.get("target_price"))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="提醒价格必须是大于零的数字。",
+                summary="提醒價格必須是大於零的數字。",
                 error_code="target_price_invalid",
             )
         if target_price <= 0:
             return ToolResult.failure(
-                summary="提醒价格必须大于零。", error_code="target_price_invalid"
+                summary="提醒價格必須大於零。", error_code="target_price_invalid"
             )
         try:
             cooldown_minutes = max(0, int(arguments.get("cooldown_minutes") or 30))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="冷却时间必须是非负整数。", error_code="cooldown_invalid"
+                summary="冷卻時間必須是非負整數。", error_code="cooldown_invalid"
             )
 
         stock, stock_registered = await _find_or_register_stock(symbol, market)
         if stock is None:
             return ToolResult.failure(
-                summary=f"PanWatch 股票库中未找到 {market.value}:{symbol}，未创建提醒。",
+                summary=f"PanWatch 股票庫中未找到 {market.value}:{symbol}，未建立提醒。",
                 error_code="stock_not_found",
             )
         direction_label = "≥" if direction == "above" else "≤"
         display_price = f"{target_price:g}"
         name = (
             str(arguments.get("name") or "").strip()
-            or f"{stock.name} 价格 {direction_label} {display_price}"
+            or f"{stock.name} 價格 {direction_label} {display_price}"
         )
         rule = create_alert_rule(
             session,
@@ -739,8 +739,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         )
         return ToolResult.success(
             summary=(
-                f"已为 {stock.name}（{market.value}:{symbol}）创建价格 {direction_label} {display_price} "
-                f"的盘中提醒，冷却 {cooldown_minutes} 分钟。"
+                f"已為 {stock.name}（{market.value}:{symbol}）建立價格 {direction_label} {display_price} "
+                f"的盤中提醒，冷卻 {cooldown_minutes} 分鐘。"
             ),
             data={
                 "rule_id": rule.id,
@@ -750,7 +750,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "target_price": target_price,
                 "stock_registered": stock_registered,
             },
-            sources=[{"name": "PanWatch 价格提醒"}],
+            sources=[{"name": "PanWatch 價格提醒"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -760,7 +760,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         market = _optional_market(arguments)
         if arguments.get("market") and market is None:
             return ToolResult.failure(
-                summary="不支持的市场代码。", error_code="market_invalid"
+                summary="不支援的市場程式碼。", error_code="market_invalid"
             )
         if symbol and market is MarketCode.HK and symbol.isdigit():
             symbol = symbol.zfill(5)
@@ -768,12 +768,12 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             limit = max(1, min(int(arguments.get("limit") or 20), 50))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="查询条数必须是数字。", error_code="limit_invalid"
+                summary="查詢條數必須是數字。", error_code="limit_invalid"
             )
         enabled = arguments.get("enabled")
         if enabled is not None and not isinstance(enabled, bool):
             return ToolResult.failure(
-                summary="enabled 必须是布尔值。", error_code="enabled_invalid"
+                summary="enabled 必須是布林值。", error_code="enabled_invalid"
             )
 
         rows = list_alert_rules(
@@ -786,22 +786,22 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         items = [compact_alert_rule(row) for row in rows]
         if not items:
             return ToolResult.success(
-                summary="没有找到符合条件的价格提醒。",
+                summary="沒有找到符合條件的價格提醒。",
                 data={"count": 0, "items": []},
-                sources=[{"name": "PanWatch 价格提醒"}],
+                sources=[{"name": "PanWatch 價格提醒"}],
                 observed_at=datetime.now(UTC),
             )
         summary = "；".join(
             f"#{item['rule_id']} {item['stock_name'] or item['symbol']}（{item['market']}:{item['symbol']}，"
-            f"{_alert_condition_summary(item)}，{'启用' if item['enabled'] else '停用'}）"
+            f"{_alert_condition_summary(item)}，{'啟用' if item['enabled'] else '停用'}）"
             for item in items[:5]
         )
         if len(items) > 5:
-            summary += f"；另有 {len(items) - 5} 条"
+            summary += f"；另有 {len(items) - 5} 條"
         return ToolResult.success(
-            summary=f"找到 {len(items)} 条价格提醒：{summary}",
+            summary=f"找到 {len(items)} 條價格提醒：{summary}",
             data={"count": len(items), "items": items},
-            sources=[{"name": "PanWatch 价格提醒"}],
+            sources=[{"name": "PanWatch 價格提醒"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -811,7 +811,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             rule_id = int(arguments.get("rule_id"))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="请提供有效的提醒 ID。", error_code="rule_id_invalid"
+                summary="請提供有效的提醒 ID。", error_code="rule_id_invalid"
             )
         updates = {
             key: arguments[key]
@@ -832,7 +832,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             rule = update_alert_rule(session, rule_id, updates)
         except LookupError:
             return ToolResult.failure(
-                summary=f"未找到价格提醒 #{rule_id}。",
+                summary=f"未找到價格提醒 #{rule_id}。",
                 error_code="price_alert_not_found",
             )
         except ValueError as exc:
@@ -842,11 +842,11 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         item = compact_alert_rule(rule)
         return ToolResult.success(
             summary=(
-                f"已更新价格提醒 #{rule_id}：{item['stock_name'] or item['symbol']}，"
-                f"{_alert_condition_summary(item)}，{'启用' if item['enabled'] else '停用'}。"
+                f"已更新價格提醒 #{rule_id}：{item['stock_name'] or item['symbol']}，"
+                f"{_alert_condition_summary(item)}，{'啟用' if item['enabled'] else '停用'}。"
             ),
             data=item,
-            sources=[{"name": "PanWatch 价格提醒"}],
+            sources=[{"name": "PanWatch 價格提醒"}],
             observed_at=datetime.now(UTC),
         )
 
@@ -856,12 +856,12 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             rule_id = int(arguments.get("rule_id"))
         except (TypeError, ValueError):
             return ToolResult.failure(
-                summary="请提供有效的提醒 ID。", error_code="rule_id_invalid"
+                summary="請提供有效的提醒 ID。", error_code="rule_id_invalid"
             )
         rule = get_alert_rule(session, rule_id)
         if rule is None:
             return ToolResult.failure(
-                summary=f"未找到价格提醒 #{rule_id}。",
+                summary=f"未找到價格提醒 #{rule_id}。",
                 error_code="price_alert_not_found",
             )
         item = compact_alert_rule(rule)
@@ -869,21 +869,21 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             delete_alert_rule(session, rule_id)
         except LookupError:
             return ToolResult.failure(
-                summary=f"未找到价格提醒 #{rule_id}。",
+                summary=f"未找到價格提醒 #{rule_id}。",
                 error_code="price_alert_not_found",
             )
         return ToolResult.success(
-            summary=f"已删除价格提醒 #{rule_id}：{item['stock_name'] or item['symbol']}。",
+            summary=f"已刪除價格提醒 #{rule_id}：{item['stock_name'] or item['symbol']}。",
             data={"rule_id": rule_id, "deleted": True},
-            sources=[{"name": "PanWatch 价格提醒"}],
+            sources=[{"name": "PanWatch 價格提醒"}],
             observed_at=datetime.now(UTC),
         )
 
     registry.register(
         ToolSpec(
             name="get_portfolio",
-            title="查询持仓",
-            description="查询用户的实盘和模拟盘持仓摘要。",
+            title="查詢持倉",
+            description="查詢使用者的實盤和模擬交易持倉摘要。",
             risk=ToolRisk.READ,
             input_schema={"type": "object", "properties": {}},
         ),
@@ -892,8 +892,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_stock_quote",
-            title="查询实时行情",
-            description="查询一只股票的最新价、涨跌幅和日内交易数据。",
+            title="查詢即時行情",
+            description="查詢一隻股票的最新價、漲跌幅和日內交易資料。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -901,12 +901,12 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "股票代码，例如 600519",
+                        "description": "股票程式碼，例如 600519",
                     },
                     "market": {
                         "type": "string",
                         "default": "CN",
-                        "description": "市场代码",
+                        "description": "市場程式碼",
                     },
                 },
             },
@@ -916,8 +916,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="find_research_candidates",
-            title="发现研究候选",
-            description="查询 PanWatch 最新机会信号，返回适合进一步研究的候选标的及其评分、风险和入场计划。只读，不会刷新策略或执行交易。",
+            title="發現研究候選",
+            description="查詢 PanWatch 最新機會訊號，返回適合進一步研究的候選標的及其評分、風險和入場計劃。只讀，不會重新整理策略或執行交易。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -925,33 +925,33 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                     "market": {
                         "type": "string",
                         "enum": ["CN", "HK", "US"],
-                        "description": "可选市场代码；不填表示全部市场",
+                        "description": "可選市場程式碼；不填表示全部市場",
                     },
                     "holding": {
                         "type": "string",
                         "enum": ["all", "held", "unheld"],
                         "default": "unheld",
-                        "description": "持仓过滤；默认只看未持仓标的",
+                        "description": "持倉過濾；預設只看未持倉標的",
                     },
                     "risk_level": {
                         "type": "string",
                         "enum": ["all", "low", "medium", "high"],
                         "default": "all",
-                        "description": "可选风险等级过滤",
+                        "description": "可選風險等級過濾",
                     },
                     "min_score": {
                         "type": "number",
                         "minimum": 0,
                         "maximum": 100,
                         "default": 70,
-                        "description": "最低机会分数",
+                        "description": "最低機會分數",
                     },
                     "limit": {
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 10,
                         "default": 5,
-                        "description": "最多返回候选数量",
+                        "description": "最多返回候選數量",
                     },
                 },
             },
@@ -961,8 +961,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_kline_summary",
-            title="分析 K 线走势",
-            description="获取一只股票的均线、动量和近期 K 线指标摘要。",
+            title="分析 K 線走勢",
+            description="獲取一隻股票的均線、動量和近期 K 線指標摘要。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -970,12 +970,12 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "股票代码，例如 600519",
+                        "description": "股票程式碼，例如 600519",
                     },
                     "market": {
                         "type": "string",
                         "default": "CN",
-                        "description": "市场代码",
+                        "description": "市場程式碼",
                     },
                 },
             },
@@ -985,8 +985,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_stock_news",
-            title="检索股票新闻",
-            description="检索一只股票最近七天的相关新闻并返回精简摘要。",
+            title="檢索股票新聞",
+            description="檢索一隻股票最近七天的相關新聞並返回精簡摘要。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -994,12 +994,12 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "股票代码，例如 600519",
+                        "description": "股票程式碼，例如 600519",
                     },
                     "market": {
                         "type": "string",
                         "default": "CN",
-                        "description": "市场代码",
+                        "description": "市場程式碼",
                     },
                     "limit": {
                         "type": "integer",
@@ -1015,18 +1015,18 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="search_stocks",
-            title="搜索股票标的",
-            description="按股票代码或名称搜索 PanWatch 股票清单，用于确认标的代码和市场。",
+            title="搜尋股票標的",
+            description="按股票程式碼或名稱搜尋 PanWatch 股票清單，用於確認標的程式碼和市場。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
                 "required": ["query"],
                 "properties": {
-                    "query": {"type": "string", "description": "股票代码或名称"},
+                    "query": {"type": "string", "description": "股票程式碼或名稱"},
                     "market": {
                         "type": "string",
                         "enum": ["CN", "HK", "US"],
-                        "description": "可选市场代码；不填表示全部市场",
+                        "description": "可選市場程式碼；不填表示全部市場",
                     },
                     "limit": {
                         "type": "integer",
@@ -1042,8 +1042,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_market_status",
-            title="查询市场状态",
-            description="查询 A 股、港股和美股当前是否处于交易时段及交易时间安排。",
+            title="查詢市場狀態",
+            description="查詢 A 股、港股和美股當前是否處於交易時段及交易時間安排。",
             risk=ToolRisk.READ,
             input_schema={"type": "object", "properties": {}},
         ),
@@ -1052,8 +1052,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_hot_stocks",
-            title="查询热门股票",
-            description="按成交额或涨幅查询指定市场的热门股票榜单。",
+            title="查詢熱門股票",
+            description="按成交額或漲幅查詢指定市場的熱門股票榜單。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -1082,8 +1082,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_hot_boards",
-            title="查询热门板块",
-            description="按涨幅、成交额或热度查询指定市场的热门板块和主题。",
+            title="查詢熱門板塊",
+            description="按漲幅、成交額或熱度查詢指定市場的熱門板塊和主題。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -1112,14 +1112,14 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_board_stocks",
-            title="查询板块成分股",
-            description="查询指定板块中按涨幅、成交额或热度排序的成分股。",
+            title="查詢板塊成分股",
+            description="查詢指定板塊中按漲幅、成交額或熱度排序的成分股。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
                 "required": ["board_code"],
                 "properties": {
-                    "board_code": {"type": "string", "description": "板块代码"},
+                    "board_code": {"type": "string", "description": "板塊程式碼"},
                     "mode": {
                         "type": "string",
                         "enum": ["gainers", "turnover", "hot"],
@@ -1139,14 +1139,14 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_stock_fundamentals",
-            title="查询股票基本面",
-            description="查询一只股票的估值、盈利、成长和财报期等基本面摘要。",
+            title="查詢股票基本面",
+            description="查詢一隻股票的估值、盈利、成長和財報期等基本面摘要。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
                 "required": ["symbol"],
                 "properties": {
-                    "symbol": {"type": "string", "description": "股票代码，例如 600519"},
+                    "symbol": {"type": "string", "description": "股票程式碼，例如 600519"},
                     "market": {"type": "string", "default": "CN"},
                 },
             },
@@ -1156,14 +1156,14 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_capital_flow",
-            title="查询资金流向",
-            description="查询一只股票的主力、超大单和大单等资金流向摘要。",
+            title="查詢資金流向",
+            description="查詢一隻股票的主力、超大單和大單等資金流向摘要。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
                 "required": ["symbol"],
                 "properties": {
-                    "symbol": {"type": "string", "description": "股票代码，例如 600519"},
+                    "symbol": {"type": "string", "description": "股票程式碼，例如 600519"},
                     "market": {"type": "string", "default": "CN"},
                 },
             },
@@ -1173,8 +1173,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_dragon_tiger",
-            title="查询龙虎榜",
-            description="查询指定交易日的龙虎榜上榜股票、上榜原因和买卖金额。",
+            title="查詢龍虎榜",
+            description="查詢指定交易日的龍虎榜上榜股票、上榜原因和買賣金額。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -1193,24 +1193,24 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="get_price_alerts",
-            title="查询价格提醒",
-            description="查询用户已创建的价格提醒，返回提醒 ID、标的、条件和启用状态。",
+            title="查詢價格提醒",
+            description="查詢使用者已建立的價格提醒，返回提醒 ID、標的、條件和啟用狀態。",
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "可选股票代码；不填则查询所有标的",
+                        "description": "可選股票程式碼；不填則查詢所有標的",
                     },
                     "market": {
                         "type": "string",
                         "enum": ["CN", "HK", "US"],
-                        "description": "可选市场代码",
+                        "description": "可選市場程式碼",
                     },
                     "enabled": {
                         "type": "boolean",
-                        "description": "可选，仅返回启用或停用的提醒",
+                        "description": "可選，僅返回啟用或停用的提醒",
                     },
                     "limit": {
                         "type": "integer",
@@ -1226,8 +1226,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="update_price_alert",
-            title="修改价格提醒",
-            description="修改一条价格提醒的名称、目标价、方向或启用状态，需要用户批准。",
+            title="修改價格提醒",
+            description="修改一條價格提醒的名稱、目標價、方向或啟用狀態，需要使用者批准。",
             risk=ToolRisk.WRITE,
             confirmation_required=True,
             input_schema={
@@ -1236,29 +1236,29 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "rule_id": {
                         "type": "integer",
-                        "description": "查询价格提醒得到的提醒 ID",
+                        "description": "查詢價格提醒得到的提醒 ID",
                     },
-                    "name": {"type": "string", "description": "新的提醒名称"},
-                    "enabled": {"type": "boolean", "description": "是否启用"},
+                    "name": {"type": "string", "description": "新的提醒名稱"},
+                    "enabled": {"type": "boolean", "description": "是否啟用"},
                     "direction": {
                         "type": "string",
                         "enum": ["above", "below"],
-                        "description": "价格触发方向",
+                        "description": "價格觸發方向",
                     },
                     "target_price": {
                         "type": "number",
                         "exclusiveMinimum": 0,
-                        "description": "新的目标价格",
+                        "description": "新的目標價格",
                     },
                     "cooldown_minutes": {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "触发后的冷却分钟数",
+                        "description": "觸發後的冷卻分鐘數",
                     },
                     "max_triggers_per_day": {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "每日最大触发次数，0 表示不限制",
+                        "description": "每日最大觸發次數，0 表示不限制",
                     },
                     "repeat_mode": {
                         "type": "string",
@@ -1270,7 +1270,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                     },
                     "expire_at": {
                         "type": ["string", "null"],
-                        "description": "ISO-8601 到期时间；传 null 清除到期时间",
+                        "description": "ISO-8601 到期時間；傳 null 清除到期時間",
                     },
                 },
             },
@@ -1280,8 +1280,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="delete_price_alert",
-            title="删除价格提醒",
-            description="删除一条价格提醒及其历史命中记录，需要用户批准。",
+            title="刪除價格提醒",
+            description="刪除一條價格提醒及其歷史命中記錄，需要使用者批准。",
             risk=ToolRisk.WRITE,
             confirmation_required=True,
             input_schema={
@@ -1290,7 +1290,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "rule_id": {
                         "type": "integer",
-                        "description": "查询价格提醒得到的提醒 ID",
+                        "description": "查詢價格提醒得到的提醒 ID",
                     }
                 },
             },
@@ -1300,8 +1300,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="create_price_alert",
-            title="创建价格提醒",
-            description="为已收录的股票创建盘中价格提醒，需要用户批准。",
+            title="建立價格提醒",
+            description="為已收錄的股票建立盤中價格提醒，需要使用者批准。",
             risk=ToolRisk.WRITE,
             confirmation_required=True,
             input_schema={
@@ -1310,17 +1310,17 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "symbol": {
                         "type": "string",
-                        "description": "股票代码，例如 600519",
+                        "description": "股票程式碼，例如 600519",
                     },
                     "market": {
                         "type": "string",
                         "default": "CN",
-                        "description": "市场代码",
+                        "description": "市場程式碼",
                     },
                     "direction": {
                         "type": "string",
                         "enum": ["above", "below"],
-                        "description": "价格向上或向下触及目标价",
+                        "description": "價格向上或向下觸及目標價",
                     },
                     "target_price": {"type": "number", "exclusiveMinimum": 0},
                     "cooldown_minutes": {
@@ -1328,7 +1328,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                         "minimum": 0,
                         "default": 30,
                     },
-                    "name": {"type": "string", "description": "可选的提醒名称"},
+                    "name": {"type": "string", "description": "可選的提醒名稱"},
                 },
             },
         ),

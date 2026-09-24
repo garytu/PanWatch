@@ -1,4 +1,4 @@
-"""建议池 API"""
+"""建議池 API"""
 import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -17,15 +17,15 @@ router = APIRouter()
 @router.get("/{symbol}")
 def get_stock_suggestions(
     symbol: str,
-    market: str = Query("", description="市场代码: CN/HK/US"),
-    include_expired: bool = Query(False, description="是否包含已过期建议"),
-    limit: int = Query(10, description="返回数量限制"),
+    market: str = Query("", description="市場程式碼: CN/HK/US"),
+    include_expired: bool = Query(False, description="是否包含已過期建議"),
+    limit: int = Query(10, description="返回數量限制"),
     db: Session = Depends(get_db),
 ):
     """
-    获取某只股票的所有建议
+    獲取某隻股票的所有建議
 
-    返回该股票的建议列表，按时间倒序排列
+    返回該股票的建議列表，按時間倒序排列
     """
     suggestions = get_suggestions_for_stock(
         stock_symbol=symbol,
@@ -37,20 +37,20 @@ def get_stock_suggestions(
 
 
 @router.get("/", name="get_suggestions")
-@router.get("", include_in_schema=False)  # 同时处理无斜杠的情况
+@router.get("", include_in_schema=False)  # 同時處理無斜槓的情況
 def get_all_latest_suggestions(
-    symbols: str = Query(None, description="股票代码列表，逗号分隔"),
+    symbols: str = Query(None, description="股票程式碼列表，逗號分隔"),
     stock_keys: str = Query(
-        None, description="市场+代码列表，格式 CN:600519,HK:00700,US:AAPL"
+        None, description="市場+程式碼列表，格式 CN:600519,HK:00700,US:AAPL"
     ),
-    include_expired: bool = Query(False, description="是否包含已过期建议"),
+    include_expired: bool = Query(False, description="是否包含已過期建議"),
     db: Session = Depends(get_db),
 ):
     """
-    获取所有股票的最新建议
+    獲取所有股票的最新建議
 
-    每只股票只返回最新的一条有效建议
-    用于持仓页面快速展示各股票的最新建议
+    每隻股票只返回最新的一條有效建議
+    用於持倉頁面快速展示各股票的最新建議
     """
     symbol_list = None
     if symbols:
@@ -83,13 +83,13 @@ def get_all_latest_suggestions(
 
 @router.delete("/cleanup")
 def cleanup_suggestions(
-    days: int = Query(7, description="清理多少天前的记录"),
+    days: int = Query(7, description="清理多少天前的記錄"),
     db: Session = Depends(get_db),
 ):
     """
-    清理过期的建议记录
+    清理過期的建議記錄
 
-    默认清理 7 天前的记录
+    預設清理 7 天前的記錄
     """
     count = cleanup_expired_suggestions(days=days)
     return {"deleted": count}

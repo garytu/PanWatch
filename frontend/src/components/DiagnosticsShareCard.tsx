@@ -5,7 +5,7 @@ interface DiagnosticsShareCardProps {
   open: boolean
   onClose: () => void
   diag: PortfolioDiagnostics
-  /** 可选:近 N 日相对大盘超额(%),有则展示在副指标里。 */
+  /** 可選:近 N 日相對大盤超額(%),有則展示在副指標裡。 */
   excessReturn?: number | null
   benchmarkLabel?: string
 }
@@ -31,12 +31,12 @@ const MARKET_LABEL: Record<string, string> = { CN: 'A股', HK: '港股', US: '�
 const marketLabel = (m: string) => MARKET_LABEL[m] || m
 
 /**
- * 集中度(HHI)定性:0~1,越高越集中。0.4+ 偏高,0.25~0.4 适中,<0.25 分散。
+ * 集中度(HHI)定性:0~1,越高越集中。0.4+ 偏高,0.25~0.4 適中,<0.25 分散。
  */
 function hhiBand(hhi: number): { label: string; color: string } {
   if (hhi >= 0.4) return { label: '偏集中', color: NEUTRAL }
-  if (hhi >= 0.25) return { label: '适中', color: SLATE }
-  return { label: '较分散', color: DOWN }
+  if (hhi >= 0.25) return { label: '適中', color: SLATE }
+  return { label: '較分散', color: DOWN }
 }
 
 function StatBox({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
@@ -60,8 +60,8 @@ function StatBox({ label, value, sub, color }: { label: string; value: string; s
 }
 
 /**
- * 组合体检卡。脱敏:只展示比例 / 数量 / 风险提示,绝不出现任何金额(¥)。
- * total_market_value 仅用于把 by_market 的市值换算成「占比 %」,数值本身不展示。
+ * 組合體檢卡。脫敏:只展示比例 / 數量 / 風險提示,絕不出現任何金額(¥)。
+ * total_market_value 僅用於把 by_market 的市值換算成「佔比 %」,數值本身不展示。
  */
 export default function DiagnosticsShareCard({
   open,
@@ -79,11 +79,11 @@ export default function DiagnosticsShareCard({
   const hasExcess = excessReturn != null && isFinite(excessReturn)
 
   return (
-    <ShareCardDialog open={open} onClose={onClose} filename="组合体检卡">
+    <ShareCardDialog open={open} onClose={onClose} filename="組合體檢卡">
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: SLATE }}>组合体检</div>
-        <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500, flexShrink: 0 }}>持仓结构 · 风险</div>
+        <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: SLATE }}>組合體檢</div>
+        <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500, flexShrink: 0 }}>持倉結構 · 風險</div>
       </div>
 
       {/* Hero:集中度(HHI) */}
@@ -110,27 +110,27 @@ export default function DiagnosticsShareCard({
         </div>
       </div>
 
-      {/* 关键指标 */}
+      {/* 關鍵指標 */}
       <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
-        <StatBox label="持仓数" value={`${diag.position_count}`} sub="只" />
+        <StatBox label="持倉數" value={`${diag.position_count}`} sub="只" />
         <StatBox
-          label="最大单仓占比"
+          label="最大單倉佔比"
           value={`${(diag.max_weight * 100).toFixed(0)}%`}
           color={diag.max_weight >= 0.4 ? NEUTRAL : SLATE}
         />
         {hasExcess && (
           <StatBox
-            label={`近期相对${benchmarkLabel || '大盘'}`}
+            label={`近期相對${benchmarkLabel || '大盤'}`}
             value={pct(excessReturn)}
             color={signColor(excessReturn)}
           />
         )}
       </div>
 
-      {/* 市场分布 */}
+      {/* 市場分佈 */}
       {markets.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>市场分布</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>市場分佈</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {markets.map(({ m, w }) => (
               <div key={m}>
@@ -156,9 +156,9 @@ export default function DiagnosticsShareCard({
         </div>
       )}
 
-      {/* 风险提示 */}
+      {/* 風險提示 */}
       <div style={{ marginTop: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>风险提示</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>風險提示</div>
         {alerts.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {alerts.map((a, i) => (
@@ -193,7 +193,7 @@ export default function DiagnosticsShareCard({
               color: '#065f46',
             }}
           >
-            ✓ 集中度 / 分布未见明显风险
+            ✓ 集中度 / 分佈未見明顯風險
           </div>
         )}
       </div>

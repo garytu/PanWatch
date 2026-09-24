@@ -1,4 +1,4 @@
-"""模拟盘引擎：自动按策略信号建仓/平仓，跟踪虚拟账户收益。"""
+"""模擬交易引擎：自動按策略訊號建倉/平倉，跟蹤虛擬帳戶收益。"""
 
 from __future__ import annotations
 
@@ -23,21 +23,21 @@ from src.modules.strategy.backtest.cost_model import CostModel
 
 logger = logging.getLogger(__name__)
 
-# 模拟盘交易成本(A股口径,Phase 1)。与回测共用同一成本模型。
+# 模擬交易交易成本(A股口徑,Phase 1)。與回測共用同一成本模型。
 COST_MODEL = CostModel()
 
-# 建仓股数下限(A股一手)
+# 建倉股數下限(A股一手)
 FIXED_QUANTITY = 100
 
-# 移动止损:浮盈超过 MIN_PROFIT_FOR_TRAILING 后启用,从持仓最高价回撤超 TRAILING_STOP_PCT 即离场
+# 移動停損:未實現獲利超過 MIN_PROFIT_FOR_TRAILING 後啟用,從持倉最高價回檔超 TRAILING_STOP_PCT 即離場
 MIN_PROFIT_FOR_TRAILING = 0.05
 TRAILING_STOP_PCT = 0.10
-# 时间止损:无 signal.holding_days 时的默认最大持有自然日
+# 時間停損:無 signal.holding_days 時的預設最大持有自然日
 DEFAULT_TIME_STOP_DAYS = 20
 
 
 def _position_weight(rank_score: float) -> float:
-    """按信号强度分配单笔资金占该市场预算的比例(rank_score 越高投越多)。"""
+    """按訊號強度分配單筆資金佔該市場預算的比例(rank_score 越高投越多)。"""
     s = float(rank_score or 0.0)
     if s >= 85:
         return 0.25
@@ -57,9 +57,9 @@ def _compute_quantity(
     cost_model: CostModel,
     lot: int = FIXED_QUANTITY,
 ) -> int:
-    """按信号强度 + 市场预算计算建仓股数(lot 整数倍),受可用现金(含买入费)约束。
+    """按訊號強度 + 市場預算計算建倉股數(lot 整數倍),受可用現金(含買入費)約束。
 
-    返回 0 表示连最小一手都买不起,应跳过。
+    返回 0 表示連最小一手都買不起,應跳過。
     """
     if price <= 0:
         return 0
@@ -104,7 +104,7 @@ def _safe_float(v: Any) -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# 分市场资金配置（投资比例 → 子池现金）
+# 分市場資金配置（投資比例 → 子池現金）
 # ---------------------------------------------------------------------------
 
 ALL_MARKETS: tuple[str, ...] = ("CN", "HK", "US")
@@ -112,7 +112,7 @@ DEFAULT_ALLOCATIONS: dict[str, float] = {"CN": 0.5, "HK": 0.3, "US": 0.2}
 
 
 def normalize_allocations(raw: dict | None) -> dict[str, float]:
-    """补齐三市场、clamp 到 [0,1]，返回 {market: ratio}。"""
+    """補齊三市場、clamp 到 [0,1]，返回 {market: ratio}。"""
     raw = raw or {}
     out: dict[str, float] = {}
     for m in ALL_MARKETS:
@@ -125,7 +125,7 @@ def normalize_allocations(raw: dict | None) -> dict[str, float]:
 
 
 def market_allocations_or_default(account: Any) -> dict[str, float]:
-    """账户未配置比例时回退默认配置，否则归一化已配置的比例。"""
+    """帳戶未配置比例時回退預設配置，否則歸一化已配置的比例。"""
     raw = getattr(account, "market_allocations", None) or {}
     if not raw:
         return dict(DEFAULT_ALLOCATIONS)
@@ -133,7 +133,7 @@ def market_allocations_or_default(account: Any) -> dict[str, float]:
 
 
 def allocations_from_excluded(excluded: list[str] | None) -> dict[str, float]:
-    """迁移用：被排除市场比例置 0，其余市场按默认权重归一化到合计 1.0。"""
+    """遷移用：被排除市場比例置 0，其餘市場按預設權重歸一化到合計 1.0。"""
     excluded_set = {str(m).upper() for m in (excluded or [])}
     weights = {m: DEFAULT_ALLOCATIONS[m] for m in ALL_MARKETS if m not in excluded_set}
     total = sum(weights.values())
@@ -146,12 +146,12 @@ def allocations_from_excluded(excluded: list[str] | None) -> dict[str, float]:
 def compute_market_cash(
     initial_capital: float, ratio: float, realized_pnl: float, open_cost: float
 ) -> float:
-    """某市场可用现金 = 总资金×比例 + 该市场已实现盈亏 − 该市场持仓成本（纯函数，可单测）。"""
+    """某市場可用現金 = 總資金×比例 + 該市場已實現損益 − 該市場持倉成本（純函式，可單測）。"""
     return initial_capital * ratio + realized_pnl - open_cost
 
 
 def market_realized_open(db: Session, market: str) -> tuple[float, float]:
-    """返回 (该市场已实现盈亏合计, 该市场未平仓持仓成本合计)。"""
+    """返回 (該市場已實現損益合計, 該市場未平倉持倉成本合計)。"""
     realized = (
         db.query(func.coalesce(func.sum(PaperTradingTrade.pnl), 0.0))
         .filter(PaperTradingTrade.stock_market == market)
@@ -176,7 +176,7 @@ def market_realized_open(db: Session, market: str) -> tuple[float, float]:
 def market_available_cash(
     db: Session, account: PaperTradingAccount, market: str, alloc: dict | None = None
 ) -> float:
-    """某市场当前可用现金（用于建仓门槛与展示）。"""
+    """某市場當前可用現金（用於建倉門檻與展示）。"""
     alloc = alloc or market_allocations_or_default(account)
     ratio = alloc.get(market, 0.0)
     realized, open_cost = market_realized_open(db, market)
@@ -184,7 +184,7 @@ def market_available_cash(
 
 
 def _serialize_position(pos: PaperTradingPosition) -> dict:
-    """将 ORM Position 提取为 plain dict，避免 detached 问题。"""
+    """將 ORM Position 提取為 plain dict，避免 detached 問題。"""
     return {
         "id": pos.id,
         "stock_symbol": pos.stock_symbol,
@@ -202,7 +202,7 @@ def _serialize_position(pos: PaperTradingPosition) -> dict:
 
 
 def _serialize_trade(trade: PaperTradingTrade) -> dict:
-    """将 ORM Trade 提取为 plain dict。"""
+    """將 ORM Trade 提取為 plain dict。"""
     return {
         "id": trade.id,
         "stock_symbol": trade.stock_symbol,
@@ -220,7 +220,7 @@ def _serialize_trade(trade: PaperTradingTrade) -> dict:
 
 
 def _serialize_signal(sig: StrategySignalRun) -> dict:
-    """将 ORM Signal 提取为 plain dict。"""
+    """將 ORM Signal 提取為 plain dict。"""
     return {
         "id": sig.id,
         "stock_symbol": sig.stock_symbol,
@@ -235,7 +235,7 @@ def _serialize_signal(sig: StrategySignalRun) -> dict:
 
 
 class PaperTradingEngine:
-    """模拟盘扫描引擎。"""
+    """模擬交易掃描引擎。"""
 
     def _get_or_create_account(self, db: Session) -> PaperTradingAccount:
         account = db.query(PaperTradingAccount).first()
@@ -251,9 +251,9 @@ class PaperTradingEngine:
         return account
 
     def _fetch_quotes_map(self, symbols_markets: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
-        """批量获取报价，返回 {(market, symbol): quote_dict}
+        """批次獲取報價，返回 {(market, symbol): quote_dict}
 
-        通过 QuoteOrchestrator 调度,支持多 provider 主备故障转移。
+        透過 QuoteOrchestrator 排程,支援多 provider 主備故障轉移。
         """
         grouped: dict[MarketCode, list[str]] = {}
         for symbol, market in symbols_markets:
@@ -275,8 +275,8 @@ class PaperTradingEngine:
     def _check_entries(
         self, db: Session, account: PaperTradingAccount,
     ) -> tuple[int, set[tuple[str, str]], list[tuple[PaperTradingPosition, StrategySignalRun | None]]]:
-        """检查可入场的策略信号，自动建仓。返回 (建仓数, 新建仓股票key集合, 建仓事件列表)。"""
-        # 查询最新活跃买入信号
+        """檢查可入場的策略訊號，自動建倉。返回 (建倉數, 新建倉股票key集合, 建倉事件列表)。"""
+        # 查詢最新活躍買入訊號
         query = (
             db.query(StrategySignalRun)
             .filter(
@@ -286,7 +286,7 @@ class PaperTradingEngine:
                 StrategySignalRun.entry_high.isnot(None),
             )
         )
-        # 按投资比例排除不投入（比例为 0）的市场
+        # 按投資比例排除不投入（比例為 0）的市場
         alloc = market_allocations_or_default(account)
         excluded = [m for m in ALL_MARKETS if alloc.get(m, 0.0) <= 0]
         if excluded:
@@ -307,7 +307,7 @@ class PaperTradingEngine:
         for p in open_positions:
             open_keys.add((p.stock_symbol, p.stock_market))
 
-        # 收集需要报价的信号（去重：同股票只取 rank_score 最高的一条）
+        # 收集需要報價的訊號（去重：同股票只取 rank_score 最高的一條）
         candidates = []
         seen = set()
         for sig in signals:
@@ -322,11 +322,11 @@ class PaperTradingEngine:
         if not candidates:
             return 0, new_keys, entry_events
 
-        # 批量获取报价
+        # 批次獲取報價
         syms = [(s.stock_symbol, s.stock_market) for s in candidates]
         quotes = self._fetch_quotes_map(syms)
 
-        # 预算各市场可用现金（建仓时按市场子池逐笔扣减）
+        # 預算各市場可用現金（建倉時按市場子池逐筆扣減）
         market_cash = {m: market_available_cash(db, account, m, alloc) for m in ALL_MARKETS}
 
         opened = 0
@@ -339,14 +339,14 @@ class PaperTradingEngine:
             if current_price is None or current_price <= 0:
                 continue
 
-            # 用当前市价入场
+            # 用當前市價入場
             entry_price = current_price
             mkt = sig.stock_market
             if alloc.get(mkt, 0.0) <= 0:
-                continue  # 该市场比例为 0，不投入
+                continue  # 該市場比例為 0，不投入
             avail = market_cash.get(mkt, 0.0)
 
-            # 仓位管理:按信号强度分配该市场预算(替换原固定 100 股)
+            # 倉位管理:按訊號強度分配該市場預算(替換原固定 100 股)
             market_budget = account.initial_capital * alloc.get(mkt, 0.0)
             quantity = _compute_quantity(
                 rank_score=float(sig.rank_score or 0.0),
@@ -356,28 +356,28 @@ class PaperTradingEngine:
                 cost_model=COST_MODEL,
             )
             if quantity <= 0:
-                continue  # 子池额度不足以买入最小一手
+                continue  # 子池額度不足以買入最小一手
 
-            # 含交易成本的实际买入流出
+            # 含交易成本的實際買入流出
             buy_fill = COST_MODEL.fill("buy", entry_price, quantity)
             buy_outlay = -buy_fill.cash_delta
 
-            # 基于入场价计算止损/止盈
-            # 优先用信号的止损/止盈比例，否则用默认 -8%/+15%
+            # 基於入場價計算停損/停利
+            # 優先用訊號的停損/停利比例，否則用預設 -8%/+15%
             stop_loss = sig.stop_loss
             target_price = sig.target_price
             if stop_loss and sig.entry_low and sig.entry_low > 0:
-                # 保留信号的止损比例，映射到实际入场价
+                # 保留訊號的停損比例，對映到實際入場價
                 orig_mid = (sig.entry_low + (sig.entry_high or sig.entry_low)) / 2
                 if orig_mid > 0:
                     stop_ratio = (stop_loss - orig_mid) / orig_mid
                     target_ratio = ((target_price - orig_mid) / orig_mid) if target_price else 0.15
                     stop_loss = round(entry_price * (1 + stop_ratio), 4)
                     target_price = round(entry_price * (1 + target_ratio), 4) if target_price else None
-            # 兜底：止损不合理时用默认 -8%
+            # 兜底：停損不合理時用預設 -8%
             if not stop_loss or stop_loss <= 0 or stop_loss >= entry_price:
                 stop_loss = round(entry_price * 0.92, 4)
-            # 兜底：止盈不合理时用默认 +15%
+            # 兜底：停利不合理時用預設 +15%
             if not target_price or target_price <= 0 or target_price <= entry_price:
                 target_price = round(entry_price * 1.15, 4)
 
@@ -406,13 +406,13 @@ class PaperTradingEngine:
             entry_events.append((pos, sig))
             opened += 1
             logger.info(
-                "[模拟盘] 建仓: %s %s @ %.2f x%d, 止损=%.2f, 止盈=%s, 买入费=%.2f, 策略=%s",
+                "[模擬交易] 建倉: %s %s @ %.2f x%d, 停損=%.2f, 停利=%s, 買入費=%.2f, 策略=%s",
                 sig.stock_name or sig.stock_symbol,
                 sig.stock_market,
                 entry_price,
                 quantity,
                 stop_loss or 0,
-                target_price or "无",
+                target_price or "無",
                 buy_fill.explicit_fees + buy_fill.slippage_cost,
                 sig.strategy_code,
             )
@@ -429,9 +429,9 @@ class PaperTradingEngine:
         exit_price: float,
         exit_reason: str,
     ) -> PaperTradingTrade:
-        """平仓单个持仓，返回交易记录。"""
+        """平倉單個持倉，返回交易記錄。"""
         now = _utc_now()
-        # 含交易成本的净盈亏:卖出净回收 − 建仓含费投入(与建仓口径一致,资金守恒)
+        # 含交易成本的淨損益:賣出淨回收 − 建倉含費投入(與建倉口徑一致,資金守恆)
         buy_cost = -COST_MODEL.fill("buy", pos.entry_price, pos.quantity).cash_delta
         sell_fill = COST_MODEL.fill("sell", exit_price, pos.quantity)
         sell_proceeds = sell_fill.cash_delta
@@ -469,7 +469,7 @@ class PaperTradingEngine:
         pos.current_price = exit_price
         pos.unrealized_pnl = pnl
 
-        # 回收资金(卖出净回收,已扣卖出费)
+        # 回收資金(賣出淨回收,已扣賣出費)
         account.current_capital += sell_proceeds
         account.total_pnl += pnl
         account.total_trades += 1
@@ -477,7 +477,7 @@ class PaperTradingEngine:
             account.winning_trades += 1
 
         logger.info(
-            "[模拟盘] 平仓: %s %s @ %.2f, 盈亏=%.2f (%.2f%%), 原因=%s",
+            "[模擬交易] 平倉: %s %s @ %.2f, 損益=%.2f (%.2f%%), 原因=%s",
             pos.stock_name or pos.stock_symbol,
             pos.stock_market,
             exit_price,
@@ -490,7 +490,7 @@ class PaperTradingEngine:
     def _check_exits(
         self, db: Session, account: PaperTradingAccount, skip_keys: set[tuple[str, str]] | None = None,
     ) -> tuple[int, list[tuple[PaperTradingPosition, PaperTradingTrade]]]:
-        """检查持仓止损/止盈/信号反转，自动平仓。skip_keys 中的股票跳过（本轮新建仓）。"""
+        """檢查持倉停損/停利/訊號反轉，自動平倉。skip_keys 中的股票跳過（本輪新建倉）。"""
         exit_events: list[tuple[PaperTradingPosition, PaperTradingTrade]] = []
         positions = (
             db.query(PaperTradingPosition)
@@ -500,13 +500,13 @@ class PaperTradingEngine:
         if not positions:
             return 0, exit_events
 
-        # 批量获取报价
+        # 批次獲取報價
         syms = [(p.stock_symbol, p.stock_market) for p in positions]
         quotes = self._fetch_quotes_map(syms)
 
         closed = 0
         for pos in positions:
-            # 跳过本轮刚建仓的持仓
+            # 跳過本輪剛建倉的持倉
             if skip_keys and (pos.stock_symbol, pos.stock_market) in skip_keys:
                 continue
             key = (pos.stock_market, pos.stock_symbol)
@@ -516,7 +516,7 @@ class PaperTradingEngine:
             if current_price is None or current_price <= 0:
                 continue
 
-            # 更新现价、净浮动盈亏(含若此刻平仓的双边成本)、持仓期最高价
+            # 更新現價、淨未實現損益(含若此刻平倉的雙邊成本)、持倉期最高價
             pos.current_price = current_price
             _buy_cost_u = -COST_MODEL.fill("buy", pos.entry_price, pos.quantity).cash_delta
             _sell_u = COST_MODEL.fill("sell", current_price, pos.quantity).cash_delta
@@ -524,21 +524,21 @@ class PaperTradingEngine:
             if pos.highest_price is None or current_price > pos.highest_price:
                 pos.highest_price = current_price
 
-            # 检查止损
+            # 檢查停損
             if pos.stop_loss and current_price <= pos.stop_loss:
                 trade = self._close_position(db, account, pos, current_price, "stop_loss")
                 exit_events.append((pos, trade))
                 closed += 1
                 continue
 
-            # 检查止盈
+            # 檢查停利
             if pos.target_price and current_price >= pos.target_price:
                 trade = self._close_position(db, account, pos, current_price, "target_price")
                 exit_events.append((pos, trade))
                 closed += 1
                 continue
 
-            # 移动止损:浮盈达标后,从持仓最高价回撤超阈值则离场
+            # 移動停損:未實現獲利達標後,從持倉最高價回檔超閾值則離場
             if pos.highest_price and pos.entry_price > 0:
                 profit_ratio = (pos.highest_price - pos.entry_price) / pos.entry_price
                 if profit_ratio >= MIN_PROFIT_FOR_TRAILING:
@@ -549,11 +549,11 @@ class PaperTradingEngine:
                         closed += 1
                         continue
 
-            # 检查信号反转
+            # 檢查訊號反轉
             if pos.signal_run_id:
-                # no_autoflush: 信号查询是只读的,不要把本轮累积的持仓现价更新提前 flush——
-                # 否则扫描中途会反复抢 SQLite 写锁,与其它调度器并发写时触发 "database is locked"。
-                # 所有写入统一在本方法末尾 db.commit() 时一次性落盘。
+                # no_autoflush: 訊號查詢是隻讀的,不要把本輪累積的持倉現價更新提前 flush——
+                # 否則掃描中途會反覆搶 SQLite 寫鎖,與其它排程器併發寫時觸發 "database is locked"。
+                # 所有寫入統一在本方法末尾 db.commit() 時一次性落盤。
                 with db.no_autoflush:
                     latest = (
                         db.query(StrategySignalRun)
@@ -571,7 +571,7 @@ class PaperTradingEngine:
                     closed += 1
                     continue
 
-            # 时间止损:持有超过最大自然日离场(优先用 signal 的 holding_days)
+            # 時間停損:持有超過最大自然日離場(優先用 signal 的 holding_days)
             max_days = DEFAULT_TIME_STOP_DAYS
             if pos.signal_run_id:
                 sig_hold = (
@@ -596,8 +596,8 @@ class PaperTradingEngine:
         return closed, exit_events
 
     def _update_account_metrics(self, db: Session, account: PaperTradingAccount) -> None:
-        """更新账户峰值和最大回撤。"""
-        # 计算包含浮动盈亏的总资产
+        """更新帳戶峰值和最大回檔。"""
+        # 計算包含未實現損益的總資產
         open_positions = (
             db.query(PaperTradingPosition)
             .filter(PaperTradingPosition.status == "open")
@@ -617,7 +617,7 @@ class PaperTradingEngine:
                 account.max_drawdown_pct = round(drawdown, 2)
 
     def _scan_sync(self) -> dict:
-        """同步扫描（在线程中执行）。"""
+        """同步掃描（線上程中執行）。"""
         db = SessionLocal()
         try:
             account = self._get_or_create_account(db)
@@ -627,7 +627,7 @@ class PaperTradingEngine:
             opened, new_keys, entry_events = self._check_entries(db, account)
             closed, exit_events = self._check_exits(db, account, skip_keys=new_keys)
 
-            # 在 db.close() 前将 ORM 对象序列化为 dict，避免 detached 问题
+            # 在 db.close() 前將 ORM 物件序列化為 dict，避免 detached 問題
             serialized_entries = [
                 {"pos_data": _serialize_position(pos), "sig_data": _serialize_signal(sig) if sig else None}
                 for pos, sig in entry_events
@@ -645,20 +645,20 @@ class PaperTradingEngine:
                 "exit_events": serialized_exits,
             }
         except Exception as e:
-            logger.exception(f"[模拟盘] 扫描异常: {e}")
+            logger.exception(f"[模擬交易] 掃描異常: {e}")
             return {"status": "error", "error": str(e)}
         finally:
             db.close()
 
     async def scan_once(self) -> dict:
-        """异步扫描入口。"""
+        """非同步掃描入口。"""
         result = await asyncio.to_thread(self._scan_sync)
-        # 发送通知（异步，失败不影响交易）
+        # 傳送通知（非同步，失敗不影響交易）
         await self._send_notifications(result)
         return result
 
     def close_position_manual(self, position_id: int) -> dict:
-        """手动平仓。"""
+        """手動平倉。"""
         db = SessionLocal()
         try:
             account = self._get_or_create_account(db)
@@ -671,9 +671,9 @@ class PaperTradingEngine:
                 .first()
             )
             if not pos:
-                return {"ok": False, "error": "持仓不存在或已平仓"}
+                return {"ok": False, "error": "持倉不存在或已平倉"}
 
-            # 获取最新报价(走 flag 门控的 md_quote_rows,支持故障转移)
+            # 獲取最新報價(走 flag 門控的 md_quote_rows,支援故障轉移)
             mc = _to_market(pos.stock_market)
             rows = md_quote_rows([pos.stock_symbol], mc.value)
 
@@ -686,7 +686,7 @@ class PaperTradingEngine:
             trade = self._close_position(db, account, pos, exit_price, "manual")
             self._update_account_metrics(db, account)
             db.commit()
-            # 序列化后返回，避免 db.close() 后 ORM 对象 detached
+            # 序列化後返回，避免 db.close() 後 ORM 物件 detached
             return {
                 "ok": True,
                 "pos_data": _serialize_position(pos),
@@ -696,7 +696,7 @@ class PaperTradingEngine:
             db.close()
 
     async def close_position_manual_async(self, position_id: int) -> dict:
-        """异步手动平仓，含通知。"""
+        """非同步手動平倉，含通知。"""
         result = await asyncio.to_thread(self.close_position_manual, position_id)
         if result.get("ok"):
             try:
@@ -706,11 +706,11 @@ class PaperTradingEngine:
                 if pos_data and trade_data:
                     await notify_exit(pos_data, trade_data)
             except Exception:
-                logger.exception("[模拟盘] 手动平仓通知失败")
+                logger.exception("[模擬交易] 手動平倉通知失敗")
         return result
 
     async def _send_notifications(self, result: dict) -> None:
-        """从扫描结果中取出序列化事件，发送通知。"""
+        """從掃描結果中取出序列化事件，傳送通知。"""
         try:
             from src.modules.paper_trading.paper_trading_notifier import notify_entry, notify_exit
 
@@ -719,10 +719,10 @@ class PaperTradingEngine:
             for evt in result.pop("exit_events", []):
                 await notify_exit(evt["pos_data"], evt["trade_data"])
         except Exception:
-            logger.exception("[模拟盘] 通知发送失败")
+            logger.exception("[模擬交易] 通知傳送失敗")
 
     def reset_account(self) -> dict:
-        """重置模拟盘（清空所有数据）。"""
+        """重置模擬交易（清空所有資料）。"""
         db = SessionLocal()
         try:
             db.query(PaperTradingPosition).delete()

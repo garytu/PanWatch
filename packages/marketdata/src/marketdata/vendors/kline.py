@@ -1,4 +1,4 @@
-"""K 线 vendors:腾讯(全市场)/ Stooq(US)/ 东财(CN/HK)/ Yahoo(US/HK)。移植自 PanWatch kline_collector 抓取核。"""
+"""K 線 vendors:騰訊(全市場)/ Stooq(US)/ 東財(CN/HK)/ Yahoo(US/HK)。移植自 PanWatch kline_collector 抓取核。"""
 from __future__ import annotations
 
 import json
@@ -25,23 +25,23 @@ def _days(config: dict, default: int = 60) -> int:
         return default
 
 
-# 腾讯 fqkline 对 count 有上限:实测 ≤800 正常返(800→801根),1000-2000 退化到 ~641,
-# ≥3000 直接返空(0根)。上层 want 常放大到 3000(为长历史/回测),若原样透传腾讯会返 0
-# → 每个标的都白白落到东财补全 → 东财一挂就没数据。故把请求 count 截到 800(取回最多)。
+# 騰訊 fqkline 對 count 有上限:實測 ≤800 正常返(800→801根),1000-2000 退化到 ~641,
+# ≥3000 直接返空(0根)。上層 want 常放大到 3000(為長曆史/回測),若原樣透傳騰訊會返 0
+# → 每個標的都白白落到東財補全 → 東財一掛就沒資料。故把請求 count 截到 800(取回最多)。
 _TENCENT_MAX_COUNT = 800
 
 
 def fetch_tencent_kline_raw(tsym: str, days: int) -> list[Bar]:
-    """按**原始腾讯符号**取日K(不经 Symbol 转换)。
+    """按**原始騰訊符號**取日K(不經 Symbol 轉換)。
 
-    供指数等显式符号场景复用(sh000001/hkHSI/usDJI…;指数与个股的符号规则不同,
-    必须显式传入)。个股路径请走 TencentKlineVendor。
+    供指數等顯式符號場景複用(sh000001/hkHSI/usDJI…;指數與個股的符號規則不同,
+    必須顯式傳入)。個股路徑請走 TencentKlineVendor。
     """
     days = min(max(int(days or 1), 1), _TENCENT_MAX_COUNT)
     text = market_get(
         _TENCENT_URL, host_key="web.ifzq.gtimg.cn", min_interval_s=0.15,
         params={"param": f"{tsym},day,,,{days},qfq", "_var": "kline_dayqfq"},
-        timeout=10, retries=2, parse="text", log_label="腾讯K线", symbol=tsym,
+        timeout=10, retries=2, parse="text", log_label="騰訊K線", symbol=tsym,
     )
     if not text or "=" not in text:
         return []
@@ -70,15 +70,15 @@ def fetch_tencent_kline_raw(tsym: str, days: int) -> list[Bar]:
     return out
 
 
-# 腾讯美股日K必须带交易所后缀(usTSLA.OQ=纳斯达克 / usBABA.N=纽交所);裸 us{CODE}
-# 只回"首日+最新"两根退化数据,错后缀只回 1 根。后缀无法从代码推断 → 依次试
-# .OQ/.N/裸,根数达标即命中并进程内记忆(下次直达,不再多请求)。
+# 騰訊美股日K必須帶交易所字尾(usTSLA.OQ=納斯達克 / usBABA.N=紐交所);裸 us{CODE}
+# 只回"首日+最新"兩根退化資料,錯字尾只回 1 根。字尾無法從程式碼推斷 → 依次試
+# .OQ/.N/裸,根數達標即命中並程序內記憶(下次直達,不再多請求)。
 _US_SUFFIX_CACHE: dict[str, str] = {}
 
 
 def _fetch_tencent_us_kline(code: str, days: int) -> list[Bar]:
     want = min(max(int(days or 1), 1), _TENCENT_MAX_COUNT)
-    ok_threshold = min(want, 5)  # 正常历史远多于 5 根;退化响应只有 1-2 根
+    ok_threshold = min(want, 5)  # 正常歷史遠多於 5 根;退化回應只有 1-2 根
     cached = _US_SUFFIX_CACHE.get(code)
     suffixes = ([cached] if cached is not None else []) + [
         s for s in (".OQ", ".N", "") if s != cached
@@ -98,7 +98,7 @@ class TencentKlineVendor(KlineVendor):
     name = "tencent"
     supports_markets = {"CN", "HK", "US"}
 
-    _MAX_COUNT = _TENCENT_MAX_COUNT  # 兼容旧引用(测试/外部按类属性取)
+    _MAX_COUNT = _TENCENT_MAX_COUNT  # 相容舊引用(測試/外部按類屬性取)
 
     def fetch(self, symbols: list[Symbol], config: dict) -> list[Bar]:
         if not symbols:
@@ -122,7 +122,7 @@ class StooqKlineVendor(KlineVendor):
         text = market_get(
             _STOOQ_URL, host_key="stooq.com", params={"s": f"{sym}.us", "i": "d"},
             headers={"User-Agent": "PanWatch/1.0 (+https://github.com/)"},
-            timeout=12, retries=2, parse="text", log_label="Stooq K线", symbol=sym,
+            timeout=12, retries=2, parse="text", log_label="Stooq K線", symbol=sym,
         )
         if not text:
             return []
@@ -153,9 +153,9 @@ def _em_secid(sym: Symbol) -> str:
 
 
 def fetch_eastmoney_kline(secid: str, days: int) -> list[Bar]:
-    """按显式 secid 取东财日K,不经个股 secid 推导规则(_em_secid)。
+    """按顯式 secid 取東財日K,不經個股 secid 推導規則(_em_secid)。
 
-    供指数等显式符号场景复用(指数与个股 secid 前缀规则不同,必须显式映射)。
+    供指數等顯式符號場景複用(指數與個股 secid 字首規則不同,必須顯式對映)。
     """
     payload = market_get(
         _EASTMONEY_URL, host_key="push2his.eastmoney.com", min_interval_s=0.2,
@@ -164,7 +164,7 @@ def fetch_eastmoney_kline(secid: str, days: int) -> list[Bar]:
                 "fields1": "f1,f2,f3,f4,f5,f6", "fields2": "f51,f52,f53,f54,f55,f56",
                 "ut": "fa5fd1943c7b386f172d6893dbfba10b"},
         headers={"User-Agent": "Mozilla/5.0", "Referer": "https://quote.eastmoney.com/"},
-        timeout=12, retries=1, parse="json", log_label="东财K线", symbol=secid,
+        timeout=12, retries=1, parse="json", log_label="東財K線", symbol=secid,
     )
     raw = (payload or {}).get("data", {}).get("klines", []) if isinstance(payload, dict) else []
     out: list[Bar] = []
@@ -195,7 +195,7 @@ class EastmoneyKlineVendor(KlineVendor):
 
 
 def _yahoo_range(days: int) -> str:
-    """days → Yahoo chart v8 的 range 枚举(不用 period1/period2,避免依赖当前时间)。"""
+    """days → Yahoo chart v8 的 range 列舉(不用 period1/period2,避免依賴當前時間)。"""
     if days <= 5:
         return "5d"
     if days <= 22:
@@ -233,7 +233,7 @@ class YahooKlineVendor(KlineVendor):
             params={"interval": "1d", "range": _yahoo_range(days)},
             headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
             timeout=10, retries=2, parse="json", proxy=proxy,
-            log_label="Yahoo K线", symbol=ysym,
+            log_label="Yahoo K線", symbol=ysym,
         )
         if not isinstance(payload, dict):
             return []

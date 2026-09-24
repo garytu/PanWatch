@@ -1,13 +1,13 @@
-"""因子自校准(M2):把孤立的 IC/IR 接进因子权重的轻量标定闭环。
+"""因子自校準(M2):把孤立的 IC/IR 接進因子權重的輕量標定閉環。
 
-把 `factor_eval.evaluate_factor_ic` 算出的每因子 IC/IR,符号感知地转成目标权重,
-EMA 平滑 + clamp 后写入 `FactorWeight`(并审计到 `FactorWeightHistory`)。
-镜像 `strategy_engine.rebalance_strategy_weights` 的机制,但作用于因子级。
+把 `factor_eval.evaluate_factor_ic` 算出的每因子 IC/IR,符號感知地轉成目標權重,
+EMA 平滑 + clamp 後寫入 `FactorWeight`(並審計到 `FactorWeightHistory`)。
+映象 `strategy_engine.rebalance_strategy_weights` 的機制,但作用於因子級。
 
-设计要点(见 .docs/factor-self-calibration-design-2026-06-20.md):
-- IC 必须测在「原始因子」上(快照存 raw,权重只在合成时乘),否则闭环自我强化失真。
-- 惩罚因子(risk/crowd)IC 预期为负:用 −IC 驱动,惩罚有效→提权,失效→降权。
-- 只吃「持有期已走完」的 outcome(point-in-time),防未来函数。
+設計要點(見 .docs/factor-self-calibration-design-2026-06-20.md):
+- IC 必須測在「原始因子」上(快照存 raw,權重只在合成時乘),否則閉環自我強化失真。
+- 懲罰因子(risk/crowd)IC 預期為負:用 −IC 驅動,懲罰有效→提權,失效→降權。
+- 只吃「持有期已走完」的 outcome(point-in-time),防未來函式。
 """
 
 from __future__ import annotations
@@ -27,16 +27,16 @@ from src.platform.persistence.models import FactorWeight, FactorWeightHistory
 
 logger = logging.getLogger(__name__)
 
-# 归一化基准:一个「不错」的 IR / 一个「有意义」的单期 IC。
+# 歸一化基準:一個「不錯」的 IR / 一個「有意義」的單期 IC。
 IR_REF = 0.5
 IC_REF = 0.05
 
 
 def compute_target(factor_code: str, ic, ir, *, beta: float = 0.4) -> float | None:
-    """由 IC/IR 算目标权重;优先 IR(更稳),fallback IC;惩罚因子翻符号。
+    """由 IC/IR 算目標權重;優先 IR(更穩),fallback IC;懲罰因子翻符號。
 
-    返回 None 表示信息不足(IC、IR 均缺失),应跳过该因子。
-    term 归一化并 clamp 到 [-1, 1];target = 1 + beta·term。
+    返回 None 表示資訊不足(IC、IR 均缺失),應跳過該因子。
+    term 歸一化並 clamp 到 [-1, 1];target = 1 + beta·term。
     """
     if ir is not None:
         term = ir / IR_REF
@@ -45,14 +45,14 @@ def compute_target(factor_code: str, ic, ir, *, beta: float = 0.4) -> float | No
     else:
         return None
     if factor_code in PENALTY_FACTORS:
-        term = -term  # 惩罚因子:IC 越负越该信
+        term = -term  # 懲罰因子:IC 越負越該信
     term = max(-1.0, min(1.0, term))
     return 1.0 * (1.0 + beta * term)
 
 
 def blend(old: float, target: float, *, alpha: float = 0.35,
           lo: float = 0.5, hi: float = 1.5) -> float:
-    """EMA 平滑(防跳变)+ clamp 到 [lo, hi]。"""
+    """EMA 平滑(防跳變)+ clamp 到 [lo, hi]。"""
     new = old * (1.0 - alpha) + target * alpha
     return max(lo, min(hi, new))
 
@@ -62,11 +62,11 @@ def calibrate_factor_weights(
     clamp: tuple[float, float] = (0.5, 1.5),
     min_samples: int = 20, horizon: int = 5, days: int = 90, db=None,
 ) -> dict:
-    """对单个市场跑一轮因子权重标定,写 FactorWeight + FactorWeightHistory。
+    """對單個市場跑一輪因子權重標定,寫 FactorWeight + FactorWeightHistory。
 
-    门控:is_pinned / auto_calibrate=False / 样本不足 / IC 缺失 → 跳过(不改权重)。
-    每次都把最近观测(last_ic/ir/sample_size)写入 FactorWeight.meta 供 API 展示;
-    History 只记录「实际发生的调整」(reason=auto),避免冷启动期审计噪声。
+    門控:is_pinned / auto_calibrate=False / 樣本不足 / IC 缺失 → 跳過(不改權重)。
+    每次都把最近觀測(last_ic/ir/sample_size)寫入 FactorWeight.meta 供 API 展示;
+    History 只記錄「實際發生的調整」(reason=auto),避免冷啟動期審計噪聲。
     """
     own = db is None
     db = db or SessionLocal()
@@ -75,7 +75,7 @@ def calibrate_factor_weights(
             days=days, horizon=horizon, min_samples=min_samples, market=market, db=db
         )
         factors = ic_result.get("factors", {})
-        get_factor_weights(market, db=db)  # 确保 5 个因子行存在
+        get_factor_weights(market, db=db)  # 確保 5 個因子行存在
 
         lo, hi = float(clamp[0]), float(clamp[1])
         changed = 0
@@ -93,7 +93,7 @@ def calibrate_factor_weights(
             ir = stats.get("ir")
             n = int(stats.get("sample_size", 0))
 
-            # 记录最近一次观测(供 API 展示),无论是否调整。
+            # 記錄最近一次觀測(供 API 展示),無論是否調整。
             row.meta = {
                 **(row.meta or {}),
                 "last_ic": ic, "last_ir": ir, "last_sample_size": n,
@@ -128,8 +128,8 @@ def calibrate_factor_weights(
         db.commit()
         return {"market": market, "checked": len(CALIBRATABLE_FACTORS),
                 "changed": changed, "rows": rows_changed}
-    except Exception as e:  # pragma: no cover - 防御性
-        logger.warning(f"[因子标定] market={market} 失败: {e}")
+    except Exception as e:  # pragma: no cover - 防禦性
+        logger.warning(f"[因子標定] market={market} 失敗: {e}")
         db.rollback()
         return {"market": market, "checked": 0, "changed": 0, "rows": [], "error": str(e)}
     finally:
@@ -138,9 +138,9 @@ def calibrate_factor_weights(
 
 
 def calibrate_all_markets(*, db=None, **kwargs) -> dict[str, dict]:
-    """对所有市场(CN/HK/US)各跑一轮因子标定;供调度器每日 outcome 评估后调用。
+    """對所有市場(CN/HK/US)各跑一輪因子標定;供排程器每日 outcome 評估後呼叫。
 
-    kwargs 透传给 calibrate_factor_weights(alpha/beta/clamp/min_samples/horizon/days)。
+    kwargs 透傳給 calibrate_factor_weights(alpha/beta/clamp/min_samples/horizon/days)。
     """
     own = db is None
     db = db or SessionLocal()

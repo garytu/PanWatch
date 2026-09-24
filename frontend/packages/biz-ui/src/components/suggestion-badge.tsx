@@ -16,13 +16,13 @@ export interface SuggestionInfo {
   reason: string
   should_alert: boolean
   raw?: string
-  // 建议池新增字段
+  // 建議池新增欄位
   agent_name?: string     // intraday_monitor/daily_report/premarket_outlook
-  agent_label?: string    // 盘中监测/盘后日报/盘前分析
-  created_at?: string     // ISO 时间戳
-  is_expired?: boolean    // 是否已过期
+  agent_label?: string    // 盤中監測/盤後日報/盤前分析
+  created_at?: string     // ISO 時間戳
+  is_expired?: boolean    // 是否已過期
   prompt_context?: string // Prompt 上下文
-  ai_response?: string    // AI 原始响应
+  ai_response?: string    // AI 原始回應
   meta?: Record<string, any>
 }
 
@@ -52,7 +52,7 @@ export interface KlineSummary {
   kdj_d?: number | null
   kdj_j?: number | null
   kdj_status?: string
-  // 布林带
+  // 布林帶
   boll_upper?: number | null
   boll_mid?: number | null
   boll_lower?: number | null
@@ -62,14 +62,14 @@ export interface KlineSummary {
   volume_trend?: string
   // 振幅
   amplitude?: number | null
-  // 多级支撑压力
+  // 多級支撐壓力
   support: number | null
   resistance: number | null
   support_s?: number | null
   support_m?: number | null
   resistance_s?: number | null
   resistance_m?: number | null
-  // K线形态
+  // K線形態
   kline_pattern?: string
 }
 
@@ -78,20 +78,20 @@ interface SuggestionBadgeProps {
   stockName?: string
   stockSymbol?: string
   kline?: KlineSummary | null
-  showFullInline?: boolean  // 是否在行内显示完整信息（Dashboard 模式）
-  market?: string           // 市场（用于技术指标弹窗）
-  hasPosition?: boolean     // 是否持仓（用于技术指标弹窗）
-  showTechnicalCompanion?: boolean // 是否展示技术指标对照徽章
+  showFullInline?: boolean  // 是否在行內顯示完整資訊（Dashboard 模式）
+  market?: string           // 市場（用於技術指標彈跳視窗）
+  hasPosition?: boolean     // 是否持倉（用於技術指標彈跳視窗）
+  showTechnicalCompanion?: boolean // 是否展示技術指標對照徽章
 }
 
-// 格式化建议时间（自动转换为本地时区，只显示时:分）
+// 格式化建議時間（自動轉換為本地時區，只顯示時:分）
 function formatSuggestionTime(isoTime?: string): string {
   if (!isoTime) return ''
   try {
     const date = new Date(isoTime)
-    // 检查日期是否有效
+    // 檢查日期是否有效
     if (isNaN(date.getTime())) return ''
-    // 使用本地时区显示
+    // 使用本地時區顯示
     return date.toLocaleTimeString('zh-CN', {
       hour: '2-digit',
       minute: '2-digit',
@@ -102,7 +102,7 @@ function formatSuggestionTime(isoTime?: string): string {
   }
 }
 
-// 格式化完整日期时间（本地时区）
+// 格式化完整日期時間（本地時區）
 function formatSuggestionDateTime(isoTime?: string): string {
   if (!isoTime) return ''
   try {
@@ -125,8 +125,8 @@ function formatKlineMeta(meta?: Record<string, any>): string {
   const computedAt = meta?.kline_meta?.computed_at
   const asof = meta?.kline_meta?.asof
   const parts: string[] = []
-  if (asof) parts.push(`K线截止 ${asof}`)
-  if (computedAt) parts.push(`计算 ${formatSuggestionTime(computedAt)}`)
+  if (asof) parts.push(`K線截止 ${asof}`)
+  if (computedAt) parts.push(`計算 ${formatSuggestionTime(computedAt)}`)
   return parts.join(' · ')
 }
 
@@ -149,7 +149,7 @@ export function SuggestionBadge({
     setFeedback(null)
   }, [suggestion?.id])
 
-  const canFeedback = !!suggestion?.id && suggestion?.agent_label !== '技术指标'
+  const canFeedback = !!suggestion?.id && suggestion?.agent_label !== '技術指標'
   const submitFeedback = async (useful: boolean) => {
     if (!suggestion?.id) return
     try {
@@ -158,9 +158,9 @@ export function SuggestionBadge({
         body: JSON.stringify({ suggestion_id: suggestion.id, useful }),
       })
       setFeedback(useful ? 'useful' : 'useless')
-      toast('反馈已提交', 'success')
+      toast('回饋已提交', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '反馈失败', 'error')
+      toast(e instanceof Error ? e.message : '回饋失敗', 'error')
     }
   }
 
@@ -177,10 +177,10 @@ export function SuggestionBadge({
 
   if (!suggestion && !kline) return null
 
-  // Dashboard 模式：行内显示完整信息（仅建议 badge）
+  // Dashboard 模式：行內顯示完整資訊（僅建議 badge）
   if (showFullInline) {
     if (!suggestion) return null
-    const isAI = !!suggestion.agent_name && suggestion.agent_label !== '技术指标'
+    const isAI = !!suggestion.agent_name && suggestion.agent_label !== '技術指標'
     const tech = kline ? buildKlineSuggestion(kline as any, hasPosition) : null
     const timeStr = formatSuggestionTime(suggestion.created_at)
     const klineMetaStr = formatKlineMeta(suggestion.meta)
@@ -197,18 +197,18 @@ export function SuggestionBadge({
                 size="lg"
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (suggestion.agent_label === '技术指标') setKlineDialogOpen(true)
+                  if (suggestion.agent_label === '技術指標') setKlineDialogOpen(true)
                   else setDialogOpen(true)
                 }}
-                title="点击查看建议详情"
+                title="點選檢視建議詳細資訊"
               />
               {isAI && showTechnicalCompanion && (
                 <TechnicalBadge
-                  label={tech ? tech.action_label : '观望'}
+                  label={tech ? tech.action_label : '觀望'}
                   tone={technicalToneFromSuggestionAction(tech?.action, tech?.action_label)}
                   size="lg"
                   onClick={(e) => { e.stopPropagation(); setKlineDialogOpen(true) }}
-                  title="点击查看技术面详情"
+                  title="點選檢視技術面詳細資訊"
                 />
               )}
             </div>
@@ -224,9 +224,9 @@ export function SuggestionBadge({
 
               {(suggestion.agent_label || timeStr) && (
                 <div className="mt-1 text-[10px] text-muted-foreground/70">
-                  来源: {suggestion.agent_label || (isAI ? 'AI' : '未知')}
+                  來源: {suggestion.agent_label || (isAI ? 'AI' : '未知')}
                   {timeStr && ` · ${timeStr}`}
-                  {suggestion.is_expired && <span className="ml-1 text-amber-600">(已过期)</span>}
+                  {suggestion.is_expired && <span className="ml-1 text-amber-600">(已過期)</span>}
                 </div>
               )}
 
@@ -255,19 +255,19 @@ export function SuggestionBadge({
                   isExpired={!!suggestion.is_expired}
                   size="lg"
                 />
-                {/* AI 标签已前置到按钮文案，不再重复 */}
+                {/* AI 標籤已前置到按鈕文案，不再重複 */}
                 {stockName && (
                   <span className="text-[14px] font-normal text-muted-foreground">
                     {stockName} {stockSymbol && `(${stockSymbol})`}
                   </span>
                 )}
               </DialogTitle>
-              {/* 来源信息 */}
+              {/* 來源資訊 */}
               {(suggestion.agent_label || suggestion.created_at) && (
                 <div className="text-[11px] text-muted-foreground/70 mt-1">
-                  来源: {suggestion.agent_label || '未知'}
+                  來源: {suggestion.agent_label || '未知'}
                   {suggestion.created_at && ` · ${formatSuggestionDateTime(suggestion.created_at)}`}
-                  {suggestion.is_expired && <span className="ml-2 text-amber-500">(已过期)</span>}
+                  {suggestion.is_expired && <span className="ml-2 text-amber-500">(已過期)</span>}
                 </div>
               )}
             </DialogHeader>
@@ -276,7 +276,7 @@ export function SuggestionBadge({
               {/* Feedback */}
               {canFeedback && (
                 <div>
-                  <div className="text-[11px] text-muted-foreground mb-1">这条建议是否有用？</div>
+                  <div className="text-[11px] text-muted-foreground mb-1">這條建議是否有用？</div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => submitFeedback(true)}
@@ -298,19 +298,19 @@ export function SuggestionBadge({
                           : 'bg-background/40 border-border/60 text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      没用
+                      沒用
                     </button>
                     {feedback && (
-                      <span className="text-[11px] text-muted-foreground">已记录，感谢反馈</span>
+                      <span className="text-[11px] text-muted-foreground">已記錄，感謝回饋</span>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* 信号 */}
+              {/* 訊號 */}
               {suggestion.signal && (
                 <div>
-                  <div className="text-[11px] text-muted-foreground mb-1">信号</div>
+                  <div className="text-[11px] text-muted-foreground mb-1">訊號</div>
                   <p className="text-[13px] font-medium text-foreground">{suggestion.signal}</p>
                 </div>
               )}
@@ -325,18 +325,18 @@ export function SuggestionBadge({
                 </div>
               )}
 
-              {/* 技术指标 */}
+              {/* 技術指標 */}
               {kline && (
                 <div className="space-y-3">
-                  <div className="text-[11px] text-muted-foreground">技术指标</div>
+                  <div className="text-[11px] text-muted-foreground">技術指標</div>
                   <KlineIndicators summary={kline as any} />
                 </div>
               )}
 
-              {/* AI 原始响应 */}
+              {/* AI 原始回應 */}
               {suggestion.ai_response && (
                 <div>
-                  <div className="text-[11px] text-muted-foreground mb-1">AI 响应</div>
+                  <div className="text-[11px] text-muted-foreground mb-1">AI 回應</div>
                   <div className="text-[12px] text-foreground whitespace-pre-wrap bg-accent/30 rounded p-2 max-h-32 overflow-y-auto scrollbar">
                     {suggestion.ai_response}
                   </div>
@@ -347,7 +347,7 @@ export function SuggestionBadge({
               {suggestion.prompt_context && (
                 <details className="group">
                   <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground">
-                    Prompt 上下文 <span className="text-[10px]">(点击展开)</span>
+                    Prompt 上下文 <span className="text-[10px]">(點選展開)</span>
                   </summary>
                   <div className="mt-2 text-[11px] text-muted-foreground whitespace-pre-wrap bg-accent/20 rounded p-2 max-h-48 overflow-y-auto scrollbar">
                     {suggestion.prompt_context}
@@ -370,20 +370,20 @@ export function SuggestionBadge({
     )
   }
 
-  // 仅展示技术指标（无建议）
+  // 僅展示技術指標（無建議）
   if (!suggestion && kline) {
     return (
       <>
         <div className="inline-flex flex-col items-start gap-0.5">
           <TechnicalBadge
-            label="指标"
+            label="指標"
             tone="neutral"
             size="xs"
             onClick={(e) => {
               e.stopPropagation()
               setKlineDialogOpen(true)
             }}
-            title="点击查看技术指标"
+            title="點選檢視技術指標"
           />
         </div>
 
@@ -401,9 +401,9 @@ export function SuggestionBadge({
   }
 
   if (!suggestion) return null
-  const isAI = !!suggestion.agent_name && suggestion.agent_label !== '技术指标'
+  const isAI = !!suggestion.agent_name && suggestion.agent_label !== '技術指標'
 
-  // 持仓页模式：小徽章 + 点击弹窗
+  // 持倉頁模式：小徽章 + 點選彈跳視窗
   const timeStr = formatSuggestionTime(suggestion.created_at)
   const sourceInfo = ''
 
@@ -419,31 +419,31 @@ export function SuggestionBadge({
             size="md"
             onClick={(e) => {
               e.stopPropagation()
-              if (suggestion.agent_label === '技术指标') setKlineDialogOpen(true)
+              if (suggestion.agent_label === '技術指標') setKlineDialogOpen(true)
               else setDialogOpen(true)
             }}
-            title={sourceInfo ? `${sourceInfo} - 点击查看详情` : '点击查看建议详情'}
+            title={sourceInfo ? `${sourceInfo} - 點選檢視詳細資訊` : '點選檢視建議詳細資訊'}
           />
-          {showTechnicalCompanion && suggestion.agent_label !== '技术指标' && (
+          {showTechnicalCompanion && suggestion.agent_label !== '技術指標' && (
             (() => {
               const tech = kline ? buildKlineSuggestion(kline as any, hasPosition) : null
               return (
                 <TechnicalBadge
-                  label={tech ? tech.action_label : '观望'}
+                  label={tech ? tech.action_label : '觀望'}
                   tone={technicalToneFromSuggestionAction(tech?.action, tech?.action_label)}
                   size="md"
                   onClick={(e) => { e.stopPropagation(); setKlineDialogOpen(true) }}
-                  title="点击查看技术面详情"
+                  title="點選檢視技術面詳細資訊"
                 />
               )
             })()
           )}
         </div>
-        {/* 来源和时间（显示在徽章下方，仅 AI 建议以增强区分）*/}
+        {/* 來源和時間（顯示在徽章下方，僅 AI 建議以增強區分）*/}
         {isAI && (
           <div className="mt-1 text-[10px] text-muted-foreground/70">
-            来源: {suggestion.agent_label || 'AI'}{timeStr && ` · ${timeStr}`}
-            {suggestion.is_expired && <span className="ml-1 text-amber-600">(已过期)</span>}
+            來源: {suggestion.agent_label || 'AI'}{timeStr && ` · ${timeStr}`}
+            {suggestion.is_expired && <span className="ml-1 text-amber-600">(已過期)</span>}
           </div>
         )}
       </div>
@@ -470,12 +470,12 @@ export function SuggestionBadge({
                 </span>
               )}
             </DialogTitle>
-            {/* 来源信息 */}
+            {/* 來源資訊 */}
             {(suggestion.agent_label || suggestion.created_at) && (
               <div className="text-[11px] text-muted-foreground/70 mt-1">
-                来源: {suggestion.agent_label || '未知'}
+                來源: {suggestion.agent_label || '未知'}
                 {suggestion.created_at && ` · ${formatSuggestionDateTime(suggestion.created_at)}`}
-                {suggestion.is_expired && <span className="ml-2 text-amber-500">(已过期)</span>}
+                {suggestion.is_expired && <span className="ml-2 text-amber-500">(已過期)</span>}
               </div>
             )}
           </DialogHeader>
@@ -484,7 +484,7 @@ export function SuggestionBadge({
             {/* Feedback */}
             {canFeedback && (
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">这条建议是否有用？</div>
+                <div className="text-[11px] text-muted-foreground mb-1">這條建議是否有用？</div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => submitFeedback(true)}
@@ -506,19 +506,19 @@ export function SuggestionBadge({
                         : 'bg-background/40 border-border/60 text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    没用
+                    沒用
                   </button>
                   {feedback && (
-                    <span className="text-[11px] text-muted-foreground">已记录，感谢反馈</span>
+                    <span className="text-[11px] text-muted-foreground">已記錄，感謝回饋</span>
                   )}
                 </div>
               </div>
             )}
 
-            {/* 信号 */}
+            {/* 訊號 */}
             {suggestion.signal && (
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">信号</div>
+                <div className="text-[11px] text-muted-foreground mb-1">訊號</div>
                 <p className="text-[13px] font-medium text-foreground">{suggestion.signal}</p>
               </div>
             )}
@@ -533,18 +533,18 @@ export function SuggestionBadge({
               </div>
             )}
 
-            {/* 技术指标 */}
+            {/* 技術指標 */}
             {kline && (
               <div className="space-y-3">
-                <div className="text-[11px] text-muted-foreground">技术指标</div>
+                <div className="text-[11px] text-muted-foreground">技術指標</div>
                 <KlineIndicators summary={kline as any} />
               </div>
             )}
 
-            {/* AI 原始响应 */}
+            {/* AI 原始回應 */}
             {suggestion.ai_response && (
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">AI 响应</div>
+                <div className="text-[11px] text-muted-foreground mb-1">AI 回應</div>
                 <div className="text-[12px] text-foreground whitespace-pre-wrap bg-accent/30 rounded p-2 max-h-32 overflow-y-auto">
                   {suggestion.ai_response}
                 </div>
@@ -555,7 +555,7 @@ export function SuggestionBadge({
             {suggestion.prompt_context && (
               <details className="group">
                 <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground">
-                  Prompt 上下文 <span className="text-[10px]">(点击展开)</span>
+                  Prompt 上下文 <span className="text-[10px]">(點選展開)</span>
                 </summary>
                 <div className="mt-2 text-[11px] text-muted-foreground whitespace-pre-wrap bg-accent/20 rounded p-2 max-h-48 overflow-y-auto">
                   {suggestion.prompt_context}

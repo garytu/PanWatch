@@ -16,37 +16,37 @@ logger = logging.getLogger(__name__)
 
 
 class AgentScheduler:
-    """Agent 调度器"""
+    """Agent 排程器"""
 
     def __init__(self, timezone: str = "UTC"):
         self.scheduler = AsyncIOScheduler()
         self.agents: dict[str, BaseAgent] = {}
         self.execution_modes: dict[str, str] = {}
         self.timezone = timezone
-        # 改为存储 context 构建函数，而非固定 context
+        # 改為儲存 context 構建函式，而非固定 context
         self.context_builder: Callable[[str], AgentContext] | None = None
 
     def set_context_builder(self, builder: Callable[[str], AgentContext]):
-        """设置 context 构建函数（每次执行时动态构建）"""
+        """設定 context 構建函式（每次執行時動態構建）"""
         self.context_builder = builder
 
     def register(self, agent: BaseAgent, schedule: str, execution_mode: str = "batch"):
         """
-        注册 Agent 到调度器。
+        註冊 Agent 到排程器。
 
         Args:
-            agent: Agent 实例
-            schedule: 调度表达式
-                - cron 格式: "分 时 日 月 周" (5 部分)
+            agent: Agent 例項
+            schedule: 排程表示式
+                - cron 格式: "分 時 日 月 周" (5 部分)
                 - interval 格式: "interval:3m" 或 "interval:30s"
-            execution_mode: 执行模式 batch/single（single 将逐只股票执行 run_single）
+            execution_mode: 執行模式 batch/single（single 將逐只股票執行 run_single）
         """
         self.agents[agent.name] = agent
         self.execution_modes[agent.name] = execution_mode or "batch"
 
-        # 解析调度表达式
-        # cron 使用 5 段: "分 时 日 月 周"
-        # 其中 day_of_week 的数字按 POSIX cron 语义(1-5=周一到周五)，会在内部做一次归一化。
+        # 解析排程表示式
+        # cron 使用 5 段: "分 時 日 月 周"
+        # 其中 day_of_week 的數字按 POSIX cron 語義(1-5=週一到週五)，會在內部做一次歸一化。
         trigger = parse_schedule(schedule, timezone=self.timezone)
 
         self.scheduler.add_job(
@@ -58,14 +58,14 @@ class AgentScheduler:
             replace_existing=True,
         )
 
-        logger.info(f"注册 Agent: {agent.display_name} (schedule: {schedule})")
+        logger.info(f"註冊 Agent: {agent.display_name} (schedule: {schedule})")
 
-    # NOTE: cron/interval 解析逻辑统一放在 src/core/schedule_parser.py
+    # NOTE: cron/interval 解析邏輯統一放在 src/core/schedule_parser.py
 
     async def _run_agent(self, agent_name: str):
-        """执行指定 Agent（动态构建 context）"""
+        """執行指定 Agent（動態構建 context）"""
         if not self.context_builder:
-            logger.error("context_builder 未设置")
+            logger.error("context_builder 未設定")
             return
 
         agent = self.agents.get(agent_name)
@@ -76,7 +76,7 @@ class AgentScheduler:
         start = time.monotonic()
         trace_id = f"sch-{agent_name}-{int(time.time() * 1000)}"
         try:
-            # OTel root span(默认关闭时 no-op);与自建 trace 共用同一 trace_id 关联。
+            # OTel root span(預設關閉時 no-op);與自建 trace 共用同一 trace_id 關聯。
             with otel.agent_run_span(
                 agent_name, trace_id=trace_id, trigger_source="schedule"
             ), log_context(
@@ -86,9 +86,9 @@ class AgentScheduler:
                 event="agent_run",
                 tags={"trigger_source": "schedule"},
             ):
-                # 每次执行时动态构建 context（获取最新配置）
+                # 每次執行時動態構建 context（獲取最新配置）
                 context = self.context_builder(agent_name)
-                logger.info(f"[调度] 开始执行 Agent: {agent.display_name}")
+                logger.info(f"[排程] 開始執行 Agent: {agent.display_name}")
                 mode = self.execution_modes.get(agent_name, "batch")
                 if mode == "single" and hasattr(agent, "run_single"):
                     processed = 0
@@ -99,7 +99,7 @@ class AgentScheduler:
                         if market_def and not market_def.is_trading_time():
                             skipped += 1
                             logger.info(
-                                f"[调度] 跳过 {agent.display_name} {stock.symbol}（{market_def.name} 非交易时段）"
+                                f"[排程] 跳過 {agent.display_name} {stock.symbol}（{market_def.name} 非交易時段）"
                             )
                             continue
                         try:
@@ -118,12 +118,12 @@ class AgentScheduler:
                                 errors.append(f"{stock.symbol} notify: {notify_error}")
                         except Exception as e:
                             logger.error(
-                                f"Agent [{agent_name}] 单只执行失败 {stock.symbol}: {e}",
+                                f"Agent [{agent_name}] 單隻執行失敗 {stock.symbol}: {e}",
                                 exc_info=True,
                             )
                             errors.append(f"{stock.symbol}: {e}")
                     logger.info(
-                        f"[调度] Agent 单只模式执行完成: {agent.display_name}（执行{processed}，跳过{skipped}，共{len(context.watchlist)}）"
+                        f"[排程] Agent 單隻模式執行完成: {agent.display_name}（執行{processed}，跳過{skipped}，共{len(context.watchlist)}）"
                     )
                     duration_ms = int((time.monotonic() - start) * 1000)
                     record_agent_run(
@@ -162,9 +162,9 @@ class AgentScheduler:
                         notify_sent=bool(raw.get("notified", False)),
                         model_label=context.model_label,
                     )
-                logger.info(f"[调度] Agent 执行完成: {agent.display_name}")
+                logger.info(f"[排程] Agent 執行完成: {agent.display_name}")
         except Exception as e:
-            logger.error(f"Agent [{agent_name}] 调度执行异常: {e}", exc_info=True)
+            logger.error(f"Agent [{agent_name}] 排程執行異常: {e}", exc_info=True)
             duration_ms = int((time.monotonic() - start) * 1000)
             record_agent_run(
                 agent_name=agent_name,
@@ -176,22 +176,22 @@ class AgentScheduler:
             )
 
     async def trigger_now(self, agent_name: str):
-        """立即执行某个 Agent（手动触发）"""
+        """立即執行某個 Agent（手動觸發）"""
         await self._run_agent(agent_name)
 
     def start(self):
-        """启动调度器"""
+        """啟動排程器"""
         self.scheduler.start()
         from src.platform.scheduling.scheduler_registry import register
         register("agent", self.scheduler)
-        logger.info(f"调度器已启动，已注册 {len(self.agents)} 个 Agent")
+        logger.info(f"排程器已啟動，已註冊 {len(self.agents)} 個 Agent")
 
-        # 打印所有已注册的任务
+        # 列印所有已註冊的任務
         jobs = self.scheduler.get_jobs()
         for job in jobs:
-            logger.info(f"  - {job.name}: 下次执行 {job.next_run_time}")
+            logger.info(f"  - {job.name}: 下次執行 {job.next_run_time}")
 
     def shutdown(self):
-        """关闭调度器"""
+        """關閉排程器"""
         self.scheduler.shutdown()
-        logger.info("调度器已关闭")
+        logger.info("排程器已關閉")

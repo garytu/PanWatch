@@ -1,4 +1,4 @@
-"""PACKAGE_VENDORS_BY_TYPE:包内各数据类型合法 vendor 权威,防与 Engine 实际注册漂移。"""
+"""PACKAGE_VENDORS_BY_TYPE:包內各資料型別合法 vendor 權威,防與 Engine 實際註冊漂移。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from marketdata.registry import VENDOR_CLASSES_BY_TYPE, build_vendors
 
 
 def test_package_vendors_by_type_content():
-    """内容必须与 client.py 现状(quote/kline/capital_flow/events 各 vendor)完全一致。"""
+    """內容必須與 client.py 現狀(quote/kline/capital_flow/events 各 vendor)完全一致。"""
     assert PACKAGE_VENDORS_BY_TYPE == {
         "quote": frozenset({"tencent", "sina", "eastmoney", "yfinance"}),
         "kline": frozenset({"tencent", "stooq", "eastmoney", "yahoo"}),
@@ -27,7 +27,7 @@ def test_package_vendors_by_type_content():
 
 
 def test_package_vendors_by_type_matches_actual_engine_registration():
-    """与 MarketData 实例上各 Engine 实际注册的 vendors keys 一致,防漂移。"""
+    """與 MarketData 例項上各 Engine 實際註冊的 vendors keys 一致,防漂移。"""
     md = MarketData(config=StaticConfigProvider({}))
     engines = {
         "quote": md._quote_engine,

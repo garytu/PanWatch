@@ -19,8 +19,8 @@ class EventItem:
     url: str
 
 
-# 东财公告全文(纯文本)content API:art_code -> data.notice_content。
-# 走系统代理(trust_env=True,env HTTP_PROXY);东财证书链偶发问题,verify=False。
+# 東財公告全文(純文本)content API:art_code -> data.notice_content。
+# 走系統代理(trust_env=True,env HTTP_PROXY);東財證書鏈偶發問題,verify=False。
 ANN_CONTENT_API_URL = "https://np-cnotice-stock.eastmoney.com/api/content/ann"
 
 
@@ -30,15 +30,15 @@ def fetch_announcement_fulltext(
     timeout_s: float = 8.0,
     proxy: str | None = None,
 ) -> str:
-    """按 art_code 取东方财富公告全文(纯文本)。
+    """按 art_code 取東方財富公告全文(純文本)。
 
-    成功返回 ``data.notice_content`` 去空白后的纯文本;任何失败(网络/解析/空)
-    返回空串 —— 调用方据此 fail-soft 只保留标题。
+    成功返回 ``data.notice_content`` 去空白後的純文本;任何失敗(網路/解析/空)
+    返回空串 —— 呼叫方據此 fail-soft 只保留標題。
 
     Args:
-        art_code: 公告唯一编号(EventItem.external_id)
-        timeout_s: 请求超时
-        proxy: 显式代理(默认不走 env 代理)
+        art_code: 公告唯一編號(EventItem.external_id)
+        timeout_s: 請求超時
+        proxy: 顯式代理(預設不走 env 代理)
     """
     if not art_code:
         return ""
@@ -61,7 +61,7 @@ def fetch_announcement_fulltext(
             verify=False,
             headers=headers,
             follow_redirects=True,
-            trust_env=True,  # 走系统代理(env HTTP_PROXY,由 apply_proxy_env 统一设)
+            trust_env=True,  # 走系統代理(env HTTP_PROXY,由 apply_proxy_env 統一設)
             proxy=proxy,
         ) as client:
             resp = client.get(ANN_CONTENT_API_URL, params=params)
@@ -70,12 +70,12 @@ def fetch_announcement_fulltext(
         content = ((data.get("data") or {}).get("notice_content")) or ""
         return str(content).strip()
     except Exception as e:
-        logger.debug(f"公告全文获取失败 art_code={art_code}: {type(e).__name__}: {e!r}")
+        logger.debug(f"公告全文獲取失敗 art_code={art_code}: {type(e).__name__}: {e!r}")
         return ""
 
 
 def get_market_data():
-    """惰性导入,避免模块加载时的循环依赖(便于测试 monkeypatch)。"""
+    """惰性匯入,避免模組載入時的迴圈依賴(便於測試 monkeypatch)。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
     return _g()
 
@@ -98,9 +98,9 @@ class EastMoneyEventsCollector:
         retries: int = 1,
         backoff_s: float = 0.6,
     ):
-        # timeout_s/connect_timeout_s/verify_ssl/proxy/retries/backoff_s 仅为兼容旧调用方签名保留
-        # (DataSource 配置、EventsCollector.COLLECTOR_MAP、EastmoneyEventsProvider 仍按这些参数构造实例);
-        # 取数已改走 marketdata 包,这些参数当前不再被内部逻辑使用。
+        # timeout_s/connect_timeout_s/verify_ssl/proxy/retries/backoff_s 僅為相容舊呼叫方簽名保留
+        # (DataSource 配置、EventsCollector.COLLECTOR_MAP、EastmoneyEventsProvider 仍按這些引數構造例項);
+        # 取數已改走 marketdata 包,這些引數當前不再被內部邏輯使用。
         self.last_error: str | None = None
 
     async def fetch_events(
@@ -116,14 +116,14 @@ class EastMoneyEventsCollector:
         if not symbols_list:
             return []
 
-        # since 语义:md.events 按 since_days 天窗过滤,本方法按 since 精确 datetime 过滤。
-        # 用 since 反推一个足够宽松的 since_days,取回数据后再用原 since 精确重过滤。
+        # since 語義:md.events 按 since_days 天窗過濾,本方法按 since 精確 datetime 過濾。
+        # 用 since 反推一個足夠寬鬆的 since_days,取回資料後再用原 since 精確重過濾。
         if since is not None:
             delta_days = (datetime.now() - since).days
             since_days = max(1, delta_days + 1)
         else:
-            # since=None 时不按时间过滤;用足够大的窗口近似同等效果
-            # (实际结果仍受上游 API page_size 条数限制,不会引入额外老旧数据)。
+            # since=None 時不按時間過濾;用足夠大的視窗近似同等效果
+            # (實際結果仍受上游 API page_size 條數限制,不會引入額外老舊資料)。
             since_days = 3650
 
         md_items = await _asyncio.to_thread(

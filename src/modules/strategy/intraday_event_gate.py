@@ -36,7 +36,7 @@ def _safe_float(v: Any) -> float | None:
         return None
 
 
-# ATR 自适应异动默认倍数:涨跌幅 >= k×ATR% 视为相对个股自身波动的异动。
+# ATR 自適應異動預設倍數:漲跌幅 >= k×ATR% 視為相對個股自身波動的異動。
 DEFAULT_ATR_K = 1.5
 
 
@@ -45,10 +45,10 @@ def adaptive_price_threshold(
     fixed_threshold: float,
     k: float = DEFAULT_ATR_K,
 ) -> float:
-    """返回自适应价格异动阈值 = max(固定阈值, k×ATR%)。
+    """返回自適應價格異動閾值 = max(固定閾值, k×ATR%)。
 
-    ATR% 缺失/非正(None/0/负/异常)时退回固定阈值,保证不丢失原有行为。
-    固定阈值始终作为下限(floor),避免极低波动个股阈值过松。
+    ATR% 缺失/非正(None/0/負/異常)時退回固定閾值,保證不丟失原有行為。
+    固定閾值始終作為下限(floor),避免極低波動個股閾值過鬆。
     """
     fixed = _safe_float(fixed_threshold) or 0.0
     ap = _safe_float(atr_pct)
@@ -63,11 +63,11 @@ def is_abnormal_move(
     k: float = DEFAULT_ATR_K,
     fixed_threshold: float = 0.0,
 ) -> bool:
-    """判断今日涨跌幅相对个股自身波动率是否异常。
+    """判斷今日漲跌幅相對個股自身波動率是否異常。
 
-    规则:|change_pct| >= max(固定阈值, k×ATR%) 即异动。
-    - atr_pct 为 None/0 时回退到 fixed_threshold(保留原有固定阈值行为)。
-    - 任一入参异常一律按"非异动"返回 False(fail-soft,不阻断 agent)。
+    規則:|change_pct| >= max(固定閾值, k×ATR%) 即異動。
+    - atr_pct 為 None/0 時回退到 fixed_threshold(保留原有固定閾值行為)。
+    - 任一入參異常一律按"非異動"返回 False(fail-soft,不阻斷 agent)。
     """
     cp = _safe_float(change_pct)
     if cp is None:

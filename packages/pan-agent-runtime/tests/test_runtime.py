@@ -49,7 +49,7 @@ class AskPolicy:
         return True
 
     async def decide(self, _request, _tool, _call):
-        return ToolPermissionDecision.ask("需要用户确认")
+        return ToolPermissionDecision.ask("需要使用者確認")
 
 
 class DenyPolicy:
@@ -102,8 +102,8 @@ class SearchExtension:
             additional_tools=(
                 ToolSpec(
                     name="tool_search",
-                    title="搜索工具",
-                    description="搜索并加载可用工具。",
+                    title="搜尋工具",
+                    description="搜尋並載入可用工具。",
                     input_schema={
                         "type": "object",
                         "required": ["query"],
@@ -118,7 +118,7 @@ class SearchExtension:
             return None
         self.loaded = True
         return ToolResult.success(
-            summary="已加载查询工具",
+            summary="已載入查詢工具",
             data={"loaded_tools": ["lookup"]},
             sources=[],
             observed_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
@@ -139,7 +139,7 @@ class SearchModel:
                     ToolCall(
                         id="search-1",
                         name="tool_search",
-                        arguments={"query": "查询数值"},
+                        arguments={"query": "查詢數值"},
                     )
                 ]
             )
@@ -163,7 +163,7 @@ def registry(executor):
     result.register(
         ToolSpec(
             name="lookup",
-            title="查询",
+            title="查詢",
             description="read",
             risk=ToolRisk.READ,
             input_schema={"type": "object", "properties": {}},
@@ -178,7 +178,7 @@ def write_registry(executor):
     result.register(
         ToolSpec(
             name="write_note",
-            title="写入备注",
+            title="寫入備註",
             description="write",
             risk=ToolRisk.WRITE,
             input_schema={"type": "object", "properties": {}},
@@ -258,7 +258,7 @@ def test_tool_failure_is_retried_once_and_answer_is_completed():
 def test_tool_result_keeps_the_preceding_call_for_the_next_model_turn():
     async def lookup(_request, _arguments):
         return ToolResult.success(
-            summary="查询完成",
+            summary="查詢完成",
             data={"value": 1},
             sources=[{"name": "test"}],
             observed_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
@@ -296,7 +296,7 @@ def test_required_tool_choice_repairs_a_text_only_turn_without_leaking_text():
         def __init__(self):
             self.turns = iter(
                 [
-                    ModelTurn(content="我已经更新提醒"),
+                    ModelTurn(content="我已經更新提醒"),
                     ModelTurn(
                         tool_calls=[
                             ToolCall(
@@ -347,7 +347,7 @@ def test_required_tool_choice_repairs_a_text_only_turn_without_leaking_text():
     assert result.answer == "提醒已成功更新。"
     assert model.tool_choices == ["required", "required", None]
     assert model.received_messages[1][-1].role == "system"
-    assert "必须调用可用的写入工具" in model.received_messages[1][-1].content
+    assert "必須呼叫可用的寫入工具" in model.received_messages[1][-1].content
     assert [
         event.data.get("token")
         for event in sink.events
@@ -465,7 +465,7 @@ def test_repeated_identical_tool_calls_are_stopped_before_the_run_can_loop_forev
         nonlocal executor_calls
         executor_calls += 1
         return ToolResult.success(
-            summary="查询完成",
+            summary="查詢完成",
             data={"value": 1},
             sources=[],
             observed_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
@@ -529,7 +529,7 @@ def test_resume_approved_call_executes_once_on_a_fresh_runtime_and_completes():
     )
     assert paused.checkpoint is not None
 
-    resumed_model = FixedModel([ModelTurn(content="已写入")])
+    resumed_model = FixedModel([ModelTurn(content="已寫入")])
     result = asyncio.run(
         AgentRuntime(resumed_model, tools, policy=AskPolicy()).resume(
             request(),
@@ -540,7 +540,7 @@ def test_resume_approved_call_executes_once_on_a_fresh_runtime_and_completes():
     )
 
     assert result.status is RunStatus.COMPLETED
-    assert result.answer == "已写入"
+    assert result.answer == "已寫入"
     assert executor_calls == 1
     assert resumed_model.received_messages[0][-1].tool_call_id == "call-1"
 
@@ -565,7 +565,7 @@ def test_resume_rejected_call_does_not_execute_and_returns_rejection_to_the_mode
     )
     assert paused.checkpoint is not None
 
-    resumed_model = FixedModel([ModelTurn(content="无法写入")])
+    resumed_model = FixedModel([ModelTurn(content="無法寫入")])
     result = asyncio.run(
         AgentRuntime(resumed_model, tools, policy=AskPolicy()).resume(
             request(),
@@ -595,7 +595,7 @@ def test_denied_call_does_not_execute_and_the_model_can_return_a_safe_alternativ
     model = FixedModel(
         [
             ModelTurn(tool_calls=[ToolCall(id="call-1", name="write_note")]),
-            ModelTurn(content="我无法执行写入操作。"),
+            ModelTurn(content="我無法執行寫入操作。"),
         ]
     )
 
@@ -657,7 +657,7 @@ def test_resume_executes_decided_call_and_repauses_remaining_approvals():
     async def recording_executor(_request, arguments):
         executed.append(arguments["text"])
         return ToolResult.success(
-            summary=f"已写入 {arguments['text']}",
+            summary=f"已寫入 {arguments['text']}",
             data={},
             sources=[],
             observed_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
@@ -748,7 +748,7 @@ def test_optional_extension_emits_facts_without_changing_model_tools():
         ).run(
             RunRequest(
                 run_id="research-runtime",
-                messages=[{"role": "user", "content": "请查询这个值"}],
+                messages=[{"role": "user", "content": "請查詢這個值"}],
                 limits=RunLimits(max_steps=1),
             ),
             sink,
@@ -775,7 +775,7 @@ def test_extension_selection_cannot_bypass_the_core_policy():
     tools.register(
         ToolSpec(
             name="write_note",
-            title="写入备注",
+            title="寫入備註",
             description="write",
             risk=ToolRisk.WRITE,
             confirmation_required=True,
@@ -800,7 +800,7 @@ def test_extension_selection_cannot_bypass_the_core_policy():
 def test_extension_can_search_virtual_tool_and_load_deferred_registry_tool():
     async def lookup(_request, _arguments):
         return ToolResult.success(
-            summary="查询完成",
+            summary="查詢完成",
             data={"value": 1},
             sources=[],
             observed_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
@@ -810,7 +810,7 @@ def test_extension_can_search_virtual_tool_and_load_deferred_registry_tool():
     tools.register(
         ToolSpec(
             name="lookup",
-            title="查询",
+            title="查詢",
             description="read",
             exposure=__import__("pan_agent").ToolExposure.DEFERRED,
             input_schema={"type": "object", "properties": {}},

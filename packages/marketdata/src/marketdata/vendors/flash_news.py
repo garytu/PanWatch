@@ -1,12 +1,12 @@
-"""快讯(7×24)vendor:cls(财联社)/ sina(新浪直播)/ eastmoney(东财快讯),均市场级、单源。
+"""快訊(7×24)vendor:cls(財聯社)/ sina(新浪直播)/ eastmoney(東財快訊),均市場級、單源。
 
-三家均为未公开文档的私有接口,字段以浏览器抓包常见键名为准,未文档化字段
-(cls 的 level/stock_list、sina 的 ext.stocks)一律用防御性 .get() + 缺失填默认,
-避免上游改字段导致硬失败。**待实抓校准**(沙箱代理拦截,无法验证真实响应结构)。
+三家均為未公開檔案的私有介面,欄位以瀏覽器抓包常見鍵名為準,未檔案化欄位
+(cls 的 level/stock_list、sina 的 ext.stocks)一律用防禦性 .get() + 缺失填預設,
+避免上游改欄位導致硬失敗。**待實抓校準**(沙箱代理攔截,無法驗證真實回應結構)。
 
-时间统一走 datetime.fromtimestamp(ts, tz=timezone.utc) 或防御解析字符串;
-解析失败一律回退到 EPOCH(1970-01-01 UTC),绝不用无参 datetime.now()/time.time(),
-保证离线测试可复现。
+時間統一走 datetime.fromtimestamp(ts, tz=timezone.utc) 或防禦解析字串;
+解析失敗一律回退到 EPOCH(1970-01-01 UTC),絕不用無參 datetime.now()/time.time(),
+保證離線測試可復現。
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ _UA = (
 
 
 def _parse_epoch_seconds(ts) -> datetime:
-    """秒级时间戳(int/float/数字字符串)→ UTC datetime;解析失败回退 EPOCH。"""
+    """秒級時間戳(int/float/數字字串)→ UTC datetime;解析失敗回退 EPOCH。"""
     try:
         return datetime.fromtimestamp(int(ts), tz=timezone.utc)
     except (TypeError, ValueError, OSError):
@@ -37,7 +37,7 @@ def _parse_epoch_seconds(ts) -> datetime:
 
 
 def _parse_datetime_str(s, fmt: str = "%Y-%m-%d %H:%M:%S") -> datetime:
-    """字符串时间(可能是数字戳或格式化串)→ UTC datetime;解析失败回退 EPOCH。"""
+    """字串時間(可能是數字戳或格式化串)→ UTC datetime;解析失敗回退 EPOCH。"""
     if s is None:
         return _EPOCH
     text = str(s).strip()
@@ -56,7 +56,7 @@ def _parse_datetime_str(s, fmt: str = "%Y-%m-%d %H:%M:%S") -> datetime:
 
 
 def _extract_symbol_code(entry) -> str:
-    """防御性地从一个"关联股"元素里取代码:可能是纯字符串,也可能是各种键名的 dict。"""
+    """防禦性地從一個"關聯股"元素裡取程式碼:可能是純字串,也可能是各種鍵名的 dict。"""
     if isinstance(entry, str):
         return entry.strip()
     if isinstance(entry, dict):
@@ -84,13 +84,13 @@ def _extract_symbols(raw) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# cls(财联社)
+# cls(財聯社)
 # ---------------------------------------------------------------------------
 
 _CLS_URL = "https://www.cls.cn/v1/roll/get_roll_list"
 _CLS_HOST = "www.cls.cn"
 
-# cls "level" 字段的常见取值(A/B/C 或数字)→ importance;未识别一律 0。
+# cls "level" 欄位的常見取值(A/B/C 或數字)→ importance;未識別一律 0。
 _CLS_LEVEL_MAP = {"A": 3, "B": 2, "C": 1}
 
 
@@ -138,7 +138,7 @@ class ClsFlashNewsVendor(_FlashNewsVendorBase):
             parse="json",
             retries=2,
             timeout=8,
-            log_label="财联社快讯",
+            log_label="財聯社快訊",
         )
         if not data:
             return []
@@ -172,7 +172,7 @@ class ClsFlashNewsVendor(_FlashNewsVendorBase):
 
 
 # ---------------------------------------------------------------------------
-# sina(新浪财经直播)
+# sina(新浪財經直播)
 # ---------------------------------------------------------------------------
 
 _SINA_URL = "https://zhibo.sina.com.cn/api/zhibo/feed"
@@ -180,7 +180,7 @@ _SINA_HOST = "zhibo.sina.com.cn"
 
 
 def _sina_symbols(item: dict) -> list[str]:
-    """sina 的关联股藏在 ext(JSON 字符串)里的 stocks 字段,防御性解析。"""
+    """sina 的關聯股藏在 ext(JSON 字串)裡的 stocks 欄位,防禦性解析。"""
     ext_raw = item.get("ext")
     if not ext_raw:
         return []
@@ -219,7 +219,7 @@ class SinaFlashNewsVendor(_FlashNewsVendorBase):
             parse="json",
             retries=2,
             timeout=8,
-            log_label="新浪快讯",
+            log_label="新浪快訊",
         )
         if not data:
             return []
@@ -252,7 +252,7 @@ class SinaFlashNewsVendor(_FlashNewsVendorBase):
 
 
 # ---------------------------------------------------------------------------
-# eastmoney(东财快讯)
+# eastmoney(東財快訊)
 # ---------------------------------------------------------------------------
 
 _EM_URL = "https://np-weblist.eastmoney.com/comm/web/getFastNewsList"
@@ -271,7 +271,7 @@ class EastmoneyFlashNewsVendor(_FlashNewsVendorBase):
             "fastColumn": "102",
             "sortEnd": "",
             "pageSize": limit,
-            # 固定串占位(非随机/非时间戳),避免破坏离线测试可复现性。
+            # 固定串佔位(非隨機/非時間戳),避免破壞離線測試可復現性。
             "req_trace": "marketdata",
         }
         headers = {"User-Agent": _UA, "Referer": "https://kuaixun.eastmoney.com/"}
@@ -284,7 +284,7 @@ class EastmoneyFlashNewsVendor(_FlashNewsVendorBase):
             parse="json",
             retries=2,
             timeout=8,
-            log_label="东财快讯",
+            log_label="東財快訊",
         )
         if not data:
             return []
