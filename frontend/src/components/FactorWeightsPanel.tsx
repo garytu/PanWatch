@@ -4,11 +4,11 @@ import { factorsApi, type FactorWeight } from '@panwatch/api'
 import { Switch } from '@panwatch/base-ui/components/ui/switch'
 
 const FACTOR_LABELS: Record<string, string> = {
-  alpha_score: '选股α',
+  alpha_score: '選股α',
   catalyst_score: '催化',
-  quality_score: '计划质量',
-  risk_penalty: '风险',
-  crowd_penalty: '拥挤度',
+  quality_score: '計劃質量',
+  risk_penalty: '風險',
+  crowd_penalty: '擁擠度',
 }
 
 const MARKET_LABELS: Record<string, string> = {
@@ -43,7 +43,7 @@ export default function FactorWeightsPanel() {
       const res = await factorsApi.list()
       setItems(res.items || [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(e instanceof Error ? e.message : '載入失敗')
       setItems([])
     } finally {
       setLoading(false)
@@ -72,7 +72,7 @@ export default function FactorWeightsPanel() {
         await factorsApi.update(item.factor_code, item.market, patch)
         await load()
       } catch (e) {
-        setError(e instanceof Error ? e.message : '更新失败')
+        setError(e instanceof Error ? e.message : '更新失敗')
       } finally {
         setSaving(null)
       }
@@ -86,10 +86,10 @@ export default function FactorWeightsPanel() {
         <div>
           <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground flex items-center gap-1.5">
             <Scale className="w-3.5 h-3.5 text-muted-foreground" />
-            因子权重自校准
+            因子權重自校準
           </h3>
           <p className="text-[11px] text-muted-foreground mt-1">
-            每因子权重由 IC/IR 每日自动标定;锁定或关闭自动标定可手动接管(仅供参考)。
+            每因子權重由 IC/IR 每日自動標定;鎖定或關閉自動標定可手動接管(僅供參考)。
           </p>
         </div>
       </div>
@@ -103,20 +103,20 @@ export default function FactorWeightsPanel() {
           <span className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
         </div>
       ) : sortedItems.length === 0 ? (
-        <div className="text-[12px] text-muted-foreground text-center py-6">暂无因子权重数据</div>
+        <div className="text-[12px] text-muted-foreground text-center py-6">暫無因子權重資料</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
             <thead>
               <tr className="text-left text-[11px] text-muted-foreground border-b border-border/50">
                 <th className="py-2 pr-3 font-medium">因子</th>
-                <th className="py-2 pr-3 font-medium">市场</th>
-                <th className="py-2 pr-3 font-medium text-right">权重</th>
+                <th className="py-2 pr-3 font-medium">市場</th>
+                <th className="py-2 pr-3 font-medium text-right">權重</th>
                 <th className="py-2 pr-3 font-medium text-right">最近IC</th>
                 <th className="py-2 pr-3 font-medium text-right">最近IR</th>
-                <th className="py-2 pr-3 font-medium text-right">样本</th>
-                <th className="py-2 pr-3 font-medium text-center">锁定</th>
-                <th className="py-2 font-medium text-center">自动标定</th>
+                <th className="py-2 pr-3 font-medium text-right">樣本</th>
+                <th className="py-2 pr-3 font-medium text-center">鎖定</th>
+                <th className="py-2 font-medium text-center">自動標定</th>
               </tr>
             </thead>
             <tbody>

@@ -1,7 +1,7 @@
-"""组合基准/归因结果缓存:按持仓指纹缓存,持仓变动即失效,空结果不缓存。
+"""組合基準/歸因結果快取:按持倉指紋快取,持倉變動即失效,空結果不快取。
 
-重建全持仓 NAV(逐只拉 K 线)很贵,首页又频繁请求基准/归因。这里按持仓指纹缓存结果,
-命中时跳过行情/K 线;持仓变化指纹即变 → 重算;失败/空结果不缓存,避免冻住瞬时故障。
+重建全持倉 NAV(逐只拉 K 線)很貴,首頁又頻繁請求基準/歸因。這裡按持倉指紋快取結果,
+命中時跳過行情/K 線;持倉變化指紋即變 → 重算;失敗/空結果不快取,避免凍住瞬時故障。
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def _add_position(db, symbol: str, qty: float):
 
 
 def test_benchmark_result_cached(db, monkeypatch):
-    """同一持仓的基准请求只计算一次,第二次命中缓存。"""
+    """同一持倉的基準請求只計算一次,第二次命中快取。"""
     _add_position(db, "600519", 100)
     calls = {"n": 0}
 
@@ -63,12 +63,12 @@ def test_benchmark_result_cached(db, monkeypatch):
 
     r1 = accounts_api.portfolio_benchmark(days=60, benchmark="000300", db=db)
     r2 = accounts_api.portfolio_benchmark(days=60, benchmark="000300", db=db)
-    assert calls["n"] == 1, f"第二次应命中缓存,实际计算 {calls['n']} 次"
+    assert calls["n"] == 1, f"第二次應命中快取,實際計算 {calls['n']} 次"
     assert r1 == r2 == {"excess_return": 1.23}
 
 
 def test_benchmark_empty_not_cached(db, monkeypatch):
-    """数据不足(build 返回空)不缓存,下次仍会重算。"""
+    """資料不足(build 返回空)不快取,下次仍會重算。"""
     _add_position(db, "600519", 100)
     calls = {"n": 0}
 
@@ -81,12 +81,12 @@ def test_benchmark_empty_not_cached(db, monkeypatch):
 
     r1 = accounts_api.portfolio_benchmark(db=db)
     accounts_api.portfolio_benchmark(db=db)
-    assert calls["n"] == 2, "空结果不应缓存,应重算"
+    assert calls["n"] == 2, "空結果不應快取,應重算"
     assert r1.get("empty") is True
 
 
 def test_benchmark_cache_invalidates_on_holdings_change(db, monkeypatch):
-    """持仓变化(指纹变)后应重新计算,不返回旧缓存。"""
+    """持倉變化(指紋變)後應重新計算,不返回舊快取。"""
     _add_position(db, "600519", 100)
     calls = {"n": 0}
 
@@ -97,14 +97,14 @@ def test_benchmark_cache_invalidates_on_holdings_change(db, monkeypatch):
     monkeypatch.setattr(accounts_api, "_gather_holdings", lambda d: list(_HOLDINGS))
     monkeypatch.setattr(pb, "build_portfolio_benchmark", fake_build)
 
-    accounts_api.portfolio_benchmark(db=db)  # 计算 1,写缓存
-    _add_position(db, "000001", 50)  # 持仓变化 → 指纹变
-    accounts_api.portfolio_benchmark(db=db)  # 应重算
-    assert calls["n"] == 2, "持仓变化后缓存应失效"
+    accounts_api.portfolio_benchmark(db=db)  # 計算 1,寫快取
+    _add_position(db, "000001", 50)  # 持倉變化 → 指紋變
+    accounts_api.portfolio_benchmark(db=db)  # 應重算
+    assert calls["n"] == 2, "持倉變化後快取應失效"
 
 
 def test_attribution_result_cached(db, monkeypatch):
-    """归因结果同样按持仓指纹缓存。"""
+    """歸因結果同樣按持倉指紋快取。"""
     _add_position(db, "600519", 100)
     calls = {"n": 0}
 
@@ -117,5 +117,5 @@ def test_attribution_result_cached(db, monkeypatch):
 
     r1 = accounts_api.portfolio_attribution(db=db)
     r2 = accounts_api.portfolio_attribution(db=db)
-    assert calls["n"] == 1, f"第二次应命中缓存,实际 {calls['n']} 次"
+    assert calls["n"] == 1, f"第二次應命中快取,實際 {calls['n']} 次"
     assert r1 == r2

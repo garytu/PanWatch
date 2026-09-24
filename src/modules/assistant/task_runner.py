@@ -39,10 +39,10 @@ ANSWER_TOKEN_BATCH_CHARS = 128
 ANSWER_TOKEN_BATCH_INTERVAL_SECONDS = 0.1
 
 _ERROR_MESSAGES = {
-    "run_timeout": "助手响应超时，请稍后重试。",
-    "empty_answer": "助手暂时不可用，请稍后重试。",
-    "transport_failed": "助手任务执行失败，请稍后重试。",
-    "worker_cancelled": "助手任务已停止。",
+    "run_timeout": "助手回應超時，請稍後重試。",
+    "empty_answer": "助手暫時不可用，請稍後重試。",
+    "transport_failed": "助手任務執行失敗，請稍後重試。",
+    "worker_cancelled": "助手任務已停止。",
 }
 
 
@@ -180,7 +180,7 @@ class AssistantTaskRunner:
                     error_code="worker_restarted",
                     event_data={
                         "code": "worker_restarted",
-                        "message": "任务所在 worker 已重启，任务未能从安全检查点恢复。",
+                        "message": "任務所在 worker 已重啟，任務未能從安全檢查點恢復。",
                     },
                 )
         finally:

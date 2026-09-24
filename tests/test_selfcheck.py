@@ -1,4 +1,4 @@
-"""系统自检:classify_hint(中文修复提示库)+ run_selfcheck(并发聚合)。"""
+"""系統自檢:classify_hint(中文修復提示庫)+ run_selfcheck(併發聚合)。"""
 
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ def _mem_db():
     return sessionmaker(bind=engine)()
 
 
-# --------------------------- classify_hint(纯函数)---------------------------
+# --------------------------- classify_hint(純函式)---------------------------
 
 def test_hint_datasource_proxy():
-    """CN 数据源连接类错误 → 提示代理 / trust_env。"""
+    """CN 資料來源連線類錯誤 → 提示代理 / trust_env。"""
     from src.modules.administration.selfcheck import classify_hint
 
     h = classify_hint("datasource", "Server disconnected without sending a response")
@@ -28,19 +28,19 @@ def test_hint_datasource_proxy():
 
 
 def test_hint_db_locked():
-    """database is locked → 提示并发 / 锁。"""
+    """database is locked → 提示併發 / 鎖。"""
     from src.modules.administration.selfcheck import classify_hint
 
     h = classify_hint("datasource", "sqlite3.OperationalError: database is locked")
-    assert "锁" in h or "并发" in h
+    assert "鎖" in h or "併發" in h
 
 
 def test_hint_ai_auth():
-    """AI 401 → 提示 API Key / 鉴权。"""
+    """AI 401 → 提示 API Key / 鑑權。"""
     from src.modules.administration.selfcheck import classify_hint
 
     h = classify_hint("ai", "Error code: 401 - invalid_api_key")
-    assert "Key" in h or "key" in h or "鉴权" in h
+    assert "Key" in h or "key" in h or "鑑權" in h
 
 
 def test_hint_ai_model_not_found():
@@ -52,7 +52,7 @@ def test_hint_ai_model_not_found():
 
 
 def test_hint_notify_invalid():
-    """通知 URI 无效 → 提示配置 / 格式。"""
+    """通知 URI 無效 → 提示配置 / 格式。"""
     from src.modules.administration.selfcheck import classify_hint
 
     h = classify_hint("notify", "Unsupported URL or invalid scheme")
@@ -60,25 +60,25 @@ def test_hint_notify_invalid():
 
 
 def test_hint_system_disk():
-    """磁盘类错误 → 提示空间/清理。"""
+    """磁碟類錯誤 → 提示空間/清理。"""
     from src.modules.administration.selfcheck import classify_hint
 
     h = classify_hint("system", "disk space low: only 50MB free")
-    assert "磁盘" in h or "空间" in h
+    assert "磁碟" in h or "空間" in h
 
 
 def test_hint_system_scheduler():
-    """调度器停止 → 提示重启。"""
+    """排程器停止 → 提示重啟。"""
     from src.modules.administration.selfcheck import classify_hint
 
     h = classify_hint("system", "scheduler stopped")
-    assert "调度" in h
+    assert "排程" in h
 
 
-# --------------------------- 基础项探测(DB/磁盘/调度)---------------------------
+# --------------------------- 基礎項探測(DB/磁碟/排程)---------------------------
 
 def test_probe_db_ok():
-    """DB 探测对真实库执行 SELECT 1,应通。"""
+    """DB 探測對真實庫執行 SELECT 1,應通。"""
     from src.modules.administration.selfcheck import probe_db
 
     r = asyncio.run(probe_db())
@@ -87,17 +87,17 @@ def test_probe_db_ok():
 
 
 def test_probe_disk_ok():
-    """磁盘探测返回用量,正常机器应通且带 note。"""
+    """磁碟探測返回用量,正常機器應通且帶 note。"""
     from src.modules.administration.selfcheck import probe_disk
 
     r = asyncio.run(probe_disk())
     assert r["key"] == "sys:disk"
     assert r["status"] in ("ok", "slow", "fail")
-    assert r["note"]  # 显示可用/总量
+    assert r["note"]  # 顯示可用/總量
 
 
 def test_probe_scheduler_empty_registry_ok():
-    """无注册调度器(如 CLI/未启动)→ ok 但带说明,不误报断。"""
+    """無註冊排程器(如 CLI/未啟動)→ ok 但帶說明,不誤報斷。"""
     from src.platform.scheduling import scheduler_registry
     from src.modules.administration.selfcheck import probe_scheduler
 
@@ -108,7 +108,7 @@ def test_probe_scheduler_empty_registry_ok():
 
 
 def test_probe_scheduler_running():
-    """注册了运行中的调度器 → ok,note 含任务数。"""
+    """註冊了執行中的排程器 → ok,note 含任務數。"""
     from src.platform.scheduling import scheduler_registry
     from src.modules.administration.selfcheck import probe_scheduler
 
@@ -129,7 +129,7 @@ def test_probe_scheduler_running():
 
 
 def test_run_selfcheck_always_includes_system_items():
-    """空库也含 3 个系统基础项(数据库/磁盘/调度)。"""
+    """空庫也含 3 個系統基礎項(資料庫/磁碟/排程)。"""
     from src.modules.administration.selfcheck import run_selfcheck
 
     db = _mem_db()
@@ -146,13 +146,13 @@ def test_run_selfcheck_always_includes_system_items():
 # --------------------------- run_selfcheck(聚合)---------------------------
 
 def test_run_selfcheck_aggregates(monkeypatch):
-    """枚举启用项 → 并发 probe → 聚合 summary(total/ok/slow/fail)。"""
+    """列舉啟用項 → 併發 probe → 聚合 summary(total/ok/slow/fail)。"""
     from src.modules.administration import selfcheck
     from src.platform.persistence.models import AIModel, AIService, DataSource, NotifyChannel
 
     db = _mem_db()
     try:
-        db.add(DataSource(name="东财", type="quote", provider="eastmoney", config={}, enabled=True))
+        db.add(DataSource(name="東財", type="quote", provider="eastmoney", config={}, enabled=True))
         db.add(NotifyChannel(name="TG", type="telegram", config={}, enabled=True))
         svc = AIService(name="deepseek", base_url="https://x", api_key="k")
         db.add(svc)
@@ -166,7 +166,7 @@ def test_run_selfcheck_aggregates(monkeypatch):
 
         async def fake_ai(model, service):
             return {"category": "ai", "key": f"ai:{model.id}", "name": model.name,
-                    "status": "fail", "latency_ms": 20, "error": "401", "hint": "key 错"}
+                    "status": "fail", "latency_ms": 20, "error": "401", "hint": "key 錯"}
 
         async def fake_nc(channel, send=False):
             return {"category": "notify", "key": f"nc:{channel.id}", "name": channel.name,
@@ -184,7 +184,7 @@ def test_run_selfcheck_aggregates(monkeypatch):
 
 
 def test_run_selfcheck_empty_db():
-    """无启用项 → 空看板,不报错。"""
+    """無啟用項 → 空看板,不報錯。"""
     from src.modules.administration.selfcheck import run_selfcheck
 
     db = _mem_db()
@@ -197,13 +197,13 @@ def test_run_selfcheck_empty_db():
 
 
 def test_list_selfcheck_items_no_probe(monkeypatch):
-    """list 模式只枚举待检身份(category/key/name),不跑探测。"""
+    """list 模式只列舉待檢身份(category/key/name),不跑探測。"""
     from src.modules.administration import selfcheck
     from src.platform.persistence.models import DataSource, NotifyChannel
 
     db = _mem_db()
     try:
-        db.add(DataSource(name="东财", type="quote", provider="eastmoney", config={}, enabled=True))
+        db.add(DataSource(name="東財", type="quote", provider="eastmoney", config={}, enabled=True))
         db.add(NotifyChannel(name="TG", type="telegram", config={}, enabled=True))
         db.commit()
 
@@ -219,13 +219,13 @@ def test_list_selfcheck_items_no_probe(monkeypatch):
         items = selfcheck.list_selfcheck_items(db=db, include_system=False)
         assert {i["key"] for i in items} == {"ds:1", "nc:1"}
         assert all({"category", "key", "name", "group"} <= set(i) for i in items)
-        assert called["n"] == 0  # 没触发任何探测
+        assert called["n"] == 0  # 沒觸發任何探測
     finally:
         db.close()
 
 
 def test_list_items_ai_has_service_group():
-    """AI 项带 group=服务商名(供前端「服务商 → 模型」层级)。"""
+    """AI 項帶 group=服務商名(供前端「服務商 → 模型」層級)。"""
     from src.modules.administration.selfcheck import list_selfcheck_items
     from src.platform.persistence.models import AIModel, AIService
 
@@ -246,13 +246,13 @@ def test_list_items_ai_has_service_group():
 
 
 def test_run_selfcheck_keys_filter(monkeypatch):
-    """keys 过滤:只探测指定 key 的项(供前端逐项更新进度)。"""
+    """keys 過濾:只探測指定 key 的項(供前端逐項更新進度)。"""
     from src.modules.administration import selfcheck
     from src.platform.persistence.models import DataSource, NotifyChannel
 
     db = _mem_db()
     try:
-        db.add(DataSource(name="东财", type="quote", provider="eastmoney", config={}, enabled=True))
+        db.add(DataSource(name="東財", type="quote", provider="eastmoney", config={}, enabled=True))
         db.add(NotifyChannel(name="TG", type="telegram", config={}, enabled=True))
         db.commit()
 
@@ -274,10 +274,10 @@ def test_run_selfcheck_keys_filter(monkeypatch):
         db.close()
 
 
-# --------------------------- 端点 ---------------------------
+# --------------------------- 端點 ---------------------------
 
 def test_selfcheck_endpoint(monkeypatch):
-    """端点调用 run_selfcheck 并原样返回看板。"""
+    """端點呼叫 run_selfcheck 並原樣返回看板。"""
     from src.modules.administration.api import health
 
     async def fake_run(*, notify_send=False, keys=None):
@@ -285,14 +285,14 @@ def test_selfcheck_endpoint(monkeypatch):
                 "notify_send": notify_send}
 
     monkeypatch.setattr(health, "run_selfcheck", fake_run)
-    # 直接调用路由函数需显式传参(Query 默认值仅在 HTTP 请求时解析)
+    # 直接呼叫路由函式需顯式傳參(Query 預設值僅在 HTTP 請求時解析)
     res = asyncio.run(health.selfcheck(notify_send=True, list_only=False, keys=None))
     assert res["summary"]["total"] == 0
     assert res["notify_send"] is True
 
 
 def test_selfcheck_route_mounted():
-    """/api/health/selfcheck 已挂载到 app。"""
+    """/api/health/selfcheck 已掛載到 app。"""
     from src.bootstrap.application import app
 
     assert "/api/health/selfcheck" in set(app.openapi().get("paths", {}).keys())
@@ -301,24 +301,24 @@ def test_selfcheck_route_mounted():
 # --------------------------- CLI doctor ---------------------------
 
 def test_doctor_print_report(capsys):
-    """make doctor 的报告:分组打印 + 失败项带错误与中文建议。"""
+    """make doctor 的報告:分組列印 + 失敗項帶錯誤與中文建議。"""
     from src.modules.administration.doctor import _print_report
 
     res = {
         "summary": {"total": 2, "ok": 1, "slow": 0, "fail": 1},
         "items": [
-            {"category": "system", "key": "sys:db", "name": "数据库", "group": None,
+            {"category": "system", "key": "sys:db", "name": "資料庫", "group": None,
              "status": "ok", "latency_ms": 5, "error": None, "hint": "", "note": None},
-            {"category": "datasource", "key": "ds:1", "name": "东财", "group": None,
-             "status": "fail", "latency_ms": 0, "error": "timeout", "hint": "检查代理设置", "note": None},
+            {"category": "datasource", "key": "ds:1", "name": "東財", "group": None,
+             "status": "fail", "latency_ms": 0, "error": "timeout", "hint": "檢查代理設定", "note": None},
         ],
     }
     _print_report(res)
     out = capsys.readouterr().out
-    assert "系统自检" in out
-    assert "【系统】" in out and "【数据源】" in out
-    assert "数据库" in out and "东财" in out
-    assert "检查代理设置" in out and "❌" in out
+    assert "系統自檢" in out
+    assert "【系統】" in out and "【資料來源】" in out
+    assert "資料庫" in out and "東財" in out
+    assert "檢查代理設定" in out and "❌" in out
 
 
-# 已移除:自检结果的定时告警 selfcheck_and_notify(用户要求自检不发结果通知);弹窗里「含真实发送通知」开关保留。
+# 已移除:自檢結果的定時告警 selfcheck_and_notify(使用者要求自檢不髮結果通知);彈跳視窗裡「含真實傳送通知」開關保留。

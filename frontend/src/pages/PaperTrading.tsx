@@ -16,10 +16,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useToast } from '@panwatch/base-ui/components/ui/toast'
 
 const EXIT_REASON_MAP: Record<string, string> = {
-  stop_loss: '止损',
-  target_price: '止盈',
-  signal_reversal: '信号反转',
-  manual: '手动平仓',
+  stop_loss: '停損',
+  target_price: '停利',
+  signal_reversal: '訊號反轉',
+  manual: '手動平倉',
 }
 
 function formatCurrency(v: number) {
@@ -40,7 +40,7 @@ function PnlPctText({ value }: { value: number }) {
 
 function EquityChart({ data }: { data: EquityCurvePoint[] }) {
   if (data.length < 2) {
-    return <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暂无足够数据绘制曲线</div>
+    return <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暫無足夠資料繪製曲線</div>
   }
 
   const width = 600
@@ -85,7 +85,7 @@ function EquityChart({ data }: { data: EquityCurvePoint[] }) {
         <g key={i}>
           <line x1={pad.left} x2={width - pad.right} y1={t.y} y2={t.y} stroke="hsl(var(--border))" strokeWidth={0.5} />
           <text x={pad.left - 6} y={t.y + 4} textAnchor="end" fill="hsl(var(--muted-foreground))" fontSize={10}>
-            {(t.v / 10000).toFixed(1)}万
+            {(t.v / 10000).toFixed(1)}萬
           </text>
         </g>
       ))}
@@ -116,16 +116,16 @@ export default function PaperTradingPage() {
   const [tradesPage, setTradesPage] = useState(0)
   const tradesPageSize = 20
 
-  // 市场视图（分段单选，切换即按该市场口径刷新统计）
+  // 市場檢視（分段單選，切換即按該市場口徑重新整理統計）
   const [marketView, setMarketView] = useState<MarketView>('ALL')
 
-  // 资金配置
+  // 資金配置
   const [configOpen, setConfigOpen] = useState(false)
   const [cfgTotal, setCfgTotal] = useState('')
   const [cfgRatios, setCfgRatios] = useState<{ CN: string; HK: string; US: string }>({ CN: '', HK: '', US: '' })
   const [cfgSaving, setCfgSaving] = useState(false)
 
-  // 通知设置
+  // 通知設定
   const [tradesOpen, setTradesOpen] = useState(false)
   const [notifyOpen, setNotifyOpen] = useState(false)
   const [notifyEnabled, setNotifyEnabled] = useState(false)
@@ -154,7 +154,7 @@ export default function PaperTradingPage() {
       setEquityCurve(metrics.equity_curve)
       setStrategyPerf(metrics.strategy_performance || [])
     } catch {
-      toast('加载失败', 'error')
+      toast('載入失敗', 'error')
     } finally {
       setLoading(false)
     }
@@ -167,20 +167,20 @@ export default function PaperTradingPage() {
     try {
       const res = await paperTradingApi.toggleAccount(!account.enabled)
       setAccount(res)
-      toast(res.enabled ? '模拟盘已启动' : '模拟盘已暂停', 'success')
+      toast(res.enabled ? '模擬交易已啟動' : '模擬交易已暫停', 'success')
     } catch {
-      toast('操作失败', 'error')
+      toast('操作失敗', 'error')
     }
   }
 
   const handleReset = async () => {
-    if (!confirm('确定重置模拟盘？所有持仓和交易记录将被清空。')) return
+    if (!confirm('確定重置模擬交易？所有持倉和交易記錄將被清空。')) return
     try {
       await paperTradingApi.resetAccount()
-      toast('模拟盘已重置', 'success')
+      toast('模擬交易已重置', 'success')
       loadData()
     } catch {
-      toast('重置失败', 'error')
+      toast('重置失敗', 'error')
     }
   }
 
@@ -188,10 +188,10 @@ export default function PaperTradingPage() {
     setScanning(true)
     try {
       const res = await paperTradingApi.scan()
-      toast(`扫描完成: 建仓 ${res.opened ?? 0} 笔, 平仓 ${res.closed ?? 0} 笔`, 'success')
+      toast(`掃描完成: 建倉 ${res.opened ?? 0} 筆, 平倉 ${res.closed ?? 0} 筆`, 'success')
       loadData()
     } catch {
-      toast('扫描失败', 'error')
+      toast('掃描失敗', 'error')
     } finally {
       setScanning(false)
     }
@@ -200,17 +200,17 @@ export default function PaperTradingPage() {
   const handleClosePosition = async (id: number) => {
     try {
       await paperTradingApi.closePosition(id)
-      toast('平仓成功', 'success')
+      toast('平倉成功', 'success')
       loadData()
     } catch {
-      toast('平仓失败', 'error')
+      toast('平倉失敗', 'error')
     }
   }
 
   const handleOpenConfig = async () => {
     setConfigOpen(true)
     try {
-      // 以"全部"口径取总资金与各市场比例
+      // 以"全部"口徑取總資金與各市場比例
       const acc = await paperTradingApi.getAccount()
       setCfgTotal(String(Math.round(acc.initial_capital)))
       const a = acc.market_allocations || {}
@@ -220,7 +220,7 @@ export default function PaperTradingPage() {
         US: String(Math.round((a.US ?? 0) * 100)),
       })
     } catch {
-      toast('加载配置失败', 'error')
+      toast('載入配置失敗', 'error')
     }
   }
 
@@ -230,11 +230,11 @@ export default function PaperTradingPage() {
     const hk = Number(cfgRatios.HK) || 0
     const us = Number(cfgRatios.US) || 0
     if (!(total > 0)) {
-      toast('总资金需大于 0', 'error')
+      toast('總資金需大於 0', 'error')
       return
     }
     if (cn + hk + us > 100) {
-      toast('比例合计不能超过 100%', 'error')
+      toast('比例合計不能超過 100%', 'error')
       return
     }
     setCfgSaving(true)
@@ -243,11 +243,11 @@ export default function PaperTradingPage() {
         initial_capital: total,
         market_allocations: { CN: cn / 100, HK: hk / 100, US: us / 100 },
       })
-      toast('资金配置已保存', 'success')
+      toast('資金配置已儲存', 'success')
       setConfigOpen(false)
       loadData()
     } catch {
-      toast('保存失败', 'error')
+      toast('儲存失敗', 'error')
     } finally {
       setCfgSaving(false)
     }
@@ -267,7 +267,7 @@ export default function PaperTradingPage() {
         : new Set<number>()
       setSelectedChannelIds(ids)
     } catch {
-      toast('加载通知配置失败', 'error')
+      toast('載入通知配置失敗', 'error')
     }
   }
 
@@ -286,10 +286,10 @@ export default function PaperTradingPage() {
         pt_notify_premarket: notifyPremarket ? 'true' : 'false',
         pt_notify_summary: notifySummary ? 'true' : 'false',
       })
-      toast('通知配置已保存', 'success')
+      toast('通知配置已儲存', 'success')
       setNotifyOpen(false)
     } catch {
-      toast('保存失败', 'error')
+      toast('儲存失敗', 'error')
     } finally {
       setNotifySaving(false)
     }
@@ -299,9 +299,9 @@ export default function PaperTradingPage() {
     setNotifyTesting(true)
     try {
       await paperTradingApi.testNotify()
-      toast('测试通知已发送', 'success')
+      toast('測試通知已傳送', 'success')
     } catch {
-      toast('测试通知发送失败', 'error')
+      toast('測試通知傳送失敗', 'error')
     } finally {
       setNotifyTesting(false)
     }
@@ -327,10 +327,10 @@ export default function PaperTradingPage() {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shrink-0">
             <Activity className="w-4 h-4 text-white" />
           </div>
-          <h1 className="text-lg font-bold">模拟盘</h1>
+          <h1 className="text-lg font-bold">模擬交易</h1>
           {account && (
             <span className={`text-xs px-2 py-0.5 rounded-full ${account.enabled ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-              {account.enabled ? '运行中' : '已暂停'}
+              {account.enabled ? '執行中' : '已暫停'}
             </span>
           )}
         </div>
@@ -338,7 +338,7 @@ export default function PaperTradingPage() {
           {tradesTotal > 0 && (
             <Button variant="outline" size="sm" className="h-8" onClick={() => setTradesOpen(true)}>
               <BarChart3 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline ml-1">平仓记录 ({tradesTotal})</span>
+              <span className="hidden sm:inline ml-1">平倉記錄 ({tradesTotal})</span>
               <span className="sm:hidden ml-1">{tradesTotal}</span>
             </Button>
           )}
@@ -348,16 +348,16 @@ export default function PaperTradingPage() {
           </Button>
           <Button variant="outline" size="sm" className="h-8" onClick={handleScan} disabled={scanning}>
             <Play className="w-3.5 h-3.5 mr-1" />
-            <span className="hidden sm:inline">{scanning ? '扫描中...' : '立即扫描'}</span>
-            <span className="sm:hidden">{scanning ? '扫描中' : '扫描'}</span>
+            <span className="hidden sm:inline">{scanning ? '掃描中...' : '立即掃描'}</span>
+            <span className="sm:hidden">{scanning ? '掃描中' : '掃描'}</span>
           </Button>
           <Button variant="outline" size="sm" className="h-8" onClick={loadData} disabled={loading}>
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline ml-1">刷新</span>
+            <span className="hidden sm:inline ml-1">重新整理</span>
           </Button>
           <Button variant="outline" size="sm" className="h-8" onClick={handleToggle}>
             <Power className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline ml-1">{account?.enabled ? '暂停' : '启动'}</span>
+            <span className="hidden sm:inline ml-1">{account?.enabled ? '暫停' : '啟動'}</span>
           </Button>
           <Button variant="outline" size="sm" className="h-8 text-destructive hover:text-destructive" onClick={handleReset}>
             <RotateCcw className="w-3.5 h-3.5" />
@@ -366,11 +366,11 @@ export default function PaperTradingPage() {
         </div>
       </div>
 
-      {/* Market View Filter + 资金配置 */}
+      {/* Market View Filter + 資金配置 */}
       {account && (
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground text-xs">交易市场:</span>
+            <span className="text-muted-foreground text-xs">交易市場:</span>
             {(['ALL', 'CN', 'HK', 'US'] as const).map(m => {
               const label = m === 'ALL' ? '全部' : m === 'CN' ? 'A股' : m === 'HK' ? '港股' : '美股'
               const active = marketView === m
@@ -395,7 +395,7 @@ export default function PaperTradingPage() {
           </div>
           <Button variant="outline" size="sm" className="h-8" onClick={handleOpenConfig}>
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline ml-1">资金配置</span>
+            <span className="hidden sm:inline ml-1">資金配置</span>
           </Button>
         </div>
       )}
@@ -406,36 +406,36 @@ export default function PaperTradingPage() {
           <div className="card p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
               <Wallet className="w-3.5 h-3.5" />
-              总资产
+              總資產
             </div>
             <div className="text-lg font-bold">{formatCurrency(account.total_equity)}</div>
           </div>
           <div className="card p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
               {account.total_pnl >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-              总收益
+              總收益
             </div>
             <div className="text-lg font-bold"><PnlText value={account.total_pnl} /></div>
           </div>
           <div className="card p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
               <Trophy className="w-3.5 h-3.5" />
-              胜率
+              勝率
             </div>
             <div className="text-lg font-bold">{account.win_rate.toFixed(1)}%</div>
-            <div className="text-xs text-muted-foreground">{account.winning_trades}/{account.total_trades} 笔</div>
+            <div className="text-xs text-muted-foreground">{account.winning_trades}/{account.total_trades} 筆</div>
           </div>
           <div className="card p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
               <BarChart3 className="w-3.5 h-3.5" />
-              最大回撤
+              最大回檔
             </div>
             <div className="text-lg font-bold text-emerald-500">{account.max_drawdown_pct.toFixed(2)}%</div>
           </div>
           <div className="card p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
               <Wallet className="w-3.5 h-3.5" />
-              可用资金
+              可用資金
             </div>
             <div className="text-lg font-bold">{formatCurrency(account.current_capital)}</div>
           </div>
@@ -444,26 +444,26 @@ export default function PaperTradingPage() {
 
       {/* Equity Curve */}
       <div className="card p-4">
-        <h2 className="text-sm font-semibold mb-3">收益曲线</h2>
+        <h2 className="text-sm font-semibold mb-3">收益曲線</h2>
         <EquityChart data={equityCurve} />
       </div>
 
       {/* Strategy Performance */}
       {strategyPerf.length > 0 && (
         <div className="card p-4">
-          <h2 className="text-sm font-semibold mb-3">策略绩效</h2>
+          <h2 className="text-sm font-semibold mb-3">策略績效</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground text-xs">
                   <th className="text-left py-2 pr-3">策略</th>
-                  <th className="text-right py-2 px-2">已平仓</th>
-                  <th className="text-right py-2 px-2">胜率</th>
-                  <th className="text-right py-2 px-2">已实现盈亏</th>
-                  <th className="text-right py-2 px-2">平均盈亏%</th>
-                  <th className="text-right py-2 px-2">平均持仓天数</th>
-                  <th className="text-right py-2 px-2">持仓中</th>
-                  <th className="text-right py-2 pl-2">浮动盈亏</th>
+                  <th className="text-right py-2 px-2">已平倉</th>
+                  <th className="text-right py-2 px-2">勝率</th>
+                  <th className="text-right py-2 px-2">已實現損益</th>
+                  <th className="text-right py-2 px-2">平均損益%</th>
+                  <th className="text-right py-2 px-2">平均持倉天數</th>
+                  <th className="text-right py-2 px-2">持倉中</th>
+                  <th className="text-right py-2 pl-2">未實現損益</th>
                 </tr>
               </thead>
               <tbody>
@@ -495,22 +495,22 @@ export default function PaperTradingPage() {
 
       {/* Open Positions */}
       <div className="card p-4">
-        <h2 className="text-sm font-semibold mb-3">当前持仓 ({positions.length})</h2>
+        <h2 className="text-sm font-semibold mb-3">當前持倉 ({positions.length})</h2>
         {positions.length === 0 ? (
-          <div className="text-center text-muted-foreground text-sm py-8">暂无持仓</div>
+          <div className="text-center text-muted-foreground text-sm py-8">暫無持倉</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-muted-foreground text-xs">
                   <th className="text-left py-2 pr-3">股票</th>
-                  <th className="text-right py-2 px-2">入场价</th>
-                  <th className="text-right py-2 px-2">现价</th>
-                  <th className="text-right py-2 px-2">浮动盈亏</th>
-                  <th className="text-right py-2 px-2">止损</th>
-                  <th className="text-right py-2 px-2">止盈</th>
+                  <th className="text-right py-2 px-2">入場價</th>
+                  <th className="text-right py-2 px-2">現價</th>
+                  <th className="text-right py-2 px-2">未實現損益</th>
+                  <th className="text-right py-2 px-2">停損</th>
+                  <th className="text-right py-2 px-2">停利</th>
                   <th className="text-left py-2 px-2">策略</th>
-                  <th className="text-right py-2 px-2">持仓天数</th>
+                  <th className="text-right py-2 px-2">持倉天數</th>
                   <th className="text-right py-2 pl-2">操作</th>
                 </tr>
               </thead>
@@ -539,7 +539,7 @@ export default function PaperTradingPage() {
                         onClick={() => handleClosePosition(p.id)}
                       >
                         <X className="w-3.5 h-3.5 mr-0.5" />
-                        平仓
+                        平倉
                       </Button>
                     </td>
                   </tr>
@@ -554,11 +554,11 @@ export default function PaperTradingPage() {
       <Dialog open={tradesOpen} onOpenChange={setTradesOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>已平仓记录 ({tradesTotal})</DialogTitle>
-            <DialogDescription>历史交易详情</DialogDescription>
+            <DialogTitle>已平倉記錄 ({tradesTotal})</DialogTitle>
+            <DialogDescription>歷史交易詳細資訊</DialogDescription>
           </DialogHeader>
           {trades.length === 0 ? (
-            <div className="text-center text-muted-foreground text-sm py-8">暂无交易记录</div>
+            <div className="text-center text-muted-foreground text-sm py-8">暫無交易記錄</div>
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -566,14 +566,14 @@ export default function PaperTradingPage() {
                   <thead>
                     <tr className="border-b border-border text-muted-foreground text-xs">
                       <th className="text-left py-2 pr-3">股票</th>
-                      <th className="text-right py-2 px-2">入场价</th>
-                      <th className="text-right py-2 px-2">出场价</th>
-                      <th className="text-right py-2 px-2">盈亏</th>
-                      <th className="text-right py-2 px-2">盈亏%</th>
-                      <th className="text-left py-2 px-2">出场原因</th>
+                      <th className="text-right py-2 px-2">入場價</th>
+                      <th className="text-right py-2 px-2">出場價</th>
+                      <th className="text-right py-2 px-2">損益</th>
+                      <th className="text-right py-2 px-2">損益%</th>
+                      <th className="text-left py-2 px-2">出場原因</th>
                       <th className="text-left py-2 px-2">策略</th>
-                      <th className="text-right py-2 px-2">持仓天数</th>
-                      <th className="text-right py-2 pl-2">平仓时间</th>
+                      <th className="text-right py-2 px-2">持倉天數</th>
+                      <th className="text-right py-2 pl-2">平倉時間</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -604,7 +604,7 @@ export default function PaperTradingPage() {
                     disabled={tradesPage === 0}
                     onClick={() => setTradesPage(p => Math.max(0, p - 1))}
                   >
-                    上一页
+                    上一頁
                   </Button>
                   <span className="text-xs text-muted-foreground">
                     {tradesPage + 1} / {totalPages}
@@ -615,7 +615,7 @@ export default function PaperTradingPage() {
                     disabled={tradesPage >= totalPages - 1}
                     onClick={() => setTradesPage(p => p + 1)}
                   >
-                    下一页
+                    下一頁
                   </Button>
                 </div>
               )}
@@ -624,17 +624,17 @@ export default function PaperTradingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 资金配置对话框 */}
+      {/* 資金配置對話方塊 */}
       <Dialog open={configOpen} onOpenChange={setConfigOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>资金配置</DialogTitle>
-            <DialogDescription>设置总资金与各市场投资比例，比例为 0 则不投入该市场（已有持仓不受影响，仅停止新建仓）</DialogDescription>
+            <DialogTitle>資金配置</DialogTitle>
+            <DialogDescription>設定總資金與各市場投資比例，比例為 0 則不投入該市場（已有持倉不受影響，僅停止新建倉）</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <div className="text-sm font-medium mb-1">总资金</div>
+              <div className="text-sm font-medium mb-1">總資金</div>
               <input
                 type="number"
                 value={cfgTotal}
@@ -646,9 +646,9 @@ export default function PaperTradingPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm font-medium">
-                <span>各市场投资比例</span>
+                <span>各市場投資比例</span>
                 <span className={`text-xs ${ratioSum > 100 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  合计 {ratioSum}%{ratioSum > 100 ? '（超过 100%）' : ''}
+                  合計 {ratioSum}%{ratioSum > 100 ? '（超過 100%）' : ''}
                 </span>
               </div>
               {(['CN', 'HK', 'US'] as const).map(m => {
@@ -671,43 +671,43 @@ export default function PaperTradingPage() {
                   </div>
                 )
               })}
-              <div className="text-xs text-muted-foreground">合计可小于 100%，余下为闲置不投入的资金。</div>
+              <div className="text-xs text-muted-foreground">合計可小於 100%，餘下為閒置不投入的資金。</div>
             </div>
 
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" onClick={handleSaveConfig} disabled={cfgSaving || ratioSum > 100}>
-                {cfgSaving ? '保存中...' : '保存'}
+                {cfgSaving ? '儲存中...' : '儲存'}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 跟单通知设置对话框 */}
+      {/* 跟單通知設定對話方塊 */}
       <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>跟单通知设置</DialogTitle>
-            <DialogDescription>配置模拟盘交易通知，实时跟踪建仓/平仓动作</DialogDescription>
+            <DialogTitle>跟單通知設定</DialogTitle>
+            <DialogDescription>配置模擬交易交易通知，即時跟蹤建倉/平倉動作</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5">
-            {/* 总开关 */}
+            {/* 總開關 */}
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium">启用通知</div>
-                <div className="text-xs text-muted-foreground">开启后将通过所选渠道推送交易通知</div>
+                <div className="text-sm font-medium">啟用通知</div>
+                <div className="text-xs text-muted-foreground">開啟後將透過所選管道推送交易通知</div>
               </div>
               <Switch checked={notifyEnabled} onCheckedChange={setNotifyEnabled} />
             </div>
 
             {notifyEnabled && (
               <>
-                {/* 通知渠道选择 */}
+                {/* 通知管道選擇 */}
                 <div>
-                  <div className="text-sm font-medium mb-2">通知渠道</div>
+                  <div className="text-sm font-medium mb-2">通知管道</div>
                   {notifyChannels.length === 0 ? (
-                    <div className="text-xs text-muted-foreground">暂无可用渠道，请先在设置中配置通知渠道</div>
+                    <div className="text-xs text-muted-foreground">暫無可用管道，請先在設定中配置通知管道</div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {notifyChannels.map(ch => (
@@ -726,7 +726,7 @@ export default function PaperTradingPage() {
                     </div>
                   )}
                   {selectedChannelIds.size === 0 && notifyChannels.length > 0 && (
-                    <div className="text-xs text-muted-foreground mt-1">未选择渠道时将使用默认渠道</div>
+                    <div className="text-xs text-muted-foreground mt-1">未選擇管道時將使用預設管道</div>
                   )}
                 </div>
 
@@ -735,22 +735,22 @@ export default function PaperTradingPage() {
                   <div className="text-sm font-medium">通知模式</div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm">实时交易信号</div>
-                      <div className="text-xs text-muted-foreground">建仓/平仓时立即推送</div>
+                      <div className="text-sm">即時交易訊號</div>
+                      <div className="text-xs text-muted-foreground">建倉/平倉時立即推送</div>
                     </div>
                     <Switch checked={notifyRealtime} onCheckedChange={setNotifyRealtime} />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm">盘前计划</div>
-                      <div className="text-xs text-muted-foreground">每天 09:00 推送当日候选列表</div>
+                      <div className="text-sm">盤前計劃</div>
+                      <div className="text-xs text-muted-foreground">每天 09:00 推送當日候選列表</div>
                     </div>
                     <Switch checked={notifyPremarket} onCheckedChange={setNotifyPremarket} />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm">日终摘要</div>
-                      <div className="text-xs text-muted-foreground">每天 15:30 推送当日操作汇总</div>
+                      <div className="text-sm">日終摘要</div>
+                      <div className="text-xs text-muted-foreground">每天 15:30 推送當日操作彙總</div>
                     </div>
                     <Switch checked={notifySummary} onCheckedChange={setNotifySummary} />
                   </div>
@@ -758,14 +758,14 @@ export default function PaperTradingPage() {
               </>
             )}
 
-            {/* 操作按钮 */}
+            {/* 操作按鈕 */}
             <div className="flex items-center gap-2 pt-2">
               <Button size="sm" onClick={handleSaveNotify} disabled={notifySaving}>
-                {notifySaving ? '保存中...' : '保存'}
+                {notifySaving ? '儲存中...' : '儲存'}
               </Button>
               {notifyEnabled && (
                 <Button variant="outline" size="sm" onClick={handleTestNotify} disabled={notifyTesting}>
-                  {notifyTesting ? '发送中...' : '测试通知'}
+                  {notifyTesting ? '傳送中...' : '測試通知'}
                 </Button>
               )}
             </div>

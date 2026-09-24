@@ -1,22 +1,22 @@
-"""AI 模型运行时 failover。
+"""AI 模型執行時 failover。
 
-对照数据源侧成熟的降级模式(marketdata engine / kline_collector 的 `_FAIL_UNTIL`
-负缓存冷却),给 AI 调用补齐"主模型失败自动切备选"的运行时能力:
+對照資料來源側成熟的降級模式(marketdata engine / kline_collector 的 `_FAIL_UNTIL`
+負快取冷卻),給 AI 呼叫補齊"主模型失敗自動切備選"的執行時能力:
 
-- **候选模型链**:主模型 + 按优先级的备选。任一候选调用失败,按错误类别决定
-  「摘参重试同模型 / 降级下一候选 / 直接抛」。
-- **错误分类**(关键):
-  - 参数不兼容(如某些模型不接受 temperature)→ 摘掉 temperature 重试**同一模型**一次;
-  - 超时 / 5xx / 限流 / 配额 / 鉴权失效 / 服务挂 → **降级下一候选**,并把该候选记入冷却;
-  - prompt / 内容策略类错误 → **不重试直接抛**(换模型也会同样失败)。
-- **负缓存冷却**:照抄 `kline_collector._FAIL_UNTIL` —— 失败候选进冷却窗口,窗口内
-  直接跳过不再联网;窗口过期后自然再次尝试即"恢复探测"。
-- **可观测**:实际使用的模型记在 `used_model_label`(供 agent_runs 落库);发生切换时
-  打 warning 日志(带 trace_id)。
+- **候選模型鏈**:主模型 + 按優先順序的備選。任一候選呼叫失敗,按錯誤類別決定
+  「摘參重試同模型 / 降級下一候選 / 直接拋」。
+- **錯誤分類**(關鍵):
+  - 引數不相容(如某些模型不接受 temperature)→ 摘掉 temperature 重試**同一模型**一次;
+  - 超時 / 5xx / 限流 / 配額 / 鑑權失效 / 服務掛 → **降級下一候選**,並把該候選記入冷卻;
+  - prompt / 內容策略類錯誤 → **不重試直接拋**(換模型也會同樣失敗)。
+- **負快取冷卻**:照抄 `kline_collector._FAIL_UNTIL` —— 失敗候選進冷卻視窗,視窗內
+  直接跳過不再聯網;視窗過期後自然再次嘗試即"恢復探測"。
+- **可觀測**:實際使用的模型記在 `used_model_label`(供 agent_runs 落庫);發生切換時
+  打 warning 日誌(帶 trace_id)。
 
-`FailoverAIClient` 对外暴露与 `AIClient` 相同的 `chat / chat_multi / chat_with_tools /
-chat_stream` 方法签名,可原地替换单一 client;并透传 `base_url / api_key / model /
-total_tokens_used` 等属性,兼容 TradingAgents 等需要底层配置的调用方。
+`FailoverAIClient` 對外暴露與 `AIClient` 相同的 `chat / chat_multi / chat_with_tools /
+chat_stream` 方法簽名,可原地替換單一 client;並透傳 `base_url / api_key / model /
+total_tokens_used` 等屬性,相容 TradingAgents 等需要底層配置的呼叫方。
 """
 
 from __future__ import annotations
@@ -40,19 +40,19 @@ from src.platform.observability.log_context import get_log_context
 
 logger = logging.getLogger(__name__)
 
-# ── 错误类别 ───────────────────────────────────────────────────────────
-ERR_PARAM = "param"    # 参数不兼容:摘参重试同模型
-ERR_SWITCH = "switch"  # 可降级:换下一候选 + 记冷却
-ERR_FATAL = "fatal"    # 不可降级:直接抛(prompt/内容类)
+# ── 錯誤類別 ───────────────────────────────────────────────────────────
+ERR_PARAM = "param"    # 引數不相容:摘參重試同模型
+ERR_SWITCH = "switch"  # 可降級:換下一候選 + 記冷卻
+ERR_FATAL = "fatal"    # 不可降級:直接拋(prompt/內容類)
 
-# ── 负缓存冷却(照抄 kline_collector 模式)────────────────────────────
-# key = 模型标签(如 "智谱/glm-4-flash");value = 冷却截止的 monotonic 时间戳。
+# ── 負快取冷卻(照抄 kline_collector 模式)────────────────────────────
+# key = 模型標籤(如 "智譜/glm-4-flash");value = 冷卻截止的 monotonic 時間戳。
 _AI_FAIL_UNTIL: dict[str, float] = {}
 _AI_FAIL_COOLDOWN_S = 60.0
 
 
 def clear_ai_failover_state() -> None:
-    """清空冷却状态(测试隔离用)。"""
+    """清空冷卻狀態(測試隔離用)。"""
     _AI_FAIL_UNTIL.clear()
 
 
@@ -65,12 +65,12 @@ def _mark_fail(label: str) -> None:
 
 
 def _mark_ok(label: str) -> None:
-    # 成功即清除冷却标记(恢复)。
+    # 成功即清除冷卻標記(恢復)。
     _AI_FAIL_UNTIL.pop(label, None)
 
 
 def _looks_like_param_error(exc: Exception) -> bool:
-    """判断 400/422 是否属于"参数不兼容"(可摘参重试)而非内容问题。"""
+    """判斷 400/422 是否屬於"引數不相容"(可摘參重試)而非內容問題。"""
     msg = str(exc).lower()
     keywords = (
         "temperature",
@@ -85,8 +85,8 @@ def _looks_like_param_error(exc: Exception) -> bool:
 
 
 def classify_ai_error(exc: Exception) -> str:
-    """把 AI 调用异常分流到三类:ERR_PARAM / ERR_SWITCH / ERR_FATAL。"""
-    # 网络 / 超时 / 5xx / 限流 / 鉴权失效 / 权限 → 换模型
+    """把 AI 呼叫異常分流到三類:ERR_PARAM / ERR_SWITCH / ERR_FATAL。"""
+    # 網路 / 超時 / 5xx / 限流 / 鑑權失效 / 權限 → 換模型
     if isinstance(
         exc,
         (
@@ -99,24 +99,24 @@ def classify_ai_error(exc: Exception) -> str:
         ),
     ):
         return ERR_SWITCH
-    # 400 / 422:区分"参数不兼容"(摘参重试)与"内容/prompt 问题"(直接抛)
+    # 400 / 422:區分"引數不相容"(摘參重試)與"內容/prompt 問題"(直接拋)
     if isinstance(exc, BadRequestError):
         return ERR_PARAM if _looks_like_param_error(exc) else ERR_FATAL
-    # 其余带 HTTP 状态码的异常:5xx 视为可降级,4xx 视为致命
+    # 其餘帶 HTTP 狀態碼的異常:5xx 視為可降級,4xx 視為致命
     status = getattr(exc, "status_code", None)
     if isinstance(status, int):
         return ERR_SWITCH if status >= 500 else ERR_FATAL
-    # 未知异常:保守降级(下一候选可能是不同服务商,或链耗尽后统一抛)
+    # 未知異常:保守降級(下一候選可能是不同服務商,或鏈耗盡後統一拋)
     return ERR_SWITCH
 
 
 class FailoverAIClient:
-    """按候选链顺序尝试的 AI 客户端包装。
+    """按候選鏈順序嘗試的 AI 使用者端包裝。
 
     Args:
-        candidates: [(AIClient, 模型标签), ...],第 0 个为主模型。
-        on_switch: 可选回调 (from_label, exc);发生降级切换时调用,
-            供 chat SSE 端点把 failover 事件推给前端(可选)。
+        candidates: [(AIClient, 模型標籤), ...],第 0 個為主模型。
+        on_switch: 可選回撥 (from_label, exc);發生降級切換時呼叫,
+            供 chat SSE 端點把 failover 事件推給前端(可選)。
     """
 
     def __init__(
@@ -125,13 +125,13 @@ class FailoverAIClient:
         on_switch: Callable[[str, Exception], None] | None = None,
     ):
         if not candidates:
-            raise ValueError("FailoverAIClient 需要至少一个候选模型")
+            raise ValueError("FailoverAIClient 需要至少一個候選模型")
         self.candidates = candidates
         self.on_switch = on_switch
-        # 实际使用的模型标签,默认主模型;成功调用后更新为真正跑通的那个。
+        # 實際使用的模型標籤,預設主模型;成功呼叫後更新為真正跑通的那個。
         self.used_model_label = candidates[0][1]
 
-    # ── 透传属性(兼容把它当普通 AIClient 用的调用方)────────────────
+    # ── 透傳屬性(相容把它當普通 AIClient 用的呼叫方)────────────────
     @property
     def _primary(self) -> AIClient:
         return self.candidates[0][0]
@@ -167,18 +167,18 @@ class FailoverAIClient:
     async def list_models(self) -> list[str]:
         return await self._primary.list_models()
 
-    # ── 候选选取:优先非冷却;全部冷却则取主候选做恢复探测 ──────────
+    # ── 候選選取:優先非冷卻;全部冷卻則取主候選做恢復探測 ──────────
     def _iter_candidates(self) -> list[tuple[AIClient, str]]:
         live = [(c, lbl) for c, lbl in self.candidates if not _is_cooling(lbl)]
         if live:
             return live
-        # 全部在冷却窗口内:降级返回主候选(忽略冷却)做恢复探测,而非直接失败。
+        # 全部在冷卻視窗內:降級返回主候選(忽略冷卻)做恢復探測,而非直接失敗。
         return self.candidates[:1]
 
     def _log_switch(self, label: str, exc: Exception) -> None:
         trace_id = get_log_context().get("trace_id") or "-"
         logger.warning(
-            "[%s] AI failover: 模型 %s 调用失败,降级下一候选: %s",
+            "[%s] AI failover: 模型 %s 呼叫失敗,降級下一候選: %s",
             trace_id,
             label,
             exc,
@@ -186,11 +186,11 @@ class FailoverAIClient:
         if self.on_switch is not None:
             try:
                 self.on_switch(label, exc)
-            except Exception:  # noqa: BLE001 — 回调不得影响主流程
-                logger.debug("on_switch 回调异常(已忽略)", exc_info=True)
+            except Exception:  # noqa: BLE001 — 回撥不得影響主流程
+                logger.debug("on_switch 回撥異常(已忽略)", exc_info=True)
 
     async def _run(self, method_name: str, *args, temperature, **kwargs):
-        """非流式方法的通用 failover 执行器。"""
+        """非流式方法的通用 failover 執行器。"""
         last_exc: Exception | None = None
         for client, label in self._iter_candidates():
             method = getattr(client, method_name)
@@ -202,7 +202,7 @@ class FailoverAIClient:
             except Exception as exc:  # noqa: BLE001
                 kind = classify_ai_error(exc)
                 if kind == ERR_PARAM:
-                    # 摘掉 temperature 重试同一模型一次
+                    # 摘掉 temperature 重試同一模型一次
                     try:
                         retry_kwargs = dict(kwargs)
                         retry_kwargs["temperature"] = None
@@ -218,12 +218,12 @@ class FailoverAIClient:
                         kind = classify_ai_error(exc2)
                 if kind == ERR_FATAL:
                     raise
-                # ERR_SWITCH:记冷却 + 打日志 + 试下一候选
+                # ERR_SWITCH:記冷卻 + 打日誌 + 試下一候選
                 _mark_fail(label)
                 last_exc = exc
                 self._log_switch(label, exc)
                 continue
-        raise last_exc or RuntimeError("所有候选模型均失败")
+        raise last_exc or RuntimeError("所有候選模型均失敗")
 
     async def chat(
         self,
@@ -263,8 +263,8 @@ class FailoverAIClient:
     ):
         """流式 failover。
 
-        注意:一旦已经产出过 token,再失败无法回滚(已推给前端),故 failover
-        只能安全覆盖"首个 token 之前"的失败;首包后异常直接透出。
+        注意:一旦已經產出過 token,再失敗無法回滾(已推給前端),故 failover
+        只能安全覆蓋"首個 token 之前"的失敗;首包後異常直接透出。
         """
         last_exc: Exception | None = None
         for client, label in self._iter_candidates():
@@ -305,7 +305,7 @@ class FailoverAIClient:
                 last_exc = exc
                 self._log_switch(label, exc)
                 continue
-        raise last_exc or RuntimeError("所有候选模型均失败(流式)")
+        raise last_exc or RuntimeError("所有候選模型均失敗(流式)")
 
 
 def _make_client(base_url: str, api_key: str, model: str, proxy: str) -> AIClient:
@@ -321,18 +321,18 @@ def build_failover_client(
     settings=None,
     max_fallbacks: int = 3,
 ) -> FailoverAIClient:
-    """根据主模型 + 库里其余模型构建候选链。
+    """根據主模型 + 庫裡其餘模型構建候選鏈。
 
     Args:
-        primary_model / primary_service: 上层四级/三级路由已选定的主模型(可为 detached
-            ORM 对象;仅读字段,不触发 lazy load)。二者任一为空时用环境变量作主候选。
+        primary_model / primary_service: 上層四級/三級路由已選定的主模型(可為 detached
+            ORM 物件;僅讀欄位,不觸發 lazy load)。二者任一為空時用環境變數作主候選。
         proxy: HTTP 代理。
-        db: 可选的 Session;传入则复用,否则内部开一个只读会话查备选模型。
-        settings: 可选的 Settings(环境变量兜底用)。
-        max_fallbacks: 主模型之外最多挂几个备选。
+        db: 可選的 Session;傳入則複用,否則內部開一個只讀會話查備選模型。
+        settings: 可選的 Settings(環境變數兜底用)。
+        max_fallbacks: 主模型之外最多掛幾個備選。
 
-    与四级路由自洽:主候选沿用上层已解析结果,备选按 `is_default` 优先、其余按 id
-    顺序补齐,天然复用现有 AIService/AIModel 配置体系,无需新增全局配置。
+    與四級路由自洽:主候選沿用上層已解析結果,備選按 `is_default` 優先、其餘按 id
+    順序補齊,天然複用現有 AIService/AIModel 配置體系,無需新增全域性配置。
     """
     from src.platform.runtime.config import Settings
 
@@ -361,7 +361,7 @@ def build_failover_client(
             )
         )
 
-    # 补齐备选候选
+    # 補齊備選候選
     own_session = False
     if db is None:
         from src.platform.persistence.database import SessionLocal
@@ -390,8 +390,8 @@ def build_failover_client(
                     f"{svc.name}/{m.model}",
                 )
             )
-    except Exception:  # noqa: BLE001 — 备选查询失败不影响主候选可用
-        logger.warning("构建 failover 备选候选失败,仅用主模型", exc_info=True)
+    except Exception:  # noqa: BLE001 — 備選查詢失敗不影響主候選可用
+        logger.warning("構建 failover 備選候選失敗,僅用主模型", exc_info=True)
     finally:
         if own_session:
             db.close()

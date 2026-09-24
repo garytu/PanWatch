@@ -3,35 +3,35 @@ from marketdata.symbol import Symbol
 from marketdata.types import Quote
 
 
-def _fake_data(code: str = "600519", name: str = "贵州茅台") -> dict:
-    """构造真实形态的 push2 stock/get JSON(f59=2 位小数,价格字段为放大 100 倍的整数)。
+def _fake_data(code: str = "600519", name: str = "貴州茅臺") -> dict:
+    """構造真實形態的 push2 stock/get JSON(f59=2 位小數,價格欄位為放大 100 倍的整數)。
 
     current=1700.00 prev_close=1680.00 open=1685.00 high=1710.00 low=1670.00
     change_amount=20.00(=current-prev) change_pct=1.19%(≈20/1680)
     """
     return {
-        "f43": 170000,     # 最新价(raw) → /10^2 = 1700.00
+        "f43": 170000,     # 最新價(raw) → /10^2 = 1700.00
         "f44": 171000,     # 最高 → 1710.00
         "f45": 167000,     # 最低 → 1670.00
-        "f46": 168500,     # 今开 → 1685.00
+        "f46": 168500,     # 今開 → 1685.00
         "f47": 12345,      # 成交量(手)
-        "f48": 6789000000, # 成交额(元)
+        "f48": 6789000000, # 成交額(元)
         "f50": 120,        # 量比(raw) → /100 = 1.20
-        "f55": 999,        # 未在本 vendor 中作为主字段使用(CN 换手率走 f168)
-        "f57": code,       # 代码
-        "f58": name,       # 名称
-        "f59": 2,          # 小数位数
+        "f55": 999,        # 未在本 vendor 中作為主欄位使用(CN 周轉率走 f168)
+        "f57": code,       # 程式碼
+        "f58": name,       # 名稱
+        "f59": 2,          # 小數位數
         "f60": 168000,     # 昨收 → 1680.00
-        "f116": 2100050000000,  # 总市值(raw 元)→ /1e8 = 21000.5(亿)
-        "f117": 2100050000000,  # 流通市值(raw 元)→ /1e8 = 21000.5(亿)
-        "f168": 50,        # 换手率(raw) → /100 = 0.50%
-        "f169": 2000,      # 涨跌额(raw) → /10^2 = 20.00
-        "f170": 119,       # 涨跌幅(raw) → /100 = 1.19%
-        "f171": 500,       # 振幅(未映射到 Quote,忽略)
+        "f116": 2100050000000,  # 總市值(raw 元)→ /1e8 = 21000.5(億)
+        "f117": 2100050000000,  # 流通市值(raw 元)→ /1e8 = 21000.5(億)
+        "f168": 50,        # 周轉率(raw) → /100 = 0.50%
+        "f169": 2000,      # 漲跌額(raw) → /10^2 = 20.00
+        "f170": 119,       # 漲跌幅(raw) → /100 = 1.19%
+        "f171": 500,       # 振幅(未對映到 Quote,忽略)
     }
 
 
-def _payload(code: str = "600519", name: str = "贵州茅台") -> dict:
+def _payload(code: str = "600519", name: str = "貴州茅臺") -> dict:
     return {"data": _fake_data(code, name)}
 
 
@@ -42,7 +42,7 @@ def test_eastmoney_parses_quote_with_decimal_restore(monkeypatch):
     assert len(out) == 1
     q = out[0]
     assert isinstance(q, Quote)
-    assert q.symbol == "600519" and q.name == "贵州茅台" and q.market == "CN"
+    assert q.symbol == "600519" and q.name == "貴州茅臺" and q.market == "CN"
     assert q.current_price == 1700.0
     assert q.prev_close == 1680.0
     assert q.open_price == 1685.0
@@ -65,16 +65,16 @@ def test_eastmoney_batch_multiple_symbols_loops_calls(monkeypatch):
         calls.append(params or {})
         secid = (params or {}).get("secid", "")
         if secid.endswith("600519"):
-            return _payload("600519", "贵州茅台")
+            return _payload("600519", "貴州茅臺")
         if secid.endswith("000001"):
-            return _payload("000001", "平安银行")
+            return _payload("000001", "平安銀行")
         return None
 
     monkeypatch.setattr(ev, "market_get", fake_market_get)
     v = ev.EastmoneyQuoteVendor()
     symbols = [Symbol.parse("600519", market="CN"), Symbol.parse("000001", market="CN")]
     out = v.fetch(symbols, {})
-    assert len(calls) == 2  # 单只查询,逐只循环
+    assert len(calls) == 2  # 單隻查詢,逐只迴圈
     assert len(out) == 2
     codes = {q.symbol for q in out}
     assert codes == {"600519", "000001"}
@@ -91,7 +91,7 @@ def test_eastmoney_no_symbols_returns_empty():
 
 
 def test_eastmoney_unsupported_market_skipped(monkeypatch):
-    # 本 vendor 只做 CN;HK/US symbol 应被跳过,不发请求
+    # 本 vendor 只做 CN;HK/US symbol 應被跳過,不發請求
     calls = {"n": 0}
 
     def fake_market_get(*a, **k):

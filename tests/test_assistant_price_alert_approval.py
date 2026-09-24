@@ -41,7 +41,7 @@ def _setup():
     )
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
-    session.add(Stock(symbol="600519", name="贵州茅台", market="CN"))
+    session.add(Stock(symbol="600519", name="貴州茅臺", market="CN"))
     session.commit()
     repository = AssistantRepository(session)
     conversation = repository.create_conversation(
@@ -56,7 +56,7 @@ def _setup():
 def _request(task_id: int) -> RunRequest:
     return RunRequest(
         run_id=str(task_id),
-        messages=[ModelMessage(role="user", content="贵州茅台涨到 1800 元时提醒我")],
+        messages=[ModelMessage(role="user", content="貴州茅臺漲到 1800 元時提醒我")],
     )
 
 
@@ -98,7 +98,7 @@ def test_price_alert_is_written_only_after_the_durable_approval_is_accepted():
 
     resumed = asyncio.run(
         AgentRuntime(
-            _FixedModel([ModelTurn(content="价格提醒已创建。")]),
+            _FixedModel([ModelTurn(content="價格提醒已建立。")]),
             build_panwatch_tool_registry(session),
             policy=service.build_tool_policy(),
         ).resume(request, outcome.checkpoint, outcome.decisions, _CollectingSink())
@@ -127,7 +127,7 @@ def test_rejected_price_alert_never_writes_a_rule():
     )
     resumed = asyncio.run(
         AgentRuntime(
-            _FixedModel([ModelTurn(content="已取消创建价格提醒。")]),
+            _FixedModel([ModelTurn(content="已取消建立價格提醒。")]),
             build_panwatch_tool_registry(session),
             policy=service.build_tool_policy(),
         ).resume(request, outcome.checkpoint, outcome.decisions, _CollectingSink())
@@ -141,7 +141,7 @@ def test_rejected_price_alert_never_writes_a_rule():
 
 def test_multiple_price_alert_approvals_execute_one_card_at_a_time():
     engine, session, service, task = _setup()
-    session.add(Stock(symbol="601238", name="广汽集团", market="CN"))
+    session.add(Stock(symbol="601238", name="廣汽集團", market="CN"))
     session.commit()
     request = _request(task.id)
     paused = asyncio.run(
@@ -203,7 +203,7 @@ def test_multiple_price_alert_approvals_execute_one_card_at_a_time():
     )
     completed = asyncio.run(
         AgentRuntime(
-            _FixedModel([ModelTurn(content="两条提醒已创建")]),
+            _FixedModel([ModelTurn(content="兩條提醒已建立")]),
             build_panwatch_tool_registry(session),
             policy=service.build_tool_policy(),
         ).resume(request, second.checkpoint, second.decisions, _CollectingSink())

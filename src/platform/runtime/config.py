@@ -1,6 +1,6 @@
-"""从环境和项目配置文件读取运行期设置的技术边界。
+"""從環境和專案配置檔案讀取執行期設定的技術邊界。
 
-该模块可同时被 HTTP、后台任务和平台适配器使用；它不包含任何投资或产品决策。
+該模組可同時被 HTTP、後臺任務和平臺介面卡使用；它不包含任何投資或產品決策。
 """
 
 from dataclasses import dataclass, field
@@ -14,7 +14,7 @@ from src.platform.marketdata.models import MarketCode
 
 
 class Settings(BaseSettings):
-    """环境变量配置"""
+    """環境變數配置"""
 
     # AI
     ai_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
@@ -39,26 +39,26 @@ class Settings(BaseSettings):
     # 代理
     http_proxy: str = ""
 
-    # 通知策略（可通过 UI 的“系统设置”覆盖）
-    # 静默时间段（本地时区），格式: HH:MM-HH:MM，空为关闭；跨夜示例: 23:00-07:00
+    # 通知策略（可透過 UI 的“系統設定”覆蓋）
+    # 靜默時間段（本地時區），格式: HH:MM-HH:MM，空為關閉；跨夜示例: 23:00-07:00
     notify_quiet_hours: str = ""
-    # 通知失败重试次数（不含首次尝试）
+    # 通知失敗重試次數（不含首次嘗試）
     notify_retry_attempts: int = 2
-    # 重试退避秒数（基数），实际会按 1x,2x,... 递增
+    # 重試退避秒數（基數），實際會按 1x,2x,... 遞增
     notify_retry_backoff_seconds: float = 2.0
-    # 幂等窗口覆盖（JSON），示例: {"news_digest":60,"daily_report":720}
+    # 冪等視窗覆蓋（JSON），示例: {"news_digest":60,"daily_report":720}
     notify_dedupe_ttl_overrides: str = ""
 
-    # SSL 证书（企业环境）
+    # SSL 證書（企業環境）
     ca_cert_file: str = ""
 
-    # 调度
-    # day_of_week 使用 POSIX cron 语义(1-5=周一到周五)
+    # 排程
+    # day_of_week 使用 POSIX cron 語義(1-5=週一到週五)
     daily_report_cron: str = "30 15 * * 1-5"
 
-    # 默认时区（用于调度、时间展示等）。
-    # 统一使用一个环境变量控制：TZ（默认 Asia/Shanghai）。
-    # 建议使用 IANA 时区名，如 Asia/Shanghai, America/New_York。
+    # 預設時區（用於排程、時間展示等）。
+    # 統一使用一個環境變數控制：TZ（預設 Asia/Shanghai）。
+    # 建議使用 IANA 時區名，如 Asia/Shanghai, America/New_York。
     app_timezone: str = Field(
         default="Asia/Shanghai",
         validation_alias=AliasChoices("TZ", "APP_TIMEZONE"),
@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
-        # .env 里可能有 HTTPS_PROXY 等未声明字段(httpx/系统标准变量),忽略不报错
+        # .env 裡可能有 HTTPS_PROXY 等未宣告欄位(httpx/系統標準變數),忽略不報錯
         "extra": "ignore",
     }
 
@@ -82,7 +82,7 @@ class Settings(BaseSettings):
 
 @dataclass
 class StockConfig:
-    """自选股配置"""
+    """自選股配置"""
 
     symbol: str
     name: str
@@ -91,14 +91,14 @@ class StockConfig:
 
 @dataclass
 class AppConfig:
-    """应用完整配置"""
+    """應用完整配置"""
 
     settings: Settings
     watchlist: list[StockConfig] = field(default_factory=list)
 
 
 def load_watchlist(path: str | Path = "config/watchlist.yaml") -> list[StockConfig]:
-    """从 YAML 加载自选股列表"""
+    """從 YAML 載入自選股列表"""
     path = Path(path)
     if not path.exists():
         return []
@@ -122,7 +122,7 @@ def load_watchlist(path: str | Path = "config/watchlist.yaml") -> list[StockConf
 
 
 def load_config() -> AppConfig:
-    """加载完整配置"""
+    """載入完整配置"""
     settings = Settings()
     watchlist = load_watchlist()
     return AppConfig(settings=settings, watchlist=watchlist)

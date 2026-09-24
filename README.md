@@ -1,6 +1,6 @@
-# 盯盘侠 PanWatch
+# 盯盤俠 PanWatch
 
-**自托管 AI 盯盘助手 · 集成 [TradingAgents](https://github.com/TauricResearch/TradingAgents) 多 Agent 投资决策** — A 股 / 港股 / 美股实时监控、持仓管理、智能分析、全渠道推送
+**自託管 AI 盯盤助手 · 整合 [TradingAgents](https://github.com/TauricResearch/TradingAgents) 多 Agent 投資決策** — A 股 / 港股 / 美股即時監控、持倉管理、智慧分析、全管道推送
 
 [![GitHub stars](https://img.shields.io/github/stars/TNT-Likely/PanWatch?style=flat&logo=github&color=yellow)](https://github.com/TNT-Likely/PanWatch/stargazers)
 [![Docker Pulls](https://img.shields.io/docker/pulls/sunxiao0721/panwatch?logo=docker&label=docker%20pulls&color=2496ED)](https://hub.docker.com/r/sunxiao0721/panwatch)
@@ -8,97 +8,97 @@
 [![Last commit](https://img.shields.io/github/last-commit/TNT-Likely/PanWatch)](https://github.com/TNT-Likely/PanWatch/commits/main)
 [![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&logoColor=white)](https://github.com/TNT-Likely/PanWatch)
 
-![盯盘侠 PanWatch · TradingAgents 深度分析演示](docs/screenshots/tradingagents-demo.gif)
+![盯盤俠 PanWatch · TradingAgents 深度分析演示](docs/screenshots/tradingagents-demo.gif)
 
-> 🧠 **持仓页点一下 → TradingAgents 9-Agent 投研团队接力分析 → 看多看空辩论 → 风控审查 → PM 决策书,3-5 分钟一条完整推理链,结论直推到你的 IM。**
+> 🧠 **持倉頁點一下 → TradingAgents 9-Agent 投研團隊接力分析 → 看多看空辯論 → 風控審查 → PM 決策書,3-5 分鐘一條完整推理鏈,結論直推到你的 IM。**
 
-## 📸 功能一览
+## 📸 功能一覽
 
-| 持仓 · 多账户汇总 | 机会页 · AI 评分选股 |
+| 持倉 · 多帳戶彙總 | 機會頁 · AI 評分選股 |
 |:---:|:---:|
-| ![持仓管理](./docs/screenshots/portfolio.png) | ![机会页 AI 评分](./docs/screenshots/opportunities.png) |
-| **模拟盘 · 净值曲线 + 绩效** | **个股深度详情** |
-| ![模拟盘](./docs/screenshots/papertrading.png) | ![个股详情](./docs/screenshots/stock-detail.png) |
-| **技术指标共振 · 一眼 MACD/RSI/KDJ** | **价格提醒 · 条件组合触发** |
-| ![技术指标](./docs/screenshots/technicals.png) | ![价格提醒](./docs/screenshots/alerts.png) |
+| ![持倉管理](./docs/screenshots/portfolio.png) | ![機會頁 AI 評分](./docs/screenshots/opportunities.png) |
+| **模擬交易 · 淨值曲線 + 績效** | **個股深度詳細資訊** |
+| ![模擬交易](./docs/screenshots/papertrading.png) | ![個股詳細資訊](./docs/screenshots/stock-detail.png) |
+| **技術指標共振 · 一眼 MACD/RSI/KDJ** | **價格提醒 · 條件組合觸發** |
+| ![技術指標](./docs/screenshots/technicals.png) | ![價格提醒](./docs/screenshots/alerts.png) |
 
 <details>
-<summary>移动端截图</summary>
+<summary>移動端截圖</summary>
 
 <img src="./docs/screenshots/mobile.png" width="300" /> <img src="./docs/screenshots/mobile-detail.png" width="300" />
 
-> 📱 支持 PWA，移动端可「添加到主屏幕」当原生 App 用。
+> 📱 支援 PWA，移動端可「新增到主螢幕」當原生 App 用。
 
 </details>
 
-> 💡 如果盯盘侠对你有帮助，点右上角 ⭐ **Star** 支持一下 —— 这是对开源项目最好的鼓励，也能让更多人发现它。
+> 💡 如果盯盤俠對你有幫助，點右上角 ⭐ **Star** 支援一下 —— 這是對開源專案最好的鼓勵，也能讓更多人發現它。
 
-## 🧠 深度分析：TradingAgents 多 Agent 决策
+## 🧠 深度分析：TradingAgents 多 Agent 決策
 
-接入 [TradingAgents](https://github.com/TauricResearch/TradingAgents)（76k+ star）多 Agent 投资决策框架，在持仓页点 🧠 图标即可触发：
+接入 [TradingAgents](https://github.com/TauricResearch/TradingAgents)（76k+ star）多 Agent 投資決策框架，在持倉頁點 🧠 圖示即可觸發：
 
-- **4 类分析师**（技术 / 情绪 / 新闻 / 基本面） → **看多看空辩论** → **风控审查** → **PM 整合决策**
-- 3-5 分钟输出完整推理链，结论同步推送到 Telegram / 微信 / 钉钉
-- 默认 deepseek-chat，单次 ~$0.05，月度预算可控
+- **4 類分析師**（技術 / 情緒 / 新聞 / 基本面） → **看多看空辯論** → **風控審查** → **PM 整合決策**
+- 3-5 分鐘輸出完整推理鏈，結論同步推送到 Telegram / 微信 / 釘釘
+- 預設 deepseek-chat，單次 ~$0.05，月度預算可控
 
-## 为什么选择盯盘侠？
+## 為什麼選擇盯盤俠？
 
-- **数据私有** — 自托管部署，持仓数据不经过任何第三方
-- **AI 原生** — 不是简单的指标堆砌，而是让 AI 理解你的持仓、风格和目标
-- **开箱即用** — Docker 一键部署，5 分钟完成配置
+- **資料私有** — 自託管部署，持倉資料不經過任何第三方
+- **AI 原生** — 不是簡單的指標堆砌，而是讓 AI 理解你的持倉、風格和目標
+- **開箱即用** — Docker 一鍵部署，5 分鐘完成配置
 
 ## 核心功能
 
 <details>
-<summary><b>智能 Agent 系统</b></summary>
+<summary><b>智慧 Agent 系統</b></summary>
 
-| Agent | 触发时机 | 功能 |
+| Agent | 觸發時機 | 功能 |
 |-------|---------|------|
-| **盘前分析** | 每日开盘前 | 综合隔夜美股、新闻消息、技术形态，给出今日操作策略 |
-| **盘中监测** | 交易时段实时 | 监控异动信号，RSI/KDJ/MACD 共振时推送提醒 |
-| **盘后日报** | 每日收盘后 | 复盘当日走势，分析资金流向，规划次日操作 |
-| **新闻速递** | 定时采集 | 抓取财经新闻，AI 筛选与持仓相关的重要信息 |
+| **盤前分析** | 每日開盤前 | 綜合隔夜美股、新聞訊息、技術形態，給出今日操作策略 |
+| **盤中監測** | 交易時段即時 | 監控異動訊號，RSI/KDJ/MACD 共振時推送提醒 |
+| **盤後日報** | 每日收盤後 | 覆盤當日走勢，分析資金流向，規劃次日操作 |
+| **新聞速遞** | 定時採集 | 抓取財經新聞，AI 篩選與持倉相關的重要資訊 |
 
 </details>
 
 <details>
-<summary><b>专业技术分析</b></summary>
+<summary><b>專業技術分析</b></summary>
 
-- **趋势指标**：MA 多空排列、MACD 金叉死叉、布林带突破
-- **动量指标**：RSI 超买超卖、KDJ 钝化与背离
-- **量价分析**：量比异动、缩量回调、放量突破
-- **形态识别**：锤子线、吞没形态、十字星等 K 线形态
-- **支撑压力**：自动计算多级支撑位和压力位
-
-</details>
-
-<details>
-<summary><b>多市场 & 多账户</b></summary>
-
-- **覆盖市场**：A 股、港股、美股实时行情
-- **账户管理**：支持多券商账户独立管理，汇总展示总资产
-- **交易风格**：按短线/波段/长线分别设置，AI 建议更精准
+- **趨勢指標**：MA 多空排列、MACD 金叉死叉、布林帶突破
+- **動量指標**：RSI 超買超賣、KDJ 鈍化與背離
+- **量價分析**：量比異動、縮量回檔、放量突破
+- **形態識別**：錘子線、吞沒形態、十字星等 K 線形態
+- **支撐壓力**：自動計算多級支撐位和壓力位
 
 </details>
 
 <details>
-<summary><b>全渠道通知</b></summary>
+<summary><b>多市場 & 多帳戶</b></summary>
 
-Telegram / 企业微信 / 钉钉 / 飞书 / Bark / 自定义 Webhook
+- **覆蓋市場**：A 股、港股、美股即時行情
+- **帳戶管理**：支援多券商帳戶獨立管理，彙總展示總資產
+- **交易風格**：按短線/波段/長線分別設定，AI 建議更精準
 
 </details>
 
 <details>
-<summary><b>价格提醒</b></summary>
+<summary><b>全管道通知</b></summary>
 
-- 支持价格、涨跌幅、成交额、量比等条件组合（AND / OR）
-- 支持交易时段/全天生效、冷却时间、日触发上限、重复触发模式
-- 到期时间使用弹窗内日期面板 + `HH:mm` 输入，留空表示永不过期
-- 可按规则选择通知渠道，不选则走系统默认渠道
+Telegram / 企業微信 / 釘釘 / 飛書 / Bark / 自定義 Webhook
 
 </details>
 
-## 快速开始
+<details>
+<summary><b>價格提醒</b></summary>
+
+- 支援價格、漲跌幅、成交額、量比等條件組合（AND / OR）
+- 支援交易時段/全天生效、冷卻時間、日觸發上限、重複觸發模式
+- 到期時間使用彈跳視窗內日期面板 + `HH:mm` 輸入，留空表示永不過期
+- 可按規則選擇通知管道，不選則走系統預設管道
+
+</details>
+
+## 快速開始
 
 ```bash
 docker run -d \
@@ -108,11 +108,11 @@ docker run -d \
   sunxiao0721/panwatch:latest
 ```
 
-访问 `http://localhost:8000`，首次使用设置账号密码即可。
+訪問 `http://localhost:8000`，首次使用設定帳號密碼即可。
 
-说明：镜像内已包含 Playwright 运行所需的系统依赖；Chromium 浏览器会在容器首次启动时自动下载并安装到挂载卷（默认 `/app/data/playwright`），首次启动可能需要几分钟且需要网络可达。
+說明：映象內已包含 Playwright 執行所需的系統依賴；Chromium 瀏覽器會在容器首次啟動時自動下載並安裝到掛載卷（預設 `/app/data/playwright`），首次啟動可能需要幾分鐘且需要網路可達。
 
-如果不需要截图等浏览器能力，可以在启动容器时设置 `PLAYWRIGHT_SKIP_BROWSER_INSTALL=1` 跳过首次 Chromium 下载/安装。
+如果不需要截圖等瀏覽器能力，可以在啟動容器時設定 `PLAYWRIGHT_SKIP_BROWSER_INSTALL=1` 跳過首次 Chromium 下載/安裝。
 
 <details>
 <summary>Docker Compose</summary>
@@ -140,132 +140,132 @@ docker-compose up -d
 </details>
 
 <details>
-<summary>环境变量</summary>
+<summary>環境變數</summary>
 
-| 变量名 | 说明 | 默认值 |
+| 變數名 | 說明 | 預設值 |
 |--------|------|--------|
-| `AUTH_USERNAME` | 预设登录用户名 | 首次访问时设置 |
-| `AUTH_PASSWORD` | 预设登录密码 | 首次访问时设置 |
-| `JWT_SECRET` | JWT 签名密钥 | 自动生成 |
-| `DATA_DIR` | 数据存储目录 | `./data` |
-| `TZ` | 应用时区（影响 Agent 调度触发时间与时间展示） | `Asia/Shanghai` |
-| `PLAYWRIGHT_SKIP_BROWSER_INSTALL` | 跳过首次 Chromium 安装（不需要截图时可用） | 未设置 |
-| `LOG_LEVEL` | 控制台日志级别。默认 `INFO`（只输出业务事件 + 错误）；排查问题时设 `DEBUG` 可看到调度心跳、采集过程等底层日志。UI 日志板始终保留完整记录，不受影响 | `INFO` |
-| `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` | 出站 HTTP 代理。三种配置方式任选其一: ① 启动前 `export HTTP_PROXY=...`；② `.env` 里写 `http_proxy=http://host:port`；③ UI「设置 → 全局 HTTP 代理」。三者优先级:外部环境变量 > UI > `.env`。生效后所有 httpx 客户端走代理。`NO_PROXY` 默认包含 `localhost,127.0.0.1` | 未设置 |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry OTLP 导出端点(如 `http://jaeger:4318`)。**配置后**才启用 OTel trace 导出;留空则完全关闭(零副作用)。还需安装可选依赖 `requirements-otel.txt`。详见下方「OTel 导出」 | 未设置(关闭) |
+| `AUTH_USERNAME` | 預設登入使用者名稱 | 首次訪問時設定 |
+| `AUTH_PASSWORD` | 預設登入密碼 | 首次訪問時設定 |
+| `JWT_SECRET` | JWT 簽名金鑰 | 自動生成 |
+| `DATA_DIR` | 資料儲存目錄 | `./data` |
+| `TZ` | 應用時區（影響 Agent 排程觸發時間與時間展示） | `Asia/Shanghai` |
+| `PLAYWRIGHT_SKIP_BROWSER_INSTALL` | 跳過首次 Chromium 安裝（不需要截圖時可用） | 未設定 |
+| `LOG_LEVEL` | 主控台日誌級別。預設 `INFO`（只輸出業務事件 + 錯誤）；排查問題時設 `DEBUG` 可看到排程心跳、採集過程等底層日誌。UI 日誌板始終保留完整記錄，不受影響 | `INFO` |
+| `HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` | 出站 HTTP 代理。三種配置方式任選其一: ① 啟動前 `export HTTP_PROXY=...`；② `.env` 裡寫 `http_proxy=http://host:port`；③ UI「設定 → 全域性 HTTP 代理」。三者優先順序:外部環境變數 > UI > `.env`。生效後所有 httpx 使用者端走代理。`NO_PROXY` 預設包含 `localhost,127.0.0.1` | 未設定 |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry OTLP 匯出端點(如 `http://jaeger:4318`)。**配置後**才啟用 OTel trace 匯出;留空則完全關閉(零副作用)。還需安裝可選依賴 `requirements-otel.txt`。詳見下方「OTel 匯出」 | 未設定(關閉) |
 
 </details>
 
 <details>
 <summary>首次配置</summary>
 
-1. 访问 Web 界面，设置登录账号
-2. **设置 → AI 服务商**：配置 OpenAI 兼容 API（支持 OpenAI / 智谱 / DeepSeek / Ollama 等）
-3. **设置 → 通知渠道**：添加 Telegram 或其他推送渠道
-4. **持仓 → 添加股票**：添加自选股，启用对应 Agent
+1. 訪問 Web 介面，設定登入帳號
+2. **設定 → AI 服務商**：配置 OpenAI 相容 API（支援 OpenAI / 智譜 / DeepSeek / Ollama 等）
+3. **設定 → 通知管道**：新增 Telegram 或其他推送管道
+4. **持倉 → 新增股票**：新增自選股，啟用對應 Agent
 
 </details>
 
 <details>
-<summary>本地开发</summary>
+<summary>本地開發</summary>
 
-**环境要求**：Python 3.10+ / Node.js 18+ / pnpm
+**環境要求**：Python 3.10+ / Node.js 18+ / pnpm
 
 ```bash
-# 一键开发（推荐）
-make dev-api          # 启动后端（自动 venv+依赖，监听 :8000）
-make dev-web          # 启动前端（自动 pnpm install，监听 :5183）
+# 一鍵開發（推薦）
+make dev-api          # 啟動後端（自動 venv+依賴，監聽 :8000）
+make dev-web          # 啟動前端（自動 pnpm install，監聽 :5183）
 
-# 或手动
+# 或手動
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python server.py                              # 后端 :8000
+python server.py                              # 後端 :8000
 
 cd frontend && pnpm install && pnpm dev       # 前端 :5183
 ```
 
-前端 dev server 跑在 `http://localhost:5183`，并把 `/api` 代理到 `127.0.0.1:8000`。
-前端用 `:5183` 而非默认 `:5173`，是为了和 BeeCount-Cloud 等本地常驻前端错开。
+前端 dev server 跑在 `http://localhost:5183`，並把 `/api` 代理到 `127.0.0.1:8000`。
+前端用 `:5183` 而非預設 `:5173`，是為了和 BeeCount-Cloud 等本地常駐前端錯開。
 
 </details>
 
 <details>
-<summary><b>技术栈</b></summary>
+<summary><b>技術棧</b></summary>
 
-**后端**：FastAPI / SQLAlchemy / APScheduler / OpenAI SDK
+**後端**：FastAPI / SQLAlchemy / APScheduler / OpenAI SDK
 
 **前端**：React 18 / TypeScript / Tailwind CSS / shadcn/ui
 
 </details>
 
 <details>
-<summary><b>OTel 导出（可选，默认关闭）</b></summary>
+<summary><b>OTel 匯出（可選，預設關閉）</b></summary>
 
-PanWatch 内建一套自建可观测体系(结构化日志 `trace_id` 贯穿 / `agent_runs` 运行表 / TradingAgents 节点级进度与成本),开箱即用、无需任何外部组件。
+PanWatch 內建一套自建可觀測體系(結構化日誌 `trace_id` 貫穿 / `agent_runs` 執行表 / TradingAgents 節點級進度與成本),開箱即用、無需任何外部元件。
 
-在此之上,可**可选地**再挂一层标准 [OpenTelemetry](https://opentelemetry.io/) 导出,把 trace 送到 Jaeger / Tempo / Langfuse 等标准 APM。三类 span 映射:
+在此之上,可**可選地**再掛一層標準 [OpenTelemetry](https://opentelemetry.io/) 匯出,把 trace 送到 Jaeger / Tempo / Langfuse 等標準 APM。三類 span 對映:
 
-- **Agent 一次运行** → root span(复用 `agent_runs` 的 `trace_id` 关联)
-- **单次 LLM 调用** → `gen_ai` 子 span,遵循 [OpenTelemetry GenAI 语义约定](https://opentelemetry.io/docs/specs/semconv/gen-ai/)(`gen_ai.system` / `gen_ai.request.model` / `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` / `gen_ai.operation.name`),可被标准 APM 识别为一次模型调用
-- **TradingAgents 节点** → 子 span(复用节点级进度回调)
+- **Agent 一次執行** → root span(複用 `agent_runs` 的 `trace_id` 關聯)
+- **單次 LLM 呼叫** → `gen_ai` 子 span,遵循 [OpenTelemetry GenAI 語義約定](https://opentelemetry.io/docs/specs/semconv/gen-ai/)(`gen_ai.system` / `gen_ai.request.model` / `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` / `gen_ai.operation.name`),可被標準 APM 識別為一次模型呼叫
+- **TradingAgents 節點** → 子 span(複用節點級進度回撥)
 
-**默认完全关闭**:不装依赖、不配 endpoint 时,导出层全程 no-op,不改变任何现有行为。
+**預設完全關閉**:不裝依賴、不配 endpoint 時,匯出層全程 no-op,不改變任何現有行為。
 
-**开启三步**:
+**開啟三步**:
 
 ```bash
-# 1. 安装可选依赖
+# 1. 安裝可選依賴
 pip install -r requirements-otel.txt
 
-# 2. 配置 OTLP 端点(指向你的 collector / APM)
+# 2. 配置 OTLP 端點(指向你的 collector / APM)
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export OTEL_SERVICE_NAME=panwatch   # 可选,默认 panwatch
+export OTEL_SERVICE_NAME=panwatch   # 可選,預設 panwatch
 
-# 3. 正常启动;启动日志出现 "OTel 导出已启用" 即生效
+# 3. 正常啟動;啟動日誌出現 "OTel 匯出已啟用" 即生效
 python server.py
 ```
 
-**本地起一个 Jaeger 验证**:
+**本地起一個 Jaeger 驗證**:
 
 ```bash
 docker run -d --name jaeger -p 16686:16686 -p 4318:4318 \
   jaegertracing/all-in-one:latest
-# 触发任意 Agent 运行后,打开 http://localhost:16686 选 service=panwatch 查看 trace
+# 觸發任意 Agent 執行後,開啟 http://localhost:16686 選 service=panwatch 檢視 trace
 ```
 
-Langfuse / Tempo 同理,把 `OTEL_EXPORTER_OTLP_ENDPOINT` 指向对应 OTLP 入口即可。
+Langfuse / Tempo 同理,把 `OTEL_EXPORTER_OTLP_ENDPOINT` 指向對應 OTLP 入口即可。
 
 </details>
 
 <details>
-<summary><b>发布（Docker 镜像）</b></summary>
+<summary><b>釋出（Docker 映象）</b></summary>
 
-本项目内置 GitHub Actions 发布流程：
+本專案內建 GitHub Actions 釋出流程：
 
-- 打 tag（例如 `0.2.3`）会自动构建并推送 Docker 镜像
+- 打 tag（例如 `0.2.3`）會自動構建並推送 Docker 映象
   - `sunxiao0721/panwatch:0.2.3`
   - `sunxiao0721/panwatch:latest`
-- 也支持在 GitHub Actions 里手动触发（workflow_dispatch）指定版本号
+- 也支援在 GitHub Actions 裡手動觸發（workflow_dispatch）指定版本號
 
-需要在仓库 Secrets 中配置：
+需要在倉庫 Secrets 中配置：
 
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
 
 </details>
 
-## 捐赠支持
+## 捐贈支援
 
-如果你觉得 PanWatch 有帮助，欢迎请作者喝杯咖啡：
+如果你覺得 PanWatch 有幫助，歡迎請作者喝杯咖啡：
 
-| 微信赞赏 | 支付宝 |
+| 微信讚賞 | 支付寶 |
 |:---:|:---:|
 | <img src="./docs/donate/wechat.png" width="240" /> | <img src="./docs/donate/alipay.png" width="240" /> |
 
-## 贡献
+## 貢獻
 
-欢迎提交 Issue 和 PR！自定义 Agent 和数据源开发请参考 [贡献指南](CONTRIBUTING.md)。
-社区交流（Telegram）：[t.me/panwatch](https://t.me/panwatch)
+歡迎提交 Issue 和 PR！自定義 Agent 和資料來源開發請參考 [貢獻指南](CONTRIBUTING.md)。
+社群交流（Telegram）：[t.me/panwatch](https://t.me/panwatch)
 
 ## License
 

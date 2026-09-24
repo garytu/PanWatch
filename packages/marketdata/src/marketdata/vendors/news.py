@@ -1,18 +1,18 @@
-"""新闻资讯 vendor:xueqiu(雪球个股新闻)/ eastmoney_news(东财个股新闻搜索)/
-eastmoney(东财公告),均 markets={"CN"}。
+"""新聞資訊 vendor:xueqiu(雪球個股新聞)/ eastmoney_news(東財個股新聞搜尋)/
+eastmoney(東財公告),均 markets={"CN"}。
 
 移植自 PanWatch src/collectors/news_collector.py 的 XueqiuNewsCollector /
-EastMoneyStockNewsCollector / EastMoneyNewsCollector 抓取核(端点/params/headers/
-_parse_item 字段全部照搬)。原实现是 async(httpx.AsyncClient),此处改为同步 market_get。
+EastMoneyStockNewsCollector / EastMoneyNewsCollector 抓取核(端點/params/headers/
+_parse_item 欄位全部照搬)。原實現是 async(httpx.AsyncClient),此處改為同步 market_get。
 
-三者均**不做 since 时间过滤**——过滤统一放 client.news() 里做(需要一个"当下"锚点,
-包内不允许偷偷调无参 datetime.now()/time.time());vendor 只管抓 + 解析,失败/空一律
-返回 [],不 raise(market_get 失败已自动 record_error)。
+三者均**不做 since 時間過濾**——過濾統一放 client.news() 裡做(需要一個"當下"錨點,
+包內不允許偷偷調無參 datetime.now()/time.time());vendor 只管抓 + 解析,失敗/空一律
+返回 [],不 raise(market_get 失敗已自動 record_error)。
 
-雪球端点已知被阿里云 WAF 拦截(返回 HTML 挑战页而非 JSON),与是否带 cookie 无关——
-检测到 HTML/非预期结构时直接 record_error 并返回 [],不强行解析。
+雪球端點已知被阿里雲 WAF 攔截(返回 HTML 挑戰頁而非 JSON),與是否帶 cookie 無關——
+檢測到 HTML/非預期結構時直接 record_error 並返回 [],不強行解析。
 
-**待实抓校准**(沙箱代理拦截真实端点,无法验证响应结构/WAF 特征字符串是否与实际一致)。
+**待實抓校準**(沙箱代理攔截真實端點,無法驗證回應結構/WAF 特徵字串是否與實際一致)。
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _strip_html(text: str | None) -> str:
 
 
 def _parse_epoch_millis(ms) -> datetime:
-    """毫秒时间戳(雪球 created_at)→ UTC datetime;解析失败回退 EPOCH。"""
+    """毫秒時間戳(雪球 created_at)→ UTC datetime;解析失敗回退 EPOCH。"""
     try:
         return datetime.fromtimestamp(int(ms) / 1000, tz=timezone.utc)
     except (TypeError, ValueError, OSError):
@@ -48,8 +48,8 @@ def _parse_epoch_millis(ms) -> datetime:
 
 
 def _parse_datetime_str(s, fmt: str = "%Y-%m-%d %H:%M:%S") -> datetime:
-    """"%Y-%m-%d %H:%M:%S" 格式时间字符串 → UTC datetime;解析失败依次回退到纯日期、
-    再回退 EPOCH(照搬 news_collector.py 两级 try/except 的容错顺序)。"""
+    """"%Y-%m-%d %H:%M:%S" 格式時間字串 → UTC datetime;解析失敗依次回退到純日期、
+    再回退 EPOCH(照搬 news_collector.py 兩級 try/except 的容錯順序)。"""
     text = str(s or "").strip()
     if not text:
         return _EPOCH
@@ -64,30 +64,30 @@ def _parse_datetime_str(s, fmt: str = "%Y-%m-%d %H:%M:%S") -> datetime:
 
 
 # ---------------------------------------------------------------------------
-# xueqiu(雪球个股新闻)
+# xueqiu(雪球個股新聞)
 # ---------------------------------------------------------------------------
 
 _XUEQIU_URL = "https://xueqiu.com/statuses/stock_timeline.json"
 _XUEQIU_HOST = "xueqiu.com"
 _XUEQIU_WAF_MARKERS = ("<textarea", "_waf_", "aliyun_waf", "<html")
-_XUEQIU_WAF_MSG = "雪球被阿里云 WAF 拦截,纯 HTTP 无法通过,与 cookie 无关"
+_XUEQIU_WAF_MSG = "雪球被阿里雲 WAF 攔截,純 HTTP 無法透過,與 cookie 無關"
 
 
 def _xueqiu_symbol_id(code: str) -> str:
-    """A股 6 位代码 → 雪球 symbol_id(SH/SZ + code);雪球接口不识别 BJ,原值透传
-    (照搬 XueqiuNewsCollector._get_symbol_id 的 SH/SZ/BJ 判断规则)。"""
+    """A股 6 位程式碼 → 雪球 symbol_id(SH/SZ + code);雪球介面不識別 BJ,原值透傳
+    (照搬 XueqiuNewsCollector._get_symbol_id 的 SH/SZ/BJ 判斷規則)。"""
     if len(code) == 6 and code.isdigit():
         if code.startswith("920") or code.startswith(("83", "87", "88")):
-            return code  # BJ:雪球不识别,保留原值
+            return code  # BJ:雪球不識別,保留原值
         prefix = "SH" if code.startswith(("5", "6")) or code.startswith("900") else "SZ"
         return f"{prefix}{code}"
     return code
 
 
 def _xueqiu_importance(title: str) -> int:
-    if any(k in title for k in ("重磅", "突发", "紧急", "重大", "独家")):
+    if any(k in title for k in ("重磅", "突發", "緊急", "重大", "獨家")):
         return 2
-    if any(k in title for k in ("快讯", "公告", "研报", "业绩")):
+    if any(k in title for k in ("快訊", "公告", "研究報告", "業績")):
         return 1
     return 0
 
@@ -120,7 +120,7 @@ class XueqiuNewsVendor(_NewsVendorBase):
             params = {
                 "symbol_id": _xueqiu_symbol_id(code),
                 "count": 15,
-                "source": "自选股新闻",
+                "source": "自選股新聞",
                 "page": 1,
             }
             text = market_get(
@@ -133,10 +133,10 @@ class XueqiuNewsVendor(_NewsVendorBase):
                 retries=1,
                 parse="text",
                 symbol=code,
-                log_label="雪球个股新闻",
+                log_label="雪球個股新聞",
             )
             if text is None:
-                continue  # market_get 失败已 record_error
+                continue  # market_get 失敗已 record_error
 
             if _looks_like_waf(text):
                 record_error(_XUEQIU_WAF_MSG)
@@ -189,7 +189,7 @@ def _parse_xueqiu_item(item: dict, code: str) -> NewsArticle | None:
 
 
 # ---------------------------------------------------------------------------
-# eastmoney_news(东财个股新闻搜索,search-api-web JSONP)
+# eastmoney_news(東財個股新聞搜尋,search-api-web JSONP)
 # ---------------------------------------------------------------------------
 
 _EM_NEWS_URL = "https://search-api-web.eastmoney.com/search/jsonp"
@@ -202,9 +202,9 @@ _EM_NEWS_HEADERS = {
 
 
 def _eastmoney_news_importance(title: str) -> int:
-    if any(k in title for k in ("重磅", "突发", "紧急", "重大", "独家")):
+    if any(k in title for k in ("重磅", "突發", "緊急", "重大", "獨家")):
         return 2
-    if any(k in title for k in ("快讯", "消息", "公告", "研报")):
+    if any(k in title for k in ("快訊", "訊息", "公告", "研究報告")):
         return 1
     return 0
 
@@ -212,7 +212,7 @@ def _eastmoney_news_importance(title: str) -> int:
 def _build_search_params(keyword: str) -> dict:
     search_param = {
         "uid": "",
-        "keyword": keyword,  # 用名称搜索效果远好于代码(照搬原逻辑)
+        "keyword": keyword,  # 用名稱搜尋效果遠好於程式碼(照搬原邏輯)
         "type": ["cmsArticleWebOld"],
         "client": "web",
         "clientType": "web",
@@ -232,7 +232,7 @@ def _build_search_params(keyword: str) -> dict:
 
 
 def _parse_jsonp(text: str) -> dict | None:
-    """剥 JSONP 外壳:"jQuery({...})" -> {...}。非预期结构返回 None(不 raise)。"""
+    """剝 JSONP 外殼:"jQuery({...})" -> {...}。非預期結構返回 None(不 raise)。"""
     stripped = (text or "").strip()
     if not (stripped.startswith("jQuery(") and stripped.endswith(")")):
         return None
@@ -256,18 +256,18 @@ class EastmoneyStockNewsVendor(_NewsVendorBase):
         result: list[NewsArticle] = []
         for sym in symbols:
             code = sym.code
-            keyword = names.get(code) or code  # 缺名 fallback 用代码搜索(照老逻辑)
+            keyword = names.get(code) or code  # 缺名 fallback 用程式碼搜尋(照老邏輯)
             for article in self._search(keyword, code):
                 if article.external_id in seen:
-                    continue  # 同一新闻可能出现在多只股票搜索结果里,去重(照老逻辑)
+                    continue  # 同一新聞可能出現在多隻股票搜尋結果裡,去重(照老邏輯)
                 seen.add(article.external_id)
                 result.append(article)
         return result
 
     @classmethod
     def fetch_by_keyword(cls, keyword: str) -> list[NewsArticle]:
-        """按任意关键词(行业/主题词,如"新能源汽车")搜中文新闻,不需 symbol_names 映射。
-        供 client.news_by_keyword 复用(照搬原 EastMoneyStockNewsCollector.fetch_by_keyword)。"""
+        """按任意關鍵詞(行業/主題詞,如"新能源汽車")搜中文新聞,不需 symbol_names 對映。
+        供 client.news_by_keyword 複用(照搬原 EastMoneyStockNewsCollector.fetch_by_keyword)。"""
         return cls()._search(keyword, keyword)
 
     def _search(self, keyword: str, symbol_tag: str) -> list[NewsArticle]:
@@ -283,9 +283,9 @@ class EastmoneyStockNewsVendor(_NewsVendorBase):
             timeout=8,
             retries=1,
             parse="text",
-            verify=False,  # 对齐原 EastMoneyStockNewsCollector(verify_ssl=False)
+            verify=False,  # 對齊原 EastMoneyStockNewsCollector(verify_ssl=False)
             symbol=symbol_tag,
-            log_label="东财个股新闻",
+            log_label="東財個股新聞",
         )
         if text is None:
             return []
@@ -333,7 +333,7 @@ def _parse_eastmoney_news_item(item: dict, symbol: str) -> NewsArticle | None:
 
 
 # ---------------------------------------------------------------------------
-# eastmoney(东财公告,ann API)
+# eastmoney(東財公告,ann API)
 # ---------------------------------------------------------------------------
 
 _EM_ANN_URL = "https://np-anotice-stock.eastmoney.com/api/security/ann"
@@ -341,11 +341,11 @@ _EM_ANN_HOST = "np-anotice-stock.eastmoney.com"
 
 
 def _ann_importance(title: str, column_names: list[str]) -> int:
-    if any(k in title for k in ("重大", "业绩预告", "业绩快报", "年报", "半年报")):
+    if any(k in title for k in ("重大", "業績預告", "業績快報", "年報", "半年報")):
         return 3
-    if any(k in title for k in ("季报", "分红", "增持", "减持")):
+    if any(k in title for k in ("季報", "分紅", "增持", "減持")):
         return 2
-    if any("临时" in c for c in column_names):
+    if any("臨時" in c for c in column_names):
         return 1
     return 0
 
@@ -379,8 +379,8 @@ class EastmoneyAnnNewsVendor(_NewsVendorBase):
             timeout=10,
             retries=1,
             parse="json",
-            verify=False,  # 对齐原 EastMoneyNewsCollector(verify_ssl=False,东财 ann 端点 SSL 关闭)
-            log_label="东财公告",
+            verify=False,  # 對齊原 EastMoneyNewsCollector(verify_ssl=False,東財 ann 端點 SSL 關閉)
+            log_label="東財公告",
         )
         if not data or not data.get("success"):
             return []
@@ -423,7 +423,7 @@ def _parse_ann_item(item: dict, symbols: list[str]) -> NewsArticle | None:
         source="eastmoney",
         external_id=external_id,
         title=title,
-        content="",  # 公告通常只有标题,内容需另外获取(照搬原逻辑)
+        content="",  # 公告通常只有標題,內容需另外獲取(照搬原邏輯)
         publish_time=publish_time,
         symbols=symbols,
         importance=importance,

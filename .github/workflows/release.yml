@@ -186,7 +186,7 @@ jobs:
           TAG="${{ steps.vars.outputs.version }}"
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${TAG}"
 
-          # 获取 commit 变更列表
+          # 獲取 commit 變更列表
           PREV_TAG=$(git tag --list --sort=-version:refname | grep -v "^${TAG}$" | head -n1)
           if [ -n "$PREV_TAG" ]; then
             COMMITS=$(git log --no-merges --pretty=format:"- %s" "$PREV_TAG"..HEAD)
@@ -194,16 +194,16 @@ jobs:
             COMMITS=$(git log --no-merges --pretty=format:"- %s")
           fi
 
-          # 转义 Markdown 特殊字符，然后进行 URL 编码
+          # 轉義 Markdown 特殊字元，然後進行 URL 編碼
           COMMITS_ESCAPED=$(echo "$COMMITS" | sed 's/\*/\\*/g; s/_/\\_/g; s/\[/\\[/g; s/\]/\\]/g; s/`/\\`/g')
           COMMITS_ENCODED=$(echo "$COMMITS_ESCAPED" | sed 's/$/%0A/g' | tr -d '\n')
 
-          # 构建消息
-          MESSAGE="📊 *PanWatch ${TAG}* 发布%0A%0A"
-          MESSAGE="${MESSAGE}🔗 [查看完整说明](${RELEASE_URL})%0A%0A"
-          MESSAGE="${MESSAGE}*变更内容*:%0A${COMMITS_ENCODED}"
+          # 構建訊息
+          MESSAGE="📊 *PanWatch ${TAG}* 釋出%0A%0A"
+          MESSAGE="${MESSAGE}🔗 [檢視完整說明](${RELEASE_URL})%0A%0A"
+          MESSAGE="${MESSAGE}*變更內容*:%0A${COMMITS_ENCODED}"
 
-          # 发送到 Telegram
+          # 傳送到 Telegram
           if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
             curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               -d "chat_id=${TELEGRAM_CHAT_ID}" \

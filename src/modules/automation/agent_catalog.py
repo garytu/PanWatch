@@ -58,8 +58,8 @@ class AgentSeedSpec:
 AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
     AgentSeedSpec(
         name="premarket_outlook",
-        display_name="盘前分析",
-        description="开盘前综合昨日分析和隔夜信息，展望今日走势",
+        display_name="盤前分析",
+        description="開盤前綜合昨日分析和隔夜資訊，展望今日走勢",
         enabled=False,
         schedule="0 9 * * 1-5",
         execution_mode="batch",
@@ -69,8 +69,8 @@ AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
     ),
     AgentSeedSpec(
         name="intraday_monitor",
-        display_name="盘中监测",
-        description="交易时段实时监控，AI 智能判断是否有值得关注的信号",
+        display_name="盤中監測",
+        description="交易時段即時監控，AI 智慧判斷是否有值得關注的訊號",
         enabled=False,
         schedule="*/5 9-15 * * 1-5",
         execution_mode="single",
@@ -88,8 +88,8 @@ AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
     ),
     AgentSeedSpec(
         name="daily_report",
-        display_name="收盘复盘",
-        description="每日收盘后生成复盘报告，包含市场回顾、个股复盘和次日关注",
+        display_name="收盤覆盤",
+        description="每日收盤後生成覆盤報告，包含市場回顧、個股覆盤和次日關注",
         enabled=True,
         schedule="30 15 * * 1-5",
         execution_mode="batch",
@@ -99,8 +99,8 @@ AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
     ),
     AgentSeedSpec(
         name="news_digest",
-        display_name="新闻速递（能力）",
-        description="内部能力：提供新闻抓取、去重与主题聚合，不独立调度",
+        display_name="新聞速遞（能力）",
+        description="內部能力：提供新聞抓取、去重與主題聚合，不獨立排程",
         enabled=False,
         schedule="",
         execution_mode="batch",
@@ -116,8 +116,8 @@ AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
     ),
     AgentSeedSpec(
         name="chart_analyst",
-        display_name="技术分析（能力）",
-        description="内部能力：详情页按需触发图像技术分析，不独立调度",
+        display_name="技術分析（能力）",
+        description="內部能力：詳細資訊頁按需觸發影像技術分析，不獨立排程",
         enabled=False,
         schedule="",
         execution_mode="single",
@@ -130,8 +130,8 @@ AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
     AgentSeedSpec(
         name="tradingagents",
         display_name="TradingAgents 深度分析",
-        description="多 Agent 投资决策框架(基本面/情绪/新闻/技术 + 看多看空辩论 + 风控 + PM)。"
-        "单次 3-5 分钟、~$0.05 (deepseek-chat)。需手动触发,默认关闭。",
+        description="多 Agent 投資決策框架(基本面/情緒/新聞/技術 + 看多看空辯論 + 風控 + PM)。"
+        "單次 3-5 分鐘、~$0.05 (deepseek-chat)。需手動觸發,預設關閉。",
         enabled=False,
         schedule="",
         execution_mode="single",
@@ -145,16 +145,16 @@ AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
             "over_budget_action": "reject",
             "cache_ttl_hours": 12,
             "output_language": "Chinese",
-            "deep_model": "",       # 留空走默认 AI Service 的 model;可填如 "claude-sonnet-4"
+            "deep_model": "",       # 留空走預設 AI Service 的 model;可填如 "claude-sonnet-4"
             "quick_model": "",      # 留空 = deep_model;可填便宜模型如 "deepseek-chat"
             "timeout_minutes": 15,
-            "llm_timeout_seconds": 120,  # 单次 LLM 请求超时，防止 analyst 永久阻塞
-            "llm_max_retries": 0,         # 深度分析失败快速落终态，不在图内重复重试
-            "llm_max_tokens": 4096,       # 限制模型输出，避免网关空闲超时
-            "emit_paper_trading_signal": False,  # 是否把 BUY 决策写入 StrategySignalRun
-                                                  # 驱动模拟盘自动开仓 (默认关,需用户主动启用)
-            "enable_sec_edgar": False,  # 仅美股：优先使用有 filing-date 语义的 SEC EDGAR 财报
-            "holding_period_days": 5,   # 上游决策质量回测使用的默认持仓期限
+            "llm_timeout_seconds": 120,  # 單次 LLM 請求超時，防止 analyst 永久阻塞
+            "llm_max_retries": 0,         # 深度分析失敗快速落終態，不在圖內重複重試
+            "llm_max_tokens": 4096,       # 限制模型輸出，避免閘道器空閒超時
+            "emit_paper_trading_signal": False,  # 是否把 BUY 決策寫入 StrategySignalRun
+                                                  # 驅動模擬交易自動開倉 (預設關,需使用者主動啟用)
+            "enable_sec_edgar": False,  # 僅美股：優先使用有 filing-date 語義的 SEC EDGAR 財報
+            "holding_period_days": 5,   # 上游決策質量回測使用的預設持倉期限
         },
     ),
 )

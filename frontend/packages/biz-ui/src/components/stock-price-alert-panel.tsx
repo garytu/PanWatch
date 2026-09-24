@@ -48,9 +48,9 @@ const DEFAULT_FORM: PriceAlertFormState = {
 
 function conditionText(item: AlertConditionItem): string {
   const label: Record<string, string> = {
-    price: '价格',
-    change_pct: '涨跌幅%',
-    turnover: '成交额',
+    price: '價格',
+    change_pct: '漲跌幅%',
+    turnover: '成交額',
     volume: '成交量',
     volume_ratio: '量比',
   }
@@ -134,7 +134,7 @@ export default function StockPriceAlertPanel(props: {
       )
       setRules(filtered)
     } catch (e) {
-      toast(e instanceof Error ? e.message : '加载提醒失败', 'error')
+      toast(e instanceof Error ? e.message : '載入提醒失敗', 'error')
     } finally {
       setLoading(false)
     }
@@ -170,18 +170,18 @@ export default function StockPriceAlertPanel(props: {
     try {
       const stockId = await ensureStockId()
       if (!stockId) {
-        toast('无法定位股票', 'error')
+        toast('無法定位股票', 'error')
         return
       }
       setEditingId(null)
       setForm({
         ...DEFAULT_FORM,
         stock_id: stockId,
-        name: props.stockName ? `${props.stockName} 价格提醒` : '',
+        name: props.stockName ? `${props.stockName} 價格提醒` : '',
       })
       setFormOpen(true)
     } catch (e) {
-      toast(e instanceof Error ? e.message : '无法创建提醒', 'error')
+      toast(e instanceof Error ? e.message : '無法建立提醒', 'error')
     }
   }
 
@@ -213,9 +213,9 @@ export default function StockPriceAlertPanel(props: {
       setFormOpen(false)
       await load()
       props.onChanged?.()
-      toast('提醒已保存', 'success')
+      toast('提醒已儲存', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '保存失败', 'error')
+      toast(e instanceof Error ? e.message : '儲存失敗', 'error')
     } finally {
       setSaving(false)
     }
@@ -227,19 +227,19 @@ export default function StockPriceAlertPanel(props: {
       await load()
       props.onChanged?.()
     } catch (e) {
-      toast(e instanceof Error ? e.message : '切换失败', 'error')
+      toast(e instanceof Error ? e.message : '切換失敗', 'error')
     }
   }
 
   const removeRule = async (r: AlertRule) => {
-    if (!window.confirm(`确认删除规则「${r.name || '提醒'}」？`)) return
+    if (!window.confirm(`確認刪除規則「${r.name || '提醒'}」？`)) return
     try {
       await fetchAPI(`/price-alerts/${r.id}`, { method: 'DELETE' })
       await load()
       props.onChanged?.()
-      toast('已删除', 'success')
+      toast('已刪除', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '删除失败', 'error')
+      toast(e instanceof Error ? e.message : '刪除失敗', 'error')
     }
   }
 
@@ -250,7 +250,7 @@ export default function StockPriceAlertPanel(props: {
       className="h-8 px-2.5"
       onClick={() => setOpen(true)}
       type="button"
-      title={shownSummary.total > 0 ? `提醒 ${shownSummary.enabled}/${shownSummary.total}` : '价格提醒'}
+      title={shownSummary.total > 0 ? `提醒 ${shownSummary.enabled}/${shownSummary.total}` : '價格提醒'}
     >
       <Bell className="w-3.5 h-3.5" />
       提醒 {shownSummary.total > 0 ? `${shownSummary.enabled}/${shownSummary.total}` : '0'}
@@ -259,7 +259,7 @@ export default function StockPriceAlertPanel(props: {
     <button
       className="relative inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-accent/40 transition-colors"
       onClick={() => setOpen(true)}
-      title={shownSummary.total > 0 ? `提醒 ${shownSummary.enabled}/${shownSummary.total}` : '价格提醒'}
+      title={shownSummary.total > 0 ? `提醒 ${shownSummary.enabled}/${shownSummary.total}` : '價格提醒'}
       type="button"
     >
       <Bell className="w-3.5 h-3.5" />
@@ -278,7 +278,7 @@ export default function StockPriceAlertPanel(props: {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{props.stockName || symbol} 提醒</DialogTitle>
-            <DialogDescription>{market} · 启用 {summary.enabled} / 共 {summary.total}</DialogDescription>
+            <DialogDescription>{market} · 啟用 {summary.enabled} / 共 {summary.total}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="flex justify-end">
@@ -288,9 +288,9 @@ export default function StockPriceAlertPanel(props: {
               </Button>
             </div>
             {loading ? (
-              <div className="text-[12px] text-muted-foreground py-6 text-center">加载中...</div>
+              <div className="text-[12px] text-muted-foreground py-6 text-center">載入中...</div>
             ) : rules.length === 0 ? (
-              <div className="text-[12px] text-muted-foreground py-6 text-center">该股票暂无提醒规则</div>
+              <div className="text-[12px] text-muted-foreground py-6 text-center">該股票暫無提醒規則</div>
             ) : (
               <div className="space-y-2 max-h-[48vh] overflow-y-auto scrollbar">
                 {rules.map(r => (
@@ -300,7 +300,7 @@ export default function StockPriceAlertPanel(props: {
                         <div className="flex items-center gap-2">
                           <span className="text-[13px] font-medium truncate">{r.name || `${props.stockName || symbol} 提醒`}</span>
                           <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.enabled ? 'bg-emerald-500/15 text-emerald-500' : 'bg-muted text-muted-foreground'}`}>
-                            {r.enabled ? '启用' : '暂停'}
+                            {r.enabled ? '啟用' : '暫停'}
                           </span>
                         </div>
                         <div className="mt-1 text-[11px] text-muted-foreground">
@@ -309,7 +309,7 @@ export default function StockPriceAlertPanel(props: {
                       </div>
                       <div className="flex items-center gap-1">
                         <Button variant="secondary" size="sm" className="h-7 px-2" onClick={() => openEdit(r)}><Pencil className="w-3 h-3" /></Button>
-                        <Button variant={r.enabled ? 'destructive' : 'default'} size="sm" className="h-7 px-2.5" onClick={() => toggleRule(r)}>{r.enabled ? '停用' : '启用'}</Button>
+                        <Button variant={r.enabled ? 'destructive' : 'default'} size="sm" className="h-7 px-2.5" onClick={() => toggleRule(r)}>{r.enabled ? '停用' : '啟用'}</Button>
                         <Button variant="secondary" size="sm" className="h-7 px-2" onClick={() => removeRule(r)}><Trash2 className="w-3 h-3" /></Button>
                       </div>
                     </div>
@@ -324,13 +324,13 @@ export default function StockPriceAlertPanel(props: {
       <PriceAlertFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
-        title={editingId ? '编辑提醒规则' : '新建提醒规则'}
-        description="支持价格、涨跌幅、成交额、量比条件，支持 AND / OR 组合"
+        title={editingId ? '編輯提醒規則' : '新建提醒規則'}
+        description="支援價格、漲跌幅、成交額、量比條件，支援 AND / OR 組合"
         stocks={formStocks}
         channels={channels}
         initial={form}
         submitting={saving}
-        submitLabel="保存规则"
+        submitLabel="儲存規則"
         onSubmit={submitForm}
       />
     </>

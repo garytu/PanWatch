@@ -57,7 +57,7 @@ def save_stock_context_snapshot(
         db.commit()
         return True
     except Exception as e:
-        logger.warning(f"保存 stock context snapshot 失败: {e}")
+        logger.warning(f"儲存 stock context snapshot 失敗: {e}")
         db.rollback()
         return False
     finally:
@@ -141,7 +141,7 @@ def save_news_topic_snapshot(
         db.commit()
         return True
     except Exception as e:
-        logger.warning(f"保存 news topic snapshot 失败: {e}")
+        logger.warning(f"儲存 news topic snapshot 失敗: {e}")
         db.rollback()
         return False
     finally:
@@ -188,7 +188,7 @@ def save_agent_context_run(
         db.commit()
         return True
     except Exception as e:
-        logger.warning(f"保存 agent context run 失败: {e}")
+        logger.warning(f"儲存 agent context run 失敗: {e}")
         db.rollback()
         return False
     finally:
@@ -244,7 +244,7 @@ def save_agent_prediction_outcome(
                 prediction_group_id=(prediction_group_id or None),
                 horizon_unit=(horizon_unit or "trading_days"),
                 action=action or "watch",
-                action_label=action_label or "观望",
+                action_label=action_label or "觀望",
                 confidence=confidence,
                 trigger_price=trigger_price,
                 outcome_status="pending",
@@ -254,7 +254,7 @@ def save_agent_prediction_outcome(
         db.commit()
         return True
     except Exception as e:
-        logger.warning(f"保存 prediction outcome 失败: {e}")
+        logger.warning(f"儲存 prediction outcome 失敗: {e}")
         db.rollback()
         return False
     finally:
@@ -284,7 +284,7 @@ def mark_agent_prediction_outcome(
         db.commit()
         return True
     except Exception as e:
-        logger.warning(f"更新 prediction outcome 失败: {e}")
+        logger.warning(f"更新 prediction outcome 失敗: {e}")
         db.rollback()
         return False
     finally:
@@ -401,7 +401,7 @@ def cleanup_context_data(
         db.commit()
         return deleted
     except Exception as e:
-        logger.warning(f"清理 context 数据失败: {e}")
+        logger.warning(f"清理 context 資料失敗: {e}")
         db.rollback()
         return deleted
     finally:

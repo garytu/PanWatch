@@ -11,7 +11,7 @@ def test_static_config_returns_sorted_enabled():
         ]
     })
     got = [s.vendor for s in cp.sources_for("quote", "CN")]
-    assert got == ["a", "b"]  # 已按 priority 排序、禁用的被剔除
+    assert got == ["a", "b"]  # 已按 priority 排序、停用的被剔除
 
 
 def test_static_config_unknown_type_empty():

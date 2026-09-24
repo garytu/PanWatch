@@ -1,4 +1,4 @@
-"""AI 服务商模型嗅探 + 测试 temperature 降级 的单元测试。"""
+"""AI 服務商模型嗅探 + 測試 temperature 降級 的單元測試。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-import src.platform.persistence.models as _models  # noqa: F401  注册 ORM
+import src.platform.persistence.models as _models  # noqa: F401  註冊 ORM
 from src.platform.ai.ai_client import AIClient
 from src.platform.persistence.database import Base
 from src.platform.persistence.models import AIModel, AIService
@@ -17,7 +17,7 @@ from src.platform.persistence.models import AIModel, AIService
 
 @pytest.fixture
 def db():
-    """独立内存 SQLite 会话,建全表。"""
+    """獨立記憶體 SQLite 會話,建全表。"""
     engine = create_engine(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
@@ -46,7 +46,7 @@ def _make_client() -> AIClient:
 
 
 def test_list_models_returns_sorted_ids():
-    """list_models 调用 models.list() 并返回排序后的模型 id 列表。"""
+    """list_models 呼叫 models.list() 並返回排序後的模型 id 列表。"""
     client = _make_client()
 
     class _FakeModels:
@@ -59,7 +59,7 @@ def test_list_models_returns_sorted_ids():
 
 
 def test_chat_omits_temperature_when_none():
-    """temperature=None 时不向 create 下发该字段。"""
+    """temperature=None 時不向 create 下發該欄位。"""
     client = _make_client()
     seen: dict = {}
 
@@ -75,7 +75,7 @@ def test_chat_omits_temperature_when_none():
 
 
 def test_chat_sends_temperature_when_float():
-    """temperature 为数值时正常下发。"""
+    """temperature 為數值時正常下發。"""
     client = _make_client()
     seen: dict = {}
 
@@ -91,7 +91,7 @@ def test_chat_sends_temperature_when_float():
 
 
 def test_discover_models_returns_list(db, monkeypatch):
-    """discover-models 用服务商凭证嗅探并返回模型 id 列表。"""
+    """discover-models 用服務商憑證嗅探並返回模型 id 列表。"""
     from src.modules.administration.api import providers
 
     svc = AIService(name="s", base_url="http://x", api_key="k")
@@ -112,7 +112,7 @@ def test_discover_models_returns_list(db, monkeypatch):
 
 
 def test_discover_models_error_maps_to_400(db, monkeypatch):
-    """嗅探失败(服务商不支持/网络错误)返回 400。"""
+    """嗅探失敗(服務商不支援/網路錯誤)返回 400。"""
     from fastapi import HTTPException
 
     from src.modules.administration.api import providers
@@ -132,13 +132,13 @@ def test_discover_models_error_maps_to_400(db, monkeypatch):
     monkeypatch.setattr(providers, "AIClient", _FakeClient)
     try:
         asyncio.run(providers.discover_models(svc.id, db))
-        assert False, "应抛 HTTPException"
+        assert False, "應拋 HTTPException"
     except HTTPException as e:
         assert e.status_code == 400
 
 
 def test_batch_add_skips_duplicates_and_sets_default(db, monkeypatch):
-    """批量新增:跳过已存在的 model 标识,设默认时清零其余。"""
+    """批次新增:跳過已存在的 model 標識,設預設時清零其餘。"""
     from src.modules.administration.api import providers
 
     svc = AIService(name="s", base_url="http://x", api_key="k")
@@ -152,28 +152,28 @@ def test_batch_add_skips_duplicates_and_sets_default(db, monkeypatch):
         models=[
             providers.BatchModelItem(
                 name="", model="dup", is_default=False
-            ),  # 重复,跳过
+            ),  # 重複,跳過
             providers.BatchModelItem(name="新A", model="new-a", is_default=True),
             providers.BatchModelItem(name="", model="new-b", is_default=False),
         ]
     )
     res = providers.batch_add_models(
         svc.id, body, db
-    )  # 同步端点(threadpool),不阻塞事件循环
+    )  # 同步端點(threadpool),不阻塞事件迴圈
     assert res["added"] == 2
 
     all_models = db.query(AIModel).filter(AIModel.service_id == svc.id).all()
     names = {m.model for m in all_models}
     assert names == {"dup", "new-a", "new-b"}
-    # new-a 设为默认后,其余(含原 dup)应被清零
+    # new-a 設為預設後,其餘(含原 dup)應被清零
     defaults = [m.model for m in all_models if m.is_default]
     assert defaults == ["new-a"]
-    # 显示名为空的回退为 model 标识
+    # 顯示名為空的回退為 model 標識
     assert next(m for m in all_models if m.model == "new-b").name == "new-b"
 
 
 def test_batch_add_retries_a_transient_sqlite_lock(db, monkeypatch):
-    """批量写模型遇到短暂 SQLite 锁时重试，不让请求卡满数据库超时。"""
+    """批次寫模型遇到短暫 SQLite 鎖時重試，不讓請求卡滿資料庫超時。"""
     from src.modules.administration.api import providers
 
     svc = AIService(name="s", base_url="http://x", api_key="k")
@@ -206,7 +206,7 @@ def test_batch_add_retries_a_transient_sqlite_lock(db, monkeypatch):
 
 
 def test_test_model_omits_temperature(db, monkeypatch):
-    """测试连通性时不下发 temperature(对不支持该参数的模型也安全)。"""
+    """測試連通性時不下發 temperature(對不支援該引數的模型也安全)。"""
     from src.modules.administration.api import providers
 
     m = _seed_service_with_model(db)
@@ -223,11 +223,11 @@ def test_test_model_omits_temperature(db, monkeypatch):
     monkeypatch.setattr(providers, "AIClient", _FakeClient)
     res = asyncio.run(providers.test_model(m.id, db))
     assert res["ok"] is True
-    assert seen["temperature"] is None  # 未带 temperature
+    assert seen["temperature"] is None  # 未帶 temperature
 
 
 def test_test_model_error_maps_to_400(db, monkeypatch):
-    """测试调用报错时映射为 400。"""
+    """測試呼叫報錯時對映為 400。"""
     from fastapi import HTTPException
 
     from src.modules.administration.api import providers
@@ -244,13 +244,13 @@ def test_test_model_error_maps_to_400(db, monkeypatch):
     monkeypatch.setattr(providers, "AIClient", _FakeClient)
     try:
         asyncio.run(providers.test_model(m.id, db))
-        assert False, "应抛 HTTPException"
+        assert False, "應拋 HTTPException"
     except HTTPException as e:
         assert e.status_code == 400
 
 
 def test_discover_models_empty_list(db, monkeypatch):
-    """嗅探返回空列表时,接口正常返回空 models。"""
+    """嗅探返回空列表時,介面正常返回空 models。"""
     from src.modules.administration.api import providers
 
     svc = AIService(name="s", base_url="http://x", api_key="k")

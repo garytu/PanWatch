@@ -1,7 +1,7 @@
-"""MCP Server + PAT 鉴权测试。
+"""MCP Server + PAT 鑑權測試。
 
-全用内存库与 TestClient,不触网:tools/call 只测纯 DB 工具(get_watchlist),
-覆盖协议握手/发现/调用/鉴权拒绝(缺失/无效/吊销)/JWT 不能进 MCP。
+全用記憶體庫與 TestClient,不觸網:tools/call 只測純 DB 工具(get_watchlist),
+覆蓋協議握手/發現/呼叫/鑑權拒絕(缺失/無效/吊銷)/JWT 不能進 MCP。
 """
 
 import pytest
@@ -18,7 +18,7 @@ from src.platform.persistence.database import Base, get_db
 
 @pytest.fixture()
 def client_and_session(monkeypatch):
-    """内存库 + 挂 pats(/api/pats)与 mcp(/mcp)的测试应用。"""
+    """記憶體庫 + 掛 pats(/api/pats)與 mcp(/mcp)的測試應用。"""
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -34,7 +34,7 @@ def client_and_session(monkeypatch):
         finally:
             db.close()
 
-    # 审计日志写库也指向内存库,避免污染真实库
+    # 審計日誌寫庫也指向記憶體庫,避免汙染真實庫
     monkeypatch.setattr(mcp_api, "SessionLocal", TestSession)
 
     app = FastAPI()
@@ -67,7 +67,7 @@ def test_missing_auth_rejected(client_and_session):
 
 
 def test_jwt_cannot_enter_mcp(client_and_session):
-    """非 PAT(如 JWT)的 Bearer → 403,JWT 不能进 MCP"""
+    """非 PAT(如 JWT)的 Bearer → 403,JWT 不能進 MCP"""
     client, _ = client_and_session
     r = client.post(
         "/mcp",
@@ -78,7 +78,7 @@ def test_jwt_cannot_enter_mcp(client_and_session):
 
 
 def test_invalid_pat_rejected(client_and_session):
-    """PAT 前缀正确但库里查不到 → 401"""
+    """PAT 字首正確但庫裡查不到 → 401"""
     client, _ = client_and_session
     r = client.post(
         "/mcp",
@@ -108,7 +108,7 @@ def test_initialize_handshake(client_and_session):
 
 
 def test_tools_list_discovery(client_and_session):
-    """tools/list 暴露 5 个只读工具,含 inputSchema"""
+    """tools/list 暴露 5 個只讀工具,含 inputSchema"""
     client, _ = client_and_session
     token = _create_pat(client)
     r = client.post(
@@ -130,7 +130,7 @@ def test_tools_list_discovery(client_and_session):
 
 
 def test_tools_call_and_audit_log(client_and_session):
-    """tools/call 执行纯 DB 工具并落审计日志"""
+    """tools/call 執行純 DB 工具並落審計日誌"""
     client, TestSession = client_and_session
     token = _create_pat(client)
     r = client.post(
@@ -144,7 +144,7 @@ def test_tools_call_and_audit_log(client_and_session):
     assert res["content"][0]["type"] == "text"
     assert isinstance(res["content"][0]["text"], str)
 
-    # 审计日志落库
+    # 審計日誌落庫
     from src.platform.persistence.models import MCPCallLog
 
     db = TestSession()
@@ -158,7 +158,7 @@ def test_tools_call_and_audit_log(client_and_session):
 
 
 def test_tools_call_unknown_tool(client_and_session):
-    """调用不在白名单的工具 → JSON-RPC 参数错误"""
+    """呼叫不在白名單的工具 → JSON-RPC 引數錯誤"""
     client, _ = client_and_session
     token = _create_pat(client)
     r = client.post(
@@ -171,12 +171,12 @@ def test_tools_call_unknown_tool(client_and_session):
 
 
 def test_revoked_pat_rejected(client_and_session):
-    """吊销后的 PAT 立即失效 → 401"""
+    """吊銷後的 PAT 立即失效 → 401"""
     client, _ = client_and_session
     create = client.post("/api/pats", json={"name": "tmp"}).json()
     token = create["token"]
     pat_id = create["id"]
-    # 吊销
+    # 吊銷
     assert client.delete(f"/api/pats/{pat_id}").status_code == 200
     r = client.post(
         "/mcp",
@@ -187,7 +187,7 @@ def test_revoked_pat_rejected(client_and_session):
 
 
 def test_notification_returns_202(client_and_session):
-    """通知类消息(无 id)无需响应 → 202"""
+    """通知類訊息(無 id)無需回應 → 202"""
     client, _ = client_and_session
     token = _create_pat(client)
     r = client.post(

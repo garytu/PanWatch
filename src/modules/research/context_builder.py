@@ -24,15 +24,15 @@ from src.platform.persistence.json_safe import to_jsonable
 
 logger = logging.getLogger(__name__)
 
-# 各市场用于相对强度对比的大盘指数(代码 + 中文标签)。
-# A股优先沪深300(000300);港股恒生指数;美股标普500(efinance 用 .INX)。
+# 各市場用於相對強度對比的大盤指數(程式碼 + 中文標籤)。
+# A股優先滬深300(000300);港股恒生指數;美股標普500(efinance 用 .INX)。
 _INDEX_BY_MARKET: dict[str, tuple[str, str]] = {
-    "CN": ("000300", "沪深300"),
-    "HK": ("HSI", "恒生指数"),
-    "US": (".INX", "标普500"),
+    "CN": ("000300", "滬深300"),
+    "HK": ("HSI", "恒生指數"),
+    "US": (".INX", "標普500"),
 }
-# A股若 000300 取数失败时的兜底指数(上证指数)。
-_CN_INDEX_FALLBACK: tuple[str, str] = ("000001", "上证指数")
+# A股若 000300 取數失敗時的兜底指數(上證指數)。
+_CN_INDEX_FALLBACK: tuple[str, str] = ("000001", "上證指數")
 
 
 def _iso_today() -> str:
@@ -71,11 +71,11 @@ def _estimate_quality_score(coverage: dict) -> int:
 
 
 class ContextBuilder:
-    """统一构建 Agent 上下文（新闻分层 + 历史K线 + 账户约束 + 质量评分）"""
+    """統一構建 Agent 上下文（新聞分層 + 歷史K線 + 帳戶約束 + 質量評分）"""
 
     def __init__(self):
         self._kline_cache: dict[tuple[str, str, int], dict] = {}
-        # 每次构建内,各市场大盘指数只取一次(避免逐股重复请求)。
+        # 每次構建內,各市場大盤指數只取一次(避免逐股重複請求)。
         self._index_cache: dict[str, dict | None] = {}
 
     @staticmethod
@@ -102,7 +102,7 @@ class ContextBuilder:
                 if not isinstance(items, list):
                     items = []
                 if not items:
-                    # 新版本盘前/盘后将新闻放在 context_payload.<symbol>.news.*
+                    # 新版本盤前/盤後將新聞放在 context_payload.<symbol>.news.*
                     ctx_payload = raw.get("context_payload") or {}
                     if isinstance(ctx_payload, dict):
                         sym_payload = ctx_payload.get(symbol) or {}
@@ -142,7 +142,7 @@ class ContextBuilder:
                     )
             return dedupe_news_items(out)
         except Exception as e:
-            logger.warning(f"读取历史新闻失败: {symbol} - {e}")
+            logger.warning(f"讀取歷史新聞失敗: {symbol} - {e}")
             return []
         finally:
             db.close()
@@ -215,17 +215,17 @@ class ContextBuilder:
         self._kline_cache[key] = ctx
         return ctx
 
-    # ----- ② 相对大盘强度 ------------------------------------------------- #
+    # ----- ② 相對大盤強度 ------------------------------------------------- #
 
     @staticmethod
     def _index_for_market(market) -> tuple[str, str]:
-        """市场 -> (指数代码, 中文标签)。未知市场回退到沪深300。"""
+        """市場 -> (指數程式碼, 中文標籤)。未知市場回退到滬深300。"""
         mkt = market.value if isinstance(market, MarketCode) else str(market or "")
         return _INDEX_BY_MARKET.get(mkt, _INDEX_BY_MARKET["CN"])
 
     def _fetch_index_context(self, symbol: str, market) -> dict:
-        """取指数多周期收益。指数 secid 规则与个股不同,用 get_index_klines 显式映射直取;
-        失败/不支持(如美股指数东财无K线)→ available False(fail-soft)。可被测试打桩。"""
+        """取指數多週期收益。指數 secid 規則與個股不同,用 get_index_klines 顯式對映直取;
+        失敗/不支援(如美股指數東財無K線)→ available False(fail-soft)。可被測試打樁。"""
         try:
             from src.platform.marketdata.collectors.kline_collector import get_index_klines
             from src.modules.market.kline_context import _pct
@@ -241,18 +241,18 @@ class ContextBuilder:
                 "ret_20d": _pct(cur, closes[-21] if len(closes) >= 21 else None),
             }
         except Exception as e:
-            logger.debug(f"指数K线获取失败 {symbol}: {e}")
+            logger.debug(f"指數K線獲取失敗 {symbol}: {e}")
             return {"available": False}
 
     def _get_index_context(self, market) -> dict | None:
-        """取某市场大盘指数上下文,每次构建内按市场缓存一次。"""
+        """取某市場大盤指數上下文,每次構建內按市場快取一次。"""
         mkt = market.value if isinstance(market, MarketCode) else str(market or "")
         if mkt in self._index_cache:
             return self._index_cache[mkt]
 
         sym, _label = self._index_for_market(market)
         ctx = self._fetch_index_context(sym, market)
-        # A股 000300 取不到时兜底上证指数
+        # A股 000300 取不到時兜底上證指數
         if (not ctx or not ctx.get("available")) and mkt == "CN":
             ctx = self._fetch_index_context(_CN_INDEX_FALLBACK[0], market)
         self._index_cache[mkt] = ctx
@@ -265,7 +265,7 @@ class ContextBuilder:
         kline_history: dict,
         index_ctx: dict | None,
     ) -> dict | None:
-        """个股 vs 大盘的 5日/20日超额收益。任一侧数据缺失 → None(fail-soft)。"""
+        """個股 vs 大盤的 5日/20日超額收益。任一側資料缺失 → None(fail-soft)。"""
         try:
             if not kline_history or not kline_history.get("available"):
                 return None
@@ -288,7 +288,7 @@ class ContextBuilder:
                 return None
 
             _sym, label = self._index_for_market(market)
-            # 兜底场景下标签可能是上证,这里用实际命中的标签做近似(沪深300/上证差异不影响语义)
+            # 兜底場景下標籤可能是上證,這裡用實際命中的標籤做近似(滬深300/上證差異不影響語義)
             return {
                 "index_label": label if market != MarketCode.CN else label,
                 "stock_5d": stock_5d,
@@ -299,10 +299,10 @@ class ContextBuilder:
                 "excess_20d": excess_20d,
             }
         except Exception as e:
-            logger.debug(f"相对强度计算失败: {e}")
+            logger.debug(f"相對強度計算失敗: {e}")
             return None
 
-    # ----- ① 公告全文 + 头部新闻正文保留 --------------------------------- #
+    # ----- ① 公告全文 + 頭部新聞正文保留 --------------------------------- #
 
     @staticmethod
     def _enrich_events_fulltext(
@@ -312,13 +312,13 @@ class ContextBuilder:
         importance_min: int = 2,
         max_chars: int = 1000,
     ) -> list[dict]:
-        """给最重要的 top_k 条公告(importance>=importance_min)附加 content_fulltext。
+        """給最重要的 top_k 條公告(importance>=importance_min)附加 content_fulltext。
 
-        逐条 fail-soft:抓取失败/空 → 只保留标题(不加字段),绝不抛异常。
+        逐條 fail-soft:抓取失敗/空 → 只保留標題(不加欄位),絕不拋異常。
         """
         if not events:
             return events
-        # 按重要性降序挑候选,保留原顺序输出
+        # 按重要性降序挑候選,保留原順序輸出
         important_idx = [
             i
             for i, ev in enumerate(events)
@@ -333,7 +333,7 @@ class ContextBuilder:
             try:
                 text = fetch_announcement_fulltext(art_code)
             except Exception as e:
-                logger.debug(f"公告全文注入失败 {art_code}: {e}")
+                logger.debug(f"公告全文注入失敗 {art_code}: {e}")
                 continue
             if text:
                 ev["content_fulltext"] = text[:max_chars]
@@ -346,9 +346,9 @@ class ContextBuilder:
         top_k: int = 2,
         max_chars: int = 800,
     ) -> list[dict]:
-        """头部 top_k 条新闻保留更多已有正文(放宽到 max_chars),其余维持原样。
+        """頭部 top_k 條新聞保留更多已有正文(放寬到 max_chars),其餘維持原樣。
 
-        不抓网络,只是放宽采集层 300 字截断 —— 没有正文的条目自然保持原样。
+        不抓網路,只是放寬採集層 300 字截斷 —— 沒有正文的條目自然保持原樣。
         """
         if not news:
             return news
@@ -482,29 +482,29 @@ class ContextBuilder:
                 "history_news_count": len(hist_ranked),
             }
 
-            # ① 头部实时新闻保留更多正文(放宽采集层 300 字截断)
+            # ① 頭部即時新聞保留更多正文(放寬採集層 300 字截斷)
             realtime_for_payload = self._retain_news_content(
                 [dict(it) for it in realtime_ranked[:8]], top_k=2, max_chars=800
             )
-            # ① 重要公告(importance>=2)的前 2-3 条附加东财全文(纯文本,~1000 字)
+            # ① 重要公告(importance>=2)的前 2-3 條附加東財全文(純文本,~1000 字)
             events_for_payload = self._enrich_events_fulltext(
                 [dict(ev) for ev in ((pack.events.items if (pack and pack.events) else [])[:8])],
                 top_k=3,
                 importance_min=2,
             )
 
-            # ② 个股相对大盘强度(指数按市场缓存一次)
+            # ② 個股相對大盤強度(指數按市場快取一次)
             relative_strength = self._compute_relative_strength(
                 market=market,
                 kline_history=kline_history,
                 index_ctx=self._get_index_context(market),
             )
 
-            # ④ 最近一次 TradingAgents 深度结论(高权重先验,仅紧凑版本)
+            # ④ 最近一次 TradingAgents 深度結論(高權重先驗,僅緊湊版本)
             try:
                 ta_verdict = get_latest_ta_verdict(symbol, within_days=14)
             except Exception as e:
-                logger.debug(f"注入 TA 深度结论失败 {symbol}: {e}")
+                logger.debug(f"注入 TA 深度結論失敗 {symbol}: {e}")
                 ta_verdict = None
 
             payload = {

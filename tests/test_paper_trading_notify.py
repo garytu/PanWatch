@@ -1,4 +1,4 @@
-"""模拟盘通知系统单元测试。"""
+"""模擬交易通知系統單元測試。"""
 
 import unittest
 from types import SimpleNamespace
@@ -21,12 +21,12 @@ from src.modules.administration.stock_link import stock_url
 
 
 def _make_signal(**kwargs):
-    """创建模拟 StrategySignalRun ORM 对象。"""
+    """建立模擬 StrategySignalRun ORM 物件。"""
     defaults = {
         "id": 1,
         "stock_symbol": "002837",
         "stock_market": "CN",
-        "stock_name": "英维克",
+        "stock_name": "英維克",
         "strategy_code": "trend_follow",
         "rank_score": 100.0,
         "entry_low": 112.01,
@@ -43,12 +43,12 @@ def _make_signal(**kwargs):
 
 
 def _make_position(**kwargs):
-    """创建模拟 PaperTradingPosition ORM 对象。"""
+    """建立模擬 PaperTradingPosition ORM 物件。"""
     defaults = {
         "id": 1,
         "stock_symbol": "002837",
         "stock_market": "CN",
-        "stock_name": "英维克",
+        "stock_name": "英維克",
         "quantity": 100,
         "entry_price": 113.0,
         "stop_loss": 104.0,
@@ -68,12 +68,12 @@ def _make_position(**kwargs):
 
 
 def _make_trade(**kwargs):
-    """创建模拟 PaperTradingTrade ORM 对象。"""
+    """建立模擬 PaperTradingTrade ORM 物件。"""
     defaults = {
         "id": 1,
         "stock_symbol": "002837",
         "stock_market": "CN",
-        "stock_name": "英维克",
+        "stock_name": "英維克",
         "quantity": 100,
         "entry_price": 113.0,
         "exit_price": 120.0,
@@ -103,13 +103,13 @@ def _make_account(**kwargs):
 
 
 # ---------------------------------------------------------------------------
-# 盘前计划去重测试
+# 盤前計劃去重測試
 # ---------------------------------------------------------------------------
 
 
 class TestPremarketDedup(unittest.TestCase):
     def test_dedup_same_stock_multiple_strategies(self):
-        """盘前去重 — 同股票4策略合并为1条"""
+        """盤前去重 — 同股票4策略合併為1條"""
         signals = [
             _make_signal(id=1, strategy_code="trend_follow", rank_score=100.0),
             _make_signal(id=2, strategy_code="macd_golden", rank_score=90.0),
@@ -124,10 +124,10 @@ class TestPremarketDedup(unittest.TestCase):
         self.assertEqual(sig.rank_score, 100.0)
 
     def test_dedup_different_stocks(self):
-        """盘前去重 — 不同股票各自保留"""
+        """盤前去重 — 不同股票各自保留"""
         signals = [
             _make_signal(id=1, stock_symbol="002837", rank_score=100.0),
-            _make_signal(id=2, stock_symbol="000001", stock_name="平安银行", rank_score=95.0),
+            _make_signal(id=2, stock_symbol="000001", stock_name="平安銀行", rank_score=95.0),
             _make_signal(id=3, stock_symbol="002837", strategy_code="macd_golden", rank_score=80.0),
         ]
         deduped = _dedup_signals(signals)
@@ -138,7 +138,7 @@ class TestPremarketDedup(unittest.TestCase):
         self.assertEqual(deduped[1][1], 1)
 
     def test_premarket_plan_format_with_dedup(self):
-        """盘前计划 — 去重后格式化含策略数和链接"""
+        """盤前計劃 — 去重後格式化含策略數和連結"""
         signals = [
             _make_signal(id=1, strategy_code="trend_follow", rank_score=100.0),
             _make_signal(id=2, strategy_code="macd_golden", rank_score=90.0),
@@ -148,34 +148,34 @@ class TestPremarketDedup(unittest.TestCase):
         account = _make_account()
         title, body = _format_premarket_plan(signals, account)
 
-        self.assertIn("盘前计划", title)
-        # 股票只出现 1 次（symbol 出现在 "002837.CN" 和 URL 中）
+        self.assertIn("盤前計劃", title)
+        # 股票只出現 1 次（symbol 出現在 "002837.CN" 和 URL 中）
         lines_with_stock = [l for l in body.split("\n") if "002837" in l]
         self.assertEqual(len(lines_with_stock), 1)
-        # 显示中文策略名 + 数量
-        self.assertIn("趋势延续 等4个策略", body)
-        # 包含雪球链接
+        # 顯示中文策略名 + 數量
+        self.assertIn("趨勢延續 等4個策略", body)
+        # 包含雪球連結
         self.assertIn("xueqiu.com", body)
 
     def test_premarket_plan_no_signals(self):
-        """盘前计划 — 空信号显示无候选"""
+        """盤前計劃 — 空訊號顯示無候選"""
         account = _make_account()
         title, body = _format_premarket_plan([], account)
-        self.assertIn("无候选", body)
+        self.assertIn("無候選", body)
 
 
 # ---------------------------------------------------------------------------
-# 消息格式化测试（dict 输入）
+# 訊息格式化測試（dict 輸入）
 # ---------------------------------------------------------------------------
 
 
 class TestMessageFormat(unittest.TestCase):
     def test_entry_message_format(self):
-        """建仓通知 — 格式含价格/策略/链接"""
+        """建倉通知 — 格式含價格/策略/連結"""
         pos_data = {
             "stock_symbol": "002837",
             "stock_market": "CN",
-            "stock_name": "英维克",
+            "stock_name": "英維克",
             "quantity": 100,
             "entry_price": 113.0,
             "stop_loss": 104.0,
@@ -187,21 +187,21 @@ class TestMessageFormat(unittest.TestCase):
             "rank_score": 100.0,
         }
         title, body = _format_entry_message(pos_data, sig_data)
-        self.assertIn("建仓", title)
-        self.assertIn("英维克", title)
+        self.assertIn("建倉", title)
+        self.assertIn("英維克", title)
         self.assertIn("113.00", body)
         self.assertIn("104.00", body)
         self.assertIn("130.00", body)
         self.assertIn("100.0", body)  # rank_score
-        self.assertIn("趋势延续", body)  # 中文策略名
-        self.assertIn("xueqiu.com", body)  # 股票链接
+        self.assertIn("趨勢延續", body)  # 中文策略名
+        self.assertIn("xueqiu.com", body)  # 股票連結
 
     def test_entry_message_no_signal(self):
-        """建仓通知 — 无信号时不报错"""
+        """建倉通知 — 無訊號時不報錯"""
         pos_data = {
             "stock_symbol": "002837",
             "stock_market": "CN",
-            "stock_name": "英维克",
+            "stock_name": "英維克",
             "quantity": 100,
             "entry_price": 113.0,
             "stop_loss": 104.0,
@@ -209,15 +209,15 @@ class TestMessageFormat(unittest.TestCase):
             "strategy_code": "trend_follow",
         }
         title, body = _format_entry_message(pos_data, None)
-        self.assertIn("建仓", title)
-        self.assertIn("趋势延续", body)
+        self.assertIn("建倉", title)
+        self.assertIn("趨勢延續", body)
 
     def test_exit_message_format(self):
-        """平仓通知 — 盈利格式含止盈/持仓天数"""
+        """平倉通知 — 盈利格式含停利/持倉天數"""
         pos_data = {
             "stock_symbol": "002837",
             "stock_market": "CN",
-            "stock_name": "英维克",
+            "stock_name": "英維克",
         }
         trade_data = {
             "entry_price": 113.0,
@@ -228,17 +228,17 @@ class TestMessageFormat(unittest.TestCase):
             "holding_days": 3,
         }
         title, body = _format_exit_message(pos_data, trade_data)
-        self.assertIn("平仓", title)
+        self.assertIn("平倉", title)
         self.assertIn("+700.00", title)
-        self.assertIn("止盈", body)
+        self.assertIn("停利", body)
         self.assertIn("113.00", body)
         self.assertIn("120.00", body)
         self.assertIn("3天", body)
-        self.assertIn("xueqiu.com", body)  # 股票链接
+        self.assertIn("xueqiu.com", body)  # 股票連結
 
     def test_exit_message_loss(self):
-        """平仓通知 — 亏损时显示负号和止损"""
-        pos_data = {"stock_symbol": "002837", "stock_market": "CN", "stock_name": "英维克"}
+        """平倉通知 — 虧損時顯示負號和停損"""
+        pos_data = {"stock_symbol": "002837", "stock_market": "CN", "stock_name": "英維克"}
         trade_data = {
             "entry_price": 113.0,
             "exit_price": 105.0,
@@ -249,28 +249,28 @@ class TestMessageFormat(unittest.TestCase):
         }
         title, body = _format_exit_message(pos_data, trade_data)
         self.assertIn("-800.00", title)
-        self.assertIn("止损", body)
+        self.assertIn("停損", body)
 
     def test_daily_summary_format(self):
-        """日终摘要 — 含总资产/平仓笔数/持仓数"""
+        """日終摘要 — 含總資產/平倉筆數/持倉數"""
         trades = [_make_trade()]
         positions = [_make_position()]
         account = _make_account()
         title, body = _format_daily_summary(trades, positions, account)
-        self.assertIn("日终摘要", title)
-        self.assertIn("总资产", body)
-        self.assertIn("当日平仓 1 笔", body)
-        self.assertIn("持仓中 1 只", body)
+        self.assertIn("日終摘要", title)
+        self.assertIn("總資產", body)
+        self.assertIn("當日平倉 1 筆", body)
+        self.assertIn("持倉中 1 只", body)
 
 
 # ---------------------------------------------------------------------------
-# 序列化函数测试
+# 序列化函式測試
 # ---------------------------------------------------------------------------
 
 
 class TestSerialize(unittest.TestCase):
     def test_serialize_position(self):
-        """序列化 — 持仓对象转 dict"""
+        """序列化 — 持倉物件轉 dict"""
         pos = _make_position()
         d = _serialize_position(pos)
         self.assertEqual(d["stock_symbol"], "002837")
@@ -279,7 +279,7 @@ class TestSerialize(unittest.TestCase):
         self.assertIn("id", d)
 
     def test_serialize_trade(self):
-        """序列化 — 交易记录转 dict"""
+        """序列化 — 交易記錄轉 dict"""
         trade = _make_trade()
         d = _serialize_trade(trade)
         self.assertEqual(d["exit_price"], 120.0)
@@ -287,7 +287,7 @@ class TestSerialize(unittest.TestCase):
         self.assertEqual(d["exit_reason"], "target_price")
 
     def test_serialize_signal(self):
-        """序列化 — 策略信号转 dict"""
+        """序列化 — 策略訊號轉 dict"""
         sig = _make_signal()
         d = _serialize_signal(sig)
         self.assertEqual(d["stock_symbol"], "002837")
@@ -297,33 +297,33 @@ class TestSerialize(unittest.TestCase):
 
 class TestHelpers(unittest.TestCase):
     def test_strategy_label_known(self):
-        """策略名映射 — 已知策略返回中文"""
-        self.assertEqual(_strategy_label("trend_follow"), "趋势延续")
+        """策略名對映 — 已知策略返回中文"""
+        self.assertEqual(_strategy_label("trend_follow"), "趨勢延續")
         self.assertEqual(_strategy_label("macd_golden"), "MACD金叉")
-        self.assertEqual(_strategy_label("momentum"), "动量策略")
-        self.assertEqual(_strategy_label("market_scan"), "市场扫描")
+        self.assertEqual(_strategy_label("momentum"), "動量策略")
+        self.assertEqual(_strategy_label("market_scan"), "市場掃描")
 
     def test_strategy_label_unknown(self):
-        """策略名映射 — 未知策略原样返回"""
+        """策略名對映 — 未知策略原樣返回"""
         self.assertEqual(_strategy_label("some_new_strategy"), "some_new_strategy")
 
     def test_stock_url_cn(self):
-        """股票链接 — 深圳股票"""
+        """股票連結 — 深圳股票"""
         url = stock_url("002837", "CN", platform="xueqiu")
         self.assertIn("xueqiu.com/S/SZ002837", url)
 
     def test_stock_url_cn_sh(self):
-        """股票链接 — 上海股票"""
+        """股票連結 — 上海股票"""
         url = stock_url("600519", "CN", platform="xueqiu")
         self.assertIn("xueqiu.com/S/SH600519", url)
 
     def test_stock_url_us(self):
-        """股票链接 — 美股"""
+        """股票連結 — 美股"""
         url = stock_url("AAPL", "US", platform="xueqiu")
         self.assertEqual(url, "https://xueqiu.com/S/AAPL")
 
     def test_stock_url_hk(self):
-        """股票链接 — 港股"""
+        """股票連結 — 港股"""
         url = stock_url("00883", "HK", platform="xueqiu")
         self.assertEqual(url, "https://xueqiu.com/S/00883")
 

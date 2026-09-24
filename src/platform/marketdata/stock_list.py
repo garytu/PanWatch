@@ -1,8 +1,8 @@
-"""股票标的清单的数据源适配器、项目级缓存与模糊搜索。
+"""股票標的清單的資料來源介面卡、專案級快取與模糊搜尋。
 
-清单可被 API、任务调度和业务模块共同使用，因此属于市场数据平台，而不是
-HTTP 层。缓存仍固定保存在项目根目录的 ``data/``，避免移动代码后悄然生成
-另一份 ``src/data`` 缓存。
+清單可被 API、任務排程和業務模組共同使用，因此屬於市場資料平臺，而不是
+HTTP 層。快取仍固定儲存在專案根目錄的 ``data/``，避免移動程式碼後悄然生成
+另一份 ``src/data`` 快取。
 """
 import json
 import os
@@ -20,7 +20,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 CACHE_FILE = DATA_DIR / "stock_list_cache.json"
 CACHE_TTL = 86400 * 7  # 7 days
 
-# 东方财富 A 股（使用 push2delay 域名，避免重定向）
+# 東方財富 A 股（使用 push2delay 域名，避免重定向）
 EASTMONEY_URL = "http://80.push2delay.eastmoney.com/api/qt/clist/get"
 EASTMONEY_PARAMS = {
     "po": "1",
@@ -32,18 +32,18 @@ EASTMONEY_PARAMS = {
     "fields": "f12,f14",
 }
 
-# 东方财富港股参数
+# 東方財富港股引數
 EASTMONEY_HK_PARAMS = {
     "po": "1",
     "np": "1",
     "fltt": "2",
     "invt": "2",
     "fid": "f12",
-    "fs": "m:128+t:3,m:128+t:4,m:128+t:1,m:128+t:2",  # 港股主板、创业板等
+    "fs": "m:128+t:3,m:128+t:4,m:128+t:1,m:128+t:2",  # 港股主機板、創業板等
     "fields": "f12,f14",
 }
 
-# 东方财富美股参数
+# 東方財富美股引數
 EASTMONEY_US_PARAMS = {
     "po": "1",
     "np": "1",
@@ -54,7 +54,7 @@ EASTMONEY_US_PARAMS = {
     "fields": "f12,f14",
 }
 
-# 东方财富北交所参数（北证A股）
+# 東方財富北交所引數（北證A股）
 EASTMONEY_BJ_PARAMS = {
     "po": "1",
     "np": "1",
@@ -65,6 +65,46 @@ EASTMONEY_BJ_PARAMS = {
     "fields": "f12,f14",
 }
 PAGE_SIZE = 100
+
+_BUNDLED_TW_STOCKS = [
+    {"symbol": "2330", "name": "台積電", "market": "TW"},
+    {"symbol": "2317", "name": "鴻海", "market": "TW"},
+    {"symbol": "2454", "name": "聯發科", "market": "TW"},
+    {"symbol": "2308", "name": "台達電", "market": "TW"},
+    {"symbol": "2382", "name": "廣達", "market": "TW"},
+    {"symbol": "2412", "name": "中華電", "market": "TW"},
+    {"symbol": "2881", "name": "富邦金", "market": "TW"},
+    {"symbol": "2882", "name": "國泰金", "market": "TW"},
+    {"symbol": "2891", "name": "中信金", "market": "TW"},
+    {"symbol": "2886", "name": "兆豐金", "market": "TW"},
+    {"symbol": "0050", "name": "元大台灣50", "market": "TW"},
+    {"symbol": "0056", "name": "元大高股息", "market": "TW"},
+    {"symbol": "00878", "name": "國泰永續高股息", "market": "TW"},
+    {"symbol": "00919", "name": "群益台灣精選高息", "market": "TW"},
+    {"symbol": "00929", "name": "復華台灣科技優息", "market": "TW"},
+    {"symbol": "2603", "name": "長榮", "market": "TW"},
+    {"symbol": "2609", "name": "陽明", "market": "TW"},
+    {"symbol": "2615", "name": "萬海", "market": "TW"},
+    {"symbol": "3008", "name": "大立光", "market": "TW"},
+    {"symbol": "2303", "name": "聯電", "market": "TW"},
+    {"symbol": "3711", "name": "日月光投控", "market": "TW"},
+    {"symbol": "2884", "name": "玉山金", "market": "TW"},
+    {"symbol": "2892", "name": "第一金", "market": "TW"},
+    {"symbol": "5880", "name": "合庫金", "market": "TW"},
+    {"symbol": "2880", "name": "華南金", "market": "TW"},
+    {"symbol": "2885", "name": "元大金", "market": "TW"},
+    {"symbol": "3231", "name": "緯創", "market": "TW"},
+    {"symbol": "2357", "name": "華碩", "market": "TW"},
+    {"symbol": "2379", "name": "瑞昱", "market": "TW"},
+    {"symbol": "3034", "name": "聯詠", "market": "TW"},
+    {"symbol": "2327", "name": "國巨", "market": "TW"},
+    {"symbol": "6669", "name": "緯穎", "market": "TW"},
+    {"symbol": "2395", "name": "研華", "market": "TW"},
+    {"symbol": "1301", "name": "台塑", "market": "TW"},
+    {"symbol": "1303", "name": "南亞", "market": "TW"},
+    {"symbol": "2002", "name": "中鋼", "market": "TW"},
+]
+
 
 
 def _load_cache() -> list[dict] | None:
@@ -94,7 +134,7 @@ HEADERS = {
 
 
 def _fetch_page(client: httpx.Client, page: int) -> list[dict]:
-    """获取东方财富股票列表的单页"""
+    """獲取東方財富股票列表的單頁"""
     params = {**EASTMONEY_PARAMS, "pn": str(page), "pz": str(PAGE_SIZE)}
     resp = client.get(EASTMONEY_URL, params=params, timeout=30, follow_redirects=True)
     data = resp.json()
@@ -104,9 +144,9 @@ def _fetch_page(client: httpx.Client, page: int) -> list[dict]:
 
 
 def _fetch_from_eastmoney() -> list[dict]:
-    """东方财富 A 股列表（HTTP 分页并发获取）"""
+    """東方財富 A 股列表（HTTP 分頁併發獲取）"""
     with httpx.Client(follow_redirects=True, headers=HEADERS, timeout=30) as client:
-        # 第一页: 获取总数
+        # 第一頁: 獲取總數
         params = {**EASTMONEY_PARAMS, "pn": "1", "pz": str(PAGE_SIZE)}
         resp = client.get(EASTMONEY_URL, params=params)
         data = resp.json()
@@ -119,7 +159,7 @@ def _fetch_from_eastmoney() -> list[dict]:
         if total <= PAGE_SIZE:
             return stocks
 
-        # 剩余页并发获取
+        # 剩餘頁併發獲取
         pages_needed = (total + PAGE_SIZE - 1) // PAGE_SIZE
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             futures = {pool.submit(_fetch_page, client, pn): pn for pn in range(2, pages_needed + 1)}
@@ -127,13 +167,13 @@ def _fetch_from_eastmoney() -> list[dict]:
                 try:
                     stocks.extend(future.result())
                 except Exception as e:
-                    logger.warning(f"东方财富第 {futures[future]} 页获取失败: {e}")
+                    logger.warning(f"東方財富第 {futures[future]} 頁獲取失敗: {e}")
 
     return stocks
 
 
 def _fetch_hk_page(client: httpx.Client, page: int) -> list[dict]:
-    """获取东方财富港股列表的单页"""
+    """獲取東方財富港股列表的單頁"""
     params = {**EASTMONEY_HK_PARAMS, "pn": str(page), "pz": str(PAGE_SIZE)}
     resp = client.get(EASTMONEY_URL, params=params, timeout=30, follow_redirects=True)
     data = resp.json()
@@ -143,7 +183,7 @@ def _fetch_hk_page(client: httpx.Client, page: int) -> list[dict]:
 
 
 def _fetch_hk_from_eastmoney() -> list[dict]:
-    """东方财富港股列表"""
+    """東方財富港股列表"""
     with httpx.Client(follow_redirects=True, headers=HEADERS, timeout=30) as client:
         params = {**EASTMONEY_HK_PARAMS, "pn": "1", "pz": str(PAGE_SIZE)}
         resp = client.get(EASTMONEY_URL, params=params)
@@ -164,13 +204,13 @@ def _fetch_hk_from_eastmoney() -> list[dict]:
                 try:
                     stocks.extend(future.result())
                 except Exception as e:
-                    logger.warning(f"东方财富港股第 {futures[future]} 页获取失败: {e}")
+                    logger.warning(f"東方財富港股第 {futures[future]} 頁獲取失敗: {e}")
 
     return stocks
 
 
 def _fetch_bj_page(client: httpx.Client, page: int) -> list[dict]:
-    """获取东方财富北交所列表的单页"""
+    """獲取東方財富北交所列表的單頁"""
     params = {**EASTMONEY_BJ_PARAMS, "pn": str(page), "pz": str(PAGE_SIZE)}
     resp = client.get(EASTMONEY_URL, params=params, timeout=30, follow_redirects=True)
     data = resp.json()
@@ -180,9 +220,9 @@ def _fetch_bj_page(client: httpx.Client, page: int) -> list[dict]:
 
 
 def _fetch_bj_from_eastmoney() -> list[dict]:
-    """东方财富北交所列表（HTTP 分页并发获取）"""
+    """東方財富北交所列表（HTTP 分頁併發獲取）"""
     with httpx.Client(follow_redirects=True, headers=HEADERS, timeout=30) as client:
-        # 第一页: 获取总数
+        # 第一頁: 獲取總數
         params = {**EASTMONEY_BJ_PARAMS, "pn": "1", "pz": str(PAGE_SIZE)}
         resp = client.get(EASTMONEY_URL, params=params)
         data = resp.json()
@@ -195,7 +235,7 @@ def _fetch_bj_from_eastmoney() -> list[dict]:
         if total <= PAGE_SIZE:
             return stocks
 
-        # 剩余页并发获取
+        # 剩餘頁併發獲取
         pages_needed = (total + PAGE_SIZE - 1) // PAGE_SIZE
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             futures = {pool.submit(_fetch_bj_page, client, pn): pn for pn in range(2, pages_needed + 1)}
@@ -203,13 +243,13 @@ def _fetch_bj_from_eastmoney() -> list[dict]:
                 try:
                     stocks.extend(future.result())
                 except Exception as e:
-                    logger.warning(f"东方财富北交所第 {futures[future]} 页获取失败: {e}")
+                    logger.warning(f"東方財富北交所第 {futures[future]} 頁獲取失敗: {e}")
 
     return stocks
 
 
 def _fetch_us_page(client: httpx.Client, page: int) -> list[dict]:
-    """获取东方财富美股列表的单页"""
+    """獲取東方財富美股列表的單頁"""
     params = {**EASTMONEY_US_PARAMS, "pn": str(page), "pz": str(PAGE_SIZE)}
     resp = client.get(EASTMONEY_URL, params=params, timeout=30, follow_redirects=True)
     data = resp.json()
@@ -219,7 +259,7 @@ def _fetch_us_page(client: httpx.Client, page: int) -> list[dict]:
 
 
 def _fetch_us_from_eastmoney() -> list[dict]:
-    """东方财富美股列表"""
+    """東方財富美股列表"""
     with httpx.Client(follow_redirects=True, headers=HEADERS, timeout=30) as client:
         params = {**EASTMONEY_US_PARAMS, "pn": "1", "pz": str(PAGE_SIZE)}
         resp = client.get(EASTMONEY_URL, params=params)
@@ -240,13 +280,13 @@ def _fetch_us_from_eastmoney() -> list[dict]:
                 try:
                     stocks.extend(future.result())
                 except Exception as e:
-                    logger.warning(f"东方财富美股第 {futures[future]} 页获取失败: {e}")
+                    logger.warning(f"東方財富美股第 {futures[future]} 頁獲取失敗: {e}")
 
     return stocks
 
 
 def _fetch_from_akshare() -> list[dict]:
-    """akshare 数据源（备用，可能有 SSL 问题）"""
+    """akshare 資料來源（備用，可能有 SSL 問題）"""
     import akshare as ak
 
     df = ak.stock_info_a_code_name()
@@ -261,68 +301,120 @@ def _fetch_from_akshare() -> list[dict]:
 
 
 def refresh_stock_list() -> list[dict]:
-    """拉取 A 股和港股列表并缓存"""
+    """拉取 A 股和港股列表並快取"""
     stocks = []
 
-    # A 股: 东方财富优先，akshare 备用
+    # A 股: 東方財富優先，akshare 備用
     try:
         cn_stocks = _fetch_from_eastmoney()
         stocks.extend(cn_stocks)
-        logger.info(f"东方财富获取 A 股列表成功: {len(cn_stocks)} 只")
+        logger.info(f"東方財富獲取 A 股列表成功: {len(cn_stocks)} 只")
     except Exception as e:
-        logger.warning(f"东方财富获取 A 股失败: {e}")
+        logger.warning(f"東方財富獲取 A 股失敗: {e}")
         try:
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 future = pool.submit(_fetch_from_akshare)
                 cn_stocks = future.result(timeout=15)
                 stocks.extend(cn_stocks)
-            logger.info(f"akshare 获取 A 股列表成功: {len(cn_stocks)} 只")
+            logger.info(f"akshare 獲取 A 股列表成功: {len(cn_stocks)} 只")
         except concurrent.futures.TimeoutError:
-            logger.error("akshare 获取超时（15s）")
+            logger.error("akshare 獲取超時（15s）")
         except Exception as e2:
-            logger.error(f"A 股数据源获取失败: {e2}")
+            logger.error(f"A 股資料來源獲取失敗: {e2}")
 
-    # 港股: 东方财富
+    # 港股: 東方財富
     try:
         hk_stocks = _fetch_hk_from_eastmoney()
         stocks.extend(hk_stocks)
-        logger.info(f"东方财富获取港股列表成功: {len(hk_stocks)} 只")
+        logger.info(f"東方財富獲取港股列表成功: {len(hk_stocks)} 只")
     except Exception as e:
-        logger.warning(f"东方财富获取港股失败: {e}")
+        logger.warning(f"東方財富獲取港股失敗: {e}")
 
-    # 美股: 东方财富
+    # 美股: 東方財富
     try:
         us_stocks = _fetch_us_from_eastmoney()
         stocks.extend(us_stocks)
-        logger.info(f"东方财富获取美股列表成功: {len(us_stocks)} 只")
+        logger.info(f"東方財富獲取美股列表成功: {len(us_stocks)} 只")
     except Exception as e:
-        logger.warning(f"东方财富获取美股失败: {e}")
+        logger.warning(f"東方財富獲取美股失敗: {e}")
 
-    # 北交所: 东方财富
+    # 北交所: 東方財富
     try:
         bj_stocks = _fetch_bj_from_eastmoney()
         stocks.extend(bj_stocks)
-        logger.info(f"东方财富获取北交所列表成功: {len(bj_stocks)} 只")
+        logger.info(f"東方財富獲取北交所列表成功: {len(bj_stocks)} 只")
     except Exception as e:
-        logger.warning(f"东方财富获取北交所失败: {e}")
+        logger.warning(f"東方財富獲取北交所失敗: {e}")
+
+    # 台股: FinMind 優先，內建主流標的清單兜底
+    try:
+        tw_stocks = _fetch_tw_from_finmind()
+        stocks.extend(tw_stocks)
+        logger.info(f"獲取台股列表成功: {len(tw_stocks)} 只")
+    except Exception as e:
+        logger.warning(f"獲取台股列表失敗: {e}")
+        stocks.extend(list(_BUNDLED_TW_STOCKS))
 
     if stocks:
         _save_cache(stocks)
     return stocks
 
 
+def _fetch_tw_from_finmind() -> list[dict]:
+    """從 FinMind 獲取台股標的總覽 (TaiwanStockInfo)"""
+    token = os.environ.get("FINMIND_API_TOKEN")
+    url = "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo"
+    if token:
+        url += f"&token={token}"
+    try:
+        with httpx.Client(timeout=10, follow_redirects=True) as client:
+            resp = client.get(url)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                latest_by_id = {}
+                for row in data:
+                    sid = str(row.get("stock_id", "")).strip()
+                    sname = str(row.get("stock_name", "")).strip()
+                    stype = str(row.get("type", ""))
+                    if len(sid) == 4 and stype in ("twse", "tpex"):
+                        latest_by_id[sid] = {"symbol": sid, "name": sname, "market": "TW"}
+                if latest_by_id:
+                    return list(latest_by_id.values())
+    except Exception as e:
+        logger.warning(f"FinMind 獲取台股總覽失敗: {e}")
+    return list(_BUNDLED_TW_STOCKS)
+
+
 def get_stock_list() -> list[dict]:
-    """获取股票列表(优先缓存)"""
+    """獲取股票列表(優先快取)"""
     cached = _load_cache()
     if cached:
         return cached
     return refresh_stock_list()
 
 
+def get_stock_name(symbol: str, market: str = "") -> str:
+    """按股票代碼查詢名稱 (用於展示，如 2330 -> 台積電)"""
+    sym = symbol.strip().upper()
+    if "." in sym:
+        sym = sym.split(".")[0]
+    stocks = get_stock_list() or []
+    for s in stocks:
+        if market and s.get("market") != market:
+            continue
+        if s.get("symbol", "").upper() == sym:
+            return s.get("name", "")
+    for s in _BUNDLED_TW_STOCKS:
+        if s["symbol"] == sym:
+            return s["name"]
+    return ""
+
+
+
 def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict]:
-    """东方财富实时搜索 API"""
+    """東方財富即時搜尋 API"""
     import urllib.parse
-    # 提高 count 以覆盖更多候选项（包含北交所）
+    # 提高 count 以覆蓋更多候選項（包含北交所）
     url = f"https://searchapi.eastmoney.com/api/suggest/get?input={urllib.parse.quote(query)}&type=14&count={limit * 5}"
 
     try:
@@ -330,7 +422,7 @@ def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict
             resp = client.get(url, headers=HEADERS)
             data = resp.json()
     except Exception as e:
-        logger.warning(f"实时搜索失败: {e}")
+        logger.warning(f"即時搜尋失敗: {e}")
         return []
 
     items = data.get("QuotationCodeTable", {}).get("Data", [])
@@ -339,7 +431,7 @@ def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict
 
     def _normalize_symbol(code: str, mkt: str) -> str:
         c = (code or "").strip().upper()
-        # 去掉可能的市场前缀/后缀，如 SH000001 / SZ000001 / BJ830799 / 00700.HK / 836239.BJ
+        # 去掉可能的市場字首/字尾，如 SH000001 / SZ000001 / BJ830799 / 00700.HK / 836239.BJ
         for p in ("SH", "SZ", "BJ", "US", "HK"):
             if c.startswith(p):
                 c = c[len(p):]
@@ -348,7 +440,7 @@ def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict
             # 形如 00700.HK / 836239.BJ
             c = c.split(".")[0]
         if mkt == "HK":
-            # 保证为 5 位代码
+            # 保證為 5 位程式碼
             c = c.zfill(5)
         return c
 
@@ -358,10 +450,10 @@ def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict
         security_type = (item.get("SecurityTypeName") or "").strip()
         code_raw = (item.get("Code") or "").strip().upper()
 
-        # 判断市场
+        # 判斷市場
         if (
             classify in ("AStock", "BJStock")
-            or any(ch in security_type for ch in ("沪", "深", "北"))
+            or any(ch in security_type for ch in ("滬", "深", "北"))
             or code_raw.endswith(".BJ")
             or code_raw.startswith("BJ")
         ):
@@ -371,13 +463,13 @@ def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict
         elif classify == "UsStock" or "美" in security_type:
             stock_market = "US"
         else:
-            continue  # 跳过其他类型（债券、基金等）
+            continue  # 跳過其他型別（債券、基金等）
 
-        # 市场筛选
+        # 市場篩選
         if market and stock_market != market:
             continue
 
-        # 只保留股票（排除债券等）
+        # 只保留股票（排除債券等）
         type_us = item.get("TypeUS", "")
         if stock_market == "US" and type_us and type_us not in ("1", "2", "3"):  # 1=普通股, 3=ADR/ADS 等；5=ETF 等
             continue
@@ -398,21 +490,21 @@ def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict
 
 
 def search_stocks(query: str, market: str = "", limit: int = 20) -> list[dict]:
-    """搜索股票 - 优先使用实时搜索，失败则使用缓存"""
+    """搜尋股票 - 優先使用即時搜尋，失敗則使用快取"""
     q = query.strip()
     if not q:
         return []
 
-    # 尝试实时搜索
+    # 嘗試即時搜尋
     results = _realtime_search(q, market, limit)
     if len(results) >= limit:
         return results[:limit]
 
-    # 实时搜索结果不足时，用缓存补全（便于聚合多市场搜索结果）
+    # 即時搜尋結果不足時，用快取補全（便於聚合多市場搜尋結果）
     cached = _cached_search(q, market, limit)
     if not results:
         if cached:
-            logger.info("实时搜索无结果，使用缓存搜索")
+            logger.info("即時搜尋無結果，使用快取搜尋")
         return cached
 
     seen = {(r.get("market"), r.get("symbol")) for r in results}
@@ -428,8 +520,10 @@ def search_stocks(query: str, market: str = "", limit: int = 20) -> list[dict]:
 
 
 def _cached_search(query: str, market: str = "", limit: int = 20) -> list[dict]:
-    """从缓存中模糊搜索股票"""
-    stocks = get_stock_list()
+    """從快取中模糊搜尋股票"""
+    stocks = list(get_stock_list() or [])
+    if not any(s.get("market") == "TW" for s in stocks):
+        stocks.extend(_BUNDLED_TW_STOCKS)
     if not stocks:
         return []
 
@@ -443,7 +537,7 @@ def _cached_search(query: str, market: str = "", limit: int = 20) -> list[dict]:
             continue
         code = s["symbol"].upper()
         name = s["name"].upper()
-        # 代码前缀匹配优先
+        # 程式碼字首匹配優先
         if code.startswith(q):
             results.append((0, s))
         elif q in name:

@@ -67,7 +67,7 @@ export async function fetchAPI<T>(path: string, options?: ApiRequestOptions): Pr
     })
   } catch (error: any) {
     if (error?.name === 'AbortError') {
-      throw new Error('请求超时，请稍后重试')
+      throw new Error('請求超時，請稍後重試')
     }
     throw error
   } finally {
@@ -78,7 +78,7 @@ export async function fetchAPI<T>(path: string, options?: ApiRequestOptions): Pr
 
   if (res.status === 401) {
     logout()
-    throw new Error('登录已过期')
+    throw new Error('登入已過期')
   }
 
   const body: ApiResponse<T> = await res.json().catch(() => ({

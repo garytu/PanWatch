@@ -7,7 +7,7 @@ def test_stock_response_includes_agent_display_name_from_config():
     stock = SimpleNamespace(
         id=1,
         symbol="600519",
-        name="贵州茅台",
+        name="貴州茅臺",
         market="CN",
         sort_order=1,
         agents=[
@@ -20,12 +20,12 @@ def test_stock_response_includes_agent_display_name_from_config():
         ],
     )
 
-    result = _stock_to_response(stock, {"daily_report": "收盘复盘"})
+    result = _stock_to_response(stock, {"daily_report": "收盤覆盤"})
 
     assert result["agents"] == [
         {
             "agent_name": "daily_report",
-            "display_name": "收盘复盘",
+            "display_name": "收盤覆盤",
             "schedule": "",
             "ai_model_id": None,
             "notify_channel_ids": [],

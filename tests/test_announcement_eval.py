@@ -1,4 +1,4 @@
-"""公告利好利空解读(Phase B)。"""
+"""公告利好利空解讀(Phase B)。"""
 
 from __future__ import annotations
 
@@ -18,27 +18,27 @@ class _FakeAIClient:
 
 def test_parse_tone():
     """利好/利空/中性 解析(子串安全)。"""
-    assert insights._parse_tone("利好,业绩超预期") == "利好"
+    assert insights._parse_tone("利好,業績超預期") == "利好"
     assert insights._parse_tone("偏利空") == "利空"
-    assert insights._parse_tone("影响中性") == "中性"
+    assert insights._parse_tone("影響中性") == "中性"
     assert insights._parse_tone("看不出") == "中性"
 
 
 def test_announcement_eval_maps_tone_per_item(monkeypatch):
-    """逐条公告映射 AI 判定的利好/利空。"""
+    """逐條公告對映 AI 判定的利好/利空。"""
     insights._ANN_CACHE.clear()
 
     async def fake_fetch(symbol, name, limit=5):
         return [
-            {"title": "中标重大项目", "time": "2026-06-18 09:00", "content": ""},
-            {"title": "股东拟减持", "time": "2026-06-17 16:00", "content": ""},
+            {"title": "中標重大專案", "time": "2026-06-18 09:00", "content": ""},
+            {"title": "股東擬減持", "time": "2026-06-17 16:00", "content": ""},
         ]
 
     monkeypatch.setattr(insights, "_fetch_recent_announcements", fake_fetch)
     monkeypatch.setattr(
         insights,
             "get_configured_failover_client",
-        lambda db, mid=None: _FakeAIClient("1|利好|中标利好业绩\n2|利空|减持承压"),
+        lambda db, mid=None: _FakeAIClient("1|利好|中標利好業績\n2|利空|減持承壓"),
     )
 
     req = insights.AnnouncementEvalRequest(symbol="600519", market="CN")
@@ -54,7 +54,7 @@ def test_announcement_eval_maps_tone_per_item(monkeypatch):
 
 
 def test_announcement_eval_empty(monkeypatch):
-    """无公告时返回空列表,不调 AI。"""
+    """無公告時返回空列表,不調 AI。"""
     insights._ANN_CACHE.clear()
 
     async def fake_fetch(symbol, name, limit=5):

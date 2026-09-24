@@ -21,4 +21,4 @@ class ReadOnlyToolPolicy:
     ) -> ToolPermissionDecision:
         if self.is_tool_visible(request, tool):
             return ToolPermissionDecision.allow()
-        return ToolPermissionDecision.deny("只读运行时不允许执行此工具")
+        return ToolPermissionDecision.deny("只讀執行時不允許執行此工具")

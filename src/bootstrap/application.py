@@ -1,8 +1,8 @@
-"""PanWatch 的 ASGI 应用装配根。
+"""PanWatch 的 ASGI 應用裝配根。
 
-这里是进程启动时唯一创建 :class:`fastapi.FastAPI` 实例的位置。它只连接
-HTTP 中间件、认证依赖和各模块 router；具体业务规则仍由 ``modules`` 与
-``platform`` 承担，避免把应用入口演变成新的通用业务层。
+這裡是程式啟動時唯一建立 :class:`fastapi.FastAPI` 例項的位置。它只連線
+HTTP 中介軟體、認證依賴和各模組 router；具體業務規則仍由 ``modules`` 與
+``platform`` 承擔，避免把應用入口演變成新的通用業務層。
 """
 
 from fastapi import Depends, FastAPI, Request
@@ -49,7 +49,7 @@ from src.web.response import ResponseWrapperMiddleware
 app = FastAPI(
     title="PanWatch API",
     version="0.1.0",
-    redirect_slashes=False,  # 避免重定向丢失 Authorization header
+    redirect_slashes=False,  # 避免重定向丟失 Authorization header
 )
 
 app.add_middleware(ResponseWrapperMiddleware)
@@ -61,12 +61,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 认证路由（无需登录）
+# 認證路由（無需登入）
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-# 市场指数（公共数据，无需登录）
+# 市場指數（公共資料，無需登入）
 app.include_router(market.router, prefix="/api/market", tags=["market"])
 
-# 需要登录的路由
+# 需要登入的路由
 protected = [Depends(get_current_user)]
 app.include_router(
     stocks.router, prefix="/api/stocks", tags=["stocks"], dependencies=protected
@@ -198,12 +198,12 @@ app.include_router(
 
 
 app.router.on_startup.append(assistant_task_runner.recover_pending)
-# PAT 管理(需登录):创建/列出/吊销 MCP 用的个人访问令牌
+# PAT 管理(需登入):建立/列出/吊銷 MCP 用的個人訪問令牌
 app.include_router(
     pats.router, prefix="/api/pats", tags=["pats"], dependencies=protected
 )
-# MCP Server:挂在顶层 /mcp(不在 /api/ 下,绕开响应包装中间件保证 JSON-RPC 原样),
-# 自带 PAT 鉴权,不走登录 JWT
+# MCP Server:掛在頂層 /mcp(不在 /api/ 下,繞開回應包裝中介軟體保證 JSON-RPC 原樣),
+# 自帶 PAT 鑑權,不走登入 JWT
 app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 
 
@@ -213,11 +213,11 @@ app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
     include_in_schema=False,
 )
 def oauth_protected_resource_metadata(request: Request, _resource_path: str = ""):
-    """RFC 9728 元数据:MCP 客户端握手前会探测此端点决定鉴权方式。
+    """RFC 9728 後設資料:MCP 使用者端握手前會探測此端點決定鑑權方式。
 
-    PanWatch 用静态 PAT(无 OAuth server),返回 authorization_servers=[] +
-    bearer_methods_supported=["header"],告诉客户端直接用 Authorization Bearer。
-    即便不用 OAuth 此端点也必须存在,否则客户端拿到 404 会因 schema 不匹配报错。
+    PanWatch 用靜態 PAT(無 OAuth server),返回 authorization_servers=[] +
+    bearer_methods_supported=["header"],告訴使用者端直接用 Authorization Bearer。
+    即便不用 OAuth 此端點也必須存在,否則使用者端拿到 404 會因 schema 不匹配報錯。
     """
     base = str(request.base_url).rstrip("/")
     return {
@@ -234,5 +234,5 @@ async def health():
 
 @app.get("/api/version")
 async def version():
-    """获取应用版本号（公开接口）"""
+    """獲取應用版本號（公開介面）"""
     return {"version": get_app_version()}

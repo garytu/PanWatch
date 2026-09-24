@@ -1,4 +1,4 @@
-"""市场指数 API - 公共数据，无需认证"""
+"""市場指數 API - 公共資料，無需認證"""
 import asyncio
 import logging
 import time
@@ -12,46 +12,46 @@ router = APIRouter()
 
 
 def get_market_data():
-    """惰性 import,避免包未装/循环 import 影响本模块加载。"""
+    """惰性 import,避免包未裝/迴圈 import 影響本模組載入。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
 
     return _g()
 
-# 主要市场指数配置
-# response_symbol: 腾讯 API 返回的 symbol（用于匹配）
+# 主要市場指數配置
+# response_symbol: 騰訊 API 返回的 symbol（用於匹配）
 MARKET_INDICES = [
-    # A股指数
-    {"symbol": "000001", "name": "上证指数", "market": "CN", "tencent_symbol": "sh000001", "response_symbol": "000001"},
-    {"symbol": "399001", "name": "深证成指", "market": "CN", "tencent_symbol": "sz399001", "response_symbol": "399001"},
-    {"symbol": "399006", "name": "创业板指", "market": "CN", "tencent_symbol": "sz399006", "response_symbol": "399006"},
-    # 港股指数
-    {"symbol": "HSI", "name": "恒生指数", "market": "HK", "tencent_symbol": "hkHSI", "response_symbol": "HSI"},
-    # 美股指数 (腾讯返回的 symbol 带点号前缀: .IXIC, .DJI)
-    {"symbol": "IXIC", "name": "纳斯达克", "market": "US", "tencent_symbol": "usIXIC", "response_symbol": ".IXIC"},
-    {"symbol": "DJI", "name": "道琼斯", "market": "US", "tencent_symbol": "usDJI", "response_symbol": ".DJI"},
+    # A股指數
+    {"symbol": "000001", "name": "上證指數", "market": "CN", "tencent_symbol": "sh000001", "response_symbol": "000001"},
+    {"symbol": "399001", "name": "深證成指", "market": "CN", "tencent_symbol": "sz399001", "response_symbol": "399001"},
+    {"symbol": "399006", "name": "創業板指", "market": "CN", "tencent_symbol": "sz399006", "response_symbol": "399006"},
+    # 港股指數
+    {"symbol": "HSI", "name": "恒生指數", "market": "HK", "tencent_symbol": "hkHSI", "response_symbol": "HSI"},
+    # 美股指數 (騰訊返回的 symbol 帶點號字首: .IXIC, .DJI)
+    {"symbol": "IXIC", "name": "納斯達克", "market": "US", "tencent_symbol": "usIXIC", "response_symbol": ".IXIC"},
+    {"symbol": "DJI", "name": "道瓊斯", "market": "US", "tencent_symbol": "usDJI", "response_symbol": ".DJI"},
 ]
 
-# 指数响应内存缓存:60s(行情价格要新鲜)。
+# 指數回應記憶體快取:60s(行情價格要新鮮)。
 _INDICES_CACHE: dict[str, tuple[float, list[dict]]] = {}
 _INDICES_CACHE_TTL_S = 60
 
-# spark(近20日收盘)独立缓存:日线一天才变,30 分钟足够新鲜。
-# 没有它,响应缓存每 60s 过期就要重付一轮 6×指数K线(部分环境东财先失败再腾讯兜底,
-# 串行约 4s)——这曾是首页快车道最大的延迟来源。空结果也缓存(坏源别反复重拉)。
+# spark(近20日收盤)獨立快取:日線一天才變,30 分鐘足夠新鮮。
+# 沒有它,回應快取每 60s 過期就要重付一輪 6×指數K線(部分環境東財先失敗再騰訊兜底,
+# 序列約 4s)——這曾是首頁快車道最大的延遲來源。空結果也快取(壞源別反覆重拉)。
 _SPARK_CACHE: dict[str, tuple[float, list[float]]] = {}
 _SPARK_TTL_S = 1800
 
 
 def clear_indices_cache() -> None:
-    """清空指数响应/spark 缓存(测试隔离用)。"""
+    """清空指數回應/spark 快取(測試隔離用)。"""
     _INDICES_CACHE.clear()
     _SPARK_CACHE.clear()
 
 
 def _spark_for(idx: dict) -> list[float]:
-    """近 20 日收盘价,供首页指数走势 sparkline 用(带 30min 独立缓存)。
+    """近 20 日收盤價,供首頁指數走勢 sparkline 用(帶 30min 獨立快取)。
 
-    fail-soft:市场码非法/取数异常/无映射一律吞掉,返回空列表,绝不影响 quote 主体。
+    fail-soft:市場碼非法/取數異常/無對映一律吞掉,返回空列表,絕不影響 quote 主體。
     """
     now = time.time()
     hit = _SPARK_CACHE.get(idx["symbol"])
@@ -62,7 +62,7 @@ def _spark_for(idx: dict) -> list[float]:
         klines = get_index_klines(idx["symbol"], market_code, days=20)
         spark = [k.close for k in klines] if klines else []
     except Exception as e:
-        logger.debug(f"指数 spark 获取失败 {idx['symbol']}: {e}")
+        logger.debug(f"指數 spark 獲取失敗 {idx['symbol']}: {e}")
         spark = []
     _SPARK_CACHE[idx["symbol"]] = (now, spark)
     return spark
@@ -70,7 +70,7 @@ def _spark_for(idx: dict) -> list[float]:
 
 @router.get("/indices")
 async def get_market_indices():
-    """获取主要市场指数（公共数据，无需认证）"""
+    """獲取主要市場指數（公共資料，無需認證）"""
     now = time.time()
     cached = _INDICES_CACHE.get("indices")
     if cached and now - cached[0] < _INDICES_CACHE_TTL_S:
@@ -81,15 +81,15 @@ async def get_market_indices():
     try:
         quotes = get_market_data().index_quotes(tencent_symbols)
     except Exception as e:
-        logger.error(f"获取市场指数失败: {e}")
+        logger.error(f"獲取市場指數失敗: {e}")
         return []
 
-    # 构建 response_symbol -> quote 映射
+    # 構建 response_symbol -> quote 對映
     quote_map = {}
     for q in quotes:
         quote_map[q["symbol"]] = q
 
-    # spark 并行取(缓存未过期时零成本;冷启动=最慢单个≈1s,而非 6 个串行累加)
+    # spark 並行取(快取未過期時零成本;冷啟動=最慢單個≈1s,而非 6 個序列累加)
     sparks = await asyncio.gather(
         *[asyncio.to_thread(_spark_for, idx) for idx in MARKET_INDICES],
         return_exceptions=True,
@@ -117,7 +117,7 @@ async def get_market_indices():
                 "spark": spark,
             })
         else:
-            # 即使没有行情也返回基本信息
+            # 即使沒有行情也返回基本資訊
             result.append({
                 "symbol": idx["symbol"],
                 "name": idx["name"],

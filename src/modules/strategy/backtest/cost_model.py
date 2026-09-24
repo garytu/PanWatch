@@ -1,13 +1,13 @@
-"""A 股交易成本模型 —— 回测(Phase 0)与模拟盘(Phase 1)共用。
+"""A 股交易成本模型 —— 回測(Phase 0)與模擬交易(Phase 1)共用。
 
-成本口径(2023-08-28 印花税下调后):
-- 印花税:**卖出单边** 0.05%(万 5)
-- 佣金:双边,默认万 2.5,单笔最低 5 元
-- 过户费:双边,成交额 0.001%(沪深统一,2022-04 起)
-- 滑点:可配置基点(默认 5bps),买入价上滑 / 卖出价下滑,模拟冲击成本
+成本口徑(2023-08-28 印花稅下調後):
+- 印花稅:**賣出單邊** 0.05%(萬 5)
+- 佣金:雙邊,預設萬 2.5,單筆最低 5 元
+- 過戶費:雙邊,成交額 0.001%(滬深統一,2022-04 起)
+- 滑點:可配置基點(預設 5bps),買入價上滑 / 賣出價下滑,模擬衝擊成本
 
-滑点体现在实际成交价(fill_price),不重复计入显式规费;显式规费 = 佣金+印花税+过户费。
-现金变动(cash_delta)= 买入为负、卖出为正,已扣全部成本与滑点,PnL 由买卖两腿 cash_delta 相加得出。
+滑點體現在實際成交價(fill_price),不重複計入顯式規費;顯式規費 = 佣金+印花稅+過戶費。
+現金變動(cash_delta)= 買入為負、賣出為正,已扣全部成本與滑點,PnL 由買賣兩腿 cash_delta 相加得出。
 """
 
 from __future__ import annotations
@@ -17,35 +17,35 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CostConfig:
-    """成本参数(可配置;默认值贴近 A 股散户实际)。"""
+    """成本引數(可配置;預設值貼近 A 股散戶實際)。"""
 
-    commission_rate: float = 0.00025   # 佣金费率(双边)万 2.5
-    min_commission: float = 5.0        # 单笔最低佣金(元)
-    stamp_duty_rate: float = 0.0005    # 印花税(仅卖出)万 5
-    transfer_fee_rate: float = 0.00001  # 过户费(双边)十万分之 1
-    slippage_bps: float = 5.0          # 滑点(基点,双边;5bps = 0.05%)
+    commission_rate: float = 0.00025   # 佣金費率(雙邊)萬 2.5
+    min_commission: float = 5.0        # 單筆最低佣金(元)
+    stamp_duty_rate: float = 0.0005    # 印花稅(僅賣出)萬 5
+    transfer_fee_rate: float = 0.00001  # 過戶費(雙邊)十萬分之 1
+    slippage_bps: float = 5.0          # 滑點(基點,雙邊;5bps = 0.05%)
 
 
 @dataclass(frozen=True)
 class Fill:
-    """一次成交的净结果(含成本拆解,便于展示与审计)。"""
+    """一次成交的淨結果(含成本拆解,便於展示與審計)。"""
 
     side: str            # "buy" | "sell"
-    price: float         # 名义价(信号/行情价,未含滑点)
-    fill_price: float    # 实际成交价(含滑点)
+    price: float         # 名義價(訊號/行情價,未含滑點)
+    fill_price: float    # 實際成交價(含滑點)
     quantity: int
-    gross: float         # 实际成交额 = fill_price * quantity
+    gross: float         # 實際成交額 = fill_price * quantity
     commission: float
     stamp_duty: float
     transfer_fee: float
-    slippage_cost: float  # 滑点损耗 = |fill_price - price| * quantity(仅展示)
-    explicit_fees: float  # 显式规费 = commission + stamp_duty + transfer_fee
-    friction: float       # 总摩擦 = explicit_fees + slippage_cost(仅展示)
-    cash_delta: float     # 现金变动:buy 为负,sell 为正(已扣显式规费;滑点含在 fill_price)
+    slippage_cost: float  # 滑點損耗 = |fill_price - price| * quantity(僅展示)
+    explicit_fees: float  # 顯式規費 = commission + stamp_duty + transfer_fee
+    friction: float       # 總摩擦 = explicit_fees + slippage_cost(僅展示)
+    cash_delta: float     # 現金變動:buy 為負,sell 為正(已扣顯式規費;滑點含在 fill_price)
 
 
 class CostModel:
-    """A 股交易成本计算器。线程无关,可全局复用。"""
+    """A 股交易成本計算器。執行緒無關,可全域性複用。"""
 
     def __init__(self, config: CostConfig | None = None) -> None:
         self.cfg = config or CostConfig()
@@ -55,19 +55,19 @@ class CostModel:
         return price + adj if side == "buy" else max(0.0, price - adj)
 
     def fill(self, side: str, price: float, quantity: int) -> Fill:
-        """计算一笔成交的成本与现金变动。
+        """計算一筆成交的成本與現金變動。
 
         Args:
             side: "buy" 或 "sell"
-            price: 名义价(未含滑点)
-            quantity: 股数(正整数)
+            price: 名義價(未含滑點)
+            quantity: 股數(正整數)
         """
         side = (side or "").strip().lower()
         if side not in ("buy", "sell"):
-            raise ValueError(f"side 必须是 buy/sell,得到 {side!r}")
+            raise ValueError(f"side 必須是 buy/sell,得到 {side!r}")
         qty = int(quantity)
         if qty <= 0 or price <= 0:
-            raise ValueError(f"price/quantity 必须为正,得到 price={price} qty={quantity}")
+            raise ValueError(f"price/quantity 必須為正,得到 price={price} qty={quantity}")
 
         fill_price = self._apply_slippage(price, side)
         gross = fill_price * qty
@@ -100,10 +100,10 @@ class CostModel:
     def round_trip_pnl(
         self, entry_price: float, exit_price: float, quantity: int
     ) -> dict:
-        """一买一卖的完整盈亏(扣全部成本)。便于单笔回测与对账。"""
+        """一買一賣的完整損益(扣全部成本)。便於單筆回測與對帳。"""
         buy = self.fill("buy", entry_price, quantity)
         sell = self.fill("sell", exit_price, quantity)
-        # 现金口径:买入流出 -cash_delta(正数),卖出流入 cash_delta
+        # 現金口徑:買入流出 -cash_delta(正數),賣出流入 cash_delta
         invested = -buy.cash_delta
         proceeds = sell.cash_delta
         pnl = proceeds - invested
@@ -123,5 +123,5 @@ class CostModel:
         }
 
 
-# 全局默认实例(可被覆盖配置)
+# 全域性預設例項(可被覆蓋配置)
 DEFAULT_COST_MODEL = CostModel()

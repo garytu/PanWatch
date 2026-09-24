@@ -1,4 +1,4 @@
-"""资金流向 vendor:东财 + 新浪(CN)。移植自 PanWatch capital_flow_collector 抓取核。"""
+"""資金流向 vendor:東財 + 新浪(CN)。移植自 PanWatch capital_flow_collector 抓取核。"""
 from __future__ import annotations
 
 import json
@@ -24,7 +24,7 @@ _SINA_DEFAULT_DAYS = 60
 
 
 def _cn_exchange_prefix(code: str) -> str:
-    """sh / sz / bj —— 与 Symbol._cn_exchange 规则一致(北交所另判)。"""
+    """sh / sz / bj —— 與 Symbol._cn_exchange 規則一致(北交所另判)。"""
     if code.startswith("920") or code.startswith(("83", "87", "88")):
         return "bj"
     if code.startswith(("5", "6")) or code.startswith("900"):
@@ -33,7 +33,7 @@ def _cn_exchange_prefix(code: str) -> str:
 
 
 def _safe_float(value) -> float:
-    """将字符串或数字安全转换为 float,无效值返回 0.0。"""
+    """將字串或數字安全轉換為 float,無效值返回 0.0。"""
     if value is None or value == "" or value == "-":
         return 0.0
     try:
@@ -75,7 +75,7 @@ class EastmoneyCapitalFlowVendor(CapitalFlowVendor):
             retries=2,
             parse="json",
             symbol=sym.code,
-            log_label="资金流",
+            log_label="資金流",
         )
         if not data:
             return []
@@ -87,16 +87,16 @@ class EastmoneyCapitalFlowVendor(CapitalFlowVendor):
         if not klines:
             return []
 
-        # 字段索引(从0开始,逗号行):
-        # 0:日期, 1:主力净额, 2:小单净额, 3:中单净额, 4:大单净额, 5:超大单净额,
-        # 6:主力占比, 7:小单占比, 8:中单占比, 9:大单占比, 10:超大单占比,
-        # 11:收盘价, 12:涨跌幅, 13:成交量, 14:成交额
+        # 欄位索引(從0開始,逗號行):
+        # 0:日期, 1:主力淨額, 2:小單淨額, 3:中單淨額, 4:大單淨額, 5:超大單淨額,
+        # 6:主力佔比, 7:小單佔比, 8:中單佔比, 9:大單佔比, 10:超大單佔比,
+        # 11:收盤價, 12:漲跌幅, 13:成交量, 14:成交額
         last_line = klines[-1]
         parts = str(last_line).split(",")
         if len(parts) < 13:
             return []
 
-        # 5日主力净流入(klines 从旧到新,取最后5条的主力净额之和)
+        # 5日主力淨流入(klines 從舊到新,取最後5條的主力淨額之和)
         last_five = klines[-5:] if len(klines) >= 5 else klines
         main_net_5d = 0.0
         for line in last_five:
@@ -107,22 +107,22 @@ class EastmoneyCapitalFlowVendor(CapitalFlowVendor):
         return [CapitalFlow(
             symbol=str(d.get("code") or sym.code),
             name=str(d.get("name") or ""),
-            main_net_inflow=_safe_float(parts[1]),      # 主力净流入
-            main_net_inflow_pct=_safe_float(parts[6]),  # 主力净流入占比
-            super_net_inflow=_safe_float(parts[5]),      # 超大单净流入
-            big_net_inflow=_safe_float(parts[4]),        # 大单净流入
-            mid_net_inflow=_safe_float(parts[3]),         # 中单净流入
-            small_net_inflow=_safe_float(parts[2]),       # 小单净流入
-            main_net_5d=main_net_5d,                      # 5日主力净流入
+            main_net_inflow=_safe_float(parts[1]),      # 主力淨流入
+            main_net_inflow_pct=_safe_float(parts[6]),  # 主力淨流入佔比
+            super_net_inflow=_safe_float(parts[5]),      # 超大單淨流入
+            big_net_inflow=_safe_float(parts[4]),        # 大單淨流入
+            mid_net_inflow=_safe_float(parts[3]),         # 中單淨流入
+            small_net_inflow=_safe_float(parts[2]),       # 小單淨流入
+            main_net_5d=main_net_5d,                      # 5日主力淨流入
         )]
 
 
 class SinaCapitalFlowVendor(CapitalFlowVendor):
-    """资金流向 vendor:新浪(CN 单市场,东财之外的第二源)。
+    """資金流向 vendor:新浪(CN 單市場,東財之外的第二源)。
 
-    端点 MoneyFlow.ssl_qsfx_zjlrqs(资金流入趋势)实测只提供「主力」+「超大单」两档
-    净额,没有大/中/小单细分——这两档字段按东财 vendor 的同形字段填 0.0,保持
-    CapitalFlow 结构一致,不抛异常、不伪造数据。
+    端點 MoneyFlow.ssl_qsfx_zjlrqs(資金流入趨勢)實測只提供「主力」+「超大單」兩檔
+    淨額,沒有大/中/小單細分——這兩檔欄位按東財 vendor 的同形欄位填 0.0,保持
+    CapitalFlow 結構一致,不拋異常、不偽造資料。
     """
 
     name = "sina"
@@ -155,7 +155,7 @@ class SinaCapitalFlowVendor(CapitalFlowVendor):
             retries=2,
             timeout=8,
             symbol=sym.code,
-            log_label="新浪资金流",
+            log_label="新浪資金流",
         )
         if not text:
             return []
@@ -169,19 +169,19 @@ class SinaCapitalFlowVendor(CapitalFlowVendor):
         if not rows:
             return []
 
-        # 新浪按 opendate 降序返回(最新在前),取最近 5 条求主力净额之和
+        # 新浪按 opendate 降序返回(最新在前),取最近 5 條求主力淨額之和
         last_five = rows[:5]
         main_net_5d = sum(_safe_float(row.get("netamount")) for row in last_five)
 
         latest = rows[0]
         return [CapitalFlow(
             symbol=sym.code,
-            name="",  # 新浪该端点不返回股票名称
-            main_net_inflow=_safe_float(latest.get("netamount")),       # 主力净流入
-            main_net_inflow_pct=_safe_float(latest.get("ratioamount")),  # 主力净流入占比
-            super_net_inflow=_safe_float(latest.get("r0_net")),          # 超大单净流入
-            big_net_inflow=0.0,     # 新浪该端点无大单细分
-            mid_net_inflow=0.0,     # 新浪该端点无中单细分
-            small_net_inflow=0.0,   # 新浪该端点无小单细分
-            main_net_5d=main_net_5d,  # 5日主力净流入
+            name="",  # 新浪該端點不返回股票名稱
+            main_net_inflow=_safe_float(latest.get("netamount")),       # 主力淨流入
+            main_net_inflow_pct=_safe_float(latest.get("ratioamount")),  # 主力淨流入佔比
+            super_net_inflow=_safe_float(latest.get("r0_net")),          # 超大單淨流入
+            big_net_inflow=0.0,     # 新浪該端點無大單細分
+            mid_net_inflow=0.0,     # 新浪該端點無中單細分
+            small_net_inflow=0.0,   # 新浪該端點無小單細分
+            main_net_5d=main_net_5d,  # 5日主力淨流入
         )]

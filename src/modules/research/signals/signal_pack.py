@@ -175,7 +175,7 @@ class SignalPackBuilder:
                         try:
                             if provider != "tencent":
                                 logger.info(
-                                    f"SignalPack quote 未支持 provider={provider}，跳过"
+                                    f"SignalPack quote 未支援 provider={provider}，跳過"
                                 )
                                 continue
 
@@ -192,7 +192,7 @@ class SignalPackBuilder:
                                 remaining.discard(sym)
                         except Exception as e:
                             logger.warning(
-                                f"SignalPack quotes 采集失败({market.value},{provider}): {e}"
+                                f"SignalPack quotes 採集失敗({market.value},{provider}): {e}"
                             )
                             continue
 
@@ -217,7 +217,7 @@ class SignalPackBuilder:
                 key = (market, sym)
                 if key not in self._tech_cache:
                     if kline_disabled:
-                        self._tech_cache[key] = {"error": "K线数据源已禁用"}
+                        self._tech_cache[key] = {"error": "K線資料來源已停用"}
                         self._tech_source_cache[key] = "disabled"
                     else:
                         last_err = None
@@ -227,7 +227,7 @@ class SignalPackBuilder:
                                     collector = KlineCollector(market)
                                 else:
                                     logger.info(
-                                        f"SignalPack kline 未支持 provider={provider}，跳过"
+                                        f"SignalPack kline 未支援 provider={provider}，跳過"
                                     )
                                     continue
                                 self._tech_cache[key] = collector.get_kline_summary(sym)
@@ -239,7 +239,7 @@ class SignalPackBuilder:
                                 continue
                         if key not in self._tech_cache:
                             self._tech_cache[key] = {
-                                "error": str(last_err) if last_err else "获取K线失败"
+                                "error": str(last_err) if last_err else "獲取K線失敗"
                             }
                             self._tech_source_cache.setdefault(key, "unavailable")
                 tech_map[sym] = self._tech_cache[key]
@@ -262,7 +262,7 @@ class SignalPackBuilder:
                     )
                     self._news_cache[key] = all_news
                 except Exception as e:
-                    logger.warning(f"SignalPack news 采集失败: {e}")
+                    logger.warning(f"SignalPack news 採集失敗: {e}")
                     self._news_cache[key] = []
 
             for it in self._news_cache[key]:
@@ -289,7 +289,7 @@ class SignalPackBuilder:
                 if flow_disabled:
                     for sym in cn_symbols:
                         key = (MarketCode.CN, sym)
-                        self._flow_cache[key] = {"error": "资金流向数据源已禁用"}
+                        self._flow_cache[key] = {"error": "資金流向資料來源已停用"}
                         self._flow_source_cache[key] = "disabled"
                         flow_map[sym] = self._flow_cache[key]
                 else:
@@ -312,7 +312,7 @@ class SignalPackBuilder:
                                 try:
                                     if provider != "eastmoney":
                                         logger.info(
-                                            f"SignalPack capital_flow 未支持 provider={provider}，跳过"
+                                            f"SignalPack capital_flow 未支援 provider={provider}，跳過"
                                         )
                                         continue
                                     self._flow_cache[key] = (
@@ -329,12 +329,12 @@ class SignalPackBuilder:
                                 self._flow_cache[key] = {
                                     "error": str(last_err)
                                     if last_err
-                                    else "获取资金流向失败"
+                                    else "獲取資金流向失敗"
                                 }
                                 self._flow_source_cache.setdefault(key, "unavailable")
                             flow_map[sym] = self._flow_cache[key]
                     except Exception as e:
-                        logger.warning(f"SignalPack capital_flow 采集失败: {e}")
+                        logger.warning(f"SignalPack capital_flow 採集失敗: {e}")
 
         # 5) Events
         events_by_symbol: dict[str, list[dict]] = {}
@@ -350,7 +350,7 @@ class SignalPackBuilder:
                     for provider, cfg in events_providers:
                         if provider != "eastmoney":
                             logger.info(
-                                f"SignalPack events 未支持 provider={provider}，跳过"
+                                f"SignalPack events 未支援 provider={provider}，跳過"
                             )
                             continue
                         try:
@@ -389,7 +389,7 @@ class SignalPackBuilder:
                             continue
 
                     if events_key not in self._events_cache:
-                        logger.warning(f"SignalPack events 采集失败: {last_err}")
+                        logger.warning(f"SignalPack events 採集失敗: {last_err}")
                         self._events_cache[events_key] = []
                         self._events_source_cache[events_key] = "unavailable"
 

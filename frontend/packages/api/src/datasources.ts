@@ -18,6 +18,6 @@ export interface ResetToSeedResult {
   seeded_missing: ResetToSeedSeededItem[]
 }
 
-/** 数据源"恢复默认":删孤儿 + 补缺失默认,重置内置测试股票,保留用户配置/凭证。 */
+/** 資料來源"恢復預設":刪孤兒 + 補缺失預設,重置內建測試股票,保留使用者配置/憑證。 */
 export const resetDataSourcesToSeed = () =>
   fetchAPI<ResetToSeedResult>('/datasources/reset-to-seed', { method: 'POST' })

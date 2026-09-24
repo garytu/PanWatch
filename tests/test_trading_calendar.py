@@ -1,4 +1,4 @@
-"""交易日历与非交易日通知守卫单元测试。"""
+"""交易日曆與非交易日通知守衛單元測試。"""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ import pytest
 from src.platform.scheduling import trading_calendar as tc
 from src.platform.marketdata.models import MARKETS, MarketCode
 
-# 2026 年真实日历切片:8/8 周六、8/9 周日休市;8/10 周一开市;
-# 10/1~10/8 国庆休市(其中 10/1 是周四 —— 工作日却休市,只靠周末判断抓不到)。
+# 2026 年真實日曆切片:8/8 週六、8/9 週日休市;8/10 週一開市;
+# 10/1~10/8 國慶休市(其中 10/1 是週四 —— 工作日卻休市,只靠週末判斷抓不到)。
 _FAKE_CN_DATES = frozenset(
     {
         date(2026, 8, 3),
@@ -35,7 +35,7 @@ _FAKE_CN_DATES = frozenset(
 
 @pytest.fixture(autouse=True)
 def _reset_calendar():
-    """每个用例前后清空日历缓存,避免互相污染。"""
+    """每個用例前後清空日曆快取,避免互相汙染。"""
     tc.reset_cache()
     yield
     tc.reset_cache()
@@ -43,7 +43,7 @@ def _reset_calendar():
 
 @pytest.fixture
 def loaded_calendar(monkeypatch):
-    """注入固定 A 股交易日历(不走网络)。"""
+    """注入固定 A 股交易日曆(不走網路)。"""
     monkeypatch.setattr(tc, "_fetch_cn_trading_dates", lambda: _FAKE_CN_DATES)
     assert tc.refresh_blocking() is True
 
@@ -53,62 +53,62 @@ def loaded_calendar(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_周末不是交易日_无需日历():
-    """周末即使没有日历也判为非交易日(零依赖、永远准确)。"""
-    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 8)) is False  # 周六
-    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 9)) is False  # 周日
+def test_週末不是交易日_無需日曆():
+    """週末即使沒有日曆也判為非交易日(零依賴、永遠準確)。"""
+    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 8)) is False  # 週六
+    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 9)) is False  # 週日
     assert tc.is_trading_day(MarketCode.HK, date(2026, 8, 8)) is False
     assert tc.is_trading_day(MarketCode.US, date(2026, 8, 9)) is False
 
 
 def test_工作日是交易日(loaded_calendar):
-    """日历已加载时,普通工作日判为交易日。"""
-    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 10)) is True  # 周一
+    """日曆已載入時,普通工作日判為交易日。"""
+    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 10)) is True  # 週一
 
 
-def test_法定节假日不是交易日(loaded_calendar):
-    """国庆(10/1 周四)靠日历识别为休市 —— 周末判断抓不到这一类。"""
+def test_法定節假日不是交易日(loaded_calendar):
+    """國慶(10/1 週四)靠日曆識別為休市 —— 週末判斷抓不到這一類。"""
     assert tc.is_trading_day(MarketCode.CN, date(2026, 10, 1)) is False
     assert tc.is_trading_day(MarketCode.CN, date(2026, 10, 2)) is False
-    assert tc.is_trading_day(MarketCode.CN, date(2026, 10, 9)) is True  # 节后首个交易日
+    assert tc.is_trading_day(MarketCode.CN, date(2026, 10, 9)) is True  # 節後首個交易日
 
 
-def test_日历缺失时降级为只判周末():
-    """拿不到日历时工作日一律视为交易日 —— 宁可多跑,不可漏发一整天。"""
+def test_日曆缺失時降級為只判週末():
+    """拿不到日曆時工作日一律視為交易日 —— 寧可多跑,不可漏發一整天。"""
     assert tc._CN_TRADING_DATES is None
-    assert tc.is_trading_day(MarketCode.CN, date(2026, 10, 1)) is True  # 降级:识别不出国庆
-    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 8)) is False  # 但周末照样拦住
+    assert tc.is_trading_day(MarketCode.CN, date(2026, 10, 1)) is True  # 降級:識別不出國慶
+    assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 8)) is False  # 但週末照樣攔住
 
 
-def test_超出日历覆盖范围时降级为只判周末(loaded_calendar):
-    """查询日期超出日历区间(如跨年未刷新)时降级,不误判交易日为休市。"""
-    assert tc.is_trading_day(MarketCode.CN, date(2027, 3, 1)) is True  # 2027-03-01 是周一
+def test_超出日曆覆蓋範圍時降級為只判週末(loaded_calendar):
+    """查詢日期超出日曆區間(如跨年未重新整理)時降級,不誤判交易日為休市。"""
+    assert tc.is_trading_day(MarketCode.CN, date(2027, 3, 1)) is True  # 2027-03-01 是週一
 
 
-def test_港美股无日历源_只判周末(loaded_calendar):
-    """A 股日历不套用到港美股(节假日不同),它们只判周末。"""
-    # 10/1 对港股/美股不是中国法定假日,不应被 A 股日历误伤
+def test_港美股無日曆源_只判週末(loaded_calendar):
+    """A 股日曆不套用到港美股(節假日不同),它們只判週末。"""
+    # 10/1 對港股/美股不是中國法定假日,不應被 A 股日曆誤傷
     assert tc.is_trading_day(MarketCode.US, date(2026, 10, 1)) is True
     assert tc.is_trading_day(MarketCode.HK, date(2026, 10, 1)) is True
 
 
-def test_接受字符串市场码与datetime(loaded_calendar):
-    """market 接受字符串,日期接受 datetime(按市场时区归到当地日)。"""
+def test_接受字串市場碼與datetime(loaded_calendar):
+    """market 接受字串,日期接受 datetime(按市場時區歸到當地日)。"""
     assert tc.is_trading_day("CN", date(2026, 10, 1)) is False
     dt = datetime(2026, 10, 1, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
     assert tc.is_trading_day("CN", dt) is False
 
 
 def test_any_market_trading_day(loaded_calendar):
-    """周末三市场全休 → False;工作日至少一个开市 → True。"""
-    assert tc.any_market_trading_day(date(2026, 8, 8)) is False  # 周六
-    assert tc.any_market_trading_day(date(2026, 8, 10)) is True  # 周一
-    # A股国庆休市但美股开市 → 仍为 True
+    """週末三市場全休 → False;工作日至少一個開市 → True。"""
+    assert tc.any_market_trading_day(date(2026, 8, 8)) is False  # 週六
+    assert tc.any_market_trading_day(date(2026, 8, 10)) is True  # 週一
+    # A股國慶休市但美股開市 → 仍為 True
     assert tc.any_market_trading_day(date(2026, 10, 1)) is True
 
 
-def test_刷新失败不抛异常且保持降级(monkeypatch):
-    """日历拉取抛异常时 refresh 返回 False,缓存保持空,行为降级而非崩溃。"""
+def test_重新整理失敗不拋異常且保持降級(monkeypatch):
+    """日曆拉取拋異常時 refresh 返回 False,快取保持空,行為降級而非崩潰。"""
 
     def _boom():
         raise RuntimeError("network down")
@@ -119,46 +119,46 @@ def test_刷新失败不抛异常且保持降级(monkeypatch):
     assert tc.is_trading_day(MarketCode.CN, date(2026, 8, 10)) is True
 
 
-def test_异步刷新不阻塞(monkeypatch):
-    """refresh() 走 to_thread,结果与同步版一致。"""
+def test_非同步重新整理不阻塞(monkeypatch):
+    """refresh() 走 to_thread,結果與同步版一致。"""
     monkeypatch.setattr(tc, "_fetch_cn_trading_dates", lambda: _FAKE_CN_DATES)
     assert asyncio.run(tc.refresh()) is True
     assert tc.is_trading_day(MarketCode.CN, date(2026, 10, 1)) is False
 
 
 # ---------------------------------------------------------------------------
-# is_trading_time 复用交易日历(一处修复,全线受益)
+# is_trading_time 複用交易日曆(一處修復,全線受益)
 # ---------------------------------------------------------------------------
 
 
-def test_交易时段判断在法定节假日返回False(loaded_calendar):
-    """节假日的 10:00 处在时段区间内,但不是交易日 → 非交易时间。"""
+def test_交易時段判斷在法定節假日返回False(loaded_calendar):
+    """節假日的 10:00 處在時段區間內,但不是交易日 → 非交易時間。"""
     md = MARKETS[MarketCode.CN]
     holiday_10am = datetime(2026, 10, 1, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
     assert md.is_trading_time(holiday_10am) is False
 
 
-def test_交易时段判断在正常交易日返回True(loaded_calendar):
-    """交易日 10:00 在时段内 → 交易中。"""
+def test_交易時段判斷在正常交易日返回True(loaded_calendar):
+    """交易日 10:00 在時段內 → 交易中。"""
     md = MARKETS[MarketCode.CN]
     trading_10am = datetime(2026, 8, 10, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
     assert md.is_trading_time(trading_10am) is True
 
 
-def test_交易日的非时段时间返回False(loaded_calendar):
-    """交易日的 08:00 不在时段内 → 非交易时间。"""
+def test_交易日的非時段時間返回False(loaded_calendar):
+    """交易日的 08:00 不在時段內 → 非交易時間。"""
     md = MARKETS[MarketCode.CN]
     before_open = datetime(2026, 8, 10, 8, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
     assert md.is_trading_time(before_open) is False
 
 
 # ---------------------------------------------------------------------------
-# 模拟盘定时通知的非交易日守卫(用户报告的 bug)
+# 模擬交易定時通知的非交易日守衛(使用者報告的 bug)
 # ---------------------------------------------------------------------------
 
 
 def _patch_notifiers(monkeypatch) -> dict[str, int]:
-    """把两个通知函数替换成计数器,用于断言是否被调用。"""
+    """把兩個通知函式替換成計數器,用於斷言是否被呼叫。"""
     calls = {"premarket": 0, "summary": 0}
 
     async def _fake_premarket():
@@ -176,8 +176,8 @@ def _patch_notifiers(monkeypatch) -> dict[str, int]:
     return calls
 
 
-def test_周末不发盘前计划和日终摘要(monkeypatch):
-    """周末两条模拟盘定时通知都必须跳过 —— 这是用户报告的 bug。"""
+def test_週末不發盤前計劃和日終摘要(monkeypatch):
+    """週末兩條模擬交易定時通知都必須跳過 —— 這是使用者報告的 bug。"""
     from src.modules.paper_trading.paper_trading_scheduler import PaperTradingScheduler
 
     calls = _patch_notifiers(monkeypatch)
@@ -191,12 +191,12 @@ def test_周末不发盘前计划和日终摘要(monkeypatch):
     assert calls == {"premarket": 0, "summary": 0}
 
 
-def test_法定节假日不发盘前计划和日终摘要(monkeypatch, loaded_calendar):
-    """A股国庆期间(美股也休市的那几天)同样跳过。"""
+def test_法定節假日不發盤前計劃和日終摘要(monkeypatch, loaded_calendar):
+    """A股國慶期間(美股也休市的那幾天)同樣跳過。"""
     from src.modules.paper_trading.paper_trading_scheduler import PaperTradingScheduler
 
     calls = _patch_notifiers(monkeypatch)
-    # 10/3 是周六:三市场全休 → 必须跳过
+    # 10/3 是週六:三市場全休 → 必須跳過
     holiday = datetime(2026, 10, 3, 9, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
     monkeypatch.setattr(tc, "_now_in_market_tz", lambda code: holiday)
 
@@ -207,8 +207,8 @@ def test_法定节假日不发盘前计划和日终摘要(monkeypatch, loaded_ca
     assert calls == {"premarket": 0, "summary": 0}
 
 
-def test_交易日照常发盘前计划和日终摘要(monkeypatch, loaded_calendar):
-    """交易日不受守卫影响,通知照常发送。"""
+def test_交易日照常發盤前計劃和日終摘要(monkeypatch, loaded_calendar):
+    """交易日不受守衛影響,通知照常傳送。"""
     from src.modules.paper_trading.paper_trading_scheduler import PaperTradingScheduler
 
     calls = _patch_notifiers(monkeypatch)
@@ -223,12 +223,12 @@ def test_交易日照常发盘前计划和日终摘要(monkeypatch, loaded_calen
 
 
 # ---------------------------------------------------------------------------
-# 机会刷新的非交易日守卫(周末重算全市场只是白烧资源)
+# 機會重新整理的非交易日守衛(週末重算全市場只是白燒資源)
 # ---------------------------------------------------------------------------
 
 
-def test_周末跳过机会刷新(monkeypatch):
-    """周末不重算机会池 —— 行情没变,扫全市场纯属浪费。"""
+def test_週末跳過機會重新整理(monkeypatch):
+    """週末不重算機會池 —— 行情沒變,掃全市場純屬浪費。"""
     from src.modules.research.context_scheduler import ContextMaintenanceScheduler
 
     calls = {"n": 0}
@@ -249,8 +249,8 @@ def test_周末跳过机会刷新(monkeypatch):
     assert calls["n"] == 0
 
 
-def test_交易日照常刷新机会(monkeypatch, loaded_calendar):
-    """交易日机会刷新不受守卫影响。"""
+def test_交易日照常重新整理機會(monkeypatch, loaded_calendar):
+    """交易日機會重新整理不受守衛影響。"""
     from src.modules.research.context_scheduler import ContextMaintenanceScheduler
 
     calls = {"n": 0}
@@ -271,8 +271,8 @@ def test_交易日照常刷新机会(monkeypatch, loaded_calendar):
     assert calls["n"] == 1
 
 
-def test_手动刷新机会不受非交易日守卫影响(monkeypatch):
-    """手动触发是用户显式意图,周末也必须能跑。"""
+def test_手動重新整理機會不受非交易日守衛影響(monkeypatch):
+    """手動觸發是使用者顯式意圖,週末也必須能跑。"""
     from src.modules.research.context_scheduler import ContextMaintenanceScheduler
 
     calls = {"n": 0}
@@ -291,3 +291,27 @@ def test_手动刷新机会不受非交易日守卫影响(monkeypatch):
     asyncio.run(sched.refresh_opportunities_once())
 
     assert calls["n"] == 1
+
+
+def test_台股交易日與休市(monkeypatch):
+    """驗證台股 (MarketCode.TW) 在有日曆時的休市判斷與降級機制。"""
+    # 週末一律不是交易日
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 8)) is False
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 9)) is False
+
+    # 模擬注入台股日曆: 8/10 與 8/12 是交易日, 8/11 是颱風休市
+    tw_fake_dates = frozenset({date(2026, 8, 10), date(2026, 8, 12)})
+    monkeypatch.setattr(tc, "_fetch_tw_trading_dates", lambda: tw_fake_dates)
+    monkeypatch.setattr(tc, "_fetch_cn_trading_dates", lambda: frozenset({date(2026, 8, 10)}))
+    tc.refresh_blocking()
+
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 10)) is True
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 11)) is False
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 12)) is True
+
+
+    # 驗證 MARKETS 中的時段判斷
+    m_tw = MARKETS[MarketCode.TW]
+    assert m_tw.is_trading_time(datetime(2026, 8, 10, 10, 0, tzinfo=ZoneInfo("Asia/Taipei"))) is True
+    # 13:30 收盤，13:31 非交易時段
+    assert m_tw.is_trading_time(datetime(2026, 8, 10, 13, 31, tzinfo=ZoneInfo("Asia/Taipei"))) is False

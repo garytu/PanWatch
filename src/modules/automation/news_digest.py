@@ -1,4 +1,4 @@
-"""新闻速递 Agent - 自选股相关新闻摘要"""
+"""新聞速遞 Agent - 自選股相關新聞摘要"""
 
 import logging
 import re
@@ -22,34 +22,34 @@ logger = logging.getLogger(__name__)
 
 PROMPT_PATH = Path(__file__).parent.parent.parent.parent / "prompts" / "news_digest.txt"
 
-# 新闻速递建议类型映射（偏“消息面”）
+# 新聞速遞建議型別對映（偏“訊息面”）
 NEWS_ACTION_MAP = {
-    "设置预警": {"action": "alert", "label": "设置预警"},
-    "关注": {"action": "watch", "label": "关注"},
-    "继续持有": {"action": "hold", "label": "继续持有"},
-    "考虑减仓": {"action": "reduce", "label": "考虑减仓"},
-    "暂时回避": {"action": "avoid", "label": "暂时回避"},
+    "設定預警": {"action": "alert", "label": "設定預警"},
+    "關注": {"action": "watch", "label": "關注"},
+    "繼續持有": {"action": "hold", "label": "繼續持有"},
+    "考慮減碼": {"action": "reduce", "label": "考慮減碼"},
+    "暫時迴避": {"action": "avoid", "label": "暫時迴避"},
 }
 
 
 class NewsDigestAgent(BaseAgent):
-    """新闻速递 Agent"""
+    """新聞速遞 Agent"""
 
     name = "news_digest"
-    display_name = "新闻速递"
-    description = "定时抓取与持仓相关的新闻资讯并推送摘要"
+    display_name = "新聞速遞"
+    description = "定時抓取與持倉相關的新聞資訊並推送摘要"
 
     def __init__(self, since_hours: int = 12, fallback_since_hours: int = 24):
         """
         Args:
-            since_hours: 获取最近 N 小时的新闻
-            fallback_since_hours: 当近 N 小时无新闻时，自动回退到更长时间窗（避免“空跑”）
+            since_hours: 獲取最近 N 小時的新聞
+            fallback_since_hours: 當近 N 小時無新聞時，自動回退到更長時間窗（避免“空跑”）
         """
         self.since_hours = since_hours
         self.fallback_since_hours = fallback_since_hours
 
     def _dedupe_with_db(self, items: list[NewsItem]) -> list[NewsItem]:
-        """使用 NewsCache 表去重（跨进程/重启也有效），避免重复推送同一条新闻。"""
+        """使用 NewsCache 表去重（跨程式/重啟也有效），避免重複推送同一條新聞。"""
         if not items:
             return []
 
@@ -82,7 +82,7 @@ class NewsDigestAgent(BaseAgent):
 
                 new_items.append(it)
                 if it.external_id:
-                    # 写入缓存表（内容适度截断，避免膨胀）
+                    # 寫入快取表（內容適度截斷，避免膨脹）
                     try:
                         db.add(
                             NewsCache(
@@ -96,24 +96,24 @@ class NewsDigestAgent(BaseAgent):
                             )
                         )
                     except Exception:
-                        # 单条写入失败不影响本次返回
+                        # 單條寫入失敗不影響本次返回
                         pass
 
             db.commit()
             return new_items
         except Exception as e:
-            logger.warning(f"NewsCache 去重失败，回退为不去重: {e}")
+            logger.warning(f"NewsCache 去重失敗，回退為不去重: {e}")
             db.rollback()
             return items
         finally:
             db.close()
 
     async def collect(self, context: AgentContext) -> dict:
-        """采集新闻（自选股相关 + 重要市场新闻）"""
+        """採集新聞（自選股相關 + 重要市場新聞）"""
         symbols = [stock.symbol for stock in context.watchlist]
 
         if not symbols:
-            logger.warning("自选股列表为空，跳过新闻采集")
+            logger.warning("自選股列表為空，跳過新聞採集")
             return {"news": [], "related_news": [], "watchlist": []}
 
         collector = NewsCollector.from_database()
@@ -128,7 +128,7 @@ class NewsDigestAgent(BaseAgent):
             and self.fallback_since_hours > self.since_hours
         ):
             logger.info(
-                f"近 {self.since_hours} 小时无新闻，回退到近 {self.fallback_since_hours} 小时"
+                f"近 {self.since_hours} 小時無新聞，回退到近 {self.fallback_since_hours} 小時"
             )
             since_hours_used = self.fallback_since_hours
             news_list = await collector.fetch_all(
@@ -136,16 +136,16 @@ class NewsDigestAgent(BaseAgent):
                 since_hours=self.fallback_since_hours,
             )
 
-        # 跨次去重：只保留“新新闻”，避免 agent 看起来一直在重复同样内容
+        # 跨次去重：只保留“新新聞”，避免 agent 看起來一直在重複同樣內容
         news_list = self._dedupe_with_db(news_list)
 
-        # 分类：自选股相关 + 重要市场新闻
+        # 分類：自選股相關 + 重要市場新聞
         related_news = self._filter_related_news(news_list, symbols)
         important_news = [
             n for n in news_list if n.importance >= 2 and n not in related_news
         ]
 
-        # 结构化信号：补充行情/技术/资金/持仓，提高“建议摘要”稳定性
+        # 結構化訊號：補充行情/技術/資金/持倉，提高“建議摘要”穩定性
         packs = {}
         try:
             builder = SignalPackBuilder()
@@ -161,12 +161,12 @@ class NewsDigestAgent(BaseAgent):
                 events_days=3,
             )
         except Exception as e:
-            logger.warning(f"SignalPack 获取失败（news_digest 继续执行）：{e}")
+            logger.warning(f"SignalPack 獲取失敗（news_digest 繼續執行）：{e}")
 
         return {
-            "news": news_list,  # 全部新闻
-            "related_news": related_news,  # 自选股相关
-            "important_news": important_news,  # 重要市场新闻
+            "news": news_list,  # 全部新聞
+            "related_news": related_news,  # 自選股相關
+            "important_news": important_news,  # 重要市場新聞
             "watchlist": context.watchlist,
             "signal_packs": packs,
             "timestamp": datetime.now().isoformat(),
@@ -176,14 +176,14 @@ class NewsDigestAgent(BaseAgent):
     def _filter_related_news(
         self, news_list: list[NewsItem], symbols: list[str]
     ) -> list[NewsItem]:
-        """过滤与自选股相关的新闻"""
+        """過濾與自選股相關的新聞"""
         related = []
         for news in news_list:
-            # 新闻已标注股票
+            # 新聞已標註股票
             if news.symbols and any(s in symbols for s in news.symbols):
                 related.append(news)
                 continue
-            # 检查标题/内容是否包含股票代码
+            # 檢查標題/內容是否包含股票程式碼
             text = news.title + news.content
             if any(s in text for s in symbols):
                 related.append(news)
@@ -191,16 +191,16 @@ class NewsDigestAgent(BaseAgent):
         return related
 
     def build_prompt(self, data: dict, context: AgentContext) -> tuple[str, str]:
-        """构建新闻速递 Prompt"""
+        """構建新聞速遞 Prompt"""
         system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
         lines = []
         since_hours_used = data.get("since_hours_used") or self.since_hours
-        lines.append(f"## 时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        lines.append(f"## 时间窗：近 {since_hours_used} 小时\n")
+        lines.append(f"## 時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        lines.append(f"## 時間窗：近 {since_hours_used} 小時\n")
 
-        # 自选股列表（标记持仓）
-        lines.append("## 自选股")
+        # 自選股列表（標記持倉）
+        lines.append("## 自選股")
         watchlist_map = {s.symbol: s for s in context.watchlist}
         packs = data.get("signal_packs", {}) or {}
         for stock in context.watchlist:
@@ -211,45 +211,45 @@ class NewsDigestAgent(BaseAgent):
             if pack and pack.quote:
                 try:
                     extra_parts.append(
-                        f"现价{pack.quote.current_price:.2f}({pack.quote.change_pct:+.2f}%)"
+                        f"現價{pack.quote.current_price:.2f}({pack.quote.change_pct:+.2f}%)"
                     )
                 except Exception:
                     pass
             tech = (pack.technical if pack else None) or {}
             if tech and not tech.get("error"):
                 if tech.get("trend"):
-                    extra_parts.append(f"趋势{tech.get('trend')}")
+                    extra_parts.append(f"趨勢{tech.get('trend')}")
                 if tech.get("macd_status"):
                     extra_parts.append(f"MACD {tech.get('macd_status')}")
             flow = (pack.capital_flow if pack else None) or {}
             if flow and not flow.get("error") and flow.get("status"):
-                extra_parts.append(f"资金{flow.get('status')}")
+                extra_parts.append(f"資金{flow.get('status')}")
 
             extra = (" | " + " ".join(extra_parts)) if extra_parts else ""
             if position:
                 lines.append(
-                    f"- {stock.name}({stock.symbol}) [持仓{position['total_quantity']}股]{extra}"
+                    f"- {stock.name}({stock.symbol}) [持倉{position['total_quantity']}股]{extra}"
                 )
             else:
                 lines.append(f"- {stock.name}({stock.symbol}){extra}")
 
-        # 自选股相关新闻
+        # 自選股相關新聞
         related_news: list[NewsItem] = data.get("related_news", [])
-        lines.append(f"\n## 自选股相关新闻 ({len(related_news)} 条)")
+        lines.append(f"\n## 自選股相關新聞 ({len(related_news)} 條)")
         if related_news:
             for news in related_news[:10]:
                 self._format_news_item(lines, news, watchlist_map)
         else:
-            lines.append("- 暂无自选股相关新闻")
+            lines.append("- 暫無自選股相關新聞")
 
-        # 重要市场新闻
+        # 重要市場新聞
         important_news: list[NewsItem] = data.get("important_news", [])
-        lines.append(f"\n## 重要市场新闻 ({len(important_news)} 条)")
+        lines.append(f"\n## 重要市場新聞 ({len(important_news)} 條)")
         if important_news:
             for news in important_news[:10]:
                 self._format_news_item(lines, news, watchlist_map)
         else:
-            lines.append("- 暂无重要市场新闻")
+            lines.append("- 暫無重要市場新聞")
 
         user_content = "\n".join(lines)
         return system_prompt, user_content
@@ -257,14 +257,14 @@ class NewsDigestAgent(BaseAgent):
     def _format_news_item(
         self, lines: list[str], news: NewsItem, watchlist_map: dict
     ) -> None:
-        """格式化单条新闻"""
+        """格式化單條新聞"""
         importance_label = ["", "[一般]", "[重要]", "[重大]"][min(news.importance, 3)]
         time_str = news.publish_time.strftime("%H:%M")
-        source_label = {"sina": "新浪", "eastmoney": "东财"}.get(
+        source_label = {"sina": "新浪", "eastmoney": "東財"}.get(
             news.source, news.source
         )
 
-        # 关联股票名称
+        # 關聯股票名稱
         stock_names = []
         for symbol in news.symbols:
             if symbol in watchlist_map:
@@ -283,7 +283,7 @@ class NewsDigestAgent(BaseAgent):
 
     def _parse_suggestions(self, content: str, watchlist: list) -> dict[str, dict]:
         """
-        从 AI 响应中解析个股建议
+        從 AI 回應中解析個股建議
         返回: {symbol: {action, action_label, reason, should_alert}}
         """
         suggestions: dict[str, dict] = {}
@@ -302,7 +302,7 @@ class NewsDigestAgent(BaseAgent):
 
             if getattr(s, "market", None) == MarketCode.HK and sym.isdigit():
                 try:
-                    symbol_map[str(int(sym))] = sym  # 兼容去掉前导 0（如 00700 -> 700）
+                    symbol_map[str(int(sym))] = sym  # 相容去掉前導 0（如 00700 -> 700）
                 except ValueError:
                     pass
                 symbol_map[f"HK{sym}"] = sym
@@ -330,21 +330,21 @@ class NewsDigestAgent(BaseAgent):
             if not action_text:
                 continue
 
-            # 1) 优先匹配「...」/【...】里的代码
+            # 1) 優先匹配「...」/【...】裡的程式碼
             m = re.search(
                 r"[「【\[]\s*(?P<sym>[A-Za-z][A-Za-z0-9\.\-]{0,9}|\d{3,6})\s*[」】\]]",
                 line,
             )
             sym_raw = m.group("sym") if m else ""
 
-            # 2) 再匹配括号里的代码（如 腾讯控股(00700)）
+            # 2) 再匹配括號裡的程式碼（如 騰訊控股(00700)）
             if not sym_raw:
                 m = re.search(
                     r"\(\s*(?P<sym>[A-Za-z][A-Za-z0-9\.\-]{0,9}|\d{3,6})\s*\)", line
                 )
                 sym_raw = m.group("sym") if m else ""
 
-            # 3) 再匹配行首代码
+            # 3) 再匹配行首程式碼
             if not sym_raw:
                 m = re.match(r"^(?P<sym>[A-Za-z][A-Za-z0-9\.\-]{0,9}|\d{3,6})\b", line)
                 sym_raw = m.group("sym") if m else ""
@@ -356,7 +356,7 @@ class NewsDigestAgent(BaseAgent):
                         sym_raw = k
                         break
 
-            # 5) 名称兜底
+            # 5) 名稱兜底
             if not sym_raw:
                 for name, sym in name_map.items():
                     if name and name in line:
@@ -374,7 +374,7 @@ class NewsDigestAgent(BaseAgent):
             if not canonical or canonical not in symbol_set:
                 continue
 
-            # 提取理由：从“建议类型”后截取
+            # 提取理由：從“建議型別”後擷取
             reason = ""
             m_reason = re.search(
                 rf"{re.escape(action_text)}\s*[：:：\\-—]?\s*(?P<r>.+)$", line
@@ -383,7 +383,7 @@ class NewsDigestAgent(BaseAgent):
                 reason = m_reason.group("r").strip()
 
             action_info = NEWS_ACTION_MAP.get(
-                action_text, {"action": "watch", "label": "关注"}
+                action_text, {"action": "watch", "label": "關注"}
             )
             suggestions[canonical] = {
                 "action": action_info["action"],
@@ -431,7 +431,7 @@ class NewsDigestAgent(BaseAgent):
             if not canonical or canonical not in symbol_set:
                 continue
             action = (it.get("action") or "watch").strip()
-            action_label = (it.get("action_label") or "关注").strip()
+            action_label = (it.get("action_label") or "關注").strip()
             reason = (it.get("reason") or "").strip()
             signal = (it.get("signal") or "").strip()
             suggestions[canonical] = {
@@ -451,20 +451,20 @@ class NewsDigestAgent(BaseAgent):
         return suggestions
 
     async def should_notify(self, result: AnalysisResult) -> bool:
-        """有自选股相关新闻或重要市场新闻时通知"""
+        """有自選股相關新聞或重要市場新聞時通知"""
         related_news = result.raw_data.get("related_news", [])
         important_news = result.raw_data.get("important_news", [])
 
-        # 有自选股相关新闻
+        # 有自選股相關新聞
         if related_news:
             return True
-        # 有重要市场新闻
+        # 有重要市場新聞
         if important_news:
             return True
         return False
 
     async def analyze(self, context: AgentContext, data: dict) -> AnalysisResult:
-        """重写分析：落库到历史，便于在 UI 中查看“新闻速递”产物。"""
+        """重寫分析：落庫到歷史，便於在 UI 中檢視“新聞速遞”產物。"""
         system_prompt, user_content = self.build_prompt(data, context)
         content = await context.ai_client.chat(system_prompt, user_content)
 
@@ -486,7 +486,7 @@ class NewsDigestAgent(BaseAgent):
             f"{(s.name or s.symbol).strip()}({s.symbol})"
             for s in context.watchlist[:5]
         ]
-        stock_names = "、".join(stock_items) if stock_items else "无股票"
+        stock_names = "、".join(stock_items) if stock_items else "無股票"
         if len(context.watchlist) > 5:
             stock_names += f" 等{len(context.watchlist)}只"
         title = f"【{self.display_name}】{stock_names}"
@@ -498,7 +498,7 @@ class NewsDigestAgent(BaseAgent):
             raw_data={**data, "structured": structured} if structured else data,
         )
 
-        # 解析个股建议并写入建议池
+        # 解析個股建議並寫入建議池
         suggestions = self._parse_suggestions_json(structured, context.watchlist)
         if not suggestions:
             suggestions = self._parse_suggestions(result.content, context.watchlist)
@@ -542,7 +542,7 @@ class NewsDigestAgent(BaseAgent):
                 },
             )
 
-        # 保存到历史记录（使用 "*" 表示全局）
+        # 儲存到歷史記錄（使用 "*" 表示全域性）
         related_news: list[NewsItem] = data.get("related_news", []) or []
         important_news: list[NewsItem] = data.get("important_news", []) or []
         payload_news = []

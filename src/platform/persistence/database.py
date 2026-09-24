@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "panwatch.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-# SQLite 适合本地开发和单实例部署，但并发写入时不能无限等待锁。
-# 将等待限制在数秒内，让上层事务可以回滚/重试或返回明确错误，而不是
-# 让浏览器请求长时间表现为“卡死”。
+# SQLite 適合本地開發和單例項部署，但併發寫入時不能無限等待鎖。
+# 將等待限制在數秒內，讓上層事務可以回滾/重試或返回明確錯誤，而不是
+# 讓瀏覽器請求長時間表現為“卡死”。
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 SQLITE_INIT_RETRY_DELAYS = (0.5, 1.0, 2.0)
 
@@ -62,7 +62,7 @@ def get_db():
 
 
 def init_db():
-    """初始化数据库，并容忍开发热重载期间的短暂跨进程锁。"""
+    """初始化資料庫，並容忍開發熱過載期間的短暫跨程式鎖。"""
     for attempt in range(len(SQLITE_INIT_RETRY_DELAYS) + 1):
         try:
             _init_db_once()
@@ -72,7 +72,7 @@ def init_db():
                 raise
             delay = SQLITE_INIT_RETRY_DELAYS[attempt]
             logger.warning(
-                "数据库初始化遇到锁，%ss 后重试 (%s/%s): %s",
+                "資料庫初始化遇到鎖，%ss 後重試 (%s/%s): %s",
                 delay,
                 attempt + 1,
                 len(SQLITE_INIT_RETRY_DELAYS),
@@ -94,7 +94,7 @@ def _init_db_once() -> None:
 
 
 def _is_sqlite_lock_error(exc: BaseException) -> bool:
-    """识别 SQLAlchemy 包装后的 SQLite 锁异常。"""
+    """識別 SQLAlchemy 包裝後的 SQLite 鎖異常。"""
     seen: set[int] = set()
     current: BaseException | None = exc
     while current is not None and id(current) not in seen:
@@ -123,7 +123,7 @@ def _has_table(conn, table: str) -> bool:
 
 
 def _backfill_sort_order(conn, table: str) -> None:
-    """只在确有待回填数据时申请 SQLite 写锁。"""
+    """只在確有待回填資料時申請 SQLite 寫鎖。"""
     if not _has_column(conn, table, "sort_order"):
         return
     pending = conn.execute(
@@ -144,30 +144,30 @@ def _backfill_sort_order(conn, table: str) -> None:
 
 
 def _drop_dangling_ai_provider_fk(conn, table: str) -> None:
-    """删掉指向已不存在的 ai_providers 表的悬空外键列。
+    """刪掉指向已不存在的 ai_providers 表的懸空外部索引鍵列。
 
-    背景: _migrate_old_providers 把 ai_providers 表删了,但
-    agent_configs.ai_provider_id / stock_agents.ai_provider_id 这两列上的 FK 没清。
-    SQLite 默认 PRAGMA foreign_keys 不开,所以历史 INSERT 没事;但某些路径下
-    (比如 INSERT ... RETURNING + SQLAlchemy 校验)会报 "no such table: ai_providers"。
+    背景: _migrate_old_providers 把 ai_providers 表刪了,但
+    agent_configs.ai_provider_id / stock_agents.ai_provider_id 這兩列上的 FK 沒清。
+    SQLite 預設 PRAGMA foreign_keys 不開,所以歷史 INSERT 沒事;但某些路徑下
+    (比如 INSERT ... RETURNING + SQLAlchemy 校驗)會報 "no such table: ai_providers"。
 
-    SQLite 3.35+ 支持 ALTER TABLE DROP COLUMN,直接 drop 即可。
+    SQLite 3.35+ 支援 ALTER TABLE DROP COLUMN,直接 drop 即可。
     """
     if not _has_column(conn, table, "ai_provider_id"):
         return
-    # ai_providers 还存在的话先不动(让 _migrate_old_providers 先迁移)
+    # ai_providers 還存在的話先不動(讓 _migrate_old_providers 先遷移)
     if _has_table(conn, "ai_providers"):
         return
     try:
         conn.execute(text(f"ALTER TABLE {table} DROP COLUMN ai_provider_id"))
         conn.commit()
-        logger.info(f"已清理 {table}.ai_provider_id 悬空外键列")
+        logger.info(f"已清理 {table}.ai_provider_id 懸空外部索引鍵列")
     except Exception as e:
-        # 老 SQLite 不支持 DROP COLUMN — fallback 留 schema 不动,改用 PRAGMA foreign_keys=OFF
-        # (本进程级别,不影响其他业务,因为 ai_providers 不存在,FK 永远无效)
+        # 老 SQLite 不支援 DROP COLUMN — fallback 留 schema 不動,改用 PRAGMA foreign_keys=OFF
+        # (本程式級別,不影響其他業務,因為 ai_providers 不存在,FK 永遠無效)
         logger.warning(
-            f"DROP COLUMN {table}.ai_provider_id 失败 (SQLite < 3.35?): {e}; "
-            f"将通过 PRAGMA foreign_keys=OFF 绕开"
+            f"DROP COLUMN {table}.ai_provider_id 失敗 (SQLite < 3.35?): {e}; "
+            f"將透過 PRAGMA foreign_keys=OFF 繞開"
         )
         try:
             conn.execute(text("PRAGMA foreign_keys = OFF"))
@@ -191,15 +191,15 @@ def _backup_db_before_migration() -> None:
     backup_path = f"{DB_PATH}.bak.{ts}"
     try:
         shutil.copy2(DB_PATH, backup_path)
-        logger.info(f"数据库迁移前备份已创建: {backup_path}")
+        logger.info(f"資料庫遷移前備份已建立: {backup_path}")
     except Exception as e:
-        logger.warning(f"数据库迁移前备份失败: {e}")
+        logger.warning(f"資料庫遷移前備份失敗: {e}")
 
 
 def _migrate(engine):
-    """增量 schema 迁移（SQLite ALTER TABLE ADD COLUMN）"""
+    """增量 schema 遷移（SQLite ALTER TABLE ADD COLUMN）"""
     migrations = [
-        # Phase 1(模拟盘求真):持仓期最高价,移动止损用
+        # Phase 1(模擬交易求真):持倉期最高價,移動停損用
         (
             "paper_trading_positions",
             "highest_price",
@@ -230,25 +230,25 @@ def _migrate(engine):
             "notify_channel_ids",
             "ALTER TABLE stock_agents ADD COLUMN notify_channel_ids TEXT DEFAULT '[]'",
         ),
-        # Phase 3: 持仓增强
+        # Phase 3: 持倉增強
         (
             "stocks",
             "invested_amount",
             "ALTER TABLE stocks ADD COLUMN invested_amount REAL",
         ),
-        # Phase 4: Agent 执行模式
+        # Phase 4: Agent 執行模式
         (
             "agent_configs",
             "execution_mode",
             "ALTER TABLE agent_configs ADD COLUMN execution_mode TEXT DEFAULT 'batch'",
         ),
-        # Phase 4: 持仓交易风格
+        # Phase 4: 持倉交易風格
         (
             "positions",
             "trading_style",
             "ALTER TABLE positions ADD COLUMN trading_style TEXT DEFAULT 'swing'",
         ),
-        # 排序字段：关注列表/持仓拖拽排序
+        # 排序欄位：關注列表/持倉拖拽排序
         (
             "stocks",
             "sort_order",
@@ -259,7 +259,7 @@ def _migrate(engine):
             "sort_order",
             "ALTER TABLE positions ADD COLUMN sort_order INTEGER DEFAULT 0",
         ),
-        # 数据源增强
+        # 資料來源增強
         (
             "data_sources",
             "supports_batch",
@@ -270,7 +270,7 @@ def _migrate(engine):
             "test_symbols",
             "ALTER TABLE data_sources ADD COLUMN test_symbols TEXT DEFAULT '[]'",
         ),
-        # Phase 5: 建议池元数据
+        # Phase 5: 建議池後設資料
         (
             "stock_suggestions",
             "meta",
@@ -283,14 +283,14 @@ def _migrate(engine):
                 conn.execute(text(sql))
                 conn.commit()
 
-        # 清理 legacy 悬空外键:agent_configs.ai_provider_id / stock_agents.ai_provider_id
-        # 这两列原本 REFERENCES ai_providers(id),但 _migrate_old_providers 已经把
-        # ai_providers 表删了。如果保留 FK,新 INSERT 会触发 SQLite "no such table" 错误
-        # (因为 SQLite 在 INSERT 时校验 FK 引用的表是否存在)。
+        # 清理 legacy 懸空外部索引鍵:agent_configs.ai_provider_id / stock_agents.ai_provider_id
+        # 這兩列原本 REFERENCES ai_providers(id),但 _migrate_old_providers 已經把
+        # ai_providers 表刪了。如果保留 FK,新 INSERT 會觸發 SQLite "no such table" 錯誤
+        # (因為 SQLite 在 INSERT 時校驗 FK 引用的表是否存在)。
         _drop_dangling_ai_provider_fk(conn, "agent_configs")
         _drop_dangling_ai_provider_fk(conn, "stock_agents")
 
-        # 初始化排序字段（仅对未初始化数据）
+        # 初始化排序欄位（僅對未初始化資料）
         _backfill_sort_order(conn, "stocks")
         _backfill_sort_order(conn, "positions")
 
@@ -322,7 +322,7 @@ CREATE TABLE IF NOT EXISTS suggestion_feedback (
 
 
 def _migrate_old_providers(engine):
-    """如果存在旧的 ai_providers 表，迁移数据到 ai_services + ai_models"""
+    """如果存在舊的 ai_providers 表，遷移資料到 ai_services + ai_models"""
     with engine.connect() as conn:
         if not _has_table(conn, "ai_providers"):
             return
@@ -390,12 +390,12 @@ def _migrate_old_providers(engine):
         conn.execute(text("DROP TABLE ai_providers"))
         conn.commit()
         logger.info(
-            f"已迁移 {len(rows)} 条旧 AI Provider 数据到 ai_services + ai_models"
+            f"已遷移 {len(rows)} 條舊 AI Provider 資料到 ai_services + ai_models"
         )
 
 
 def _migrate_settings_to_models(engine):
-    """将旧的 app_settings 中的 AI/通知配置迁移为 AIService+AIModel / NotifyChannel 记录"""
+    """將舊的 app_settings 中的 AI/通知配置遷移為 AIService+AIModel / NotifyChannel 記錄"""
     with engine.connect() as conn:
         if not _has_table(conn, "app_settings"):
             return
@@ -424,7 +424,7 @@ def _migrate_settings_to_models(engine):
                     ),
                     {"name": ai_model, "service_id": service_id, "model": ai_model},
                 )
-                logger.info(f"已迁移 AI 配置: {ai_model}")
+                logger.info(f"已遷移 AI 配置: {ai_model}")
 
         # Migrate Telegram settings if present and no channels exist yet
         bot_token = settings_map.get("notify_telegram_bot_token", "")
@@ -442,7 +442,7 @@ def _migrate_settings_to_models(engine):
                     ),
                     {"name": "Telegram", "type": "telegram", "config": config_json},
                 )
-                logger.info("已迁移 Telegram 配置为 NotifyChannel")
+                logger.info("已遷移 Telegram 配置為 NotifyChannel")
 
         # Remove old settings keys
         old_keys = [
@@ -463,11 +463,11 @@ def _migrate_settings_to_models(engine):
 
 def _migrate_positions_to_accounts(engine):
     """
-    将旧的 stocks 表中的持仓数据迁移到 accounts + positions 表
-    创建一个默认账户，并将有持仓的股票数据迁移过去
+    將舊的 stocks 表中的持倉資料遷移到 accounts + positions 表
+    建立一個預設帳戶，並將有持倉的股票資料遷移過去
     """
     with engine.connect() as conn:
-        # 检查是否已有账户数据（避免重复迁移）
+        # 檢查是否已有帳戶資料（避免重複遷移）
         if not _has_table(conn, "accounts"):
             return
 
@@ -475,7 +475,7 @@ def _migrate_positions_to_accounts(engine):
         if existing_accounts > 0:
             return
 
-        # 检查 stocks 表是否有持仓数据需要迁移
+        # 檢查 stocks 表是否有持倉資料需要遷移
         if not _has_column(conn, "stocks", "cost_price"):
             return
 
@@ -487,18 +487,18 @@ def _migrate_positions_to_accounts(engine):
         ).fetchall()
 
         if not stocks_with_position:
-            # 没有持仓数据，创建一个空的默认账户
+            # 沒有持倉資料，建立一個空的預設帳戶
             conn.execute(
                 text(
-                    "INSERT INTO accounts (name, available_funds, enabled) VALUES ('默认账户', 0, 1)"
+                    "INSERT INTO accounts (name, available_funds, enabled) VALUES ('預設帳戶', 0, 1)"
                 )
             )
             conn.commit()
-            logger.info("已创建默认账户")
+            logger.info("已建立預設帳戶")
             return
 
-        # 创建默认账户
-        # 先获取旧的 available_funds 设置
+        # 建立預設帳戶
+        # 先獲取舊的 available_funds 設定
         old_funds = conn.execute(
             text("SELECT value FROM app_settings WHERE key = 'available_funds'")
         ).scalar()
@@ -508,11 +508,11 @@ def _migrate_positions_to_accounts(engine):
             text(
                 "INSERT INTO accounts (name, available_funds, enabled) VALUES (:name, :funds, 1)"
             ),
-            {"name": "默认账户", "funds": available_funds},
+            {"name": "預設帳戶", "funds": available_funds},
         )
         account_id = conn.execute(text("SELECT last_insert_rowid()")).scalar()
 
-        # 迁移持仓数据
+        # 遷移持倉資料
         for row in stocks_with_position:
             stock_id, cost_price, quantity, invested_amount = row
             conn.execute(
@@ -529,20 +529,20 @@ def _migrate_positions_to_accounts(engine):
                 },
             )
 
-        # 删除旧的 available_funds 设置
+        # 刪除舊的 available_funds 設定
         conn.execute(text("DELETE FROM app_settings WHERE key = 'available_funds'"))
 
         conn.commit()
-        logger.info(f"已迁移 {len(stocks_with_position)} 条持仓数据到默认账户")
+        logger.info(f"已遷移 {len(stocks_with_position)} 條持倉資料到預設帳戶")
 
 
 def _migrate_remove_stock_enabled(engine):
-    """移除历史 stocks.enabled 软删除字段并清理残留数据。"""
+    """移除歷史 stocks.enabled 軟刪除欄位並清理殘留資料。"""
     with engine.connect() as conn:
         if not _has_table(conn, "stocks") or not _has_column(conn, "stocks", "enabled"):
             return
 
-        # 历史软删除数据：无任何关联则直接删除；有关联则恢复为有效股票。
+        # 歷史軟刪除資料：無任何關聯則直接刪除；有關聯則恢復為有效股票。
         conn.execute(
             text(
                 """
@@ -557,14 +557,14 @@ WHERE COALESCE(enabled, 1) = 0
         conn.execute(text("UPDATE stocks SET enabled = 1 WHERE COALESCE(enabled, 1) = 0"))
         conn.commit()
 
-        # 优先直接删列；旧版 SQLite 不支持时，重建表以确保物理移除。
+        # 優先直接刪列；舊版 SQLite 不支援時，重建表以確保物理移除。
         try:
             conn.execute(text("ALTER TABLE stocks DROP COLUMN enabled"))
             conn.commit()
             logger.info("已移除 stocks.enabled 列")
         except Exception:
             conn.rollback()
-            logger.info("当前 SQLite 不支持 DROP COLUMN，改为重建 stocks 表移除 enabled")
+            logger.info("當前 SQLite 不支援 DROP COLUMN，改為重建 stocks 表移除 enabled")
             conn.execute(text("PRAGMA foreign_keys=OFF"))
             conn.execute(
                 text(
@@ -600,4 +600,4 @@ FROM stocks
             conn.execute(text("ALTER TABLE stocks__new RENAME TO stocks"))
             conn.execute(text("PRAGMA foreign_keys=ON"))
             conn.commit()
-            logger.info("已通过重建表移除 stocks.enabled 列")
+            logger.info("已透過重建表移除 stocks.enabled 列")

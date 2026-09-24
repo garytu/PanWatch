@@ -7,7 +7,7 @@ interface SignalScoreShareCardProps {
   item: StrategySignalItem
 }
 
-// A股配色:看多=红、看空/中性等
+// A股配色:看多=紅、看空/中性等
 const UP = '#e11d48'
 const NEUTRAL = '#d97706'
 const SLATE = '#475569'
@@ -16,20 +16,20 @@ const MARKET_LABEL: Record<string, string> = { CN: 'A股', HK: '港股', US: '�
 const marketLabel = (m?: string) => (m ? MARKET_LABEL[m] || m : '')
 
 /**
- * action → 展示标签 + 配色(与机会页一致:buy/add 看多偏红,hold 中性琥珀,其余灰)。
- * 非持仓的 hold → 观望、非持仓的 add → 建仓(与 Opportunities 的 displayActionLabel 对齐)。
+ * action → 展示標籤 + 配色(與機會頁一致:buy/add 看多偏紅,hold 中性琥珀,其餘灰)。
+ * 非持倉的 hold → 觀望、非持倉的 add → 建倉(與 Opportunities 的 displayActionLabel 對齊)。
  */
 function actionVisual(item: StrategySignalItem): { label: string; color: string } {
   const key = (item.action || '').toLowerCase()
-  let label = item.action_label || item.action || '观望'
-  if (!item.is_holding_snapshot && key === 'hold') label = '观望'
-  if (!item.is_holding_snapshot && key === 'add') label = '建仓'
+  let label = item.action_label || item.action || '觀望'
+  if (!item.is_holding_snapshot && key === 'hold') label = '觀望'
+  if (!item.is_holding_snapshot && key === 'add') label = '建倉'
   if (key === 'buy' || key === 'add') return { label, color: UP }
   if (key === 'hold') return { label, color: NEUTRAL }
   return { label, color: SLATE }
 }
 
-/** AI 评分(1~10)分档配色:≥8 红(强)、6~8 琥珀、<6 灰。 */
+/** AI 評分(1~10)分檔配色:≥8 紅(強)、6~8 琥珀、<6 灰。 */
 function scoreColor(score: number): string {
   if (score >= 8) return UP
   if (score >= 6) return NEUTRAL
@@ -86,7 +86,7 @@ function FactorList({
 }
 
 /**
- * 个股 AI 评分卡。Hero=AI 评分 X/10 + 操作标签 + 标的;下方利好/风险因子来自 factor_explain。
+ * 個股 AI 評分卡。Hero=AI 評分 X/10 + 操作標籤 + 標的;下方利好/風險因子來自 factor_explain。
  */
 export default function SignalScoreShareCard({ open, onClose, item }: SignalScoreShareCardProps) {
   const av = actionVisual(item)
@@ -98,16 +98,16 @@ export default function SignalScoreShareCard({ open, onClose, item }: SignalScor
   const summary = (item.signal || item.reason || '').replace(/\s+/g, ' ').trim()
 
   return (
-    <ShareCardDialog open={open} onClose={onClose} filename={`AI选股评分-${name}`}>
+    <ShareCardDialog open={open} onClose={onClose} filename={`AI選股評分-${name}`}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: '#0f172a' }}>AI 选股评分</div>
+        <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: '#0f172a' }}>AI 選股評分</div>
         <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500, flexShrink: 0 }}>
           {marketLabel(item.stock_market)}
         </div>
       </div>
 
-      {/* Hero:AI 评分 + 操作标签 + 标的 */}
+      {/* Hero:AI 評分 + 操作標籤 + 標的 */}
       <div
         style={{
           marginTop: 18,
@@ -137,7 +137,7 @@ export default function SignalScoreShareCard({ open, onClose, item }: SignalScor
             </div>
           </div>
           <div style={{ marginLeft: 'auto', textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 12, opacity: 0.92, fontWeight: 600, letterSpacing: 1 }}>AI 评分</div>
+            <div style={{ fontSize: 12, opacity: 0.92, fontWeight: 600, letterSpacing: 1 }}>AI 評分</div>
             <div style={{ fontSize: 44, fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
               {aiScore != null ? aiScore : '--'}
               <span style={{ fontSize: 20, opacity: 0.85 }}> / 10</span>
@@ -161,7 +161,7 @@ export default function SignalScoreShareCard({ open, onClose, item }: SignalScor
         </div>
       </div>
 
-      {/* 一句话信号 */}
+      {/* 一句話訊號 */}
       {summary && (
         <div
           style={{
@@ -179,7 +179,7 @@ export default function SignalScoreShareCard({ open, onClose, item }: SignalScor
         </div>
       )}
 
-      {/* 因子拆解:利好(绿) / 风险(红) */}
+      {/* 因子拆解:利好(綠) / 風險(紅) */}
       {(positive.length > 0 || negative.length > 0) && (
         <div style={{ marginTop: 18, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           <FactorList
@@ -190,7 +190,7 @@ export default function SignalScoreShareCard({ open, onClose, item }: SignalScor
             items={positive}
             sign="+"
           />
-          <FactorList title="风险因子" color="#e11d48" bg="#fff1f2" border="#fecdd3" items={negative} sign="-" />
+          <FactorList title="風險因子" color="#e11d48" bg="#fff1f2" border="#fecdd3" items={negative} sign="-" />
         </div>
       )}
     </ShareCardDialog>

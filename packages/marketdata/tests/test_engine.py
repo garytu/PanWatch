@@ -57,7 +57,7 @@ def test_all_fail_returns_not_ok():
 
 def test_market_filter_skips_unsupported():
     v = FakeVendor("a", "ok")
-    v.supports_markets = {"US"}   # 不支持 CN
+    v.supports_markets = {"US"}   # 不支援 CN
     assert _engine({"a": v}, [SourceConfig(vendor="a", priority=1)]).fetch(_req()).ok is False
 
 
@@ -87,9 +87,9 @@ def test_priority_resort_when_config_unsorted():
 def test_min_count_prefers_first_sufficient():
     e = _engine({"a": FakeVendor("a", "ok"), "b": FakeVendor("b", "ok")},
                 [SourceConfig(vendor="a", priority=1), SourceConfig(vendor="b", priority=2)])
-    # FakeVendor "ok" 返回 1 条;min_count=2 → a 不足 → 试 b → b 也 1 条 → 都不足 → 取最长(并列取先到的 a)
+    # FakeVendor "ok" 返回 1 條;min_count=2 → a 不足 → 試 b → b 也 1 條 → 都不足 → 取最長(並列取先到的 a)
     r = e.fetch(Request(symbols=("600519",), market="CN"), min_count=2)
-    assert r.ok and len(r.data) == 1  # 返回了(最长的),不因不足而失败
+    assert r.ok and len(r.data) == 1  # 返回了(最長的),不因不足而失敗
 
 
 def test_min_count_returns_first_meeting_threshold():
@@ -104,7 +104,7 @@ def test_min_count_returns_first_meeting_threshold():
 
 def test_min_count_default_one_unchanged():
     e = _engine({"a": FakeVendor("a", "ok")}, [SourceConfig(vendor="a", priority=1)])
-    r = e.fetch(Request(symbols=("x",), market="CN"))  # 默认 min_count=1
+    r = e.fetch(Request(symbols=("x",), market="CN"))  # 預設 min_count=1
     assert r.ok and r.vendor == "a"
 
 
@@ -122,7 +122,7 @@ def test_engine_passes_request_limit_as_days_to_vendor():
 
 
 def test_engine_passes_request_extra_to_vendor_config():
-    # 守护测试:events 等 vendor 需要 req.extra(如 since_days)透传进 call_config。
+    # 守護測試:events 等 vendor 需要 req.extra(如 since_days)透傳進 call_config。
     seen = {}
     class ExtraVendor:
         name = "e"
@@ -134,4 +134,4 @@ def test_engine_passes_request_extra_to_vendor_config():
     e = _engine({"e": ExtraVendor()}, [SourceConfig(vendor="e", priority=1)])
     e.fetch(Request(symbols=("x",), market="CN", limit=99, extra=(("since_days", 30),)))
     assert seen["since_days"] == 30
-    assert seen["days"] == 99  # extra 透传不应破坏原有 days 注入
+    assert seen["days"] == 99  # extra 透傳不應破壞原有 days 注入

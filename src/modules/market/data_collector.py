@@ -1,4 +1,4 @@
-"""统一数据源管理器"""
+"""統一資料來源管理器"""
 
 import asyncio
 import logging
@@ -13,8 +13,8 @@ from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import DataSource
 from src.platform.marketdata.models import MarketCode
 
-# 数据源测试的统一样本。每个市场固定两个稳定、容易识别的代码，避免新建数据源
-# 时只测到 A 股，导致港股/美股 provider 的市场路由问题直到生产才暴露。
+# 資料來源測試的統一樣本。每個市場固定兩個穩定、容易識別的程式碼，避免新建資料來源
+# 時只測到 A 股，導致港股/美股 provider 的市場路由問題直到生產才暴露。
 DEFAULT_TEST_SYMBOLS_BY_MARKET: dict[str, tuple[str, str]] = {
     "CN": ("600519", "601127"),
     "HK": ("00700", "00386"),
@@ -28,15 +28,15 @@ DEFAULT_TEST_SYMBOLS: tuple[str, ...] = tuple(
 
 logger = logging.getLogger(__name__)
 
-# 数据源"测试"最多测多少个配置的 test_symbols(上限,防用户贴一大串把源打爆)。
-# 取 10 覆盖常见配置(此前 kline/capital_flow 写死 [:3]、quote/events [:5],会把用户
-# 配的第 4/6 个悄悄切掉,造成"配了 N 个只返回前几个"的意外)。
+# 資料來源"測試"最多測多少個配置的 test_symbols(上限,防使用者貼一大串把源打爆)。
+# 取 10 覆蓋常見配置(此前 kline/capital_flow 寫死 [:3]、quote/events [:5],會把使用者
+# 配的第 4/6 個悄悄切掉,造成"配了 N 個只返回前幾個"的意外)。
 _TEST_SYMBOL_LIMIT = 10
 
 
 @dataclass
 class CollectorResult:
-    """采集结果"""
+    """採集結果"""
 
     success: bool
     data: Any = None
@@ -45,15 +45,15 @@ class CollectorResult:
     error: str = ""
     source_name: str = ""
     source_provider: str = ""
-    # 本次实际执行的代码(包含未返回的数据),用于测试弹窗回显配置/默认值。
+    # 本次實際執行的程式碼(包含未返回的資料),用於測試彈跳視窗回顯配置/預設值。
     test_symbols: list[str] = field(default_factory=list)
-    # 部分成功时保留逐代码失败原因，避免无数据代码(如 APPL)静默消失。
+    # 部分成功時保留逐程式碼失敗原因，避免無資料程式碼(如 APPL)靜默消失。
     errors: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
 class CollectorLog:
-    """采集日志"""
+    """採集日誌"""
 
     timestamp: datetime
     source_name: str
@@ -66,15 +66,15 @@ class CollectorLog:
 
 class DataCollectorManager:
     """
-    统一数据源管理器
+    統一資料來源管理器
 
-    提供统一的数据采集接口，支持：
-    - 从数据库配置加载数据源
-    - 记录采集日志
-    - 批量/单个采集
+    提供統一的資料採集介面，支援：
+    - 從資料庫配置載入資料來源
+    - 記錄採集日誌
+    - 批次/單個採集
     """
 
-    # 数据源类型 -> (provider -> 采集器工厂)
+    # 資料來源型別 -> (provider -> 採集器工廠)
     COLLECTOR_FACTORIES: dict[str, dict[str, Callable]] = {}
 
     def __init__(self):
@@ -82,7 +82,7 @@ class DataCollectorManager:
         self._register_collectors()
 
     def _register_collectors(self):
-        """注册所有采集器"""
+        """註冊所有采集器"""
         from src.platform.marketdata.collectors.kline_collector import KlineCollector
         from src.platform.marketdata.collectors.capital_flow_collector import CapitalFlowCollector
         from src.platform.marketdata.collectors.events_collector import EastMoneyEventsCollector
@@ -112,7 +112,7 @@ class DataCollectorManager:
         duration_ms: int = 0,
         count: int = 0,
     ):
-        """记录日志"""
+        """記錄日誌"""
         log = CollectorLog(
             timestamp=datetime.now(),
             source_name=source_name,
@@ -124,15 +124,15 @@ class DataCollectorManager:
         )
         self.logs.append(log)
 
-        # 同时输出到 logger:error 走 WARNING；start/success 是底层心跳,降到 DEBUG。
-        # UI 日志板始终从 self.logs 读完整记录,不受这里影响。
+        # 同時輸出到 logger:error 走 WARNING；start/success 是底層心跳,降到 DEBUG。
+        # UI 日誌板始終從 self.logs 讀完整記錄,不受這裡影響。
         if action == "error":
             logger.warning(f"[{source_name}] {message}")
         else:
             logger.debug(f"[{source_name}] {message}")
 
     def get_logs(self) -> list[dict]:
-        """获取日志（用于 UI 展示）"""
+        """獲取日誌（用於 UI 展示）"""
         return [
             {
                 "timestamp": log.timestamp.strftime("%H:%M:%S"),
@@ -147,11 +147,11 @@ class DataCollectorManager:
         ]
 
     def clear_logs(self):
-        """清空日志"""
+        """清空日誌"""
         self.logs = []
 
     def get_enabled_sources(self, source_type: str) -> list[DataSource]:
-        """获取指定类型的已启用数据源"""
+        """獲取指定型別的已啟用資料來源"""
         db = SessionLocal()
         try:
             return (
@@ -164,7 +164,7 @@ class DataCollectorManager:
             db.close()
 
     def get_source_by_id(self, source_id: int) -> DataSource | None:
-        """根据 ID 获取数据源"""
+        """根據 ID 獲取資料來源"""
         db = SessionLocal()
         try:
             return db.query(DataSource).filter(DataSource.id == source_id).first()
@@ -172,16 +172,16 @@ class DataCollectorManager:
             db.close()
 
     def _get_stock_names(self, symbols: list[str]) -> dict[str, str]:
-        """获取股票代码到名称的映射"""
+        """獲取股票程式碼到名稱的對映"""
         from src.platform.persistence.models import Stock
 
-        # 默认测试股票名称映射
+        # 預設測試股票名稱對映
         default_names = {
-            "601127": "赛力斯",
-            "600519": "贵州茅台",
-            "000001": "平安银行",
-            "000858": "五粮液",
-            "300750": "宁德时代",
+            "601127": "賽力斯",
+            "600519": "貴州茅臺",
+            "000001": "平安銀行",
+            "000858": "五糧液",
+            "300750": "寧德時代",
         }
 
         db = SessionLocal()
@@ -189,15 +189,15 @@ class DataCollectorManager:
             stocks = db.query(Stock).filter(Stock.symbol.in_(symbols)).all()
             result = {s.symbol: s.name for s in stocks}
 
-            # 对于数据库中没有的股票，使用默认名称
+            # 對於資料庫中沒有的股票，使用預設名稱
             for symbol in symbols:
                 if symbol not in result and symbol in default_names:
                     result[symbol] = default_names[symbol]
 
             return result
         except Exception as e:
-            logger.warning(f"获取股票名称失败: {e}")
-            # 返回默认名称
+            logger.warning(f"獲取股票名稱失敗: {e}")
+            # 返回預設名稱
             return {s: default_names.get(s, s) for s in symbols if s in default_names}
         finally:
             db.close()
@@ -205,11 +205,11 @@ class DataCollectorManager:
     async def collect_news(
         self, symbols: list[str], hours: int = 12
     ) -> CollectorResult:
-        """采集新闻（使用所有已启用的新闻数据源）"""
+        """採集新聞（使用所有已啟用的新聞資料來源）"""
         from src.platform.marketdata.collectors.news_collector import NewsCollector
 
         start_time = datetime.now()
-        self._log("新闻采集", "news", "start", f"开始采集 {len(symbols)} 只股票的新闻")
+        self._log("新聞採集", "news", "start", f"開始採集 {len(symbols)} 只股票的新聞")
 
         try:
             collector = NewsCollector.from_database()
@@ -217,10 +217,10 @@ class DataCollectorManager:
 
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             self._log(
-                "新闻采集",
+                "新聞採集",
                 "news",
                 "success",
-                f"采集完成，共 {len(news_list)} 条",
+                f"採集完成，共 {len(news_list)} 條",
                 duration_ms=duration_ms,
                 count=len(news_list),
             )
@@ -233,18 +233,18 @@ class DataCollectorManager:
             )
         except Exception as e:
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-            self._log("新闻采集", "news", "error", str(e), duration_ms=duration_ms)
+            self._log("新聞採集", "news", "error", str(e), duration_ms=duration_ms)
             return CollectorResult(success=False, error=str(e), duration_ms=duration_ms)
 
     async def collect_kline(
         self, symbol: str, market: str = "CN", days: int = 60
     ) -> CollectorResult:
-        """采集 K 线数据"""
+        """採集 K 線資料"""
         from src.platform.marketdata.collectors.kline_collector import KlineCollector
         from src.platform.marketdata.models import MarketCode
 
         start_time = datetime.now()
-        self._log("K线数据", "kline", "start", f"获取 {symbol} 的 K 线数据")
+        self._log("K線資料", "kline", "start", f"獲取 {symbol} 的 K 線資料")
 
         try:
             market_code = MarketCode(market)
@@ -255,7 +255,7 @@ class DataCollectorManager:
 
             if summary.get("error"):
                 self._log(
-                    "K线数据",
+                    "K線資料",
                     "kline",
                     "error",
                     summary["error"],
@@ -266,10 +266,10 @@ class DataCollectorManager:
                 )
 
             self._log(
-                "K线数据",
+                "K線資料",
                 "kline",
                 "success",
-                f"获取成功，最新收盘价 {summary.get('last_close', 'N/A')}",
+                f"獲取成功，最新收盤價 {summary.get('last_close', 'N/A')}",
                 duration_ms=duration_ms,
             )
 
@@ -281,15 +281,15 @@ class DataCollectorManager:
             )
         except Exception as e:
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-            self._log("K线数据", "kline", "error", str(e), duration_ms=duration_ms)
+            self._log("K線資料", "kline", "error", str(e), duration_ms=duration_ms)
             return CollectorResult(success=False, error=str(e), duration_ms=duration_ms)
 
     async def collect_capital_flow(self, symbol: str) -> CollectorResult:
-        """采集资金流向"""
+        """採集資金流向"""
         from src.platform.marketdata.collectors.capital_flow_collector import CapitalFlowCollector
 
         start_time = datetime.now()
-        self._log("资金流向", "capital_flow", "start", f"获取 {symbol} 的资金流向")
+        self._log("資金流向", "capital_flow", "start", f"獲取 {symbol} 的資金流向")
 
         try:
             collector = CapitalFlowCollector(MarketCode.CN)
@@ -299,21 +299,21 @@ class DataCollectorManager:
 
             if not data:
                 self._log(
-                    "资金流向",
+                    "資金流向",
                     "capital_flow",
                     "error",
-                    "无数据",
+                    "無資料",
                     duration_ms=duration_ms,
                 )
                 return CollectorResult(
-                    success=False, error="无数据", duration_ms=duration_ms
+                    success=False, error="無資料", duration_ms=duration_ms
                 )
 
             self._log(
-                "资金流向",
+                "資金流向",
                 "capital_flow",
                 "success",
-                f"获取成功，主力净流入 {data.main_net_inflow / 10000:.2f}万",
+                f"獲取成功，主力淨流入 {data.main_net_inflow / 10000:.2f}萬",
                 duration_ms=duration_ms,
             )
 
@@ -326,26 +326,26 @@ class DataCollectorManager:
         except Exception as e:
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             self._log(
-                "资金流向", "capital_flow", "error", str(e), duration_ms=duration_ms
+                "資金流向", "capital_flow", "error", str(e), duration_ms=duration_ms
             )
             return CollectorResult(success=False, error=str(e), duration_ms=duration_ms)
 
     async def collect_quote(self, symbols: list[str]) -> CollectorResult:
-        """采集实时行情"""
+        """採集即時行情"""
         from src.platform.marketdata.marketdata_client import md_stock_data
 
         start_time = datetime.now()
-        self._log("实时行情", "quote", "start", f"获取 {len(symbols)} 只股票的行情")
+        self._log("即時行情", "quote", "start", f"獲取 {len(symbols)} 只股票的行情")
 
         try:
             stocks = await asyncio.to_thread(md_stock_data, symbols, MarketCode.CN.value)
 
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
             self._log(
-                "实时行情",
+                "即時行情",
                 "quote",
                 "success",
-                f"获取成功，共 {len(stocks)} 只",
+                f"獲取成功，共 {len(stocks)} 只",
                 duration_ms=duration_ms,
                 count=len(stocks),
             )
@@ -358,11 +358,11 @@ class DataCollectorManager:
             )
         except Exception as e:
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-            self._log("实时行情", "quote", "error", str(e), duration_ms=duration_ms)
+            self._log("即時行情", "quote", "error", str(e), duration_ms=duration_ms)
             return CollectorResult(success=False, error=str(e), duration_ms=duration_ms)
 
     async def test_source(self, source: DataSource) -> CollectorResult:
-        """测试单个数据源"""
+        """測試單個資料源"""
         test_symbols = source.test_symbols or list(DEFAULT_TEST_SYMBOLS)
 
         start_time = datetime.now()
@@ -370,24 +370,24 @@ class DataCollectorManager:
             source.name,
             source.type,
             "start",
-            f"开始测试，测试股票: {','.join(test_symbols)}",
+            f"開始測試，測試股票: {','.join(test_symbols)}",
         )
 
         try:
-            # 收集 vendor/market_get 的真实失败原因,失败时透到 UI(而不是笼统的"无数据")
+            # 收集 vendor/market_get 的真實失敗原因,失敗時透到 UI(而不是籠統的"無資料")
             with capture_errors() as errs:
                 result = await self._test_source_impl(source, test_symbols)
             result.test_symbols = list(test_symbols)
             if not result.success and errs:
-                # 去重保序 + 截断,拼成真因;若原本已有更具体的 error(如"provider 无对应 vendor")保留在前
+                # 去重保序 + 截斷,拼成真因;若原本已有更具體的 error(如"provider 無對應 vendor")保留在前
                 seen: dict[str, None] = {}
                 for m in errs:
                     seen.setdefault(m, None)
                 detail = "; ".join(list(seen)[:8])
-                generic = {"", "无数据", "获取行情失败", "获取 K 线数据失败", "获取资金流向失败",
-                           "未获取到新闻数据", "未获取到快讯数据", "未获取到基本面数据",
-                           "未获取到龙虎榜数据", "未获取到融资融券数据", "未获取到股东数据",
-                           "未获取到分红数据", "未获取到北向资金数据"}
+                generic = {"", "無資料", "獲取行情失敗", "獲取 K 線資料失敗", "獲取資金流向失敗",
+                           "未獲取到新聞資料", "未獲取到快訊資料", "未獲取到基本面資料",
+                           "未獲取到龍虎榜資料", "未獲取到融資融券資料", "未獲取到股東資料",
+                           "未獲取到分紅資料", "未獲取到北向資金資料"}
                 result.error = detail if (result.error or "") in generic else f"{result.error};真因: {detail}"
             duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
 
@@ -396,7 +396,7 @@ class DataCollectorManager:
                     source.name,
                     source.type,
                     "success",
-                    f"测试成功，获取到 {result.count} 条数据",
+                    f"測試成功，獲取到 {result.count} 條資料",
                     duration_ms=duration_ms,
                     count=result.count,
                 )
@@ -431,13 +431,13 @@ class DataCollectorManager:
     async def _test_source_impl(
         self, source: DataSource, test_symbols: list[str]
     ) -> CollectorResult:
-        """测试数据源的具体实现"""
+        """測試資料來源的具體實現"""
         if source.type == "news":
             return await self._test_news_source(source, test_symbols)
 
         elif source.type == "kline":
-            # 按 provider 路由到对应 Provider,而不是写死走 tencent (KlineCollector)。
-            # Tushare/YFinance 的 token 等配置从 source.config 注入。
+            # 按 provider 路由到對應 Provider,而不是寫死走 tencent (KlineCollector)。
+            # Tushare/YFinance 的 token 等配置從 source.config 注入。
             return await self._test_kline_source(source, test_symbols)
 
         elif source.type == "capital_flow":
@@ -461,11 +461,11 @@ class DataCollectorManager:
                 success=len(results) > 0,
                 data=results,
                 count=len(results),
-                error="" if results else "获取资金流向失败",
+                error="" if results else "獲取資金流向失敗",
             )
 
         elif source.type == "quote":
-            # 按 provider 路由到对应 Provider,Tushare(暂无 quote)/YFinance 可正确测到。
+            # 按 provider 路由到對應 Provider,Tushare(暫無 quote)/YFinance 可正確測到。
             return await self._test_quote_source(source, test_symbols)
 
         elif source.type == "chart":
@@ -477,7 +477,7 @@ class DataCollectorManager:
                 symbol = test_symbols[0] if test_symbols else "601127"
                 screenshot = await collector.capture(
                     symbol=symbol,
-                    name="测试",
+                    name="測試",
                     market="CN",
                     provider=source.provider,
                 )
@@ -489,7 +489,7 @@ class DataCollectorManager:
                         data={"image": f"data:image/png;base64,{img_base64}"},
                         count=1,
                     )
-                return CollectorResult(success=False, error="截图失败")
+                return CollectorResult(success=False, error="截圖失敗")
             finally:
                 await collector.close()
 
@@ -537,7 +537,7 @@ class DataCollectorManager:
                     count=len(items),
                     error=""
                     if items
-                    else f"未获取到事件数据（lookback={lookback_days}d）",
+                    else f"未獲取到事件資料（lookback={lookback_days}d）",
                 )
 
         elif source.type == "flash_news":
@@ -562,11 +562,11 @@ class DataCollectorManager:
             return await self._test_northbound_source(source)
 
         return CollectorResult(
-            success=False, error=f"不支持的数据源类型: {source.type}"
+            success=False, error=f"不支援的資料來源型別: {source.type}"
         )
 
-    # 包内 kline/quote/flash_news/fundamentals Engine 各自只注册了这些 vendor(权威来源见 marketdata.PACKAGE_VENDORS_BY_TYPE)。
-    # provider 不在这个集合里 = 包内没实现该源,测试应给出明确 error,不能构造 Engine 硬跑。
+    # 包內 kline/quote/flash_news/fundamentals Engine 各自只註冊了這些 vendor(權威來源見 marketdata.PACKAGE_VENDORS_BY_TYPE)。
+    # provider 不在這個集合裡 = 包內沒實現該源,測試應給出明確 error,不能構造 Engine 硬跑。
     _NEWS_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["news"]
     _KLINE_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["kline"]
     _QUOTE_PACKAGE_VENDORS = PACKAGE_VENDORS_BY_TYPE["quote"]
@@ -581,17 +581,17 @@ class DataCollectorManager:
     async def _test_kline_source(
         self, source: DataSource, test_symbols: list[str]
     ) -> CollectorResult:
-        """按 provider 测试 K 线源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """按 provider 測試 K 線源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        测试需要的是"这个 provider 自己工作正常",不是"整条主备链有 fallback 能跑通",
-        所以用只含这一个 vendor 的 StaticConfigProvider 隔离测试指定源。
+        測試需要的是"這個 provider 自己工作正常",不是"整條主備鏈有 fallback 能跑通",
+        所以用只含這一個 vendor 的 StaticConfigProvider 隔離測試指定源。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider, Symbol
 
         if source.provider not in self._KLINE_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该 K 线源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該 K 線源",
             )
 
         cfg = source.config or {}
@@ -619,9 +619,9 @@ class DataCollectorManager:
                         }
                     )
                 elif not first_error:
-                    first_error = "无数据"
+                    first_error = "無資料"
                 if not bars:
-                    errors.append({"symbol": symbol, "market": market, "error": "无数据"})
+                    errors.append({"symbol": symbol, "market": market, "error": "無資料"})
             except Exception as e:
                 errors.append({"symbol": symbol, "market": market, "error": str(e)})
                 if not first_error:
@@ -631,14 +631,14 @@ class DataCollectorManager:
             success=len(results) > 0,
             data=results,
             count=len(results),
-            error="" if results else (first_error or "获取 K 线数据失败"),
+            error="" if results else (first_error or "獲取 K 線資料失敗"),
             errors=errors,
         )
 
     async def _test_quote_source(
         self, source: DataSource, test_symbols: list[str]
     ) -> CollectorResult:
-        """按 provider 测试行情源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。"""
+        """按 provider 測試行情源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。"""
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         from src.platform.marketdata.marketdata_client import _quote_to_row
@@ -646,7 +646,7 @@ class DataCollectorManager:
         if source.provider not in self._QUOTE_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该行情源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該行情源",
             )
 
         cfg = source.config or {}
@@ -674,24 +674,24 @@ class DataCollectorManager:
                 for row in rows
             ],
             count=len(rows),
-            error="" if rows else "获取行情失败",
+            error="" if rows else "獲取行情失敗",
         )
 
     async def _test_news_source(
         self, source: DataSource, test_symbols: list[str]
     ) -> CollectorResult:
-        """按 provider 测试新闻源:走 marketdata 包的单源 Engine(仅该 vendor,不聚合其它源)。
+        """按 provider 測試新聞源:走 marketdata 包的單源 Engine(僅該 vendor,不聚合其它源)。
 
-        新闻是按 symbol 的数据;eastmoney_news 用股票名称搜索(效果远好于代码搜索),
-        所以这里取测试股票的名称映射一并传入。capture_errors 已在 test_source 外层
-        包着,失败时会自动透真因（含雪球 WAF 拦截）。
+        新聞是按 symbol 的資料;eastmoney_news 用股票名稱搜尋(效果遠好於程式碼搜尋),
+        所以這裡取測試股票的名稱對映一併傳入。capture_errors 已在 test_source 外層
+        包著,失敗時會自動透真因（含雪球 WAF 攔截）。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._NEWS_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该新闻源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該新聞源",
             )
 
         cfg = source.config or {}
@@ -704,7 +704,7 @@ class DataCollectorManager:
         names = self._get_stock_names(test_symbols)
 
         try:
-            # 包内 news publish_time 是 aware(UTC),now 也须 aware,否则 since 过滤崩
+            # 包內 news publish_time 是 aware(UTC),now 也須 aware,否則 since 過濾崩
             from datetime import timezone
             news = md.news(test_symbols, names=names, now=datetime.now(timezone.utc))
         except Exception as e:
@@ -720,20 +720,20 @@ class DataCollectorManager:
                 for n in news[:10]
             ],
             count=len(news),
-            error="" if news else "未获取到新闻数据",
+            error="" if news else "未獲取到新聞資料",
         )
 
     async def _test_flash_news_source(self, source: DataSource) -> CollectorResult:
-        """按 provider 测试快讯源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """按 provider 測試快訊源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        快讯是市场级数据(7×24 电报),不按 symbols 过滤,所以不传 test_symbols。
+        快訊是市場級資料(7×24 電報),不按 symbols 過濾,所以不傳 test_symbols。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._FLASH_NEWS_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该快讯源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該快訊源",
             )
 
         cfg = source.config or {}
@@ -759,26 +759,26 @@ class DataCollectorManager:
                 for i in items[:10]
             ],
             count=len(items),
-            error="" if items else "未获取到快讯数据",
+            error="" if items else "未獲取到快訊資料",
         )
 
     async def _test_fundamentals_source(self, source: DataSource) -> CollectorResult:
-        """按 provider 测试基本面源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """按 provider 測試基本面源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        基本面是按 symbol 的数据(与市场级 flash_news 不同),测试必须显式配置
-        test_symbols,不套用全局默认股票,配置缺失时直接给出明确 error。
+        基本面是按 symbol 的資料(與市場級 flash_news 不同),測試必須顯式配置
+        test_symbols,不套用全域性預設股票,配置缺失時直接給出明確 error。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._FUNDAMENTALS_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该基本面源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該基本面源",
             )
 
         syms = list(source.test_symbols or [])[:5]
         if not syms:
-            return CollectorResult(success=False, error="请配置测试股票代码")
+            return CollectorResult(success=False, error="請配置測試股票程式碼")
 
         cfg = source.config or {}
         md = MarketData(
@@ -809,22 +809,22 @@ class DataCollectorManager:
                 for i in items[:10]
             ],
             count=len(items),
-            error="" if items else "未获取到基本面数据",
+            error="" if items else "未獲取到基本面資料",
         )
 
     async def _test_dragon_tiger_source(self, source: DataSource) -> CollectorResult:
-        """测试龙虎榜源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """測試龍虎榜源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        龙虎榜是市场级数据(不按 symbols 过滤),但需要指定交易日。测试时优先取
-        source.config.test_date,未配置则用当前日期占位(仅用于验证连通性，
-        实抓以真实交易日为准）。
+        龍虎榜是市場級資料(不按 symbols 過濾),但需要指定交易日。測試時優先取
+        source.config.test_date,未配置則用當前日期佔位(僅用於驗證連通性，
+        實抓以真實交易日為準）。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._DRAGON_TIGER_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该龙虎榜源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該龍虎榜源",
             )
 
         cfg = source.config or {}
@@ -858,25 +858,25 @@ class DataCollectorManager:
             count=len(items),
             error=""
             if items
-            else "未获取到龙虎榜数据（需配置 test_date 或当日有榜）",
+            else "未獲取到龍虎榜資料（需配置 test_date 或當日有榜）",
         )
 
     async def _test_margin_source(self, source: DataSource) -> CollectorResult:
-        """测试融资融券源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """測試融資融券源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        融资融券是按 symbol 的数据,测试必须显式配置 test_symbols。
+        融資融券是按 symbol 的資料,測試必須顯式配置 test_symbols。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._MARGIN_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该融资融券源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該融資融券源",
             )
 
         syms = list(source.test_symbols or [])[:5]
         if not syms:
-            return CollectorResult(success=False, error="请配置测试股票代码")
+            return CollectorResult(success=False, error="請配置測試股票程式碼")
 
         cfg = source.config or {}
         md = MarketData(
@@ -901,25 +901,25 @@ class DataCollectorManager:
                 for i in items[:10]
             ],
             count=len(items),
-            error="" if items else "未获取到融资融券数据",
+            error="" if items else "未獲取到融資融券資料",
         )
 
     async def _test_shareholders_source(self, source: DataSource) -> CollectorResult:
-        """测试股东户数源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """測試股東戶數源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        股东户数是按 symbol 的数据,测试必须显式配置 test_symbols。
+        股東戶數是按 symbol 的資料,測試必須顯式配置 test_symbols。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._SHAREHOLDERS_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该股东户数源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該股東戶數源",
             )
 
         syms = list(source.test_symbols or [])[:5]
         if not syms:
-            return CollectorResult(success=False, error="请配置测试股票代码")
+            return CollectorResult(success=False, error="請配置測試股票程式碼")
 
         cfg = source.config or {}
         md = MarketData(
@@ -948,25 +948,25 @@ class DataCollectorManager:
                 for i in items[:10]
             ],
             count=len(items),
-            error="" if items else "未获取到股东户数数据",
+            error="" if items else "未獲取到股東戶數資料",
         )
 
     async def _test_dividend_source(self, source: DataSource) -> CollectorResult:
-        """测试分红源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """測試分紅源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        分红是按 symbol 的数据,测试必须显式配置 test_symbols。
+        分紅是按 symbol 的資料,測試必須顯式配置 test_symbols。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._DIVIDEND_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该分红源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該分紅源",
             )
 
         syms = list(source.test_symbols or [])[:5]
         if not syms:
-            return CollectorResult(success=False, error="请配置测试股票代码")
+            return CollectorResult(success=False, error="請配置測試股票程式碼")
 
         cfg = source.config or {}
         md = MarketData(
@@ -991,20 +991,20 @@ class DataCollectorManager:
                 for i in items[:10]
             ],
             count=len(items),
-            error="" if items else "未获取到分红数据",
+            error="" if items else "未獲取到分紅資料",
         )
 
     async def _test_northbound_source(self, source: DataSource) -> CollectorResult:
-        """测试北向资金源:走 marketdata 包的单源 Engine(仅该 vendor,不串备份链)。
+        """測試北向資金源:走 marketdata 包的單源 Engine(僅該 vendor,不串備份鏈)。
 
-        北向资金是市场级数据(7×24 资金流),不按 symbols 过滤,所以不传 test_symbols。
+        北向資金是市場級資料(7×24 資金流),不按 symbols 過濾,所以不傳 test_symbols。
         """
         from marketdata import MarketData, SourceConfig, StaticConfigProvider
 
         if source.provider not in self._NORTHBOUND_PACKAGE_VENDORS:
             return CollectorResult(
                 success=False,
-                error=f"provider {source.provider} 无对应 vendor，包内未实现该北向资金源",
+                error=f"provider {source.provider} 無對應 vendor，包內未實現該北向資金源",
             )
 
         cfg = source.config or {}
@@ -1034,16 +1034,16 @@ class DataCollectorManager:
                 for i in items[:10]
             ],
             count=len(items),
-            error="" if items else "未获取到北向资金数据",
+            error="" if items else "未獲取到北向資金資料",
         )
 
 
-# 全局单例
+# 全域性單例
 _manager: DataCollectorManager | None = None
 
 
 def get_collector_manager() -> DataCollectorManager:
-    """获取全局数据源管理器"""
+    """獲取全域性資料來源管理器"""
     global _manager
     if _manager is None:
         _manager = DataCollectorManager()

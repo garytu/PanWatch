@@ -30,7 +30,7 @@ export function TestErrorList({ errors }: { errors: TestErrorItem[] }) {
 
   return (
     <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-      <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mb-1">未返回明细</div>
+      <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium mb-1">未返回明細</div>
       <div className="space-y-1">
         {errors.map((item, i) => (
           <div key={`${item.symbol}-${i}`} className="text-[12px] text-amber-700 dark:text-amber-300">
@@ -69,31 +69,31 @@ interface DataSourceForm {
 }
 
 const DATASOURCE_TYPES = {
-  news: { label: '新闻资讯', icon: Newspaper, color: 'text-blue-500' },
-  kline: { label: 'K线数据', icon: LineChart, color: 'text-orange-500' },
-  capital_flow: { label: '资金流向', icon: DollarSign, color: 'text-yellow-500' },
-  quote: { label: '实时行情', icon: TrendingUp, color: 'text-emerald-500' },
-  events: { label: '事件日历', icon: Layers, color: 'text-violet-500' },
-  chart: { label: 'K线截图', icon: Image, color: 'text-purple-500' },
-  flash_news: { label: '快讯', icon: Zap, color: 'text-amber-500' },
+  news: { label: '新聞資訊', icon: Newspaper, color: 'text-blue-500' },
+  kline: { label: 'K線資料', icon: LineChart, color: 'text-orange-500' },
+  capital_flow: { label: '資金流向', icon: DollarSign, color: 'text-yellow-500' },
+  quote: { label: '即時行情', icon: TrendingUp, color: 'text-emerald-500' },
+  events: { label: '事件日曆', icon: Layers, color: 'text-violet-500' },
+  chart: { label: 'K線截圖', icon: Image, color: 'text-purple-500' },
+  flash_news: { label: '快訊', icon: Zap, color: 'text-amber-500' },
   fundamentals: { label: '基本面', icon: BarChart3, color: 'text-indigo-500' },
-  dragon_tiger: { label: '龙虎榜', icon: Trophy, color: 'text-red-500' },
-  margin: { label: '融资融券', icon: Landmark, color: 'text-cyan-500' },
-  shareholders: { label: '股东户数', icon: Users, color: 'text-teal-500' },
-  dividend: { label: '分红', icon: Gift, color: 'text-pink-500' },
-  northbound: { label: '北向资金', icon: ArrowLeftRight, color: 'text-sky-500' },
+  dragon_tiger: { label: '龍虎榜', icon: Trophy, color: 'text-red-500' },
+  margin: { label: '融資融券', icon: Landmark, color: 'text-cyan-500' },
+  shareholders: { label: '股東戶數', icon: Users, color: 'text-teal-500' },
+  dividend: { label: '分紅', icon: Gift, color: 'text-pink-500' },
+  northbound: { label: '北向資金', icon: ArrowLeftRight, color: 'text-sky-500' },
 }
 
-// 数据源分类分组:仅用于页面展示时的二级归组,不影响数据结构与后端
+// 資料來源分類分組:僅用於頁面展示時的二級歸組,不影響資料結構與後端
 const DATASOURCE_CATEGORIES: { key: string; label: string; types: string[] }[] = [
-  { key: 'quote_kline', label: '行情 & K线', types: ['quote', 'kline'] },
-  { key: 'news', label: '资讯 & 快讯', types: ['news', 'flash_news', 'events'] },
-  { key: 'fundamentals', label: '基本面 & 财务', types: ['fundamentals'] },
-  { key: 'capital', label: '资金 & 市场面', types: ['capital_flow', 'dragon_tiger', 'margin', 'shareholders', 'northbound', 'dividend'] },
-  { key: 'chart', label: '图表', types: ['chart'] },
+  { key: 'quote_kline', label: '行情 & K線', types: ['quote', 'kline'] },
+  { key: 'news', label: '資訊 & 快訊', types: ['news', 'flash_news', 'events'] },
+  { key: 'fundamentals', label: '基本面 & 財務', types: ['fundamentals'] },
+  { key: 'capital', label: '資金 & 市場面', types: ['capital_flow', 'dragon_tiger', 'margin', 'shareholders', 'northbound', 'dividend'] },
+  { key: 'chart', label: '圖表', types: ['chart'] },
 ]
 
-// 兜底:未被以上分类覆盖的 type 归入"其他"(防止将来新增 type 时漏显示)
+// 兜底:未被以上分類覆蓋的 type 歸入"其他"(防止將來新增 type 時漏顯示)
 const CATEGORIZED_TYPES = new Set(DATASOURCE_CATEGORIES.flatMap(c => c.types))
 const UNCATEGORIZED_TYPES = Object.keys(DATASOURCE_TYPES).filter(t => !CATEGORIZED_TYPES.has(t))
 const ALL_DATASOURCE_CATEGORIES = UNCATEGORIZED_TYPES.length > 0
@@ -102,13 +102,13 @@ const ALL_DATASOURCE_CATEGORIES = UNCATEGORIZED_TYPES.length > 0
 
 interface CredentialFieldDef { key: string; label: string; placeholder: string; secret?: boolean; help?: string }
 
-// provider → 凭证字段(前端持有 UI 元数据,新增带凭证的 provider 时在此加一行)
+// provider → 憑證欄位(前端持有 UI 後設資料,新增帶憑證的 provider 時在此加一行)
 const PROVIDER_CREDENTIAL_FIELDS: Record<string, CredentialFieldDef[]> = {
   tushare: [
-    { key: 'token', label: 'Tushare Token', placeholder: '粘贴 token,留空则读环境变量 TUSHARE_TOKEN', secret: true, help: '登录 tushare.pro 个人主页获取' },
+    { key: 'token', label: 'Tushare Token', placeholder: '貼上 token,留空則讀環境變數 TUSHARE_TOKEN', secret: true, help: '登入 tushare.pro 個人主頁獲取' },
   ],
   xueqiu: [
-    { key: 'cookies', label: '雪球 Cookies', placeholder: 'xq_a_token=...; xq_r_token=...', secret: true, help: '浏览器 DevTools → Network → 复制完整 cookie 字符串' },
+    { key: 'cookies', label: '雪球 Cookies', placeholder: 'xq_a_token=...; xq_r_token=...', secret: true, help: '瀏覽器 DevTools → Network → 複製完整 cookie 字串' },
   ],
 }
 
@@ -134,7 +134,7 @@ export default function DataSourcesPage() {
   const [testSymbolsInput, setTestSymbolsInput] = useState('')
   const [secretVisible, setSecretVisible] = useState(false)
   const [resetting, setResetting] = useState(false)
-  // 分类折叠态:key 不存在或为 false 视为展开(默认全部展开)
+  // 分類摺疊態:key 不存在或為 false 視為展開(預設全部展開)
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({})
   const toggleCategory = (key: string) => setCollapsedCategories(prev => ({ ...prev, [key]: !prev[key] }))
 
@@ -146,7 +146,7 @@ export default function DataSourcesPage() {
       setSources(data)
     } catch (e) {
       console.error(e)
-      toast('加载数据源失败', 'error')
+      toast('載入資料來源失敗', 'error')
     } finally {
       setLoading(false)
     }
@@ -183,14 +183,14 @@ export default function DataSourcesPage() {
         await fetchAPI(`/datasources/${editId}`, { method: 'PUT',
           body: JSON.stringify({ priority: form.priority, test_symbols: testSymbols, config: form.config || {} }) })
       } else {
-        if (!form.name || !form.type || !form.provider) { toast('名称/类型/Provider 必填', 'error'); return }
+        if (!form.name || !form.type || !form.provider) { toast('名稱/型別/Provider 必填', 'error'); return }
         await fetchAPI('/datasources', { method: 'POST', body: JSON.stringify({
           name: form.name, type: form.type, provider: form.provider,
           config: form.config || {}, priority: form.priority,
           supports_batch: form.supports_batch, test_symbols: testSymbols, enabled: true }) })
       }
-      setDialogOpen(false); load(); toast(editId ? '设置已保存' : '已新增数据源', 'success')
-    } catch (e) { toast(e instanceof Error ? e.message : '保存失败', 'error') }
+      setDialogOpen(false); load(); toast(editId ? '設定已儲存' : '已新增資料來源', 'success')
+    } catch (e) { toast(e instanceof Error ? e.message : '儲存失敗', 'error') }
   }
 
   const toggleEnabled = async (source: DataSource) => {
@@ -201,7 +201,7 @@ export default function DataSourcesPage() {
       })
       load()
     } catch {
-      toast('操作失败', 'error')
+      toast('操作失敗', 'error')
     }
   }
 
@@ -212,7 +212,7 @@ export default function DataSourcesPage() {
       setTestResult(result)
       setTestResultOpen(true)
     } catch (e) {
-      toast(e instanceof Error ? e.message : '测试失败', 'error')
+      toast(e instanceof Error ? e.message : '測試失敗', 'error')
     } finally {
       setTesting(null)
     }
@@ -226,7 +226,7 @@ export default function DataSourcesPage() {
     return acc
   }, {} as Record<string, DataSource[]>)
 
-  // 组内按当前顺序(API 已按 type,priority,id 排序)与相邻源交换优先级
+  // 組內按當前順序(API 已按 type,priority,id 排序)與相鄰源交換優先順序
   const moveSource = async (source: DataSource, dir: -1 | 1) => {
     const group = groupedSources[source.type] || []
     const idx = group.findIndex(s => s.id === source.id)
@@ -238,18 +238,18 @@ export default function DataSourcesPage() {
         fetchAPI(`/datasources/${swap.id}`, { method: 'PUT', body: JSON.stringify({ priority: source.priority }) }),
       ])
       load()
-    } catch { toast('调整顺序失败', 'error') }
+    } catch { toast('調整順序失敗', 'error') }
   }
 
   const resetToSeed = async () => {
-    if (!window.confirm('将删除孤儿源、补齐缺失默认源，并把内置数据源测试股票恢复为 A/HK/US 各两条；自定义配置与凭证会保留。是否继续?')) return
+    if (!window.confirm('將刪除孤兒源、補齊缺失預設源，並把內建資料來源測試股票恢復為 A/HK/US 各兩條；自定義配置與憑證會保留。是否繼續?')) return
     setResetting(true)
     try {
       const result = await resetDataSourcesToSeed()
       load()
-      toast(`已恢复默认测试股票，清理 ${result.deleted.length} 个孤儿源,补齐 ${result.seeded_missing.length} 个默认源`, 'success')
+      toast(`已恢復預設測試股票，清理 ${result.deleted.length} 個孤兒源,補齊 ${result.seeded_missing.length} 個預設源`, 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '恢复默认失败', 'error')
+      toast(e instanceof Error ? e.message : '恢復預設失敗', 'error')
     } finally {
       setResetting(false)
     }
@@ -257,14 +257,14 @@ export default function DataSourcesPage() {
 
   const deleteSource = async () => {
     if (!editId) return
-    if (!window.confirm(`确定删除数据源「${form.name}」?`)) return
+    if (!window.confirm(`確定刪除資料來源「${form.name}」?`)) return
     try {
       await fetchAPI(`/datasources/${editId}`, { method: 'DELETE' })
-      setDialogOpen(false); load(); toast('已删除', 'success')
-    } catch (e) { toast(e instanceof Error ? e.message : '删除失败', 'error') }
+      setDialogOpen(false); load(); toast('已刪除', 'success')
+    } catch (e) { toast(e instanceof Error ? e.message : '刪除失敗', 'error') }
   }
 
-  // 单个 type 的 section 渲染(结构与此前平铺版本完全一致,仅抽成函数以便按分类复用)
+  // 單個 type 的 section 渲染(結構與此前平鋪版本完全一致,僅抽成函式以便按分類複用)
   const renderTypeSection = (type: string) => {
     const meta = DATASOURCE_TYPES[type as keyof typeof DATASOURCE_TYPES]
     if (!meta) return null
@@ -275,12 +275,12 @@ export default function DataSourcesPage() {
           <Icon className={`w-4 h-4 ${color}`} />
           <h3 className="text-[13px] font-semibold text-foreground">{label}</h3>
           <span className="text-[11px] text-muted-foreground ml-auto">
-            {groupedSources[type]?.length || 0} 个
+            {groupedSources[type]?.length || 0} 個
           </span>
         </div>
 
         {(!groupedSources[type] || groupedSources[type].length === 0) ? (
-          <p className="text-[13px] text-muted-foreground text-center py-6">暂无{label}数据源</p>
+          <p className="text-[13px] text-muted-foreground text-center py-6">暫無{label}資料來源</p>
         ) : (
           <div className="space-y-2">
             {groupedSources[type].map(source => (
@@ -296,22 +296,22 @@ export default function DataSourcesPage() {
                         {source.supports_batch && (
                           <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                             <Layers className="w-2.5 h-2.5" />
-                            批量
+                            批次
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-[11px] text-muted-foreground font-mono">{source.provider}</span>
-                        <span className="text-[11px] text-muted-foreground">优先级: {source.priority}</span>
+                        <span className="text-[11px] text-muted-foreground">優先順序: {source.priority}</span>
                         {source.engine_attached ? (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">已接入新引擎</span>
                         ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">旧路·待迁移</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">舊路·待遷移</span>
                         )}
                         {source.is_orphan && (
                           <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5">
                             <AlertTriangle className="w-2.5 h-2.5" />
-                            无对应源·待清理
+                            無對應源·待清理
                           </Badge>
                         )}
                         {source.engine_attached && source.health && source.health.success_rate != null && (
@@ -321,14 +321,14 @@ export default function DataSourcesPage() {
                               : source.health.success_rate >= 0.8 ? 'bg-amber-500' : 'bg-red-500'}`} />
                             成功率 {Math.round(source.health.success_rate * 100)}%
                             {source.health.p50_latency_ms != null && ` · p50 ${source.health.p50_latency_ms}ms`}
-                            {source.health.last_error ? ` · 最近错误` : ''}
+                            {source.health.last_error ? ` · 最近錯誤` : ''}
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveSource(source, -1)} title="上移(提高优先级)">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveSource(source, -1)} title="上移(提高優先順序)">
                       <ChevronUp className="w-3.5 h-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveSource(source, 1)} title="下移">
@@ -340,7 +340,7 @@ export default function DataSourcesPage() {
                       className="h-7 w-7"
                       onClick={() => testSource(source.id)}
                       disabled={testing === source.id || !source.enabled}
-                      title="测试连接"
+                      title="測試連線"
                     >
                       {testing === source.id ? (
                         <span className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
@@ -349,7 +349,7 @@ export default function DataSourcesPage() {
                       )}
                     </Button>
                     <Switch checked={source.enabled} onCheckedChange={() => toggleEnabled(source)} />
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog(source)} title="设置">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog(source)} title="設定">
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -373,8 +373,8 @@ export default function DataSourcesPage() {
     <div>
       <div className="mb-4 md:mb-8 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-[20px] md:text-[22px] font-bold text-foreground tracking-tight">数据源</h1>
-          <p className="text-[12px] md:text-[13px] text-muted-foreground mt-0.5 md:mt-1">管理新闻、K线、资金流向和行情数据来源</p>
+          <h1 className="text-[20px] md:text-[22px] font-bold text-foreground tracking-tight">資料來源</h1>
+          <p className="text-[12px] md:text-[13px] text-muted-foreground mt-0.5 md:mt-1">管理新聞、K線、資金流向和行情資料來源</p>
         </div>
         <Button variant="outline" size="sm" className="h-8 text-[12px] flex-shrink-0" onClick={resetToSeed} disabled={resetting}>
           {resetting ? (
@@ -382,7 +382,7 @@ export default function DataSourcesPage() {
           ) : (
             <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
           )}
-          恢复默认
+          恢復預設
         </Button>
       </div>
 
@@ -401,7 +401,7 @@ export default function DataSourcesPage() {
                 <span className="text-[13px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                   {category.label}
                 </span>
-                <span className="text-[11px] text-muted-foreground/70">{categoryCount} 个源</span>
+                <span className="text-[11px] text-muted-foreground/70">{categoryCount} 個源</span>
                 <div className="flex-1 h-px bg-border ml-2" />
               </button>
               {isOpen && (
@@ -414,17 +414,17 @@ export default function DataSourcesPage() {
         })}
       </div>
 
-      {/* Edit Dialog - 编辑模式只允许修改配置项;新增模式含名称/类型/Provider */}
+      {/* Edit Dialog - 編輯模式只允許修改配置項;新增模式含名稱/型別/Provider */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>数据源设置 - {form.name}</DialogTitle>
+            <DialogTitle>資料來源設定 - {form.name}</DialogTitle>
             <DialogDescription>{form.provider}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>优先级 <span className="text-muted-foreground font-normal">(越小越高)</span></Label>
+                <Label>優先順序 <span className="text-muted-foreground font-normal">(越小越高)</span></Label>
                 <Input
                   type="number"
                   value={form.priority}
@@ -434,7 +434,7 @@ export default function DataSourcesPage() {
               </div>
             </div>
             <div>
-              <Label>测试股票代码 <span className="text-muted-foreground font-normal">(逗号分隔)</span></Label>
+              <Label>測試股票程式碼 <span className="text-muted-foreground font-normal">(逗號分隔)</span></Label>
               <Input
                 value={testSymbolsInput}
                 onChange={e => setTestSymbolsInput(e.target.value)}
@@ -442,7 +442,7 @@ export default function DataSourcesPage() {
               />
             </div>
 
-            {/* 凭证类配置:按 provider 动态渲染对应字段 */}
+            {/* 憑證類配置:按 provider 動態渲染對應欄位 */}
             {(PROVIDER_CREDENTIAL_FIELDS[form.provider] || []).map(field => (
               <div key={field.key}>
                 <Label>{field.label}
@@ -467,11 +467,11 @@ export default function DataSourcesPage() {
               </div>
             ))}
 
-            {/* 高级:完整 JSON 编辑(只读形式,展开后可编辑) */}
+            {/* 高階:完整 JSON 編輯(只讀形式,展開後可編輯) */}
             {Object.keys(form.config || {}).length > 0 && (
               <details className="text-[12px]">
                 <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                  高级:查看/编辑完整 config JSON
+                  高階:檢視/編輯完整 config JSON
                 </summary>
                 <textarea
                   className="mt-2 w-full font-mono text-[11px] p-2 border border-border rounded bg-background min-h-[100px]"
@@ -481,7 +481,7 @@ export default function DataSourcesPage() {
                       const parsed = JSON.parse(e.target.value)
                       setForm({ ...form, config: parsed })
                     } catch {
-                      // 解析失败时不更新,允许用户继续输入
+                      // 解析失敗時不更新,允許使用者繼續輸入
                     }
                   }}
                 />
@@ -491,12 +491,12 @@ export default function DataSourcesPage() {
             <div className="flex justify-between gap-2 pt-2">
               {editId ? (
                 <Button variant="ghost" className="text-red-500 hover:text-red-600" onClick={deleteSource}>
-                  <Trash2 className="w-4 h-4 mr-1" />删除
+                  <Trash2 className="w-4 h-4 mr-1" />刪除
                 </Button>
               ) : <span />}
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => setDialogOpen(false)}>取消</Button>
-                <Button onClick={saveSource}>{editId ? '保存' : '新增'}</Button>
+                <Button onClick={saveSource}>{editId ? '儲存' : '新增'}</Button>
               </div>
             </div>
           </div>
@@ -516,11 +516,11 @@ export default function DataSourcesPage() {
               ) : (
                 <X className="w-5 h-5 text-red-500" />
               )}
-              测试结果 - {testResult?.source_name}
+              測試結果 - {testResult?.source_name}
             </DialogTitle>
             <DialogDescription>
               {testResult?.type_label} · {testResult?.provider}
-              {testResult?.supports_batch && ' · 支持批量'}
+              {testResult?.supports_batch && ' · 支援批次'}
             </DialogDescription>
           </DialogHeader>
 
@@ -528,17 +528,17 @@ export default function DataSourcesPage() {
             {/* Summary */}
             <div className="flex items-center gap-4 p-3 rounded-lg bg-accent/30">
               <div className="flex-1">
-                <div className="text-[11px] text-muted-foreground">状态</div>
+                <div className="text-[11px] text-muted-foreground">狀態</div>
                 <div className={`text-[13px] font-medium ${testResult?.test_passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                  {testResult?.test_passed ? '测试成功' : '测试失败'}
+                  {testResult?.test_passed ? '測試成功' : '測試失敗'}
                 </div>
               </div>
               <div className="flex-1">
-                <div className="text-[11px] text-muted-foreground">数据量</div>
-                <div className="text-[13px] font-medium">{testResult?.count ?? 0} 条</div>
+                <div className="text-[11px] text-muted-foreground">資料量</div>
+                <div className="text-[13px] font-medium">{testResult?.count ?? 0} 條</div>
               </div>
               <div className="flex-1">
-                <div className="text-[11px] text-muted-foreground">耗时</div>
+                <div className="text-[11px] text-muted-foreground">耗時</div>
                 <div className="text-[13px] font-medium">{testResult?.duration_ms ?? 0} ms</div>
               </div>
             </div>
@@ -546,7 +546,7 @@ export default function DataSourcesPage() {
             {/* Error message */}
             {testResult?.error && (
               <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                <div className="text-[11px] text-red-500 font-medium mb-1">错误信息</div>
+                <div className="text-[11px] text-red-500 font-medium mb-1">錯誤資訊</div>
                 <div className="text-[12px] text-red-600 dark:text-red-400 break-words whitespace-pre-wrap">{testResult.error}</div>
               </div>
             )}
@@ -558,7 +558,7 @@ export default function DataSourcesPage() {
               <div>
                 <div className="text-[12px] font-medium text-foreground mb-2 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" />
-                  执行日志
+                  執行日誌
                 </div>
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {testResult.logs.map((log, i) => (
@@ -569,7 +569,7 @@ export default function DataSourcesPage() {
                         log.action === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
                         'bg-red-500/10 text-red-500'
                       }`}>
-                        {log.action === 'start' ? '开始' : log.action === 'success' ? '成功' : '失败'}
+                        {log.action === 'start' ? '開始' : log.action === 'success' ? '成功' : '失敗'}
                       </span>
                       <span className="text-foreground flex-1">{log.message}</span>
                       {log.duration_ms > 0 && (
@@ -585,9 +585,9 @@ export default function DataSourcesPage() {
             {/* Chart type - show image outside scrollable area */}
             {testResult?.test_passed && testResult.source_type === 'chart' && (testResult.items as {image?: string})?.image && (
               <div>
-                <div className="text-[12px] font-medium text-foreground mb-2">数据预览</div>
+                <div className="text-[12px] font-medium text-foreground mb-2">資料預覽</div>
                 <div className="rounded-lg overflow-hidden border">
-                  <img src={(testResult.items as {image: string}).image} alt="K线图截图" className="w-full" />
+                  <img src={(testResult.items as {image: string}).image} alt="K線圖截圖" className="w-full" />
                 </div>
               </div>
             )}
@@ -595,7 +595,7 @@ export default function DataSourcesPage() {
             {/* Other data types - in scrollable container */}
             {testResult?.test_passed && testResult.items && testResult.source_type !== 'chart' && Array.isArray(testResult.items) && testResult.items.length > 0 && (
               <div>
-                <div className="text-[12px] font-medium text-foreground mb-2">数据预览</div>
+                <div className="text-[12px] font-medium text-foreground mb-2">資料預覽</div>
                 <div className="space-y-1.5 max-h-60 overflow-y-auto">
 
                   {/* News type */}
@@ -694,7 +694,7 @@ export default function DataSourcesPage() {
                           <span className={`text-[12px] font-mono ${
                             (flowItem.main_net ?? 0) > 0 ? 'text-red-500' : 'text-green-500'
                           }`}>
-                            {(flowItem.main_net ?? 0) > 0 ? '+' : ''}{((flowItem.main_net ?? 0) / 10000).toFixed(2)}万
+                            {(flowItem.main_net ?? 0) > 0 ? '+' : ''}{((flowItem.main_net ?? 0) / 10000).toFixed(2)}萬
                           </span>
                           <span className="text-[11px] text-muted-foreground">
                             {flowItem.main_pct?.toFixed(2)}%
@@ -713,7 +713,7 @@ export default function DataSourcesPage() {
                         <span className={`text-[12px] font-mono ${
                           (dtItem.net_buy ?? 0) > 0 ? 'text-red-500' : 'text-green-500'
                         }`}>
-                          {(dtItem.net_buy ?? 0) > 0 ? '+' : ''}{((dtItem.net_buy ?? 0) / 10000).toFixed(2)}万
+                          {(dtItem.net_buy ?? 0) > 0 ? '+' : ''}{((dtItem.net_buy ?? 0) / 10000).toFixed(2)}萬
                         </span>
                       </div>
                     )
@@ -726,7 +726,7 @@ export default function DataSourcesPage() {
                       <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-accent/30">
                         <span className="text-[12px] font-medium text-foreground">{marginItem.symbol}</span>
                         <div className="flex items-center gap-3">
-                          <span className="text-[12px] font-mono">{((marginItem.total_balance ?? 0) / 10000).toFixed(2)}万</span>
+                          <span className="text-[12px] font-mono">{((marginItem.total_balance ?? 0) / 10000).toFixed(2)}萬</span>
                           <span className="text-[11px] text-muted-foreground">{marginItem.date}</span>
                         </div>
                       </div>
@@ -771,10 +771,10 @@ export default function DataSourcesPage() {
                           <span className={`text-[12px] font-mono ${
                             (nbItem.total_net ?? 0) > 0 ? 'text-red-500' : 'text-green-500'
                           }`}>
-                            {(nbItem.total_net ?? 0) > 0 ? '+' : ''}{((nbItem.total_net ?? 0) / 10000).toFixed(2)}万
+                            {(nbItem.total_net ?? 0) > 0 ? '+' : ''}{((nbItem.total_net ?? 0) / 10000).toFixed(2)}萬
                           </span>
                           <span className="text-[11px] text-muted-foreground">
-                            沪股通 {((nbItem.hgt_net ?? 0) / 10000).toFixed(2)}万
+                            滬股通 {((nbItem.hgt_net ?? 0) / 10000).toFixed(2)}萬
                           </span>
                         </div>
                       </div>
@@ -787,7 +787,7 @@ export default function DataSourcesPage() {
             {/* Test symbols info */}
             {testResult?.test_symbols && testResult.test_symbols.length > 0 && (
               <div className="text-[11px] text-muted-foreground">
-                测试股票: {testResult.test_symbols.join(', ')}
+                測試股票: {testResult.test_symbols.join(', ')}
               </div>
             )}
           </div>
