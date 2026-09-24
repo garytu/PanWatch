@@ -106,10 +106,9 @@ interface PortfolioSummary {
     available_funds: number
     total_assets: number
   }
-  exchange_rates?: {
-    HKD_CNY: number
-    USD_CNY?: number
-  }
+  base_currency?: string
+  currency_symbol?: string
+  exchange_rates?: Record<string, number>
   quotes?: Record<string, { current_price: number | null; change_pct: number | null }>
 }
 
@@ -276,8 +275,24 @@ const mergePortfolioQuotes = (
 ): PortfolioSummary | null => {
   if (!portfolio) return null
 
-  const hkdRate = portfolio.exchange_rates?.HKD_CNY ?? 0.92
-  const usdRate = portfolio.exchange_rates?.USD_CNY ?? 7.25
+  const baseCurrency = portfolio.base_currency || 'TWD'
+  const rates = portfolio.exchange_rates || {}
+
+  const getRate = (market: string): { rate: number; isForeign: boolean } => {
+    if (baseCurrency === 'TWD') {
+      if (market === 'TW') return { rate: 1.0, isForeign: false }
+      if (market === 'US') return { rate: rates.USD_TWD ?? 31.8, isForeign: true }
+      if (market === 'HK') return { rate: rates.HKD_TWD ?? 4.05, isForeign: true }
+      if (market === 'CN') return { rate: rates.CNY_TWD ?? 4.73, isForeign: true }
+      return { rate: 1.0, isForeign: false }
+    } else {
+      if (market === 'CN') return { rate: 1.0, isForeign: false }
+      if (market === 'HK') return { rate: rates.HKD_CNY ?? 0.92, isForeign: true }
+      if (market === 'US') return { rate: rates.USD_CNY ?? 7.25, isForeign: true }
+      if (market === 'TW') return { rate: rates.TWD_CNY ?? 0.222, isForeign: true }
+      return { rate: 1.0, isForeign: false }
+    }
+  }
 
   let grandMarketValue = 0
   let grandCost = 0
@@ -293,7 +308,7 @@ const mergePortfolioQuotes = (
       const quote = quotes[`${pos.market}:${pos.symbol}`]
       const current_price = quote?.current_price ?? pos.current_price ?? null
       const change_pct = quote?.change_pct ?? pos.change_pct ?? null
-      const rate = pos.market === 'HK' ? hkdRate : pos.market === 'US' ? usdRate : 1
+      const { rate, isForeign } = getRate(pos.market)
 
       const cost = pos.cost_price * pos.quantity * rate
       accCost += cost
@@ -333,7 +348,7 @@ const mergePortfolioQuotes = (
         pnl_pct,
         daily_pnl,
         daily_pnl_pct,
-        exchange_rate: pos.market === 'HK' || pos.market === 'US' ? rate : null,
+        exchange_rate: isForeign ? rate : null,
       }
     })
 
@@ -1404,12 +1419,13 @@ export default function StocksPage() {
     return value.toFixed(2)
   }
 
-  const marketLabel = (m: string) => m === 'CN' ? 'A股' : m === 'HK' ? '港股' : m === 'US' ? '美股' : m
+  const marketLabel = (m: string) => m === 'CN' ? 'A股' : m === 'HK' ? '港股' : m === 'US' ? '美股' : m === 'TW' ? '台股' : m
 
   // 市場徽章樣式和短標籤
   const marketBadge = (m: string) => {
     if (m === 'HK') return { style: 'bg-orange-500/10 text-orange-600', label: '港' }
     if (m === 'US') return { style: 'bg-green-500/10 text-green-600', label: '美' }
+    if (m === 'TW') return { style: 'bg-purple-500/10 text-purple-600', label: '台' }
     return { style: 'bg-blue-500/10 text-blue-600', label: 'A' }
   }
 
@@ -1711,87 +1727,87 @@ export default function StocksPage() {
         </div>
       ) : portfolio ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <TrendingUp className="w-4 h-4" />
-              <span className="text-[12px]">總市值</span>
-            </div>
-            <div className="text-[20px] font-bold text-foreground font-mono">
-              {formatMoney(portfolio.total.total_market_value)}
-            </div>
-          </div>
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              {portfolio.total.total_pnl >= 0 ? (
-                <ArrowUpRight className="w-4 h-4 text-rose-500" />
-              ) : (
-                <ArrowDownRight className="w-4 h-4 text-emerald-500" />
-              )}
-              <span className="text-[12px]">總損益</span>
-            </div>
-            <div className={`text-[20px] font-bold font-mono ${portfolio.total.total_pnl >= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-              {portfolio.total.total_pnl >= 0 ? '+' : ''}{formatMoney(portfolio.total.total_pnl)}
-              <span className="text-[13px] ml-1.5">
-                ({portfolio.total.total_pnl_pct >= 0 ? '+' : ''}{portfolio.total.total_pnl_pct.toFixed(2)}%)
-              </span>
-            </div>
-          </div>
-
           {(() => {
+            const currencySymbol = portfolio.currency_symbol || (portfolio.base_currency === 'TWD' ? 'NT$' : '¥')
             const dayPnl = portfolio.total.total_daily_pnl
             const totalMv = portfolio.total.total_market_value
             const prevMv = totalMv - dayPnl
             const pct = prevMv > 0 ? (dayPnl / prevMv * 100) : 0
             const isUp = dayPnl >= 0
             return (
-              <div className="card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  {isUp ? (
-                    <ArrowUpRight className="w-4 h-4 text-rose-500" />
-                  ) : (
-                    <ArrowDownRight className="w-4 h-4 text-emerald-500" />
-                  )}
-                  <span className="text-[12px]">今日損益</span>
+              <>
+                <div className="card p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-[12px]">總市值 ({currencySymbol})</span>
+                  </div>
+                  <div className="text-[20px] font-bold text-foreground font-mono">
+                    {formatMoney(portfolio.total.total_market_value)}
+                  </div>
                 </div>
-                <div className={`text-[20px] font-bold font-mono ${isUp ? 'text-rose-500' : 'text-emerald-500'}`}>
-                  {isUp ? '+' : ''}{formatMoney(dayPnl)}
-                  <span className="text-[13px] ml-1.5">({pct >= 0 ? '+' : ''}{pct.toFixed(2)}%)</span>
+                <div className="card p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    {portfolio.total.total_pnl >= 0 ? (
+                      <ArrowUpRight className="w-4 h-4 text-rose-500" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 text-emerald-500" />
+                    )}
+                    <span className="text-[12px]">總損益 ({currencySymbol})</span>
+                  </div>
+                  <div className={`text-[20px] font-bold font-mono ${portfolio.total.total_pnl >= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    {portfolio.total.total_pnl >= 0 ? '+' : ''}{formatMoney(portfolio.total.total_pnl)}
+                    <span className="text-[13px] ml-1.5">
+                      ({portfolio.total.total_pnl_pct >= 0 ? '+' : ''}{portfolio.total.total_pnl_pct.toFixed(2)}%)
+                    </span>
+                  </div>
                 </div>
-              </div>
+                <div className="card p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    {isUp ? (
+                      <ArrowUpRight className="w-4 h-4 text-rose-500" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 text-emerald-500" />
+                    )}
+                    <span className="text-[12px]">今日損益 ({currencySymbol})</span>
+                  </div>
+                  <div className={`text-[20px] font-bold font-mono ${isUp ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    {isUp ? '+' : ''}{formatMoney(dayPnl)}
+                    <span className="text-[13px] ml-1.5">({pct >= 0 ? '+' : ''}{pct.toFixed(2)}%)</span>
+                  </div>
+                </div>
+                <div className="card p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <Wallet className="w-4 h-4" />
+                    <span className="text-[12px]">可用資金 ({currencySymbol})</span>
+                  </div>
+                  <div className="text-[20px] font-bold text-foreground font-mono">
+                    {formatMoney(portfolio.total.available_funds)}
+                  </div>
+                </div>
+                <div className="card p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <PiggyBank className="w-4 h-4" />
+                    <span className="text-[12px]">總資產 ({currencySymbol})</span>
+                  </div>
+                  <div className="text-[20px] font-bold text-foreground font-mono">
+                    {formatMoney(portfolio.total.total_assets)}
+                  </div>
+                </div>
+                <div className="card p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <Bell className="w-4 h-4" />
+                    <span className="text-[12px]">倉位佔比</span>
+                  </div>
+                  <div className="text-[20px] font-bold text-foreground font-mono">
+                    {positionRatio ? `${positionRatio.pct.toFixed(1)}%` : '--'}
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
+                    {positionRatio ? `持倉市值 ${formatMoney(positionRatio.mv)} / 總資產 ${formatMoney(positionRatio.assets)}` : '—'}
+                  </div>
+                </div>
+              </>
             )
           })()}
-
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Wallet className="w-4 h-4" />
-              <span className="text-[12px]">可用資金</span>
-            </div>
-            <div className="text-[20px] font-bold text-foreground font-mono">
-              {formatMoney(portfolio.total.available_funds)}
-            </div>
-          </div>
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <PiggyBank className="w-4 h-4" />
-              <span className="text-[12px]">總資產</span>
-            </div>
-            <div className="text-[20px] font-bold text-foreground font-mono">
-              {formatMoney(portfolio.total.total_assets)}
-            </div>
-          </div>
-
-          <div className="card p-4">
-            <div className="flex items-center gap-2 text-muted-foreground mb-1">
-              <Bell className="w-4 h-4" />
-              <span className="text-[12px]">倉位佔比</span>
-            </div>
-            <div className="text-[20px] font-bold text-foreground font-mono">
-              {positionRatio ? `${positionRatio.pct.toFixed(1)}%` : '--'}
-            </div>
-            <div className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
-              {positionRatio ? `持倉市值 ${formatMoney(positionRatio.mv)} / 總資產 ${formatMoney(positionRatio.assets)}` : '—'}
-            </div>
-          </div>
         </div>
       ) : null}
 
@@ -2012,7 +2028,9 @@ export default function StocksPage() {
                             {account.positions.map((pos, i) => {
                               const stock = stocks.find(s => s.id === pos.stock_id)
                               const badge = marketBadge(pos.market)
-                              const isForeign = pos.market === 'HK' || pos.market === 'US'
+                              const baseCurr = portfolio?.base_currency || 'TWD'
+                              const isForeign = baseCurr === 'TWD' ? pos.market !== 'TW' : pos.market !== 'CN'
+                              const foreignCurrency = pos.market === 'HK' ? 'HKD' : pos.market === 'US' ? 'USD' : pos.market === 'TW' ? 'TWD' : 'CNY'
                               const changeColor = pos.change_pct != null
                                 ? (pos.change_pct > 0 ? 'text-rose-500' : pos.change_pct < 0 ? 'text-emerald-500' : 'text-muted-foreground')
                                 : 'text-muted-foreground'
@@ -2080,7 +2098,7 @@ export default function StocksPage() {
                                     })()}
                                   </td>
                                   <td className={`px-4 py-2.5 text-right font-mono text-[12px] ${changeColor}`}>
-                                    {pos.current_price != null ? <span>{pos.current_price.toFixed(2)}{isForeign ? (pos.market === 'HK' ? ' HKD' : ' USD') : ''}</span> : '—'}
+                                    {pos.current_price != null ? <span>{pos.current_price.toFixed(2)}{isForeign ? ` ${foreignCurrency}` : ''}</span> : '—'}
                                   </td>
                                   <td className={`px-4 py-2.5 text-right font-mono text-[12px] ${changeColor}`}>
                                     {pos.change_pct != null ? `${pos.change_pct >= 0 ? '+' : ''}${pos.change_pct.toFixed(2)}%` : '—'}
@@ -2092,8 +2110,8 @@ export default function StocksPage() {
                                       <div className="flex flex-col items-end">
                                         {isForeign ? (
                                           <>
-                                            <span>{formatMoney(pos.market_value)} {pos.market === 'HK' ? 'HKD' : 'USD'}</span>
-                                            {pos.market_value_cny && <span className="text-[10px] text-muted-foreground/60">≈{formatMoney(pos.market_value_cny)}</span>}
+                                            <span>{formatMoney(pos.market_value)} {foreignCurrency}</span>
+                                            {pos.market_value_cny && <span className="text-[10px] text-muted-foreground/60">≈{formatMoney(pos.market_value_cny)} {baseCurr}</span>}
                                           </>
                                         ) : <span>{formatMoney(pos.market_value)}</span>}
                                       </div>
@@ -2103,7 +2121,7 @@ export default function StocksPage() {
                                     {pos.pnl != null ? (
                                       <div className="flex flex-col items-end">
                                         <span>{pos.pnl >= 0 ? '+' : ''}{formatMoney(pos.pnl)}</span>
-                                        <span className="text-[10px] opacity-70">{pos.pnl_pct != null ? `${pos.pnl_pct >= 0 ? '+' : ''}${pos.pnl_pct.toFixed(2)}%` : ''}{isForeign && ' CNY'}</span>
+                                        <span className="text-[10px] opacity-70">{pos.pnl_pct != null ? `${pos.pnl_pct >= 0 ? '+' : ''}${pos.pnl_pct.toFixed(2)}%` : ''}{isForeign && ` ${baseCurr}`}</span>
                                       </div>
                                     ) : '—'}
                                   </td>

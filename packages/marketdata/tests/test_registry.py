@@ -11,17 +11,18 @@ from marketdata.registry import VENDOR_CLASSES_BY_TYPE, build_vendors
 def test_package_vendors_by_type_content():
     """內容必須與 client.py 現狀(quote/kline/capital_flow/events 各 vendor)完全一致。"""
     assert PACKAGE_VENDORS_BY_TYPE == {
-        "quote": frozenset({"tencent", "sina", "eastmoney", "yfinance"}),
-        "kline": frozenset({"tencent", "stooq", "eastmoney", "yahoo"}),
-        "capital_flow": frozenset({"eastmoney", "sina"}),
+        "quote": frozenset({"tencent", "sina", "eastmoney", "yfinance", "external_quote"}),
+        "kline": frozenset({"tencent", "stooq", "eastmoney", "yahoo", "finmind"}),
+        "intraday_kline": frozenset({"external_kline"}),
+        "capital_flow": frozenset({"eastmoney", "sina", "finmind"}),
         "events": frozenset({"eastmoney"}),
         "flash_news": frozenset({"cls", "sina", "eastmoney"}),
-        "news": frozenset({"xueqiu", "eastmoney_news", "eastmoney"}),
-        "fundamentals": frozenset({"tencent", "eastmoney"}),
+        "news": frozenset({"xueqiu", "eastmoney_news", "eastmoney", "finmind"}),
+        "fundamentals": frozenset({"tencent", "eastmoney", "finmind"}),
         "dragon_tiger": frozenset({"eastmoney"}),
-        "margin": frozenset({"eastmoney"}),
+        "margin": frozenset({"eastmoney", "finmind"}),
         "shareholders": frozenset({"eastmoney"}),
-        "dividend": frozenset({"eastmoney"}),
+        "dividend": frozenset({"eastmoney", "finmind"}),
         "northbound": frozenset({"ths"}),
     }
 
@@ -32,6 +33,7 @@ def test_package_vendors_by_type_matches_actual_engine_registration():
     engines = {
         "quote": md._quote_engine,
         "kline": md._kline_engine,
+        "intraday_kline": md._intraday_kline_engine,
         "capital_flow": md._capital_flow_engine,
         "events": md._events_engine,
         "flash_news": md._flash_news_engine,

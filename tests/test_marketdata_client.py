@@ -56,3 +56,27 @@ def test_db_config_provider_skips_tencent_us_kline(monkeypatch):
     got = cp.sources_for("kline", "US")
 
     assert [s.vendor for s in got] == ["stooq"]
+
+
+def test_db_config_provider_tw_market_routing(monkeypatch):
+    monkeypatch.setenv("EXTERNAL_QUOTE_FEED_URL", "http://tw-feed:8088")
+    monkeypatch.setenv("EXTERNAL_QUOTE_FEED_TOKEN", "test-token")
+    monkeypatch.setenv("FINMIND_API_TOKEN", "test-fm-token")
+
+    cp = mc.DbConfigProvider()
+
+    quote_sources = cp.sources_for("quote", "TW")
+    assert len(quote_sources) == 1
+    assert quote_sources[0].vendor == "external_quote"
+    assert quote_sources[0].config["base_url"] == "http://tw-feed:8088"
+    assert quote_sources[0].config["token"] == "test-token"
+
+    intraday_sources = cp.sources_for("intraday_kline", "TW")
+    assert len(intraday_sources) == 1
+    assert intraday_sources[0].vendor == "external_kline"
+    assert intraday_sources[0].config["base_url"] == "http://tw-feed:8088"
+
+    kline_sources = cp.sources_for("kline", "TW")
+    assert len(kline_sources) == 1
+    assert kline_sources[0].vendor == "finmind"
+    assert kline_sources[0].config["token"] == "test-fm-token"

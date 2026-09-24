@@ -66,6 +66,46 @@ EASTMONEY_BJ_PARAMS = {
 }
 PAGE_SIZE = 100
 
+_BUNDLED_TW_STOCKS = [
+    {"symbol": "2330", "name": "台積電", "market": "TW"},
+    {"symbol": "2317", "name": "鴻海", "market": "TW"},
+    {"symbol": "2454", "name": "聯發科", "market": "TW"},
+    {"symbol": "2308", "name": "台達電", "market": "TW"},
+    {"symbol": "2382", "name": "廣達", "market": "TW"},
+    {"symbol": "2412", "name": "中華電", "market": "TW"},
+    {"symbol": "2881", "name": "富邦金", "market": "TW"},
+    {"symbol": "2882", "name": "國泰金", "market": "TW"},
+    {"symbol": "2891", "name": "中信金", "market": "TW"},
+    {"symbol": "2886", "name": "兆豐金", "market": "TW"},
+    {"symbol": "0050", "name": "元大台灣50", "market": "TW"},
+    {"symbol": "0056", "name": "元大高股息", "market": "TW"},
+    {"symbol": "00878", "name": "國泰永續高股息", "market": "TW"},
+    {"symbol": "00919", "name": "群益台灣精選高息", "market": "TW"},
+    {"symbol": "00929", "name": "復華台灣科技優息", "market": "TW"},
+    {"symbol": "2603", "name": "長榮", "market": "TW"},
+    {"symbol": "2609", "name": "陽明", "market": "TW"},
+    {"symbol": "2615", "name": "萬海", "market": "TW"},
+    {"symbol": "3008", "name": "大立光", "market": "TW"},
+    {"symbol": "2303", "name": "聯電", "market": "TW"},
+    {"symbol": "3711", "name": "日月光投控", "market": "TW"},
+    {"symbol": "2884", "name": "玉山金", "market": "TW"},
+    {"symbol": "2892", "name": "第一金", "market": "TW"},
+    {"symbol": "5880", "name": "合庫金", "market": "TW"},
+    {"symbol": "2880", "name": "華南金", "market": "TW"},
+    {"symbol": "2885", "name": "元大金", "market": "TW"},
+    {"symbol": "3231", "name": "緯創", "market": "TW"},
+    {"symbol": "2357", "name": "華碩", "market": "TW"},
+    {"symbol": "2379", "name": "瑞昱", "market": "TW"},
+    {"symbol": "3034", "name": "聯詠", "market": "TW"},
+    {"symbol": "2327", "name": "國巨", "market": "TW"},
+    {"symbol": "6669", "name": "緯穎", "market": "TW"},
+    {"symbol": "2395", "name": "研華", "market": "TW"},
+    {"symbol": "1301", "name": "台塑", "market": "TW"},
+    {"symbol": "1303", "name": "南亞", "market": "TW"},
+    {"symbol": "2002", "name": "中鋼", "market": "TW"},
+]
+
+
 
 def _load_cache() -> list[dict] | None:
     if not os.path.exists(CACHE_FILE):
@@ -306,9 +346,43 @@ def refresh_stock_list() -> list[dict]:
     except Exception as e:
         logger.warning(f"東方財富獲取北交所失敗: {e}")
 
+    # 台股: FinMind 優先，內建主流標的清單兜底
+    try:
+        tw_stocks = _fetch_tw_from_finmind()
+        stocks.extend(tw_stocks)
+        logger.info(f"獲取台股列表成功: {len(tw_stocks)} 只")
+    except Exception as e:
+        logger.warning(f"獲取台股列表失敗: {e}")
+        stocks.extend(list(_BUNDLED_TW_STOCKS))
+
     if stocks:
         _save_cache(stocks)
     return stocks
+
+
+def _fetch_tw_from_finmind() -> list[dict]:
+    """從 FinMind 獲取台股標的總覽 (TaiwanStockInfo)"""
+    token = os.environ.get("FINMIND_API_TOKEN")
+    url = "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInfo"
+    if token:
+        url += f"&token={token}"
+    try:
+        with httpx.Client(timeout=10, follow_redirects=True) as client:
+            resp = client.get(url)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                latest_by_id = {}
+                for row in data:
+                    sid = str(row.get("stock_id", "")).strip()
+                    sname = str(row.get("stock_name", "")).strip()
+                    stype = str(row.get("type", ""))
+                    if len(sid) == 4 and stype in ("twse", "tpex"):
+                        latest_by_id[sid] = {"symbol": sid, "name": sname, "market": "TW"}
+                if latest_by_id:
+                    return list(latest_by_id.values())
+    except Exception as e:
+        logger.warning(f"FinMind 獲取台股總覽失敗: {e}")
+    return list(_BUNDLED_TW_STOCKS)
 
 
 def get_stock_list() -> list[dict]:
@@ -317,6 +391,24 @@ def get_stock_list() -> list[dict]:
     if cached:
         return cached
     return refresh_stock_list()
+
+
+def get_stock_name(symbol: str, market: str = "") -> str:
+    """按股票代碼查詢名稱 (用於展示，如 2330 -> 台積電)"""
+    sym = symbol.strip().upper()
+    if "." in sym:
+        sym = sym.split(".")[0]
+    stocks = get_stock_list() or []
+    for s in stocks:
+        if market and s.get("market") != market:
+            continue
+        if s.get("symbol", "").upper() == sym:
+            return s.get("name", "")
+    for s in _BUNDLED_TW_STOCKS:
+        if s["symbol"] == sym:
+            return s["name"]
+    return ""
+
 
 
 def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict]:
@@ -429,7 +521,9 @@ def search_stocks(query: str, market: str = "", limit: int = 20) -> list[dict]:
 
 def _cached_search(query: str, market: str = "", limit: int = 20) -> list[dict]:
     """從快取中模糊搜尋股票"""
-    stocks = get_stock_list()
+    stocks = list(get_stock_list() or [])
+    if not any(s.get("market") == "TW" for s in stocks):
+        stocks.extend(_BUNDLED_TW_STOCKS)
     if not stocks:
         return []
 

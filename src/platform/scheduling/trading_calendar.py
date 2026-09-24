@@ -29,17 +29,22 @@ logger = logging.getLogger(__name__)
 
 # A 股交易日集合;None = 尚未載入或載入失敗(此時降級為只判週末)
 _CN_TRADING_DATES: frozenset[date] | None = None
-# 日曆覆蓋區間,用於判斷查詢日期是否落在可信範圍內(跨年未重新整理時會超出)
 _CN_RANGE: tuple[date, date] | None = None
+
+# 台股交易日集合;None = 尚未載入或載入失敗(此時降級為只判週末)
+_TW_TRADING_DATES: frozenset[date] | None = None
+_TW_RANGE: tuple[date, date] | None = None
 
 _FALLBACK_TZ = "Asia/Shanghai"
 
 
 def reset_cache() -> None:
     """清空日曆快取(配置變更或測試用)。"""
-    global _CN_TRADING_DATES, _CN_RANGE
+    global _CN_TRADING_DATES, _CN_RANGE, _TW_TRADING_DATES, _TW_RANGE
     _CN_TRADING_DATES = None
     _CN_RANGE = None
+    _TW_TRADING_DATES = None
+    _TW_RANGE = None
 
 
 def _fetch_cn_trading_dates() -> frozenset[date]:
@@ -58,26 +63,56 @@ def _fetch_cn_trading_dates() -> frozenset[date]:
     return frozenset(out)
 
 
+def _fetch_tw_trading_dates() -> frozenset[date]:
+    """阻塞拉取台股交易日曆。僅由 `refresh_blocking()` 呼叫。"""
+    from marketdata.vendors.finmind import fetch_finmind_trading_dates
+
+    dates_str = fetch_finmind_trading_dates()
+    out: set[date] = set()
+    for s in dates_str:
+        try:
+            out.add(date.fromisoformat(str(s)[:10]))
+        except Exception:
+            pass
+    return frozenset(out)
+
+
 def refresh_blocking() -> bool:
-    """同步重新整理 A 股交易日曆。返回是否成功;失敗不拋異常(保持降級行為)。"""
-    global _CN_TRADING_DATES, _CN_RANGE
+    """同步重新整理交易日曆(A股 + 台股)。返回是否至少有一個成功;失敗不拋異常(保持降級行為)。"""
+    global _CN_TRADING_DATES, _CN_RANGE, _TW_TRADING_DATES, _TW_RANGE
+
+    cn_ok = False
     try:
         dates = _fetch_cn_trading_dates()
+        if dates:
+            _CN_TRADING_DATES = dates
+            _CN_RANGE = (min(dates), max(dates))
+            logger.info(
+                "[交易日曆] A股日曆已載入: %s 個交易日 (%s ~ %s)",
+                len(dates),
+                _CN_RANGE[0],
+                _CN_RANGE[1],
+            )
+            cn_ok = True
     except Exception as e:
         logger.warning("[交易日曆] A股日曆拉取失敗,降級為只判週末: %s", e)
-        return False
-    if not dates:
-        logger.warning("[交易日曆] A股日曆為空,降級為只判週末")
-        return False
-    _CN_TRADING_DATES = dates
-    _CN_RANGE = (min(dates), max(dates))
-    logger.info(
-        "[交易日曆] A股日曆已載入: %s 個交易日 (%s ~ %s)",
-        len(dates),
-        _CN_RANGE[0],
-        _CN_RANGE[1],
-    )
-    return True
+
+    try:
+        tw_dates = _fetch_tw_trading_dates()
+        if tw_dates:
+            _TW_TRADING_DATES = tw_dates
+            _TW_RANGE = (min(tw_dates), max(tw_dates))
+            logger.info(
+                "[交易日曆] 台股日曆已載入: %s 個交易日 (%s ~ %s)",
+                len(tw_dates),
+                _TW_RANGE[0],
+                _TW_RANGE[1],
+            )
+    except Exception as e:
+        logger.warning("[交易日曆] 台股日曆拉取失敗,降級為只判週末: %s", e)
+
+    return cn_ok
+
 
 
 async def refresh() -> bool:
@@ -143,14 +178,20 @@ def is_trading_day(market, d: date | datetime | None = None) -> bool:
             return target in _CN_TRADING_DATES
         logger.debug("[交易日曆] %s 超出A股日曆覆蓋範圍,降級為只判週末", target)
 
+    # 台股:日曆已載入且覆蓋該日期時按日曆判(含法定節假日)。
+    if code == MarketCode.TW and _TW_TRADING_DATES and _TW_RANGE:
+        if _TW_RANGE[0] <= target <= _TW_RANGE[1]:
+            return target in _TW_TRADING_DATES
+        logger.debug("[交易日曆] %s 超出台股日曆覆蓋範圍,降級為只判週末", target)
+
     # 港美股、日曆缺失、超出覆蓋範圍:只判週末。
     return True
 
 
 def any_market_trading_day(d: date | datetime | None = None) -> bool:
-    """CN/HK/US 任一為交易日即 `True`。全市場休市(如週末)返回 `False`。"""
+    """CN/HK/US/TW 任一為交易日即 `True`。全市場休市(如週末)返回 `False`。"""
     from src.platform.marketdata.models import MarketCode
 
     return any(
-        is_trading_day(m, d) for m in (MarketCode.CN, MarketCode.HK, MarketCode.US)
+        is_trading_day(m, d) for m in (MarketCode.CN, MarketCode.HK, MarketCode.US, MarketCode.TW)
     )

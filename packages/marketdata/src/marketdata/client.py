@@ -73,6 +73,12 @@ class MarketData:
             config=config, metrics=self.metrics,
             cache=TTLCache(default_ttl_sec=0.0), default_ttl=0.0,
         )
+        self._intraday_kline_engine = Engine(
+            datatype="intraday_kline",
+            vendors=build_vendors("intraday_kline"),
+            config=config, metrics=self.metrics,
+            cache=TTLCache(default_ttl_sec=3.0), default_ttl=3.0,
+        )
         self._capital_flow_engine = Engine(
             datatype="capital_flow",
             vendors=build_vendors("capital_flow"),
@@ -147,6 +153,13 @@ class MarketData:
         req = Request(symbols=(symbol,), market=market, timeframe="day", limit=days,
                       extra=(("days", days),))
         resp = self._kline_engine.fetch(req, min_count=min_count, cache_ttl_sec=0)
+        return resp.data or []
+
+    def intraday_klines(self, symbol: str, *, market: str = "TW", timeframe: str = "1m", limit: int = 270) -> list[Bar]:
+        """按 priority 主備取盤中分K。返回 list[Bar]。"""
+        req = Request(symbols=(symbol,), market=market, timeframe=timeframe, limit=limit,
+                      extra=(("timeframe", timeframe), ("limit", limit)))
+        resp = self._intraday_kline_engine.fetch(req, cache_ttl_sec=3.0)
         return resp.data or []
 
     def quotes(self, symbols: list[str | Symbol], *, market: str | None = None) -> list[Quote]:

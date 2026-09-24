@@ -34,7 +34,52 @@ class DbConfigProvider:
             db.close()
 
     def sources_for(self, datatype: str, market: str | None) -> list[SourceConfig]:
+        import os
         market_code = (market or "").strip().upper()
+
+        # 台股市場專用路由 (TW)
+        if market_code == "TW":
+            # 1. 盤中即時行情/五檔: 僅支援單一外部 Provider，配置取自 .env
+            if datatype == "quote":
+                feed_url = os.environ.get("EXTERNAL_QUOTE_FEED_URL") or os.environ.get("TW_QUOTE_FEED_URL") or "http://127.0.0.1:8088"
+                feed_token = os.environ.get("EXTERNAL_QUOTE_FEED_TOKEN") or os.environ.get("TW_QUOTE_FEED_TOKEN") or ""
+                return [
+                    SourceConfig(
+                        vendor="external_quote",
+                        priority=0,
+                        enabled=True,
+                        config={"base_url": feed_url, "token": feed_token},
+                        supports_batch=True,
+                    )
+                ]
+
+            # 2. 盤中分K: 僅支援單一外部 Provider，配置取自 .env
+            if datatype == "intraday_kline":
+                feed_url = os.environ.get("EXTERNAL_QUOTE_FEED_URL") or os.environ.get("TW_QUOTE_FEED_URL") or "http://127.0.0.1:8088"
+                feed_token = os.environ.get("EXTERNAL_QUOTE_FEED_TOKEN") or os.environ.get("TW_QUOTE_FEED_TOKEN") or ""
+                return [
+                    SourceConfig(
+                        vendor="external_kline",
+                        priority=0,
+                        enabled=True,
+                        config={"base_url": feed_url, "token": feed_token},
+                        supports_batch=False,
+                    )
+                ]
+
+            # 3. 日K、基本面、三大法人、融資融券、除權息、新聞: FinMind Provider，配置取自 .env
+            if datatype in {"kline", "fundamentals", "capital_flow", "margin", "dividend", "news"}:
+                fm_token = os.environ.get("FINMIND_API_TOKEN") or ""
+                return [
+                    SourceConfig(
+                        vendor="finmind",
+                        priority=0,
+                        enabled=True,
+                        config={"token": fm_token},
+                        supports_batch=False,
+                    )
+                ]
+
         rows = self._query_rows(datatype)
         has_us_fallback = any(
             row.provider in {"stooq", "yahoo"} for row in rows
@@ -59,6 +104,7 @@ class DbConfigProvider:
                 )
             )
         return sources
+
 
 
 _md: MarketData | None = None

@@ -77,9 +77,16 @@ export interface DashboardPortfolioSummary {
     available_funds: number
     total_assets: number
   }
+  base_currency?: string
+  currency_symbol?: string
   exchange_rates?: {
-    HKD_CNY: number
+    HKD_CNY?: number
     USD_CNY?: number
+    TWD_CNY?: number
+    USD_TWD?: number
+    HKD_TWD?: number
+    CNY_TWD?: number
+    [key: string]: number | undefined
   }
 }
 

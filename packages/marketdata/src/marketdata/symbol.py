@@ -11,19 +11,25 @@ class Market(str, Enum):
     CN = "CN"
     HK = "HK"
     US = "US"
+    TW = "TW"
 
 
 _CN_RE = re.compile(r"^[036]\d{5}$")   # 6 位,0/3/6 開頭
 _HK_RE = re.compile(r"^\d{5}$")        # 5 位數字
+_TW_RE = re.compile(r"^\d{4}[A-Z]?$")  # 4 位數字或 4 位+字母 (如 2330, 2881A)
 _US_RE = re.compile(r"^[A-Z.]{1,6}$")  # 1-6 位字母(含指數 .DJI)
 
 
 def _detect_market(code: str) -> Market:
     c = code.strip().upper()
+    if c.endswith(".TW") or c.endswith(".TWO"):
+        return Market.TW
     if _CN_RE.match(c):
         return Market.CN
     if _HK_RE.match(c):
         return Market.HK
+    if _TW_RE.match(c):
+        return Market.TW
     if _US_RE.match(c):
         return Market.US
     # 兜底:6 位數字當 CN,其餘當 US
@@ -47,6 +53,11 @@ class Symbol:
     @classmethod
     def parse(cls, raw: str, market: str | None = None) -> "Symbol":
         code = raw.strip()
+        u = code.upper()
+        if u.endswith(".TW"):
+            return cls(Market.TW, code[:-3])
+        if u.endswith(".TWO"):
+            return cls(Market.TW, code[:-4])
         if market:
             return cls(Market(market), code)
         return cls(_detect_market(code), code)
@@ -61,6 +72,8 @@ class Symbol:
     def to_yfinance(self) -> str:
         if self.market == Market.HK:
             return f"{int(self.code):04d}.HK" if self.code.isdigit() else f"{self.code}.HK"
+        if self.market == Market.TW:
+            return f"{self.code}.TW" if "." not in self.code else self.code
         return self.code  # US 直接用;CN 由 vendor.supports_markets 攔截,不會走到這
 
     def to_eastmoney_secid(self) -> str:

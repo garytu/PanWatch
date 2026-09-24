@@ -1,5 +1,6 @@
 """帳戶和持倉管理 API"""
 import logging
+import os
 import time
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,20 +20,84 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # 匯率快取
+EXCHANGE_RATE_TTL = 3600  # 1 小時快取
 _hkd_rate_cache: dict = {"rate": 0.92, "ts": 0}  # 港幣預設匯率 0.92
 _usd_rate_cache: dict = {"rate": 7.25, "ts": 0}  # 美元預設匯率 7.25
-EXCHANGE_RATE_TTL = 3600  # 1 小時快取
+_twd_rate_cache: dict = {"rate": 0.222, "ts": 0.0}
+
+_fx_to_twd_cache: dict[str, dict] = {
+    "USD": {"rate": 31.8, "ts": 0.0},
+    "HKD": {"rate": 4.05, "ts": 0.0},
+    "CNY": {"rate": 4.73, "ts": 0.0},
+    "TWD": {"rate": 1.0, "ts": 0.0},
+}
+
+
+def get_primary_currency() -> str:
+    """獲取系統設定的主要基準貨幣，預設為 TWD (新台幣)"""
+    return os.getenv("PRIMARY_CURRENCY", os.getenv("BASE_CURRENCY", "TWD")).strip().upper()
+
+
+def get_usd_twd_rate() -> float:
+    """獲取美元兌新台幣匯率 (1 USD = ? TWD)"""
+    global _fx_to_twd_cache
+    cached = _fx_to_twd_cache["USD"]
+    if time.time() - cached["ts"] < EXCHANGE_RATE_TTL:
+        return cached["rate"]
+    try:
+        from marketdata.vendors.finmind import fetch_finmind_exchange_rate
+        rate = fetch_finmind_exchange_rate("USD")
+        if rate and rate > 0:
+            _fx_to_twd_cache["USD"] = {"rate": round(rate, 4), "ts": time.time()}
+            logger.info(f"更新美元/台幣匯率: 1 USD = {rate:.4f} TWD")
+            return _fx_to_twd_cache["USD"]["rate"]
+    except Exception as e:
+        logger.warning(f"獲取美元/台幣匯率失敗，使用快取: {e}")
+    return _fx_to_twd_cache["USD"]["rate"]
+
+
+def get_hkd_twd_rate() -> float:
+    """獲取港幣兌新台幣匯率 (1 HKD = ? TWD)"""
+    global _fx_to_twd_cache
+    cached = _fx_to_twd_cache["HKD"]
+    if time.time() - cached["ts"] < EXCHANGE_RATE_TTL:
+        return cached["rate"]
+    try:
+        from marketdata.vendors.finmind import fetch_finmind_exchange_rate
+        rate = fetch_finmind_exchange_rate("HKD")
+        if rate and rate > 0:
+            _fx_to_twd_cache["HKD"] = {"rate": round(rate, 4), "ts": time.time()}
+            logger.info(f"更新港幣/台幣匯率: 1 HKD = {rate:.4f} TWD")
+            return _fx_to_twd_cache["HKD"]["rate"]
+    except Exception as e:
+        logger.warning(f"獲取港幣/台幣匯率失敗，使用快取: {e}")
+    return _fx_to_twd_cache["HKD"]["rate"]
+
+
+def get_cny_twd_rate() -> float:
+    """獲取人民幣兌新台幣匯率 (1 CNY = ? TWD)"""
+    global _fx_to_twd_cache
+    cached = _fx_to_twd_cache["CNY"]
+    if time.time() - cached["ts"] < EXCHANGE_RATE_TTL:
+        return cached["rate"]
+    try:
+        from marketdata.vendors.finmind import fetch_finmind_exchange_rate
+        rate = fetch_finmind_exchange_rate("CNY")
+        if rate and rate > 0:
+            _fx_to_twd_cache["CNY"] = {"rate": round(rate, 4), "ts": time.time()}
+            logger.info(f"更新人民幣/台幣匯率: 1 CNY = {rate:.4f} TWD")
+            return _fx_to_twd_cache["CNY"]["rate"]
+    except Exception as e:
+        logger.warning(f"獲取人民幣/台幣匯率失敗，使用快取: {e}")
+    return _fx_to_twd_cache["CNY"]["rate"]
 
 
 def get_hkd_cny_rate() -> float:
     """獲取港幣兌人民幣匯率"""
     global _hkd_rate_cache
-
-    # 檢查快取
     if time.time() - _hkd_rate_cache["ts"] < EXCHANGE_RATE_TTL:
         return _hkd_rate_cache["rate"]
 
-    # 從新浪財經獲取匯率
     try:
         resp = httpx.get(
             "https://hq.sinajs.cn/list=fx_shkdcny",
@@ -42,7 +107,6 @@ def get_hkd_cny_rate() -> float:
                 "Referer": "https://finance.sina.com.cn/"
             }
         )
-        # 格式: var hq_str_fx_shkdcny="時間,匯率,..."
         text = resp.text
         if "=" in text and "," in text:
             data = text.split('"')[1]
@@ -61,12 +125,9 @@ def get_hkd_cny_rate() -> float:
 def get_usd_cny_rate() -> float:
     """獲取美元兌人民幣匯率"""
     global _usd_rate_cache
-
-    # 檢查快取
     if time.time() - _usd_rate_cache["ts"] < EXCHANGE_RATE_TTL:
         return _usd_rate_cache["rate"]
 
-    # 從新浪財經獲取匯率
     try:
         resp = httpx.get(
             "https://hq.sinajs.cn/list=fx_susdcny",
@@ -76,7 +137,6 @@ def get_usd_cny_rate() -> float:
                 "Referer": "https://finance.sina.com.cn/"
             }
         )
-        # 格式: var hq_str_fx_susdcny="時間,匯率,..."
         text = resp.text
         if "=" in text and "," in text:
             data = text.split('"')[1]
@@ -90,6 +150,72 @@ def get_usd_cny_rate() -> float:
         logger.warning(f"獲取美元匯率失敗，使用快取: {e}")
 
     return _usd_rate_cache["rate"]
+
+
+def get_twd_cny_rate() -> float:
+    """獲取新台幣兌人民幣匯率 (1 TWD = ? CNY)"""
+    global _twd_rate_cache
+    if time.time() - _twd_rate_cache["ts"] < EXCHANGE_RATE_TTL:
+        return _twd_rate_cache["rate"]
+
+    try:
+        from marketdata.vendors.finmind import fetch_finmind_exchange_rate
+        cny_to_twd = fetch_finmind_exchange_rate("CNY")
+        if cny_to_twd and cny_to_twd > 0:
+            rate = round(1.0 / cny_to_twd, 4)
+            _twd_rate_cache = {"rate": rate, "ts": time.time()}
+            logger.info(f"更新新台幣匯率: 1 TWD = {rate} CNY")
+            return rate
+    except Exception as e:
+        logger.warning(f"獲取新台幣匯率失敗，使用快取: {e}")
+
+    return _twd_rate_cache["rate"]
+
+
+def get_rate_to_base(market: str, base_currency: str | None = None) -> tuple[float, bool]:
+    """獲取特定市場貨幣對基準貨幣的匯率以及是否為外幣 (rate, is_foreign)。"""
+    base_curr = (base_currency or get_primary_currency()).upper()
+    if base_curr == "TWD":
+        if market == "TW":
+            return 1.0, False
+        if market == "US":
+            return get_usd_twd_rate(), True
+        if market == "HK":
+            return get_hkd_twd_rate(), True
+        if market == "CN":
+            return get_cny_twd_rate(), True
+        return 1.0, False
+    else:  # CNY
+        if market == "CN":
+            return 1.0, False
+        if market == "HK":
+            return get_hkd_cny_rate(), True
+        if market == "US":
+            return get_usd_cny_rate(), True
+        if market == "TW":
+            return get_twd_cny_rate(), True
+        return 1.0, False
+
+
+def get_exchange_rates(base_currency: str | None = None) -> dict[str, float]:
+    """獲取包含全幣種對應的匯率字典。"""
+    usd_twd = get_usd_twd_rate()
+    hkd_twd = get_hkd_twd_rate()
+    cny_twd = get_cny_twd_rate()
+    twd_cny = round(1.0 / cny_twd, 4) if cny_twd else 0.222
+    usd_cny = round(usd_twd / cny_twd, 4) if cny_twd else 7.25
+    hkd_cny = round(hkd_twd / cny_twd, 4) if cny_twd else 0.92
+
+    return {
+        "USD_TWD": usd_twd,
+        "HKD_TWD": hkd_twd,
+        "CNY_TWD": cny_twd,
+        "TWD_TWD": 1.0,
+        "USD_CNY": usd_cny,
+        "HKD_CNY": hkd_cny,
+        "TWD_CNY": twd_cny,
+    }
+
 
 
 # ========== Pydantic Models ==========
@@ -432,9 +558,10 @@ def get_portfolio_summary(
     # 獲取即時行情（可選）
     quotes = _fetch_quotes_for_stocks(stocks) if include_quotes else {}
 
-    # 獲取匯率
-    hkd_rate = get_hkd_cny_rate()
-    usd_rate = get_usd_cny_rate()
+    # 獲取匯率與基準貨幣
+    base_curr = get_primary_currency()
+    curr_symbol = "NT$" if base_curr == "TWD" else "¥"
+    rates = get_exchange_rates(base_curr)
 
     # 計算各帳戶持倉
     account_summaries = []
@@ -463,17 +590,11 @@ def get_portfolio_summary(
             change_pct = quote["change_pct"] if quote else None
             prev_close = quote.get("prev_close") if quote else None
 
-            # 根據市場確定匯率
-            is_foreign = stock.market in ("HK", "US")
-            if stock.market == "HK":
-                rate = hkd_rate
-            elif stock.market == "US":
-                rate = usd_rate
-            else:
-                rate = 1.0
+            # 根據市場與基準貨幣確定匯率
+            rate, is_foreign = get_rate_to_base(stock.market, base_curr)
 
             market_value = None
-            market_value_cny = None
+            market_value_base = None
             pnl = None
             pnl_pct = None
             daily_pnl = None
@@ -485,16 +606,16 @@ def get_portfolio_summary(
                 acc_daily_pnl += daily_pnl
 
             cost = pos.cost_price * pos.quantity
-            cost_cny = cost * rate  # 假設成本價也是原幣種
-            acc_cost += cost_cny
+            cost_base = cost * rate  # 換算為基準貨幣成本
+            acc_cost += cost_base
 
             if current_price is not None:
                 market_value = current_price * pos.quantity  # 原幣種市值
-                market_value_cny = market_value * rate  # 人民幣市值
-                pnl = market_value_cny - cost_cny
-                pnl_pct = (pnl / cost_cny * 100) if cost_cny > 0 else 0
+                market_value_base = market_value * rate  # 基準貨幣市值
+                pnl = market_value_base - cost_base
+                pnl_pct = (pnl / cost_base * 100) if cost_base > 0 else 0
 
-                acc_market_value += market_value_cny
+                acc_market_value += market_value_base
 
             positions_data.append({
                 "id": pos.id,
@@ -509,9 +630,11 @@ def get_portfolio_summary(
                 "trading_style": pos.trading_style,
                 "current_price": current_price,
                 "current_price_cny": round(current_price * rate, 2) if current_price else None,
+                "current_price_base": round(current_price * rate, 2) if current_price else None,
                 "change_pct": change_pct,
                 "market_value": round(market_value, 2) if market_value else None,
-                "market_value_cny": round(market_value_cny, 2) if market_value_cny else None,
+                "market_value_cny": round(market_value_base, 2) if market_value_base else None,
+                "market_value_base": round(market_value_base, 2) if market_value_base else None,
                 "pnl": round(pnl, 2) if pnl else None,
                 "pnl_pct": round(pnl_pct, 2) if pnl_pct else None,
                 "daily_pnl": round(daily_pnl, 2) if daily_pnl is not None else None,
@@ -575,10 +698,9 @@ def get_portfolio_summary(
             "available_funds": round(grand_available_funds, 2),
             "total_assets": round(grand_total_assets, 2),
         },
-        "exchange_rates": {
-            "HKD_CNY": hkd_rate,
-            "USD_CNY": usd_rate,
-        },
+        "base_currency": base_curr,
+        "currency_symbol": curr_symbol,
+        "exchange_rates": rates,
         "quotes": quotes_dict,  # 可選：返回行情資料
     }
 
@@ -637,7 +759,7 @@ def _gather_holdings(db: Session) -> list[dict]:
     stocks = db.query(Stock).filter(Stock.id.in_(stock_ids)).all() if stock_ids else []
     stock_map = {s.id: s for s in stocks}
     quotes = _fetch_quotes_for_stocks(stocks) if stocks else {}
-    hkd, usd = get_hkd_cny_rate(), get_usd_cny_rate()
+    base_curr = get_primary_currency()
 
     out: list[dict] = []
     seen: dict[tuple[str, str], dict] = {}
@@ -646,18 +768,18 @@ def _gather_holdings(db: Session) -> list[dict]:
             stock = stock_map.get(pos.stock_id)
             if not stock:
                 continue
-            rate = hkd if stock.market == "HK" else usd if stock.market == "US" else 1.0
+            rate, _ = get_rate_to_base(stock.market, base_curr)
             quote = quotes.get(stock.symbol)
             price = quote.get("current_price") if quote else None
-            cost_cny = pos.cost_price * pos.quantity * rate
-            mv_cny = (price * pos.quantity * rate) if price else cost_cny
-            pnl_cny = (mv_cny - cost_cny) if price else 0.0
+            cost_base = pos.cost_price * pos.quantity * rate
+            mv_base = (price * pos.quantity * rate) if price else cost_base
+            pnl_base = (mv_base - cost_base) if price else 0.0
             key = (stock.market, stock.symbol)
             if key in seen:  # 多帳戶同一標的合併
                 h = seen[key]
                 h["quantity"] += pos.quantity
-                h["market_value"] += mv_cny
-                h["unrealized_pnl"] += pnl_cny
+                h["market_value"] += mv_base
+                h["unrealized_pnl"] += pnl_base
             else:
                 h = {
                     "symbol": stock.symbol,
@@ -665,8 +787,8 @@ def _gather_holdings(db: Session) -> list[dict]:
                     "name": stock.name,
                     "quantity": pos.quantity,
                     "fx": rate,
-                    "market_value": mv_cny,
-                    "unrealized_pnl": pnl_cny,
+                    "market_value": mv_base,
+                    "unrealized_pnl": pnl_base,
                     "strategy_code": pos.trading_style or "",
                 }
                 seen[key] = h
@@ -824,10 +946,11 @@ async def portfolio_ai_review(model_id: int | None = None, db: Session = Depends
     top = attr[:3]
     worst = list(reversed(attr[-3:])) if len(attr) > 3 else []
 
+    base_curr = get_primary_currency()
     lines = [
         f"持倉 {diag['position_count']} 只,總市值 {diag['total_market_value']:.0f},未實現獲利 {diag['total_unrealized_pnl']:.0f}",
         f"持倉內部集中度 HHI {diag['hhi']},最大單倉佔已投資金額 {diag['max_weight'] * 100:.0f}%",
-        f"啟用帳戶總資產 {totals['total_assets']:.0f} CNY（現金/可用資金 {totals['available_funds']:.0f} CNY）",
+        f"啟用帳戶總資產 {totals['total_assets']:.0f} {base_curr}（現金/可用資金 {totals['available_funds']:.0f} {base_curr}）",
         (f"總資產敞口：權益類倉位佔總資產 {totals['equity_ratio'] * 100:.1f}%"
          if totals['equity_ratio'] is not None else "總資產敞口：總資產非正，比例不可計算"),
     ]
@@ -838,7 +961,7 @@ async def portfolio_ai_review(model_id: int | None = None, db: Session = Depends
             f"相對回檔 {bench.get('relative_drawdown')}%"
         )
     if diag.get("by_market"):
-        lines.append("持倉內部市場分佈（市值 CNY）:" + ", ".join(f"{k} {v:.0f}" for k, v in diag["by_market"].items()))
+        lines.append(f"持倉內部市場分佈（市值 {base_curr}）:" + ", ".join(f"{k} {v:.0f}" for k, v in diag["by_market"].items()))
     if diag.get("alerts"):
         lines.append("風險提示:" + "; ".join(diag["alerts"]))
     if top:

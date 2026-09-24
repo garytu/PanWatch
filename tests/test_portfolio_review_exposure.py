@@ -48,7 +48,7 @@ def test_review_keeps_internal_distribution_separate_from_total_exposure(db, mon
     result = asyncio.run(accounts.portfolio_ai_review(db=db))
     system, context = client.chat.call_args.args
     assert '持倉內部集中度' in system and '總資產敞口' in system
-    assert '總資產 550 CNY' in context and '45.5%' in context
+    assert f'總資產 550 {accounts.get_primary_currency()}' in context and '45.5%' in context
     assert result['diagnostics']['by_market'] == {'CN':250}
     assert result['diagnostics']['max_weight'] == 1
     assert result['account_totals']['available_funds'] == 300

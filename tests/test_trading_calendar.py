@@ -291,3 +291,27 @@ def test_手動重新整理機會不受非交易日守衛影響(monkeypatch):
     asyncio.run(sched.refresh_opportunities_once())
 
     assert calls["n"] == 1
+
+
+def test_台股交易日與休市(monkeypatch):
+    """驗證台股 (MarketCode.TW) 在有日曆時的休市判斷與降級機制。"""
+    # 週末一律不是交易日
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 8)) is False
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 9)) is False
+
+    # 模擬注入台股日曆: 8/10 與 8/12 是交易日, 8/11 是颱風休市
+    tw_fake_dates = frozenset({date(2026, 8, 10), date(2026, 8, 12)})
+    monkeypatch.setattr(tc, "_fetch_tw_trading_dates", lambda: tw_fake_dates)
+    monkeypatch.setattr(tc, "_fetch_cn_trading_dates", lambda: frozenset({date(2026, 8, 10)}))
+    tc.refresh_blocking()
+
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 10)) is True
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 11)) is False
+    assert tc.is_trading_day(MarketCode.TW, date(2026, 8, 12)) is True
+
+
+    # 驗證 MARKETS 中的時段判斷
+    m_tw = MARKETS[MarketCode.TW]
+    assert m_tw.is_trading_time(datetime(2026, 8, 10, 10, 0, tzinfo=ZoneInfo("Asia/Taipei"))) is True
+    # 13:30 收盤，13:31 非交易時段
+    assert m_tw.is_trading_time(datetime(2026, 8, 10, 13, 31, tzinfo=ZoneInfo("Asia/Taipei"))) is False

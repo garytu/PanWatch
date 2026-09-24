@@ -14,14 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 def _yf_ticker(sym: Symbol) -> str:
-    if sym.market == Market.HK:
-        return f"{int(sym.code):04d}.HK" if sym.code.isdigit() else f"{sym.code}.HK"
-    return sym.code
+    return sym.to_yfinance()
 
 
 class YFinanceQuoteVendor(QuoteVendor):
     name = "yfinance"
-    supports_markets = {"HK", "US"}
+    supports_markets = {"HK", "US", "TW"}
+
 
     def fetch(self, symbols: list[Symbol], config: dict) -> list[Quote]:
         if not symbols:

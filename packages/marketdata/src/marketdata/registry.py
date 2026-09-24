@@ -14,6 +14,15 @@ from __future__ import annotations
 from marketdata.vendors.capital_flow import EastmoneyCapitalFlowVendor, SinaCapitalFlowVendor
 from marketdata.vendors.eastmoney import EastmoneyQuoteVendor
 from marketdata.vendors.events import EventsVendor
+from marketdata.vendors.external_feed import ExternalKlineVendor, ExternalQuoteVendor
+from marketdata.vendors.finmind import (
+    FinMindCapitalFlowVendor,
+    FinMindDividendVendor,
+    FinMindFundamentalsVendor,
+    FinMindKlineVendor,
+    FinMindMarginVendor,
+    FinMindNewsVendor,
+)
 from marketdata.vendors.fundamentals import EastmoneyFundamentalsVendor, TencentFundamentalsVendor
 from marketdata.vendors.flash_news import (
     ClsFlashNewsVendor,
@@ -50,16 +59,22 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
         "sina": SinaQuoteVendor,
         "eastmoney": EastmoneyQuoteVendor,
         "yfinance": YFinanceQuoteVendor,
+        "external_quote": ExternalQuoteVendor,
     },
     "kline": {
         "tencent": TencentKlineVendor,
         "stooq": StooqKlineVendor,
         "eastmoney": EastmoneyKlineVendor,
         "yahoo": YahooKlineVendor,
+        "finmind": FinMindKlineVendor,
+    },
+    "intraday_kline": {
+        "external_kline": ExternalKlineVendor,
     },
     "capital_flow": {
         "eastmoney": EastmoneyCapitalFlowVendor,
         "sina": SinaCapitalFlowVendor,
+        "finmind": FinMindCapitalFlowVendor,
     },
     "events": {
         "eastmoney": EventsVendor,
@@ -67,6 +82,7 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
     "fundamentals": {
         "tencent": TencentFundamentalsVendor,
         "eastmoney": EastmoneyFundamentalsVendor,
+        "finmind": FinMindFundamentalsVendor,
     },
     "flash_news": {
         "cls": ClsFlashNewsVendor,
@@ -77,18 +93,21 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
         "xueqiu": XueqiuNewsVendor,
         "eastmoney_news": EastmoneyStockNewsVendor,
         "eastmoney": EastmoneyAnnNewsVendor,
+        "finmind": FinMindNewsVendor,
     },
     "dragon_tiger": {
         "eastmoney": EastmoneyDragonTigerVendor,
     },
     "margin": {
         "eastmoney": EastmoneyMarginVendor,
+        "finmind": FinMindMarginVendor,
     },
     "shareholders": {
         "eastmoney": EastmoneyShareholdersVendor,
     },
     "dividend": {
         "eastmoney": EastmoneyDividendVendor,
+        "finmind": FinMindDividendVendor,
     },
     "northbound": {
         "ths": HexinNorthboundVendor,

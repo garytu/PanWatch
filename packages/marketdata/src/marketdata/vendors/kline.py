@@ -217,14 +217,15 @@ class YahooKlineVendor(KlineVendor):
     """Yahoo chart v8 日K,零 crumb / 零 cookie(crumb 只有 quoteSummary 基本面才需要)。"""
 
     name = "yahoo"
-    supports_markets = {"US", "HK"}
+    supports_markets = {"US", "HK", "TW"}
 
     def fetch(self, symbols: list[Symbol], config: dict) -> list[Bar]:
         if not symbols:
             return []
         sym = symbols[0]
-        if sym.market not in (Market.US, Market.HK):
+        if sym.market not in (Market.US, Market.HK, Market.TW):
             return []
+
         days = _days(config)
         ysym = sym.to_yfinance()
         proxy = config.get("proxy")

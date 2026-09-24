@@ -88,3 +88,132 @@ def test_delete_position_does_not_read_detached_relationships_after_delete():
     position = FakePosition()
 
     assert delete_position(position.id, FakeSession(position)) == {"success": True}
+
+
+def test_portfolio_summary_and_holdings_primary_currency_twd(monkeypatch):
+    """驗證基準貨幣為 TWD 時，台股持倉為本幣（匯率 1.0），美股正確折算為新台幣。"""
+    from src.modules.portfolio.api.accounts import (
+        _gather_holdings,
+        get_portfolio_summary,
+    )
+
+    monkeypatch.setenv("PRIMARY_CURRENCY", "TWD")
+    monkeypatch.setattr(
+        "src.modules.portfolio.api.accounts.get_usd_twd_rate",
+        lambda: 32.0,
+    )
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+
+    account = Account(name="新台幣綜合投資帳戶", available_funds=100000.0, enabled=True)
+    stock_tw = Stock(symbol="2330", name="台積電", market="TW")
+    stock_us = Stock(symbol="NVDA", name="NVIDIA", market="US")
+    session.add_all([account, stock_tw, stock_us])
+    session.flush()
+
+    # 台股: 成本 1000 TWD, 100 股 => 100,000 TWD
+    pos_tw = Position(
+        account_id=account.id,
+        stock_id=stock_tw.id,
+        cost_price=1000.0,
+        quantity=100,
+    )
+    # 美股: 成本 100 USD, 10 股 => 1,000 USD * 32.0 = 32,000 TWD
+    pos_us = Position(
+        account_id=account.id,
+        stock_id=stock_us.id,
+        cost_price=100.0,
+        quantity=10,
+    )
+    session.add_all([pos_tw, pos_us])
+    session.commit()
+
+    summary = get_portfolio_summary(include_quotes=False, db=session)
+    assert summary["base_currency"] == "TWD"
+    assert summary["currency_symbol"] == "NT$"
+    assert len(summary["accounts"]) == 1
+    acc_summary = summary["accounts"][0]
+    # 總成本: 100,000 + 32,000 = 132,000 TWD
+    assert acc_summary["total_cost"] == 132000.0
+
+    pos_tw_data = next(p for p in acc_summary["positions"] if p["symbol"] == "2330")
+    assert pos_tw_data["exchange_rate"] is None  # 台股非外幣
+
+    pos_us_data = next(p for p in acc_summary["positions"] if p["symbol"] == "NVDA")
+    assert pos_us_data["exchange_rate"] == 32.0  # 美股折算匯率
+
+    holdings = _gather_holdings(session)
+    assert len(holdings) == 2
+    h_tw = next(h for h in holdings if h["symbol"] == "2330")
+    assert h_tw["fx"] == 1.0
+    assert h_tw["market_value"] == 100000.0
+
+    h_us = next(h for h in holdings if h["symbol"] == "NVDA")
+    assert h_us["fx"] == 32.0
+    assert h_us["market_value"] == 32000.0
+
+    session.close()
+    engine.dispose()
+
+
+def test_portfolio_summary_and_holdings_primary_currency_cny(monkeypatch):
+    """驗證基準貨幣為 CNY 時，台股持倉折算為人民幣。"""
+    from src.modules.portfolio.api.accounts import (
+        _gather_holdings,
+        get_portfolio_summary,
+    )
+
+    monkeypatch.setenv("PRIMARY_CURRENCY", "CNY")
+    monkeypatch.setattr(
+        "src.modules.portfolio.api.accounts.get_twd_cny_rate",
+        lambda: 0.22,
+    )
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+
+    account = Account(name="人民幣帳戶", available_funds=50000.0, enabled=True)
+    stock = Stock(symbol="2330", name="台積電", market="TW")
+    session.add_all([account, stock])
+    session.flush()
+
+    # 成本 1000 TWD, 數量 100 股
+    pos = Position(
+        account_id=account.id,
+        stock_id=stock.id,
+        cost_price=1000.0,
+        quantity=100,
+    )
+    session.add(pos)
+    session.commit()
+
+    summary = get_portfolio_summary(include_quotes=False, db=session)
+    assert summary["base_currency"] == "CNY"
+    assert summary["currency_symbol"] == "¥"
+    acc_summary = summary["accounts"][0]
+    # cost_cny = 1000 * 100 * 0.22 = 22000.0
+    assert acc_summary["total_cost"] == 22000.0
+    pos_data = acc_summary["positions"][0]
+    assert pos_data["market"] == "TW"
+    assert pos_data["exchange_rate"] == 0.22
+
+    holdings = _gather_holdings(session)
+    assert len(holdings) == 1
+    assert holdings[0]["symbol"] == "2330"
+    assert holdings[0]["market"] == "TW"
+    assert holdings[0]["fx"] == 0.22
+    assert holdings[0]["market_value"] == 22000.0
+
+    session.close()
+    engine.dispose()
