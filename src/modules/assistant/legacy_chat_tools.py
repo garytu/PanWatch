@@ -37,7 +37,7 @@ CHAT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "symbol": {"type": "string", "description": "股票程式碼，如 600519"},
-                    "market": {"type": "string", "description": "市場程式碼：CN/HK/US", "default": "CN"},
+                    "market": {"type": "string", "description": "市場程式碼：CN/HK/US/TW", "default": "CN"},
                 },
                 "required": ["symbol"],
             },
@@ -52,7 +52,7 @@ CHAT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "symbol": {"type": "string", "description": "股票程式碼"},
-                    "market": {"type": "string", "description": "市場程式碼：CN/HK/US", "default": "CN"},
+                    "market": {"type": "string", "description": "市場程式碼：CN/HK/US/TW", "default": "CN"},
                 },
                 "required": ["symbol"],
             },
@@ -67,7 +67,7 @@ CHAT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "symbol": {"type": "string", "description": "股票程式碼"},
-                    "market": {"type": "string", "description": "市場程式碼：CN/HK/US", "default": "CN"},
+                    "market": {"type": "string", "description": "市場程式碼：CN/HK/US/TW", "default": "CN"},
                 },
                 "required": ["symbol"],
             },
@@ -139,15 +139,19 @@ async def fetch_realtime_context(symbol: str, market: str) -> str:
         from src.platform.marketdata.marketdata_client import md_quote_rows
         from src.platform.marketdata.models import MarketCode
 
-        code = MarketCode(market) if market in ("CN", "HK", "US") else MarketCode.CN
+        code = MarketCode(market) if market in ("CN", "HK", "US", "TW") else MarketCode.CN
         rows = await asyncio.to_thread(md_quote_rows, [symbol], code.value)
         if not rows:
             return ""
         quote = rows[0]
+        kind = "歷史收盤" if quote.get("price_kind") == "eod" else "即時行情"
+        metadata = (f"，日期 {quote.get('trade_date')}，時效 {quote.get('freshness')}，"
+                    f"成交量單位 {quote.get('units', {}).get('volume', '未知')}，"
+                    f"可交易 {quote.get('usable_for_trading')}" if code == MarketCode.TW else "")
         return (
-            f"即時行情：{quote.get('name', symbol)}（{market}:{symbol}）價格 "
+            f"{kind}：{quote.get('name', symbol)}（{market}:{symbol}）價格 "
             f"{quote.get('current_price', '--')}，漲跌幅 {quote.get('change_pct', '--')}%，"
-            f"成交量 {quote.get('volume', '--')}"
+            f"成交量 {quote.get('volume', '--')}{metadata}"
         )
     except Exception as exc:  # noqa: BLE001 - a missing quote must not fail chat
         logger.debug("獲取即時行情失敗: %s", exc)

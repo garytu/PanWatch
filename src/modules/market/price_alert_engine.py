@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from src.platform.marketdata.collectors.kline_collector import KlineCollector, kline_source
 from src.platform.notifications.notifier import NotifierManager
-from src.platform.marketdata.marketdata_client import md_quote_rows
+from src.platform.marketdata.marketdata_client import md_quote_rows, quote_usable_for_trading
 from src.platform.marketdata.models import MarketCode, MARKETS
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import NotifyChannel, PriceAlertHit, PriceAlertRule, Stock
@@ -183,6 +183,8 @@ class PriceAlertEngine:
         }
 
     async def eval_rule(self, rule: PriceAlertRule, quote: dict) -> RuleEvalResult:
+        if not quote_usable_for_trading(quote, rule.stock.market):
+            return RuleEvalResult(matched=False, hits=[], snapshot={"error": "unusable_quote"})
         cond_group = rule.condition_group or {}
         op = str(cond_group.get("op", "and")).lower()
         items = cond_group.get("items") or []
@@ -347,6 +349,11 @@ class PriceAlertEngine:
                 if not quote:
                     skipped += 1
                     items.append({"rule_id": rule.id, "status": "no_quote"})
+                    continue
+
+                if not quote_usable_for_trading(quote, market.value):
+                    skipped += 1
+                    items.append({"rule_id": rule.id, "status": "unusable_quote", "freshness": quote.get("freshness")})
                     continue
 
                 can, reason = self._can_trigger(

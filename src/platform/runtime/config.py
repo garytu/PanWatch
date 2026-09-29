@@ -32,6 +32,25 @@ class Settings(BaseSettings):
     context_keep_recent_messages: int = Field(default=8, ge=1, le=100)
     tool_research_enabled: bool = True
 
+    # Local PanWatch and twmd can run on separate ports.
+    panwatch_port: int = Field(default=8000, ge=1, le=65535)
+    playwright_chromium_executable: str = ""
+    tw_data_provider: str = "twmd"
+    twmd_base_url: str = "http://127.0.0.1:8000"
+    twmd_api_token: str = ""
+    twmd_timeout_sec: float = Field(default=5, gt=0)
+    finmind_api_token: str = ""
+    external_quote_feed_url: str = Field(default="http://127.0.0.1:8088", validation_alias=AliasChoices(
+        "EXTERNAL_QUOTE_FEED_URL", "TW_QUOTE_FEED_URL"))
+    external_quote_feed_token: str = Field(default="", validation_alias=AliasChoices(
+        "EXTERNAL_QUOTE_FEED_TOKEN", "TW_QUOTE_FEED_TOKEN"))
+    external_quote_feed_timeout_sec: str = Field(default="5", validation_alias=AliasChoices(
+        "EXTERNAL_QUOTE_FEED_TIMEOUT_SEC", "TW_QUOTE_FEED_TIMEOUT_SEC"))
+    tw_paper_lot_size: int = 1000
+    tw_commission_rate: float = Field(default=0.001425, ge=0)
+    tw_min_commission: float = Field(default=20, ge=0)
+    tw_extra_closed_dates: str = ""
+
     # Telegram
     notify_telegram_bot_token: str = ""
     notify_telegram_chat_id: str = ""

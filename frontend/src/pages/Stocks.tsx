@@ -1,3 +1,4 @@
+import { TaiwanFeedStatus } from '@panwatch/biz-ui/components/taiwan-feed-status'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Plus, Trash2, Pencil, Search, X, TrendingUp, Bot, Play, RefreshCw, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Building2, ChevronDown, ChevronRight, Cpu, Bell, Clock, Newspaper, ExternalLink, BarChart3, Brain } from 'lucide-react'
 import { fetchAPI, stocksApi, type AIService, type NotifyChannel } from '@panwatch/api'
@@ -109,7 +110,7 @@ interface PortfolioSummary {
   base_currency?: string
   currency_symbol?: string
   exchange_rates?: Record<string, number>
-  quotes?: Record<string, { current_price: number | null; change_pct: number | null }>
+  quotes?: Record<string, QuoteValue>
 }
 
 interface AgentConfig {
@@ -138,7 +139,17 @@ interface QuoteRequestItem {
   market: string
 }
 
-interface QuoteResponse {
+interface QuoteValue {
+  current_price: number | null
+  change_pct: number | null
+  price_kind?: string | null
+  trade_date?: string | null
+  timestamp?: string | null
+  freshness?: { status?: string; reason?: string } | null
+  usable_for_trading?: boolean | null
+}
+
+interface QuoteResponse extends QuoteValue {
   symbol: string
   market: string
   current_price: number | null
@@ -245,10 +256,11 @@ const buildQuoteItemsFrom = (stockList: Stock[], portfolio: PortfolioSummary | n
   return items
 }
 
-const toQuoteMap = (rows: QuoteResponse[]): Record<string, { current_price: number | null; change_pct: number | null }> => {
-  const map: Record<string, { current_price: number | null; change_pct: number | null }> = {}
+const toQuoteMap = (rows: QuoteResponse[]): Record<string, QuoteValue> => {
+  const map: Record<string, QuoteValue> = {}
   for (const item of rows || []) {
     map[`${item.market}:${item.symbol}`] = {
+      ...item,
       current_price: item.current_price ?? null,
       change_pct: item.change_pct ?? null,
     }
@@ -271,7 +283,7 @@ const round2 = (value: number) => Math.round(value * 100) / 100
 
 const mergePortfolioQuotes = (
   portfolio: PortfolioSummary | null,
-  quotes: Record<string, { current_price: number | null; change_pct: number | null }>
+  quotes: Record<string, QuoteValue>
 ): PortfolioSummary | null => {
   if (!portfolio) return null
 
@@ -407,7 +419,7 @@ export default function StocksPage() {
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set())
 
   // Quotes for all stocks (used in stock list)
-  const [quotes, setQuotes] = useState<Record<string, { current_price: number | null; change_pct: number | null }>>({})
+  const [quotes, setQuotes] = useState<Record<string, QuoteValue>>({})
   const [quotesLoading, setQuotesLoading] = useState(false)
   // Keyed by `${market}:${symbol}` to avoid cross-market symbol collisions
   const [klineSummaries, setKlineSummaries] = useState<Record<string, KlineSummary>>({})
@@ -2373,6 +2385,7 @@ export default function StocksPage() {
       {/* Watchlist */}
       {viewTab === 'watchlist' && (
         <div className="card p-4">
+          {stocks.some(stock => stock.market === 'TW') && <TaiwanFeedStatus />}
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[13px] font-semibold text-foreground">關注列表</h3>
             <div className="flex items-center gap-1">
@@ -2381,6 +2394,7 @@ export default function StocksPage() {
                 { value: 'CN', label: 'A股', count: stocks.filter(s => s.market === 'CN').length },
                 { value: 'HK', label: '港股', count: stocks.filter(s => s.market === 'HK').length },
                 { value: 'US', label: '美股', count: stocks.filter(s => s.market === 'US').length },
+                { value: 'TW', label: '台股', count: stocks.filter(s => s.market === 'TW').length },
               ].map(opt => (
                 <button
                   key={opt.value}
@@ -2492,6 +2506,9 @@ export default function StocksPage() {
                       <div className="text-right">
                         <div className={`font-mono text-[14px] font-bold leading-tight ${changeColor}`}>
                           {quote?.current_price != null ? quote.current_price.toFixed(2) : '--'}
+                          {stock.market === 'TW' && <div className="text-[10px] font-normal text-muted-foreground" title={quote?.freshness?.reason || ''}>
+                            {quote?.price_kind === 'eod' ? `收盤 ${quote.trade_date || ''}` : quote?.usable_for_trading ? '即時' : quote?.price_kind === 'live' ? '即時報價已過期／休市' : '即時報價未就緒'}
+                          </div>}
                         </div>
                         <div className={`font-mono text-[11px] leading-tight ${changeColor}`}>
                           {quote?.change_pct != null ? `${quote.change_pct >= 0 ? '+' : ''}${quote.change_pct.toFixed(2)}%` : '--'}

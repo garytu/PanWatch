@@ -130,6 +130,25 @@ def test_quote_tool_returns_controlled_failure_without_quote(monkeypatch):
     engine.dispose()
 
 
+def test_taiwan_quote_tool_preserves_historical_date_without_fresh_timestamp(monkeypatch):
+    engine, session = _session()
+    monkeypatch.setattr(assistant_tools, "md_quote_rows", lambda *_: [{
+        "symbol": "TWSE:2330", "instrument_id": "TWSE:2330", "name": "台積電", "market": "TW",
+        "current_price": 100, "price_kind": "eod", "trade_date": "2026-09-29", "timestamp": None,
+        "provider": "TWSE", "usable_for_trading": False, "units": {"currency": "TWD", "volume": "shares"},
+        "freshness": {"status": "closed"},
+    }])
+    try:
+        result = asyncio.run(assistant_tools.build_panwatch_tool_registry(session).execute(
+            "get_stock_quote", _request(), {"symbol": "TWSE:2330", "market": "TW"}))
+        assert result.ok and result.observed_at is None
+        assert result.data["price_kind"] == "eod" and result.data["usable_for_trading"] is False
+        assert result.data["units"]["currency"] == "TWD" and "2026-09-29" in result.summary
+    finally:
+        session.close()
+        engine.dispose()
+
+
 def test_research_candidates_tool_reuses_strategy_signals_and_returns_compact_candidates(monkeypatch):
     engine, session = _session()
     captured = {}

@@ -11,9 +11,9 @@ from marketdata.registry import VENDOR_CLASSES_BY_TYPE, build_vendors
 def test_package_vendors_by_type_content():
     """內容必須與 client.py 現狀(quote/kline/capital_flow/events 各 vendor)完全一致。"""
     assert PACKAGE_VENDORS_BY_TYPE == {
-        "quote": frozenset({"tencent", "sina", "eastmoney", "yfinance", "external_quote"}),
-        "kline": frozenset({"tencent", "stooq", "eastmoney", "yahoo", "finmind"}),
-        "intraday_kline": frozenset({"external_kline"}),
+        "quote": frozenset({"tencent", "sina", "eastmoney", "yfinance", "external_quote", "twmd"}),
+        "kline": frozenset({"tencent", "stooq", "eastmoney", "yahoo", "finmind", "twmd"}),
+        "intraday_kline": frozenset({"external_kline", "twmd"}),
         "capital_flow": frozenset({"eastmoney", "sina", "finmind"}),
         "events": frozenset({"eastmoney"}),
         "flash_news": frozenset({"cls", "sina", "eastmoney"}),

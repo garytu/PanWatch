@@ -465,7 +465,7 @@ class ContextBuilder:
             )
 
             coverage = {
-                "quote": bool(pack and pack.quote),
+                "quote": bool(pack and pack.quote and getattr(pack.quote, "current_price", None) is not None),
                 "technical": bool(pack and pack.technical and not pack.technical.get("error")),
                 "events": bool(pack and pack.events and pack.events.items),
                 "news_realtime": len(realtime_ranked) > 0,

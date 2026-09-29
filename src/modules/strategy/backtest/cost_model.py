@@ -125,3 +125,37 @@ class CostModel:
 
 # 全域性預設例項(可被覆蓋配置)
 DEFAULT_COST_MODEL = CostModel()
+
+
+def cost_model_for_market(market: str, symbol: str = "", *, security_type: str = "EQUITY") -> CostModel:
+    """TW stock swing-trade assumptions; broker commissions are configurable.
+
+    Tax: https://www.twse.com.tw/en/about/company/guide.html
+    ETF: https://www.twse.com.tw/en/products/securities/etf/overview/rules.html
+    Same-day stock-tax relief is deliberately not assumed by the swing simulator.
+    """
+    if market != "TW":
+        return DEFAULT_COST_MODEL
+    from datetime import date
+    from src.platform.runtime.config import Settings
+    settings = Settings()
+    code = symbol.split(":")[-1].split(".")[0]
+    tax = 0.001 if security_type == "ETF" else 0.003
+    # Taiwan bond ETF codes end in B; the exemption currently runs through 2026.
+    if security_type == "ETF" and code.endswith("B") and date.today().year <= 2026:
+        tax = 0.0
+    return CostModel(CostConfig(
+        commission_rate=settings.tw_commission_rate,
+        min_commission=settings.tw_min_commission,
+        stamp_duty_rate=tax, transfer_fee_rate=0.0,
+    ))
+
+
+def trading_lot(market: str) -> int:
+    if market == "TW":
+        from src.platform.runtime.config import Settings
+        lot = Settings().tw_paper_lot_size
+        if lot not in {1, 1000}:
+            raise ValueError("TW_PAPER_LOT_SIZE must be 1 (odd lots) or 1000 (regular lots)")
+        return lot
+    return 100

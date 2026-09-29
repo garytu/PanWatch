@@ -34,9 +34,10 @@ _FAKE_CN_DATES = frozenset(
 
 
 @pytest.fixture(autouse=True)
-def _reset_calendar():
+def _reset_calendar(monkeypatch):
     """每個用例前後清空日曆快取,避免互相汙染。"""
     tc.reset_cache()
+    monkeypatch.setattr(tc, "_fetch_tw_trading_dates", lambda: frozenset())
     yield
     tc.reset_cache()
 

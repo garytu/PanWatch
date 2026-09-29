@@ -16,13 +16,13 @@ class Market(str, Enum):
 
 _CN_RE = re.compile(r"^[036]\d{5}$")   # 6 位,0/3/6 開頭
 _HK_RE = re.compile(r"^\d{5}$")        # 5 位數字
-_TW_RE = re.compile(r"^\d{4}[A-Z]?$")  # 4 位數字或 4 位+字母 (如 2330, 2881A)
+_TW_RE = re.compile(r"^\d{4,6}[A-Z]?$")
 _US_RE = re.compile(r"^[A-Z.]{1,6}$")  # 1-6 位字母(含指數 .DJI)
 
 
 def _detect_market(code: str) -> Market:
     c = code.strip().upper()
-    if c.endswith(".TW") or c.endswith(".TWO"):
+    if c.startswith(("TWSE:", "TPEX:")) or c.endswith(".TW") or c.endswith(".TWO"):
         return Market.TW
     if _CN_RE.match(c):
         return Market.CN
@@ -49,15 +49,25 @@ def _cn_exchange(code: str) -> str:
 class Symbol:
     market: Market
     code: str
+    venue: str | None = None
+
+    @property
+    def identity(self) -> str:
+        return f"{self.venue}:{self.code}" if self.market == Market.TW and self.venue else self.code
 
     @classmethod
     def parse(cls, raw: str, market: str | None = None) -> "Symbol":
         code = raw.strip()
         u = code.upper()
+        if u.startswith(("TWSE:", "TPEX:")):
+            venue, code = u.split(":", 1)
+            if not _TW_RE.fullmatch(code):
+                raise ValueError(f"Invalid Taiwan symbol: {raw}")
+            return cls(Market.TW, code, venue)
         if u.endswith(".TW"):
-            return cls(Market.TW, code[:-3])
+            return cls(Market.TW, u[:-3], "TWSE")
         if u.endswith(".TWO"):
-            return cls(Market.TW, code[:-4])
+            return cls(Market.TW, u[:-4], "TPEX")
         if market:
             return cls(Market(market), code)
         return cls(_detect_market(code), code)
@@ -73,7 +83,7 @@ class Symbol:
         if self.market == Market.HK:
             return f"{int(self.code):04d}.HK" if self.code.isdigit() else f"{self.code}.HK"
         if self.market == Market.TW:
-            return f"{self.code}.TW" if "." not in self.code else self.code
+            return f"{self.code}.{'TWO' if self.venue == 'TPEX' else 'TW'}"
         return self.code  # US 直接用;CN 由 vendor.supports_markets 攔截,不會走到這
 
     def to_eastmoney_secid(self) -> str:

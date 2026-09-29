@@ -313,7 +313,8 @@ class DataCollectorManager:
                 "資金流向",
                 "capital_flow",
                 "success",
-                f"獲取成功，主力淨流入 {data.main_net_inflow / 10000:.2f}萬",
+                (f"獲取成功，法人淨買賣超 {data.institutional_net_shares} 股" if data.flow_kind == "institutional_shares"
+                 else f"獲取成功，主力淨流入 {(data.main_net_inflow or 0) / 10000:.2f}萬"),
                 duration_ms=duration_ms,
             )
 

@@ -29,7 +29,8 @@ class ExternalQuoteVendor(QuoteVendor):
             return []
 
         base_url = (config.get("base_url") or _DEFAULT_ENDPOINT).rstrip("/")
-        timeout = float(config.get("timeout_sec") or 2.0)
+        # 本地批次行情查詢可能超過 3 秒，預留查詢與傳輸時間。
+        timeout = float(config.get("timeout_sec") or 5.0)
         token = config.get("token")
         proxy = config.get("proxy")
 

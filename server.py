@@ -1604,8 +1604,9 @@ if os.path.exists(static_dir):
 
 
 if __name__ == "__main__":
-    print("盯盤俠啟動: http://127.0.0.1:8000")
-    print("API 檔案: http://127.0.0.1:8000/docs")
+    _port = Settings().panwatch_port
+    print(f"盯盤俠啟動: http://127.0.0.1:{_port}")
+    print(f"API 檔案: http://127.0.0.1:{_port}/docs")
     # 生產(Docker `python server.py`)不應開 reload:uvicorn 檔案監聽會多起一個 reloader
     # 子程式、浪費資源,且監聽 data/ 寫入易誤觸發重啟。本地熱過載用 `make dev-api`
     # (uvicorn --reload),或顯式設 DEV_RELOAD=1。
@@ -1613,7 +1614,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "server:app",
         host="0.0.0.0",
-        port=8000,
+        port=_port,
         reload=_dev_reload,
         reload_dirs=["src", "."] if _dev_reload else None,
         reload_excludes=["data/*", "frontend/*", ".claude/*"] if _dev_reload else None,

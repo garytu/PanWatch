@@ -90,7 +90,7 @@ MARKETS: dict[MarketCode, MarketDef] = {
         sessions=[
             TradingSession(time(9, 0), time(13, 30)),
         ],
-        symbol_pattern=r"^\d{4}[A-Z]?$",
+        symbol_pattern=r"^(?:(?:TWSE|TPEX):)?\d{4,6}[A-Z]?$",
     ),
 }
 
@@ -101,16 +101,31 @@ class StockData:
     symbol: str
     name: str
     market: MarketCode
-    current_price: float
-    change_pct: float       # 漲跌幅 %
-    change_amount: float    # 漲跌額
-    volume: float           # 成交量（手）
-    turnover: float         # 成交額（元）
-    open_price: float
-    high_price: float
-    low_price: float
-    prev_close: float
-    timestamp: datetime = field(default_factory=datetime.now)
+    current_price: float | None
+    change_pct: float | None
+    change_amount: float | None
+    volume: float | None  # 單位見 units，TW 為股
+    turnover: float | None
+    open_price: float | None
+    high_price: float | None
+    low_price: float | None
+    prev_close: float | None
+    timestamp: datetime | None = field(default_factory=datetime.now)
+    instrument_id: str | None = None
+    venue: str | None = None
+    price_kind: str | None = None
+    provider: str | None = None
+    trade_date: str | None = None
+    reference_price: float | None = None
+    change_basis: str | None = None
+    adjustment_mode: str | None = None
+    availability: str | None = None
+    freshness: dict = field(default_factory=dict)
+    collection_health: dict = field(default_factory=dict)
+    usable_for_trading: bool | None = None
+    units: dict = field(default_factory=dict)
+    volume_semantics: str | None = None
+    eod_fallback: dict | None = None
 
 
 @dataclass

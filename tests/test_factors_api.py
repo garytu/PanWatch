@@ -18,14 +18,14 @@ def _mem_db():
 
 
 def test_list_weights_returns_all_market_factor_pairs():
-    """GET 列表返回 5 因子 × 3 市場。"""
+    """GET 列表返回 5 因子 × 4 市場。"""
     from src.modules.strategy.api import factors
 
     db = _mem_db()
     try:
         res = factors.list_weights(db=db)
         assert "items" in res
-        assert len(res["items"]) == 15
+        assert len(res["items"]) == 20
     finally:
         db.close()
 

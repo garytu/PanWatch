@@ -38,6 +38,8 @@ def market_label(market: MarketCode) -> str:
         return "港股"
     if market == MarketCode.US:
         return "美股"
+    if market == MarketCode.TW:
+        return "台股"
     return market.value
 
 
@@ -149,6 +151,15 @@ class IntradayMonitorAgent(BaseAgent):
         quality_overview = context_pack.get("quality_overview", {}) or {}
 
         stock_data = pack.quote if pack and pack.quote else None
+        if market == MarketCode.TW:
+            from dataclasses import asdict
+            from src.platform.marketdata.marketdata_client import quote_usable_for_trading
+            row = asdict(stock_data) if stock_data else {}
+            if stock_data and stock_data.timestamp:
+                row["timestamp"] = stock_data.timestamp.isoformat()
+            if not quote_usable_for_trading(row, "TW"):
+                return {"stocks": [], "stock_data": None, "skip_reason": "unusable_quote",
+                        "freshness": row.get("freshness")}
 
         kline_summary = pack.technical if pack else None
 
@@ -215,15 +226,18 @@ class IntradayMonitorAgent(BaseAgent):
 
         lines.append("## 股票行情")
         lines.append(f"- 股票：{stock.name}（{stock.symbol}）")
-        lines.append(f"- 現價：{current_price:.2f}")
-        lines.append(f"- 漲跌幅：{change_pct:+.2f}%")
-        lines.append(f"- 漲跌額：{change_amount:+.2f}")
-        lines.append(f"- 今開：{open_price:.2f}")
-        lines.append(f"- 最高：{high_price:.2f}")
-        lines.append(f"- 最低：{low_price:.2f}")
-        lines.append(f"- 昨收：{prev_close:.2f}")
+        lines.append(f"- 現價：{format_num(stock.current_price)}")
+        lines.append(f"- 漲跌幅：{format_num(stock.change_pct)}%")
+        lines.append(f"- 漲跌額：{format_num(stock.change_amount)}")
+        lines.append(f"- 今開：{format_num(stock.open_price)}")
+        lines.append(f"- 最高：{format_num(stock.high_price)}")
+        lines.append(f"- 最低：{format_num(stock.low_price)}")
+        lines.append(f"- 昨收：{format_num(stock.prev_close)}")
+        if stock.market == MarketCode.TW:
+            lines.append(f"- 報價：{stock.price_kind}，日期 {stock.trade_date}，漲跌基準 {stock.change_basis}")
+            lines.append(f"- 交易參考價：{format_num(stock.reference_price)}（與昨收分開）")
         if volume > 0:
-            lines.append(f"- 成交量：{volume:.0f} 手")
+            lines.append(f"- 成交量：{volume:.0f} {'股' if stock.market == MarketCode.TW else '手'}")
         if turnover > 0:
             lines.append(f"- 成交額：{turnover / 10000:.0f} 萬")
 
@@ -387,7 +401,9 @@ class IntradayMonitorAgent(BaseAgent):
         # 資金流向（僅A股，若可用）
         pack = data.get("signal_pack")
         flow = getattr(pack, "capital_flow", None) if pack else None
-        if (
+        if isinstance(flow, dict) and flow.get("flow_kind") == "institutional_shares":
+            lines.append(f"- 法人（股）：{flow.get('status')}；{flow.get('trend_5d', '')}")
+        elif (
             isinstance(flow, dict)
             and flow
             and not flow.get("error")

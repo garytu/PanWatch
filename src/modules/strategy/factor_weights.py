@@ -30,7 +30,7 @@ CALIBRATABLE_FACTORS = (
 # 懲罰類因子:在 raw_score 中被減,IC 預期為負。
 PENALTY_FACTORS = frozenset({"risk_penalty", "crowd_penalty"})
 
-MARKETS = ("CN", "HK", "US")
+MARKETS = ("CN", "HK", "US", "TW")
 
 
 def get_factor_weights(market: str, *, db=None) -> dict[str, float]:

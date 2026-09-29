@@ -346,9 +346,9 @@ def refresh_stock_list() -> list[dict]:
     except Exception as e:
         logger.warning(f"東方財富獲取北交所失敗: {e}")
 
-    # 台股: FinMind 優先，內建主流標的清單兜底
+    # 台股: twmd instrument catalog 優先，FinMind / 內建清單兜底
     try:
-        tw_stocks = _fetch_tw_from_finmind()
+        tw_stocks = _fetch_tw_from_twmd() or _fetch_tw_from_finmind()
         stocks.extend(tw_stocks)
         logger.info(f"獲取台股列表成功: {len(tw_stocks)} 只")
     except Exception as e:
@@ -358,6 +358,15 @@ def refresh_stock_list() -> list[dict]:
     if stocks:
         _save_cache(stocks)
     return stocks
+
+
+def _fetch_tw_from_twmd() -> list[dict]:
+    from marketdata.vendors.twmd import TwmdClient
+    from src.platform.marketdata.marketdata_client import twmd_config
+    return [{"symbol": row["instrument_id"], "name": row["name"], "market": "TW",
+             "venue": row["venue"], "security_type": row.get("security_type")}
+            for row in TwmdClient(twmd_config()).instruments()
+            if row.get("is_active") and row.get("security_type") in {"EQUITY", "ETF", "PREFERRED"}]
 
 
 def _fetch_tw_from_finmind() -> list[dict]:
@@ -376,8 +385,11 @@ def _fetch_tw_from_finmind() -> list[dict]:
                     sid = str(row.get("stock_id", "")).strip()
                     sname = str(row.get("stock_name", "")).strip()
                     stype = str(row.get("type", ""))
-                    if len(sid) == 4 and stype in ("twse", "tpex"):
-                        latest_by_id[sid] = {"symbol": sid, "name": sname, "market": "TW"}
+                    import re
+                    if re.fullmatch(r"\d{4,6}[A-Z]?", sid) and stype in ("twse", "tpex"):
+                        venue = stype.upper()
+                        identity = f"{venue}:{sid}"
+                        latest_by_id[identity] = {"symbol": identity, "name": sname, "market": "TW", "venue": venue}
                 if latest_by_id:
                     return list(latest_by_id.values())
     except Exception as e:
@@ -396,6 +408,20 @@ def get_stock_list() -> list[dict]:
 def get_stock_name(symbol: str, market: str = "") -> str:
     """按股票代碼查詢名稱 (用於展示，如 2330 -> 台積電)"""
     sym = symbol.strip().upper()
+    if market == "TW" or sym.startswith(("TWSE:", "TPEX:")) or sym.endswith((".TW", ".TWO")):
+        from marketdata.symbol import Symbol
+        parsed = Symbol.parse(sym, "TW")
+        rows = _fetch_tw_from_twmd()
+        matches = [row for row in rows if row["symbol"] == parsed.identity
+                   or (not parsed.venue and row["symbol"].split(":")[-1] == parsed.code)]
+        if len(matches) == 1:
+            return matches[0]["name"]
+        if len(matches) > 1:
+            return ""
+        if parsed.venue:
+            # Never resolve an explicit venue through a bundled bare-code alias.
+            return ""
+        sym = parsed.code
     if "." in sym:
         sym = sym.split(".")[0]
     stocks = get_stock_list() or []
@@ -494,6 +520,11 @@ def search_stocks(query: str, market: str = "", limit: int = 20) -> list[dict]:
     q = query.strip()
     if not q:
         return []
+    if market == "TW":
+        rows = _fetch_tw_from_twmd()
+        if not rows:
+            rows = _fetch_tw_from_finmind()
+        return [row for row in rows if q.upper() in row["symbol"].upper() or q in row["name"]][:limit]
 
     # 嘗試即時搜尋
     results = _realtime_search(q, market, limit)

@@ -38,7 +38,7 @@ class Engine:
             return cached
 
         market = req.market
-        syms = [Symbol(Market(market), c) for c in req.symbols]
+        syms = [Symbol.parse(c, market) for c in req.symbols]
         sources = sorted(self.config.sources_for(self.datatype, market), key=lambda s: s.priority)
 
         last_err = ""

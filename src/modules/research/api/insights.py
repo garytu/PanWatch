@@ -5,7 +5,7 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from src.platform.marketdata.models import MarketCode
-from src.platform.marketdata.marketdata_client import md_quote_rows
+from src.platform.marketdata.marketdata_client import md_quote_rows, QUOTE_METADATA
 from src.platform.marketdata.collectors.kline_collector import KlineCollector
 from src.modules.automation.suggestion_pool import get_latest_suggestions
 from src.modules.assistant.legacy_chat_tools import (
@@ -31,7 +31,7 @@ router = APIRouter()
 
 class InsightItem(BaseModel):
     symbol: str = Field(..., description="股票程式碼")
-    market: str = Field(..., description="市場: CN/HK/US")
+    market: str = Field(..., description="市場: CN/HK/US/TW")
 
 
 class InsightsBatchRequest(BaseModel):
@@ -112,6 +112,8 @@ def insights_batch(payload: InsightsBatchRequest):
                 "low_price": quote.get("low_price") if quote else None,
                 "volume": quote.get("volume") if quote else None,
                 "turnover": quote.get("turnover") if quote else None,
+                "timestamp": quote.get("timestamp") if quote else None,
+                **{key: quote.get(key) if quote else None for key in QUOTE_METADATA},
             },
             "kline_summary": kline_by_symbol.get(f"{market_code.value}:{it.symbol}", {}),
             "suggestion": latest_sugs.get(f"{market_code.value}:{it.symbol}"),
@@ -145,7 +147,7 @@ def _parse_verdict(text: str) -> str:
 async def _fetch_fundamental_context(symbol: str, market: str) -> str:
     """基本面摘要:PE / 周轉率 / 市值 / 今日振幅(取自即時行情,失敗返回空)。"""
     try:
-        mc = MarketCode(market) if market in ("CN", "HK", "US") else MarketCode.CN
+        mc = MarketCode(market) if market in ("CN", "HK", "US", "TW") else MarketCode.CN
         rows = await asyncio.to_thread(md_quote_rows, [symbol], mc.value)
         if not rows:
             return ""

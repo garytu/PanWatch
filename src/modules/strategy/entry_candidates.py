@@ -910,6 +910,10 @@ def _load_market_scan_seed_inputs(*, market: str, limit: int) -> dict[str, dict]
             "change_pct": _safe_float(getattr(row, "change_pct", None)),
             "turnover": _safe_float(getattr(row, "turnover", None)),
             "volume": _safe_float(getattr(row, "volume", None)),
+            "price_kind": getattr(row, "price_kind", None),
+            "trade_date": getattr(row, "trade_date", None),
+            "freshness": getattr(row, "freshness", None),
+            "usable_for_trading": False if market == "TW" else None,
         }
         if quote["current_price"] is None:
             continue
@@ -982,7 +986,7 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
     safe_limit = max(20, int(limit_per_market))
     min_required = min(max(12, int(safe_limit * 0.55)), safe_limit)
 
-    for market in ("CN", "HK", "US"):
+    for market in ("CN", "HK", "US", "TW"):
         try:
             turnover = _run_async(
                 collector.fetch_hot_stocks(
@@ -1017,6 +1021,10 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
                 "change_pct": _safe_float(getattr(row, "change_pct", None)),
                 "turnover": _safe_float(getattr(row, "turnover", None)),
                 "volume": _safe_float(getattr(row, "volume", None)),
+                "price_kind": getattr(row, "price_kind", None),
+                "trade_date": getattr(row, "trade_date", None),
+                "freshness": getattr(row, "freshness", None),
+                "usable_for_trading": False if market == "TW" else None,
             }
             if key in result:
                 exist_quote = result[key].get("quote_seed") or {}
@@ -1103,7 +1111,7 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
                 )
 
     # Final per-market cap and stable ordering.
-    for market in ("CN", "HK", "US"):
+    for market in ("CN", "HK", "US", "TW"):
         keys = [k for k in result.keys() if k.startswith(f"{market}:")]
         if len(keys) <= safe_limit:
             continue

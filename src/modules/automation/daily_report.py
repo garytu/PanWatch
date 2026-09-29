@@ -183,28 +183,32 @@ class DailyReportAgent(BaseAgent):
                 )
 
             # 基本行情
-            if quote:
-                change_pct = safe_num(quote.change_pct)
-                direction = "↑" if change_pct > 0 else "↓" if change_pct < 0 else "→"
-
-                current_price = safe_num(quote.current_price)
-                high_price = safe_num(quote.high_price)
-                low_price = safe_num(quote.low_price)
-                prev_close = safe_num(quote.prev_close, 1)  # 避免除零
-                turnover = safe_num(quote.turnover)
+            if quote and quote.current_price is not None:
+                change_pct = quote.change_pct
+                direction = "↑" if change_pct and change_pct > 0 else "↓" if change_pct and change_pct < 0 else "→"
+                change_text = f"{direction} {change_pct:+.2f}%" if change_pct is not None else "N/A"
+                current_price = quote.current_price
+                high_price, low_price = quote.high_price, quote.low_price
+                reference = (quote.reference_price if quote.reference_price is not None else quote.prev_close) if quote.market == MarketCode.TW else quote.prev_close
+                turnover = quote.turnover
 
                 lines.append(
-                    f"- 今日：{current_price:.2f} {direction} {change_pct:+.2f}%"
+                    f"- 價格：{current_price:.2f} {change_text}"
                 )
-                amplitude = (
-                    (high_price - low_price) / prev_close * 100 if prev_close > 0 else 0
-                )
+                if quote.market == MarketCode.TW:
+                    lines.append(f"- 價格種類：{quote.price_kind}，資料日期 {quote.trade_date}，漲跌基準 {quote.change_basis}")
+                amplitude = ((high_price - low_price) / reference * 100
+                             if high_price is not None and low_price is not None and reference and reference > 0 else None)
+                amplitude_text = f"{amplitude:.1f}%" if amplitude is not None else "N/A"
+                high_text = f"{high_price:.2f}" if high_price is not None else "N/A"
+                low_text = f"{low_price:.2f}" if low_price is not None else "N/A"
                 lines.append(
-                    f"- 振幅：{amplitude:.1f}%  最高{high_price:.2f} 最低{low_price:.2f}"
+                    f"- 振幅：{amplitude_text}  最高{high_text} 最低{low_text}"
                 )
-                lines.append(f"- 成交額：{turnover / 1e8:.2f}億")
+                turnover_text = f"{turnover / 1e8:.2f}億" if turnover is not None else "N/A"
+                lines.append(f"- 成交額：{turnover_text}")
             else:
-                current_price = 0
+                current_price = None
                 lines.append("- 今日：行情資料缺失")
 
             # 技術指標
@@ -277,7 +281,9 @@ class DailyReportAgent(BaseAgent):
 
             # 資金流向（僅A股）
             flow = (pack.capital_flow if pack else None) or {}
-            if not flow.get("error") and flow.get("status"):
+            if isinstance(flow, dict) and flow.get("flow_kind") == "institutional_shares":
+                lines.append(f"- 法人（股）：{flow.get('status')}；{flow.get('trend_5d', '')}")
+            elif not flow.get("error") and flow.get("status"):
                 inflow = safe_num(flow.get("main_net_inflow"))
                 inflow_pct = safe_num(flow.get("main_net_inflow_pct"))
                 inflow_str = (
@@ -345,14 +351,14 @@ class DailyReportAgent(BaseAgent):
             if position:
                 total_qty = position.get("total_quantity")
                 avg_cost = safe_num(position.get("avg_cost"), 1)
-                pnl_pct = (
-                    (current_price - avg_cost) / avg_cost * 100 if avg_cost > 0 else 0
-                )
+                pnl_pct = ((current_price - avg_cost) / avg_cost * 100
+                           if current_price is not None and avg_cost > 0 else None)
+                pnl_text = f"{pnl_pct:+.1f}%" if pnl_pct is not None else "N/A"
                 style_labels = {"short": "短線", "swing": "波段", "long": "長線"}
                 style = style_labels.get(position.get("trading_style", "swing"), "波段")
                 if total_qty is not None:
                     lines.append(
-                        f"- 持倉：{total_qty}股 成本{avg_cost:.2f} 未實現獲利{pnl_pct:+.1f}%（{style}）"
+                        f"- 持倉：{total_qty}股 成本{avg_cost:.2f} 未實現獲利{pnl_text}（{style}）"
                     )
 
             kline_history = stock_ctx.get("kline_history") or {}

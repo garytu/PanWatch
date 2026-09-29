@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.platform.persistence.database import get_db
 from src.platform.persistence.models import Account, PriceAlertRule, Position, Stock
-from src.platform.marketdata.marketdata_client import md_quote_rows
+from src.platform.marketdata.marketdata_client import md_quote_rows, QUOTE_METADATA
 from src.platform.marketdata.collectors.market_http import TTLCache
 from src.platform.marketdata.models import MarketCode
 
@@ -632,6 +632,8 @@ def get_portfolio_summary(
                 "current_price_cny": round(current_price * rate, 2) if current_price else None,
                 "current_price_base": round(current_price * rate, 2) if current_price else None,
                 "change_pct": change_pct,
+                "timestamp": (quote or {}).get("timestamp"),
+                **{key: (quote or {}).get(key) for key in QUOTE_METADATA},
                 "market_value": round(market_value, 2) if market_value else None,
                 "market_value_cny": round(market_value_base, 2) if market_value_base else None,
                 "market_value_base": round(market_value_base, 2) if market_value_base else None,
@@ -685,6 +687,8 @@ def get_portfolio_summary(
             quotes_dict[symbol] = {
                 "current_price": quote.get("current_price"),
                 "change_pct": quote.get("change_pct"),
+                "timestamp": quote.get("timestamp"),
+                **{key: quote.get(key) for key in QUOTE_METADATA},
             }
 
     return {

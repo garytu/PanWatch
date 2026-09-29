@@ -37,7 +37,7 @@ class TestNormalizeAllocations(unittest.TestCase):
     def test_none_input(self):
         """歸一化 — 入參為 None 時三市場全 0"""
         out = normalize_allocations(None)
-        self.assertEqual(out, {"CN": 0.0, "HK": 0.0, "US": 0.0})
+        self.assertEqual(out, {"CN": 0.0, "HK": 0.0, "US": 0.0, "TW": 0.0})
 
 
 class TestAllocationsFromExcluded(unittest.TestCase):
@@ -59,7 +59,7 @@ class TestAllocationsFromExcluded(unittest.TestCase):
     def test_all_excluded_fallback_cn(self):
         """遷移 — 全部排除時兜底投 A 股"""
         out = allocations_from_excluded(["CN", "HK", "US"])
-        self.assertEqual(out, {"CN": 1.0, "HK": 0.0, "US": 0.0})
+        self.assertEqual(out, {"CN": 1.0, "HK": 0.0, "US": 0.0, "TW": 0.0})
 
 
 class TestComputeMarketCash(unittest.TestCase):
@@ -93,7 +93,7 @@ class TestMarketAllocationsOrDefault(unittest.TestCase):
             market_allocations={"CN": 1.0, "HK": 0, "US": 0}, initial_capital=1_000_000
         )
         out = market_allocations_or_default(acc)
-        self.assertEqual(out, {"CN": 1.0, "HK": 0.0, "US": 0.0})
+        self.assertEqual(out, {"CN": 1.0, "HK": 0.0, "US": 0.0, "TW": 0.0})
 
     def test_sum_le_one_invariant(self):
         """帳戶比例 — 合理配置合計不超過 1"""

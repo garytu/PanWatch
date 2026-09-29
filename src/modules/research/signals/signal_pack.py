@@ -163,17 +163,17 @@ class SignalPackBuilder:
         for market, items in by_market.items():
             missing = [s for s, _ in items if (market, s) not in self._quote_cache]
             if missing:
-                if quote_disabled:
+                if quote_disabled and market != MarketCode.TW:
                     for sym in missing:
                         self._quote_cache[(market, sym)] = None
                         self._quote_source_cache[(market, sym)] = "disabled"
                 else:
                     remaining = set(missing)
-                    for provider, cfg in quote_providers:
+                    for provider, cfg in ([("twmd", {})] if market == MarketCode.TW else quote_providers):
                         if not remaining:
                             break
                         try:
-                            if provider != "tencent":
+                            if provider != "tencent" and market != MarketCode.TW:
                                 logger.info(
                                     f"SignalPack quote 未支援 provider={provider}，跳過"
                                 )
@@ -188,7 +188,7 @@ class SignalPackBuilder:
                                 if not sd:
                                     continue
                                 self._quote_cache[(market, sym)] = sd
-                                self._quote_source_cache[(market, sym)] = provider
+                                self._quote_source_cache[(market, sym)] = getattr(sd, "provider", None) or provider
                                 remaining.discard(sym)
                         except Exception as e:
                             logger.warning(
@@ -216,14 +216,14 @@ class SignalPackBuilder:
             for sym, market, _ in symbols:
                 key = (market, sym)
                 if key not in self._tech_cache:
-                    if kline_disabled:
+                    if kline_disabled and market != MarketCode.TW:
                         self._tech_cache[key] = {"error": "K線資料來源已停用"}
                         self._tech_source_cache[key] = "disabled"
                     else:
                         last_err = None
-                        for provider, cfg in kline_providers:
+                        for provider, cfg in ([("twmd", {})] if market == MarketCode.TW else kline_providers):
                             try:
-                                if provider == "tencent":
+                                if provider == "tencent" or market == MarketCode.TW:
                                     collector = KlineCollector(market)
                                 else:
                                     logger.info(
@@ -256,10 +256,15 @@ class SignalPackBuilder:
             if key not in self._news_cache:
                 try:
                     collector = NewsCollector.from_database()
-                    all_news = await collector.fetch_all(
-                        symbols=sorted(symbol_set),
-                        since_hours=news_hours,
-                    )
+                    other_symbols = sorted(sym for sym, market, _ in symbols if market != MarketCode.TW)
+                    all_news = (await collector.fetch_all(symbols=other_symbols, since_hours=news_hours)
+                                if other_symbols else [])
+                    if MarketCode.TW in by_market:
+                        from src.platform.marketdata.marketdata_client import md_news
+                        tw_news = await asyncio.to_thread(md_news, [sym for sym, _ in by_market[MarketCode.TW]],
+                                                         news_hours, market="TW")
+                        all_news = [news for news in all_news if not set(news.symbols) & {sym for sym, _ in by_market[MarketCode.TW]}]
+                        all_news.extend(tw_news)
                     self._news_cache[key] = all_news
                 except Exception as e:
                     logger.warning(f"SignalPack news 採集失敗: {e}")
@@ -335,6 +340,21 @@ class SignalPackBuilder:
                             flow_map[sym] = self._flow_cache[key]
                     except Exception as e:
                         logger.warning(f"SignalPack capital_flow 採集失敗: {e}")
+
+        if include_capital_flow:
+            from src.platform.marketdata.collectors.capital_flow_collector import CapitalFlowCollector
+            for sym, market, _ in symbols:
+                if market != MarketCode.TW:
+                    continue
+                key = (market, sym)
+                if key not in self._flow_cache:
+                    try:
+                        self._flow_cache[key] = CapitalFlowCollector(market).get_capital_flow_summary(sym)
+                        self._flow_source_cache[key] = "finmind"
+                    except Exception as exc:
+                        self._flow_cache[key] = {"error": str(exc)}
+                        self._flow_source_cache[key] = "unavailable"
+                flow_map[sym] = self._flow_cache[key]
 
         # 5) Events
         events_by_symbol: dict[str, list[dict]] = {}
@@ -429,7 +449,7 @@ class SignalPackBuilder:
                 aggregated = None
 
             missing: list[str] = []
-            if quote_map.get(sym) is None:
+            if quote_map.get(sym) is None or quote_map[sym].current_price is None:
                 missing.append("quote")
             if include_technical:
                 tech = tech_map.get(sym) or {}
@@ -441,7 +461,7 @@ class SignalPackBuilder:
             if include_events:
                 if not events_by_symbol.get(sym):
                     missing.append("events")
-            if include_capital_flow and market == MarketCode.CN:
+            if include_capital_flow and market in (MarketCode.CN, MarketCode.TW):
                 flow = flow_map.get(sym) or {}
                 if not flow or flow.get("error"):
                     missing.append("capital_flow")
@@ -464,7 +484,7 @@ class SignalPackBuilder:
                 if include_news
                 else None,
                 capital_flow=flow_map.get(sym)
-                if (include_capital_flow and market == MarketCode.CN)
+                if (include_capital_flow and market in (MarketCode.CN, MarketCode.TW))
                 else None,
                 events=EventsSnapshot(
                     days=int(events_days), items=events_by_symbol.get(sym, [])[:5]
@@ -478,9 +498,9 @@ class SignalPackBuilder:
                     else "skipped",
                     "news": "db" if include_news else "skipped",
                     "capital_flow": self._flow_source_cache.get(
-                        (MarketCode.CN, sym), "unknown"
+                        (market, sym), "unknown"
                     )
-                    if (include_capital_flow and market == MarketCode.CN)
+                    if (include_capital_flow and market in (MarketCode.CN, MarketCode.TW))
                     else "skipped",
                     "events": self._events_source_cache.get(events_key, "unknown")
                     if include_events

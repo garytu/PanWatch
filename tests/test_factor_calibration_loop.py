@@ -47,7 +47,7 @@ def test_calibrate_all_markets_closes_loop_into_scoring():
         db.commit()
 
         res = calibrate_all_markets(db=db, min_samples=5)
-        assert set(res) == {"CN", "HK", "US"}
+        assert set(res) == {"CN", "HK", "US", "TW"}
 
         w = get_factor_weights("CN", db=db)
         assert w["alpha_score"] > 1.0  # IC 閉環把權重抬高

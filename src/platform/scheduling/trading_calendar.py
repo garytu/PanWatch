@@ -8,10 +8,11 @@
 - **A 股**:akshare 交易日曆(`tool_trade_date_hist_sina`),含法定節假日,權威。
   結果快取在記憶體,由 `refresh()` 更新(啟動預熱 + 每日凌晨重新整理)。
 - **港股 / 美股**:沒有等價的公開日曆源,只判週末(誠實降級,不假裝支援節假日)。
+- **台股**:證交所年度休市日曆,使用當年度磁碟快取;額外休市日可由配置補充。
 
 降級原則
-拿不到日曆時退回「只判週末」—— 寧可多發一條通知,也不能把交易日誤判為休市。
-少發一條是遺憾,漏發一整天是事故。
+A 股拿不到日曆時退回「只判週末」。台股日曆未知或超出年度覆蓋時停止交易時段任務,
+避免僅憑平日判斷就允許提醒或模擬成交。
 
 併發安全
 同步介面只讀記憶體快取,**永不發起網路請求**;網路拉取集中在 `refresh()`
@@ -22,7 +23,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+import json
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
@@ -31,9 +34,10 @@ logger = logging.getLogger(__name__)
 _CN_TRADING_DATES: frozenset[date] | None = None
 _CN_RANGE: tuple[date, date] | None = None
 
-# 台股交易日集合;None = 尚未載入或載入失敗(此時降級為只判週末)
+# 台股交易日集合;None = 未知，此時不允許交易時段任務
 _TW_TRADING_DATES: frozenset[date] | None = None
 _TW_RANGE: tuple[date, date] | None = None
+_TW_CALENDAR_CACHE = Path(__file__).resolve().parents[3] / "data" / "tw_trading_calendar.json"
 
 _FALLBACK_TZ = "Asia/Shanghai"
 
@@ -63,18 +67,48 @@ def _fetch_cn_trading_dates() -> frozenset[date]:
     return frozenset(out)
 
 
-def _fetch_tw_trading_dates() -> frozenset[date]:
-    """阻塞拉取台股交易日曆。僅由 `refresh_blocking()` 呼叫。"""
-    from marketdata.vendors.finmind import fetch_finmind_trading_dates
+def _parse_tw_calendar(payload: dict, year: int) -> frozenset[date]:
+    if (not isinstance(payload, dict) or payload.get("stat") != "ok"
+            or str(payload.get("queryYear")) != str(year) or not payload.get("data")):
+        raise ValueError("TWSE calendar unavailable or year mismatch")
+    closed = set()
+    for row in payload["data"]:
+        if not isinstance(row, list) or len(row) < 2:
+            raise ValueError("Invalid TWSE calendar row")
+        day = date.fromisoformat(row[0])
+        if day.year != year:
+            raise ValueError("TWSE calendar year mismatch")
+        label = str(row[1])
+        # These rows announce trading dates, rather than holidays.
+        if "開始交易" in label or "最後交易" in label:
+            continue
+        closed.add(day)
+    start = date(year, 1, 1)
+    return frozenset(start + timedelta(days=i) for i in range((date(year + 1, 1, 1) - start).days)
+                     if (start + timedelta(days=i)).weekday() < 5 and start + timedelta(days=i) not in closed)
 
-    dates_str = fetch_finmind_trading_dates()
-    out: set[date] = set()
-    for s in dates_str:
+
+def _fetch_tw_trading_dates() -> frozenset[date]:
+    """Validate the official annual schedule before replacing a usable cached copy."""
+    from marketdata.http import market_get
+    year = datetime.now(ZoneInfo("Asia/Taipei")).year
+    payload = market_get("https://www.twse.com.tw/holidaySchedule/holidaySchedule", host_key="twse_calendar",
+                         params={"response": "json", "queryYear": year}, parse="json", timeout=10, retries=0)
+    try:
+        dates = _parse_tw_calendar(payload, year)
+    except (ValueError, TypeError, KeyError):
         try:
-            out.add(date.fromisoformat(str(s)[:10]))
-        except Exception:
-            pass
-    return frozenset(out)
+            return _parse_tw_calendar(json.loads(_TW_CALENDAR_CACHE.read_text()), year)
+        except (OSError, ValueError, TypeError, KeyError):
+            return frozenset()
+    try:
+        _TW_CALENDAR_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        temp = _TW_CALENDAR_CACHE.with_suffix(".tmp")
+        temp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        temp.replace(_TW_CALENDAR_CACHE)
+    except OSError:
+        logger.warning("Unable to persist Taiwan calendar cache", exc_info=True)
+    return dates
 
 
 def refresh_blocking() -> bool:
@@ -82,6 +116,7 @@ def refresh_blocking() -> bool:
     global _CN_TRADING_DATES, _CN_RANGE, _TW_TRADING_DATES, _TW_RANGE
 
     cn_ok = False
+    tw_ok = False
     try:
         dates = _fetch_cn_trading_dates()
         if dates:
@@ -101,7 +136,9 @@ def refresh_blocking() -> bool:
         tw_dates = _fetch_tw_trading_dates()
         if tw_dates:
             _TW_TRADING_DATES = tw_dates
-            _TW_RANGE = (min(tw_dates), max(tw_dates))
+            year = min(tw_dates).year
+            _TW_RANGE = (date(year, 1, 1), date(year, 12, 31))
+            tw_ok = True
             logger.info(
                 "[交易日曆] 台股日曆已載入: %s 個交易日 (%s ~ %s)",
                 len(tw_dates),
@@ -109,9 +146,9 @@ def refresh_blocking() -> bool:
                 _TW_RANGE[1],
             )
     except Exception as e:
-        logger.warning("[交易日曆] 台股日曆拉取失敗,降級為只判週末: %s", e)
+        logger.warning("[交易日曆] 台股日曆拉取失敗，覆蓋未知時暫停交易: %s", e)
 
-    return cn_ok
+    return cn_ok or tw_ok
 
 
 
@@ -179,13 +216,29 @@ def is_trading_day(market, d: date | datetime | None = None) -> bool:
         logger.debug("[交易日曆] %s 超出A股日曆覆蓋範圍,降級為只判週末", target)
 
     # 台股:日曆已載入且覆蓋該日期時按日曆判(含法定節假日)。
-    if code == MarketCode.TW and _TW_TRADING_DATES and _TW_RANGE:
-        if _TW_RANGE[0] <= target <= _TW_RANGE[1]:
+    if code == MarketCode.TW:
+        from src.platform.runtime.config import Settings
+        extra_closed = Settings().tw_extra_closed_dates.split(",")
+        if target.isoformat() in {day.strip() for day in extra_closed}:
+            return False
+        if _TW_TRADING_DATES and _TW_RANGE and _TW_RANGE[0] <= target <= _TW_RANGE[1]:
             return target in _TW_TRADING_DATES
-        logger.debug("[交易日曆] %s 超出台股日曆覆蓋範圍,降級為只判週末", target)
+        return False
 
     # 港美股、日曆缺失、超出覆蓋範圍:只判週末。
     return True
+
+
+def calendar_status(market, d: date | datetime | None = None) -> dict:
+    from src.platform.marketdata.models import MarketCode
+    code = _to_market_code(market)
+    target = _resolve_date(code, d)
+    covered = code != MarketCode.TW or bool(_TW_RANGE and _TW_RANGE[0] <= target <= _TW_RANGE[1])
+    return {"status": "known" if covered else "unknown", "date": target.isoformat(),
+            "source": "TWSE annual schedule" if code == MarketCode.TW and covered else None,
+            "is_trading_day": is_trading_day(code, target),
+            "coverage_start": _TW_RANGE[0].isoformat() if code == MarketCode.TW and _TW_RANGE else None,
+            "coverage_end": _TW_RANGE[1].isoformat() if code == MarketCode.TW and _TW_RANGE else None}
 
 
 def any_market_trading_day(d: date | datetime | None = None) -> bool:

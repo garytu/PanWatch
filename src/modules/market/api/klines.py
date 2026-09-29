@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -12,7 +12,7 @@ router = APIRouter()
 
 class KlineItem(BaseModel):
     symbol: str = Field(..., description="股票程式碼")
-    market: str = Field(..., description="市場: CN/HK/US")
+    market: str = Field(..., description="市場: CN/HK/US/TW")
     days: int | None = Field(default=60, description="K線天數")
     interval: str | None = Field(default="1d", description="週期: 1d/1w/1m")
 
@@ -23,7 +23,7 @@ class KlineBatchRequest(BaseModel):
 
 class KlineSummaryItem(BaseModel):
     symbol: str = Field(..., description="股票程式碼")
-    market: str = Field(..., description="市場: CN/HK/US")
+    market: str = Field(..., description="市場: CN/HK/US/TW")
 
 
 class KlineSummaryBatchRequest(BaseModel):
@@ -46,6 +46,9 @@ def _serialize_klines(klines) -> list[dict]:
             "high": k.high,
             "low": k.low,
             "volume": k.volume,
+            "provider": getattr(k, "provider", None),
+            "adjustment_mode": getattr(k, "adjustment_mode", None),
+            "volume_unit": getattr(k, "volume_unit", None),
         }
         for k in klines
     ]
@@ -94,10 +97,58 @@ def _aggregate_klines(klines, interval: str) -> list:
                 high=high,
                 low=low,
                 volume=vol,
+                provider=getattr(first, "provider", None),
+                adjustment_mode=getattr(first, "adjustment_mode", None),
+                volume_unit=getattr(first, "volume_unit", None),
             )
         )
     out.sort(key=lambda k: k.date)
     return out
+
+
+@router.get("/{symbol}/intraday")
+def get_intraday_klines(symbol: str, market: str = "TW", timeframe: str = "1m",
+                       limit: int = Query(270, ge=1, le=1000),
+                       start_date: str | None = None, end_date: str | None = None):
+    """Stored minute bars. Missing/no-trade slots retain null prices and their status."""
+    from marketdata.symbol import Symbol
+    from marketdata.vendors.twmd import TwmdClient, number
+    from src.platform.marketdata.marketdata_client import twmd_config
+    if market != "TW" or timeframe not in {"1m", "5m"}:
+        raise HTTPException(400, "台股歷史分K支援 1m/5m")
+    params = {}
+    if bool(start_date) != bool(end_date):
+        raise HTTPException(400, "start_date/end_date 必須一起提供")
+    if start_date:
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise HTTPException(400, "日期必須為 YYYY-MM-DD") from exc
+        if (end - start).days < 0 or (end - start).days >= 30:
+            raise HTTPException(400, "分K日期範圍最多 30 天")
+        params = {"start_date": start_date, "end_date": end_date}
+    try:
+        payload = TwmdClient(twmd_config()).bars(Symbol.parse(symbol, "TW"), timeframe=timeframe,
+                                               limit=limit, **params)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not payload:
+        raise HTTPException(503, "twmd 分K資料來源不可用")
+    bars = [{**bar, "date": bar["timestamp"],
+             **{field: number(bar.get(field)) for field in ("open", "close", "high", "low", "volume", "turnover")}}
+            for bar in payload.get("bars", [])]
+    valid = [bar for bar in bars if bar.get("finalized") and bar.get("status") == "observed"
+             and all(bar.get(field) is not None for field in ("open", "close", "high", "low", "volume"))]
+    summary = None
+    if payload.get("coverage_complete") and len(valid) >= 20:
+        from src.platform.marketdata.collectors.kline_collector import KlineData
+        data = [KlineData(date=bar["date"], open=bar["open"], close=bar["close"],
+                          high=bar["high"], low=bar["low"], volume=bar["volume"]) for bar in valid]
+        from dataclasses import asdict
+        summary = asdict(KlineCollector(MarketCode.TW).get_technical_indicators(klines=data))
+    return {**payload, "symbol": symbol, "market": "TW", "klines": bars, "summary": summary,
+            "live_collection": False, "usable_for_trading": False}
 
 
 @router.get("/{symbol}")

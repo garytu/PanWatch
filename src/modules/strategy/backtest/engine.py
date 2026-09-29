@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from typing import Callable
 
 from src.modules.strategy.backtest import metrics as M
-from src.modules.strategy.backtest.cost_model import CostModel
+from src.modules.strategy.backtest.cost_model import CostModel, cost_model_for_market, trading_lot
 from src.modules.strategy.backtest.data_adapter import PriceBar, first_index_after
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ class Signal:
     stop_loss: float | None = None
     target_price: float | None = None
     holding_days: int = 10            # 最大持有交易日(event 模式)
+    security_type: str = "EQUITY"
 
 
 @dataclass
@@ -95,12 +96,16 @@ class Backtester:
         cost_model: CostModel | None = None,
         initial_capital: float = 1_000_000.0,
         cash_per_trade: float = 100_000.0,
-        lot: int = 100,
+        lot: int | None = None,
         sizer: PositionSizer | None = None,
     ) -> None:
         self.cost = cost_model or CostModel()
+        self._cost_override = cost_model
+        self._lot_override = lot
+        self._sizer_override = sizer
+        self._cash_per_trade = cash_per_trade
         self.initial_capital = float(initial_capital)
-        self.sizer = sizer or fixed_cash_sizer(cash_per_trade, lot)
+        self.sizer = sizer or fixed_cash_sizer(cash_per_trade, lot or 100)
 
     def run_single(self, signal: Signal, bars: list[PriceBar]) -> BTTrade | None:
         """單訊號回測:下一交易日開盤入場,逐日停損/停利/到期平倉。"""
@@ -113,7 +118,10 @@ class Backtester:
         entry_price = entry_bar.open if signal.entry_price is None else float(signal.entry_price)
         if entry_price <= 0:
             return None
-        qty = self.sizer(entry_price)
+        sizer = self.sizer
+        if signal.market == "TW" and self._sizer_override is None:
+            sizer = fixed_cash_sizer(self._cash_per_trade, self._lot_override or trading_lot("TW"))
+        qty = sizer(entry_price)
         if qty <= 0:
             return None
 
@@ -150,7 +158,10 @@ class Backtester:
             exit_price, exit_date, exit_reason = last.close, last.date, "eod"
             held = len(bars) - 1 - ei
 
-        rt = self.cost.round_trip_pnl(entry_price, exit_price, qty)
+        cost = self._cost_override or (cost_model_for_market(signal.market, signal.symbol,
+                                                            security_type=signal.security_type)
+                                       if signal.market == "TW" else self.cost)
+        rt = cost.round_trip_pnl(entry_price, exit_price, qty)
         return BTTrade(
             symbol=signal.symbol,
             market=signal.market,

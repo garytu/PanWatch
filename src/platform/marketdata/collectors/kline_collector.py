@@ -108,6 +108,9 @@ class KlineData:
     high: float
     low: float
     volume: float
+    provider: str | None = None
+    adjustment_mode: str | None = None
+    volume_unit: str | None = None
 
 
 @dataclass
@@ -462,7 +465,9 @@ class KlineCollector:
         want = min(max(days, 3000), 20000) if self.market in (MarketCode.CN, MarketCode.HK) else days
         bars = get_market_data().klines(symbol, market=self.market.value, days=want, min_count=need)
         return [KlineData(date=b.date, open=b.open, close=b.close, high=b.high,
-                          low=b.low, volume=b.volume) for b in bars]
+                          low=b.low, volume=b.volume, provider=getattr(b, "provider", None),
+                          adjustment_mode=getattr(b, "adjustment_mode", None),
+                          volume_unit=getattr(b, "volume_unit", None)) for b in bars]
 
     def get_technical_indicators(
         self, symbol: str = "", klines: list[KlineData] | None = None
@@ -713,6 +718,9 @@ class KlineCollector:
             "timeframe": "1d",
             "computed_at": now,
             "asof": last_date,
+            "provider": klines[-1].provider if klines else None,
+            "adjustment_mode": klines[-1].adjustment_mode if klines else None,
+            "volume_unit": klines[-1].volume_unit if klines else None,
             "params": {
                 "ma": [5, 10, 20, 60],
                 "macd": {"fast": 12, "slow": 26, "signal": 9},

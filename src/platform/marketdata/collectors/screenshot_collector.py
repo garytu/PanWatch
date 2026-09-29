@@ -2,6 +2,8 @@
 import logging
 import os
 import tempfile
+import asyncio
+from html import escape
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +39,47 @@ class ChartScreenshot:
         return os.path.exists(self.filepath)
 
 
+def taiwan_chart_html(symbol: str, name: str, bars: list, period: str = "daily") -> str:
+    """Render stored OHLCV locally, preserving the provenance on the exported chart."""
+    from .kline_collector import KlineData
+    if period not in {"daily", "weekly", "monthly"}:
+        raise ValueError(f"Unsupported chart period: {period}")
+    buckets = {}
+    for bar in bars:
+        day = datetime.strptime(bar.date, "%Y-%m-%d")
+        key = day.date() if period == "daily" else day.isocalendar()[:2] if period == "weekly" else (day.year, day.month)
+        buckets.setdefault(key, []).append(bar)
+    candles = [KlineData(date=group[-1].date, open=group[0].open, close=group[-1].close,
+                         high=max(bar.high for bar in group), low=min(bar.low for bar in group),
+                         volume=sum(bar.volume for bar in group)) for group in buckets.values()]
+    if not candles:
+        raise ValueError("No Taiwan daily bars available")
+    lower, upper = min(bar.low for bar in candles), max(bar.high for bar in candles)
+    span = upper - lower or 1
+    scale = lambda price: 490 - (price - lower) / span * 390
+    max_volume = max(bar.volume for bar in candles) or 1
+    width = 1050 / len(candles)
+    elements = []
+    for index, bar in enumerate(candles):
+        x = 100 + width * (index + .5)
+        color = "#dc2626" if bar.close >= bar.open else "#059669"
+        top = min(scale(bar.open), scale(bar.close))
+        height = max(1, abs(scale(bar.open) - scale(bar.close)))
+        elements.append(f'<line x1="{x}" x2="{x}" y1="{scale(bar.high)}" y2="{scale(bar.low)}" stroke="{color}"/>')
+        elements.append(f'<rect x="{x-width*.3}" y="{top}" width="{width*.6}" height="{height}" fill="{color}"/>')
+        volume_height = bar.volume / max_volume * 100
+        elements.append(f'<rect x="{x-width*.3}" y="{620-volume_height}" width="{width*.6}" height="{volume_height}" fill="{color}"/>')
+    mode = getattr(bars[-1], "adjustment_mode", None) or "unknown"
+    label = f"{escape(name)} ({escape(symbol)}) · {period} · TWD / shares · adjustment: {escape(mode)}"
+    return (f'<!doctype html><html><body style="margin:0;background:#fff;color:#111827;font:20px sans-serif">'
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" role="img">'
+            f'<text x="50" y="40">{label}</text><text x="50" y="72" font-size="16">'
+            f'Stored historical bars through {escape(candles[-1].date)}; not a live quote</text>'
+            f'<text x="20" y="110">{upper:.2f}</text><text x="20" y="490">{lower:.2f}</text>'
+            f'{"".join(elements)}<text x="100" y="660">{escape(candles[0].date)}</text>'
+            f'<text x="1000" y="660">{escape(candles[-1].date)}</text></svg></body></html>')
+
+
 class ScreenshotCollector:
     """
     K線圖截圖採集器
@@ -60,10 +103,13 @@ class ScreenshotCollector:
         try:
             from playwright.async_api import async_playwright
             self._playwright = await async_playwright().start()
+            from src.platform.runtime.config import Settings
+            executable = self.config.get("executable_path") or Settings().playwright_chromium_executable or None
 
             # 使用反檢測設定啟動瀏覽器
             self._browser = await self._playwright.chromium.launch(
                 headless=True,
+                executable_path=executable,
                 args=[
                     '--disable-blink-features=AutomationControlled',
                     '--disable-dev-shm-usage',
@@ -132,6 +178,8 @@ class ScreenshotCollector:
             ChartScreenshot 或 None（失敗時）
         """
         await self._ensure_browser()
+        if market.upper() == "TW":
+            return await self._capture_twmd(symbol, name, period)
 
         url = self._get_url(symbol, market, provider)
         filepath = str(SCREENSHOT_DIR / f"{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
@@ -404,6 +452,28 @@ class ScreenshotCollector:
                     return
             except Exception:
                 continue
+
+    async def _capture_twmd(self, symbol: str, name: str, period: str) -> ChartScreenshot | None:
+        from .kline_collector import KlineCollector
+        from src.platform.marketdata.models import MarketCode
+        context = None
+        try:
+            bars = await asyncio.to_thread(KlineCollector(MarketCode.TW).get_klines, symbol, days=120)
+            content = taiwan_chart_html(symbol, name, bars, period)
+            context = await self._browser.new_context(viewport={"width": 1280, "height": 720})
+            page = await context.new_page()
+            await page.set_content(content)
+            await page.evaluate("document.fonts.ready")
+            safe_symbol = symbol.replace(":", "_").replace("/", "_")
+            filepath = str(SCREENSHOT_DIR / f"{safe_symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+            await page.screenshot(path=filepath)
+            return ChartScreenshot(symbol=symbol, name=name, market="TW", filepath=filepath, period=period)
+        except Exception as exc:
+            logger.warning("twmd chart capture failed for %s: %s", symbol, exc)
+            return None
+        finally:
+            if context:
+                await context.close()
 
     async def capture_batch(
         self,

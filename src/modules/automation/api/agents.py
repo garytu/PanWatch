@@ -15,6 +15,7 @@ from src.platform.persistence.models import AgentConfig, AgentRun, LogEntry
 from src.platform.scheduling.schedule_parser import preview_schedule
 from src.platform.scheduling.schedule_parser import count_runs_within
 from src.platform.runtime.config import Settings
+from src.platform.marketdata.marketdata_client import QUOTE_METADATA, quote_usable_for_trading
 from src.modules.automation.agent_catalog import (
     AGENT_KIND_CAPABILITY,
     AGENT_KIND_WORKFLOW,
@@ -1052,7 +1053,7 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
             return None
 
     async def _build_result_item(quote):
-        change_pct = quote.change_pct or 0
+        change_pct = quote.change_pct
         market = stock_market_map.get(quote.symbol, MarketCode.CN)
 
         # 獲取持倉資訊
@@ -1069,7 +1070,11 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
 
         # 判斷異動型別
         alert_type = None
-        if abs(change_pct) >= getattr(monitor_agent, "price_alert_threshold", 3.0):
+        if (change_pct is not None
+                and quote_usable_for_trading({"current_price": quote.current_price,
+                                             "timestamp": quote.timestamp.isoformat() if quote.timestamp else None,
+                                             **{key: getattr(quote, key, None) for key in QUOTE_METADATA}}, market.value)
+                and abs(change_pct) >= getattr(monitor_agent, "price_alert_threshold", 3.0)):
             alert_type = "急漲" if change_pct > 0 else "急跌"
 
         return {
@@ -1085,6 +1090,8 @@ async def scan_intraday(analyze: bool = False, db: Session = Depends(get_db)):
             "prev_close": quote.prev_close,
             "volume": quote.volume,
             "turnover": quote.turnover,
+            "timestamp": quote.timestamp.isoformat() if quote.timestamp else None,
+            **{key: getattr(quote, key, None) for key in QUOTE_METADATA},
             "alert_type": alert_type,
             "has_position": has_position,
             "cost_price": cost_price,

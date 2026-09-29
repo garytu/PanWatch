@@ -3,7 +3,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from src.platform.marketdata.marketdata_client import md_quote_rows
+from src.platform.marketdata.marketdata_client import md_quote_rows, QUOTE_METADATA
 from src.platform.marketdata.models import MarketCode
 
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 
 class QuoteItem(BaseModel):
     symbol: str = Field(..., description="股票程式碼")
-    market: str = Field(..., description="市場: CN/HK/US")
+    market: str = Field(..., description="市場: CN/HK/US/TW")
 
 
 class QuoteBatchRequest(BaseModel):
@@ -44,6 +44,9 @@ def _quote_to_response(symbol: str, market: MarketCode, quote: dict | None) -> d
             "pe_ratio": None,
             "total_market_value": None,
             "circulating_market_value": None,
+            "timestamp": None,
+            "availability": "unavailable",
+            "usable_for_trading": False,
         }
 
     return {
@@ -63,7 +66,45 @@ def _quote_to_response(symbol: str, market: MarketCode, quote: dict | None) -> d
         "pe_ratio": quote.get("pe_ratio"),
         "total_market_value": quote.get("total_market_value"),
         "circulating_market_value": quote.get("circulating_market_value"),
+        "timestamp": quote.get("timestamp"),
+        **{key: quote.get(key) for key in QUOTE_METADATA},
     }
+
+
+@router.get("/taiwan/status")
+def get_taiwan_feed_status():
+    """Readiness and watchlist subscription coverage; never mutates twmd configuration."""
+    from concurrent.futures import ThreadPoolExecutor
+    from marketdata.symbol import Symbol
+    from marketdata.vendors.twmd import TwmdClient
+    from src.platform.marketdata.marketdata_client import twmd_config
+    from src.platform.persistence.database import SessionLocal
+    from src.platform.persistence.models import Stock
+    from src.platform.scheduling.trading_calendar import calendar_status
+    client = TwmdClient(twmd_config())
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = [pool.submit(client.get, path) for path in ("quotes/capabilities", "bars/capabilities", "readiness")]
+        quotes, bars, storage = [future.result() or {} for future in futures]
+    # Usage/account information is unnecessary for this UI response.
+    quotes.pop("account_usage", None)
+    catalog = client.instruments()
+    active_counts = {venue: sum(row.get("venue") == venue and bool(row.get("is_active"))
+                               and row.get("security_type") in {"EQUITY", "ETF", "PREFERRED"} for row in catalog)
+                     for venue in ("TWSE", "TPEX")}
+    requested, unresolved = [], []
+    with SessionLocal() as db:
+        symbols = [row.symbol for row in db.query(Stock).filter(Stock.market == "TW").all()]
+    for symbol in symbols:
+        try:
+            requested.append(client.resolve(Symbol.parse(symbol, "TW")))
+        except ValueError:
+            unresolved.append(symbol)
+    confirmed = set(quotes.get("confirmed_instrument_ids") or [])
+    return {"quotes": quotes, "intraday": bars, "storage": storage, "calendar": calendar_status("TW"),
+            "watchlist_instrument_ids": sorted(set(requested)), "unresolved_symbols": unresolved,
+            "unsubscribed_instrument_ids": sorted(set(requested) - confirmed),
+            "active_instrument_counts": active_counts,
+            "subscription_coverage_complete": not unresolved and set(requested) <= confirmed}
 
 
 @router.get("/{symbol}")

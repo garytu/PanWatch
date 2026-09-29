@@ -2,7 +2,7 @@
 
 - PriceBar 定義在本模組頂層,且 **不在頂層 import KlineCollector**(延遲匯入),
   使回測核心與單測不被 httpx/網路庫耦合,可離線執行。
-- KlineCollector 返回的已是前復權(qfq)日線,停牌日天然無 bar,交易日曆 = 實際 bar 序列。
+- 日線價格口徑由來源決定(TW/twmd 為原始價格);交易日序列取實際 bar,不補停牌價格。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PriceBar:
-    """單根日 K(前復權)。"""
+    """單根日 K，保留來源價格口徑。"""
 
     date: str  # YYYY-MM-DD
     open: float
@@ -23,6 +23,8 @@ class PriceBar:
     low: float
     close: float
     volume: float
+    provider: str | None = None
+    adjustment_mode: str | None = None
 
 
 def from_klines(klines) -> list[PriceBar]:
@@ -38,6 +40,8 @@ def from_klines(klines) -> list[PriceBar]:
                     low=float(k.low),
                     close=float(k.close),
                     volume=float(k.volume or 0),
+                    provider=getattr(k, "provider", None),
+                    adjustment_mode=getattr(k, "adjustment_mode", None),
                 )
             )
         except Exception:

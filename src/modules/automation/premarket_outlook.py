@@ -356,7 +356,9 @@ class PremarketOutlookAgent(BaseAgent):
 
             # 資金流向（僅A股，若可用）
             flow = (pack.capital_flow if pack else None) or {}
-            if (
+            if flow.get("flow_kind") == "institutional_shares":
+                lines.append(f"- 法人（股）：{flow.get('status')}；{flow.get('trend_5d', '')}")
+            elif (
                 getattr(stock, "market", None) == MarketCode.CN
                 and isinstance(flow, dict)
                 and flow

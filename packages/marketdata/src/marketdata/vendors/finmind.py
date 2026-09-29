@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -268,11 +269,10 @@ class FinMindCapitalFlowVendor(CapitalFlowVendor):
             CapitalFlow(
                 symbol=sym.code,
                 name="",
-                main_net_inflow=total_main_net,
-                super_net_inflow=foreign_net,  # 外資作為超大單對齊
-                big_net_inflow=trust_net,      # 投信作為大單對齊
-                mid_net_inflow=dealer_net,     # 自營商作為中單對齊
-                main_net_5d=main_5d,
+                flow_kind="institutional_shares", unit="shares", trade_date=latest_date,
+                foreign_net_shares=foreign_net, trust_net_shares=trust_net,
+                dealer_net_shares=dealer_net, institutional_net_shares=total_main_net,
+                institutional_net_5d_shares=main_5d,
             )
         ]
 
@@ -302,24 +302,25 @@ class FinMindMarginVendor(MarginVendor):
             return []
 
         latest = data[-1]
-        rz_bal = float(latest.get("MarginPurchaseTodayBalance") or 0.0)
-        rz_buy = float(latest.get("MarginPurchaseBuy") or 0.0)
-        rz_repay = float(latest.get("MarginPurchaseCashRepayment") or 0.0)
-        rq_bal = float(latest.get("ShortSaleTodayBalance") or 0.0)
-        rq_sell = float(latest.get("ShortSaleSell") or 0.0)
-        rq_repay = float(latest.get("ShortSaleCashRepayment") or 0.0)
+        def quantity(key: str) -> float | None:
+            try:
+                value = float(latest[key])
+                return value if math.isfinite(value) else None
+            except (KeyError, TypeError, ValueError):
+                return None
 
         return [
             MarginItem(
                 date=str(latest.get("date", "")),
                 symbol=sym.code,
-                rz_balance=rz_bal,
-                rz_buy=rz_buy,
-                rz_repay=rz_repay,
-                rq_balance=rq_bal,
-                rq_sell_vol=rq_sell,
-                rq_repay_vol=rq_repay,
-                total_balance=rz_bal,
+                # FinMind reports quantities in lots, rather than money or shares.
+                quantity_unit="lots",
+                margin_balance_lots=quantity("MarginPurchaseTodayBalance"),
+                margin_buy_lots=quantity("MarginPurchaseBuy"),
+                margin_cash_repayment_lots=quantity("MarginPurchaseCashRepayment"),
+                short_balance_lots=quantity("ShortSaleTodayBalance"),
+                short_sell_lots=quantity("ShortSaleSell"),
+                short_repayment_lots=quantity("ShortSaleCashRepayment"),
             )
         ]
 

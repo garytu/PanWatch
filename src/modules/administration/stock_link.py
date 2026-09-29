@@ -43,6 +43,10 @@ def stock_url(symbol: str, market: str, platform: str = "") -> str:
         platform = get_platform()
 
     m = market.upper()
+    if m == "TW":
+        from marketdata.symbol import Symbol
+        from urllib.parse import quote
+        return f"https://finance.yahoo.com/quote/{quote(Symbol.parse(symbol, 'TW').to_yfinance())}/"
 
     if platform == "xueqiu":
         return _xueqiu_url(symbol, m)

@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from src.platform.marketdata.marketdata_client import md_quote_rows
+from src.platform.marketdata.marketdata_client import md_quote_rows, quote_usable_for_trading
 from src.platform.marketdata.models import MarketCode, MARKETS
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import (
@@ -19,12 +19,27 @@ from src.platform.persistence.models import (
     PaperTradingTrade,
     StrategySignalRun,
 )
-from src.modules.strategy.backtest.cost_model import CostModel
+from src.modules.strategy.backtest.cost_model import CostModel, cost_model_for_market, trading_lot
 
 logger = logging.getLogger(__name__)
 
 # 模擬交易交易成本(A股口徑,Phase 1)。與回測共用同一成本模型。
 COST_MODEL = CostModel()
+
+
+def _cost_model(market: str, symbol: str) -> CostModel:
+    if market != "TW":
+        return COST_MODEL
+    from marketdata.symbol import Symbol
+    from marketdata.vendors.twmd import TwmdClient
+    from src.platform.marketdata.marketdata_client import twmd_config
+    client = TwmdClient(twmd_config())
+    instrument_id = client.resolve(Symbol.parse(symbol, "TW"))
+    instrument = next((row for row in client.instruments() if row["instrument_id"] == instrument_id), {})
+    security_type = instrument.get("security_type")
+    if security_type not in {"EQUITY", "PREFERRED", "ETF"}:
+        raise ValueError(f"Unsupported Taiwan paper-trading instrument: {instrument_id}")
+    return cost_model_for_market(market, symbol, security_type=security_type)
 
 # 建倉股數下限(A股一手)
 FIXED_QUANTITY = 100
@@ -107,12 +122,12 @@ def _safe_float(v: Any) -> float | None:
 # 分市場資金配置（投資比例 → 子池現金）
 # ---------------------------------------------------------------------------
 
-ALL_MARKETS: tuple[str, ...] = ("CN", "HK", "US")
-DEFAULT_ALLOCATIONS: dict[str, float] = {"CN": 0.5, "HK": 0.3, "US": 0.2}
+ALL_MARKETS: tuple[str, ...] = ("CN", "HK", "US", "TW")
+DEFAULT_ALLOCATIONS: dict[str, float] = {"CN": 0.5, "HK": 0.3, "US": 0.2, "TW": 0.0}
 
 
 def normalize_allocations(raw: dict | None) -> dict[str, float]:
-    """補齊三市場、clamp 到 [0,1]，返回 {market: ratio}。"""
+    """補齊四市場、clamp 到 [0,1]，返回 {market: ratio}。"""
     raw = raw or {}
     out: dict[str, float] = {}
     for m in ALL_MARKETS:
@@ -139,7 +154,7 @@ def allocations_from_excluded(excluded: list[str] | None) -> dict[str, float]:
     total = sum(weights.values())
     if total <= 0:
         # 全部被排除：兜底投 A 股
-        return {"CN": 1.0, "HK": 0.0, "US": 0.0}
+        return {m: float(m == "CN") for m in ALL_MARKETS}
     return {m: round(weights.get(m, 0.0) / total, 6) for m in ALL_MARKETS}
 
 
@@ -264,6 +279,8 @@ class PaperTradingEngine:
         for market, symbols in grouped.items():
             if not symbols:
                 continue
+            if market == MarketCode.TW and not _is_trading_time("TW"):
+                continue
             rows = md_quote_rows(symbols, market.value)
             by_symbol = {str(r.get("symbol")): r for r in rows}
             for sym in symbols:
@@ -335,6 +352,8 @@ class PaperTradingEngine:
             quote = quotes.get(key)
             if not quote:
                 continue
+            if not quote_usable_for_trading(quote, sig.stock_market):
+                continue
             current_price = _safe_float(quote.get("current_price"))
             if current_price is None or current_price <= 0:
                 continue
@@ -348,18 +367,25 @@ class PaperTradingEngine:
 
             # 倉位管理:按訊號強度分配該市場預算(替換原固定 100 股)
             market_budget = account.initial_capital * alloc.get(mkt, 0.0)
+            if mkt == "TW" and market_budget * _position_weight(float(sig.rank_score or 0)) < entry_price * trading_lot(mkt):
+                continue
+            try:
+                cost_model = _cost_model(mkt, sig.stock_symbol)
+            except ValueError:
+                continue
             quantity = _compute_quantity(
                 rank_score=float(sig.rank_score or 0.0),
                 market_budget=market_budget,
                 price=entry_price,
                 available_cash=avail,
-                cost_model=COST_MODEL,
+                cost_model=cost_model,
+                lot=trading_lot(mkt),
             )
             if quantity <= 0:
                 continue  # 子池額度不足以買入最小一手
 
             # 含交易成本的實際買入流出
-            buy_fill = COST_MODEL.fill("buy", entry_price, quantity)
+            buy_fill = cost_model.fill("buy", entry_price, quantity)
             buy_outlay = -buy_fill.cash_delta
 
             # 基於入場價計算停損/停利
@@ -432,8 +458,9 @@ class PaperTradingEngine:
         """平倉單個持倉，返回交易記錄。"""
         now = _utc_now()
         # 含交易成本的淨損益:賣出淨回收 − 建倉含費投入(與建倉口徑一致,資金守恆)
-        buy_cost = -COST_MODEL.fill("buy", pos.entry_price, pos.quantity).cash_delta
-        sell_fill = COST_MODEL.fill("sell", exit_price, pos.quantity)
+        cost_model = _cost_model(pos.stock_market, pos.stock_symbol)
+        buy_cost = -cost_model.fill("buy", pos.entry_price, pos.quantity).cash_delta
+        sell_fill = cost_model.fill("sell", exit_price, pos.quantity)
         sell_proceeds = sell_fill.cash_delta
         pnl = round(sell_proceeds - buy_cost, 4)
         pnl_pct = (pnl / buy_cost * 100) if buy_cost > 0 else 0.0
@@ -511,6 +538,8 @@ class PaperTradingEngine:
                 continue
             key = (pos.stock_market, pos.stock_symbol)
             quote = quotes.get(key)
+            if not quote_usable_for_trading(quote, pos.stock_market):
+                continue
             current_price = _safe_float(quote.get("current_price")) if quote else None
 
             if current_price is None or current_price <= 0:
@@ -518,8 +547,9 @@ class PaperTradingEngine:
 
             # 更新現價、淨未實現損益(含若此刻平倉的雙邊成本)、持倉期最高價
             pos.current_price = current_price
-            _buy_cost_u = -COST_MODEL.fill("buy", pos.entry_price, pos.quantity).cash_delta
-            _sell_u = COST_MODEL.fill("sell", current_price, pos.quantity).cash_delta
+            cost_model = _cost_model(pos.stock_market, pos.stock_symbol)
+            _buy_cost_u = -cost_model.fill("buy", pos.entry_price, pos.quantity).cash_delta
+            _sell_u = cost_model.fill("sell", current_price, pos.quantity).cash_delta
             pos.unrealized_pnl = round(_sell_u - _buy_cost_u, 4)
             if pos.highest_price is None or current_price > pos.highest_price:
                 pos.highest_price = current_price
@@ -675,7 +705,11 @@ class PaperTradingEngine:
 
             # 獲取最新報價(走 flag 門控的 md_quote_rows,支援故障轉移)
             mc = _to_market(pos.stock_market)
+            if mc == MarketCode.TW and not _is_trading_time("TW"):
+                return {"ok": False, "error": "台股目前不在已確認的交易時段"}
             rows = md_quote_rows([pos.stock_symbol], mc.value)
+            if mc == MarketCode.TW and (not rows or not quote_usable_for_trading(rows[0], "TW")):
+                return {"ok": False, "error": "台股平倉需要有效且未過期的即時報價"}
 
             exit_price = pos.current_price or pos.entry_price
             if rows:

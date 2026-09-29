@@ -6,12 +6,15 @@ import { Button } from '@panwatch/base-ui/components/ui/button'
 import { buildKlineSuggestion } from '@/lib/kline-scorer'
 import { HoverPopover } from '@panwatch/base-ui/components/ui/hover-popover'
 import { TechnicalBadge, technicalToneFromSuggestionAction } from '@panwatch/biz-ui/components/technical-badge'
+import { TaiwanIntradayChart } from './taiwan-intraday-chart'
 
 export interface KlineSummaryData {
   // meta (from backend)
   timeframe?: string
   computed_at?: string
   asof?: string
+  adjustment_mode?: string
+  volume_unit?: string
   params?: Record<string, any>
 
   last_close?: number | null
@@ -203,6 +206,12 @@ export function KlineSummaryDialog({
             </div>
           </DialogDescription>
         </DialogHeader>
+
+        {market === 'TW' && <TaiwanIntradayChart symbol={symbol} />}
+        {market === 'TW' && effectiveSummary && <div className="text-[11px] text-muted-foreground">
+          日K：{effectiveSummary.adjustment_mode === 'raw' ? '未還原價格' : effectiveSummary.adjustment_mode || '還原方式未知'}
+          {' · 成交量單位：'}{effectiveSummary.volume_unit === 'shares' ? '股' : effectiveSummary.volume_unit || '未知'}
+        </div>}
 
         {!initialSummary && loading ? (
           <div className="text-[12px] text-muted-foreground">載入中...</div>

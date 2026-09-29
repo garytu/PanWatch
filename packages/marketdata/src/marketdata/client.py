@@ -171,7 +171,7 @@ class MarketData:
 
         out: list[Quote] = []
         for mkt, syms in groups.items():
-            req = Request(symbols=tuple(s.code for s in syms), market=mkt)
+            req = Request(symbols=tuple(s.identity for s in syms), market=mkt)
             resp = self._quote_engine.fetch(req)
             if resp.ok and resp.data:
                 out.extend(resp.data)
@@ -389,6 +389,31 @@ class MarketData:
 
     def hot_stocks(self, **kw) -> list[HotStock]:
         """熱門/異動股(東財榜單,市場級、不經 Engine)。"""
+        if kw.get("market") == "TW":
+            from marketdata.vendors.twmd import TwmdClient, number
+            sources = self.config.sources_for("quote", "TW")
+            source = next((source for source in sources if source.vendor == "twmd" and source.enabled), None)
+            if source is None:
+                return []
+            client = TwmdClient(source.config)
+            ids = [row["instrument_id"] for row in client.instruments()
+                   if row.get("is_active") and row.get("security_type") in {"EQUITY", "ETF", "PREFERRED"}]
+            rows = []
+            for offset in range(0, len(ids), 100):
+                payload = client.get("price-snapshots", instrument_ids=",".join(ids[offset:offset + 100])) or {}
+                rows.extend(payload.get("snapshots", []))
+            rows = [row for row in rows if number(row.get("close")) is not None
+                    and (row.get("availability") or {}).get("status") == "available"
+                    and ((row.get("availability") or {}).get("freshness") or {}).get("status") == "current"]
+            field = "value" if kw.get("mode", "turnover") == "turnover" else "change_pct"
+            rows = [row for row in rows if number(row.get(field)) is not None]
+            rows.sort(key=lambda row: number(row[field]), reverse=True)
+            return [HotStock(symbol=row["instrument_id"], market="TW", name=row.get("name") or row["symbol"],
+                             price=number(row["close"]), change_pct=number(row.get("change_pct")),
+                             turnover=number(row.get("value")), volume=number(row.get("volume")),
+                             price_kind="eod", trade_date=row.get("trade_date"),
+                             freshness=(row.get("availability") or {}).get("freshness") or {})
+                    for row in rows[:int(kw.get("limit", 20))]]
         return self._discovery.hot_stocks(**kw)
 
     def hot_boards(self, **kw) -> list[HotBoard]:

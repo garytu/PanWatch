@@ -79,9 +79,11 @@ def test_finmind_capital_flow_vendor(monkeypatch):
     cf = res[0]
     assert cf.symbol == "2330"
     # 2026-09-23: Foreign: +1000, Trust: +250, Dealer: -100 => Total main = +1150
-    assert cf.main_net_inflow == 1150.0
-    assert cf.super_net_inflow == 1000.0
-    assert cf.big_net_inflow == 250.0
+    assert cf.main_net_inflow is None
+    assert cf.flow_kind == "institutional_shares" and cf.unit == "shares"
+    assert cf.institutional_net_shares == 1150.0
+    assert cf.super_net_inflow is None and cf.big_net_inflow is None
+    assert cf.foreign_net_shares == 1000.0 and cf.trust_net_shares == 250.0
 
 
 def test_finmind_margin_vendor(monkeypatch):
@@ -103,9 +105,12 @@ def test_finmind_margin_vendor(monkeypatch):
     assert len(res) == 1
     m = res[0]
     assert m.symbol == "2330"
-    assert m.rz_balance == 12000.0
-    assert m.rz_buy == 1500.0
-    assert m.rq_balance == 450.0
+    assert m.rz_balance is None and m.total_balance is None
+    assert m.rq_balance is None and m.rq_sell_vol is None
+    assert m.quantity_unit == "lots"
+    assert m.margin_balance_lots == 12000.0
+    assert m.margin_buy_lots == 1500.0
+    assert m.short_balance_lots == 450.0
 
 
 def test_finmind_dividend_vendor(monkeypatch):

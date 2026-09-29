@@ -133,12 +133,17 @@ def get_market_status():
                 sessions_desc.append(f"{session.start.strftime('%H:%M')}-{session.end.strftime('%H:%M')}")
 
             # 判斷狀態
+            from src.platform.scheduling.trading_calendar import calendar_status, is_trading_day
+            calendar = calendar_status(market_code, now)
             weekday = now.weekday()
             current_time = now.time()
 
-            if weekday >= 5:
+            if market_code == MarketCode.TW and calendar["status"] == "unknown":
+                status = "unknown"
+                status_text = "交易日曆未就緒"
+            elif not is_trading_day(market_code, now):
                 status = "closed"
-                status_text = "休市（週末）"
+                status_text = "休市（週末）" if weekday >= 5 else "休市（交易日曆）"
             elif is_trading:
                 status = "trading"
                 status_text = "交易中"
@@ -165,6 +170,7 @@ def get_market_status():
                 "sessions": sessions_desc,
                 "local_time": now.strftime("%H:%M"),
                 "timezone": market_def.timezone,
+                "calendar": calendar,
             })
         except Exception as e:
             # 單個市場獲取失敗不影響其他市場
@@ -232,6 +238,7 @@ def get_quotes(db: Session = Depends(get_db)):
                     "change_pct": item["change_pct"],
                     "change_amount": item["change_amount"],
                     "prev_close": item["prev_close"],
+                    **{key: value for key, value in item.items() if key not in {"symbol", "market"}},
                 }
         except Exception as e:
             logger.error(f"獲取 {market} 行情失敗: {e}")
@@ -241,11 +248,27 @@ def get_quotes(db: Session = Depends(get_db)):
 
 @router.post("", response_model=StockResponse)
 def create_stock(stock: StockCreate, db: Session = Depends(get_db)):
+    if stock.market == "TW":
+        from marketdata.symbol import Symbol
+        from marketdata.vendors.twmd import TwmdClient
+        from src.platform.marketdata.marketdata_client import twmd_config
+        try:
+            parsed = Symbol.parse(stock.symbol, "TW")
+            stock.symbol = TwmdClient(twmd_config()).resolve(parsed)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
     existing = db.query(Stock).filter(
         Stock.symbol == stock.symbol, Stock.market == stock.market
     ).first()
     if existing:
         raise HTTPException(400, f"股票 {stock.symbol} 已存在")
+    if stock.market == "TW":
+        # Existing bare/suffix records remain valid; avoid creating a second watchlist entry.
+        parsed = Symbol.parse(stock.symbol, "TW")
+        suffix = "TWO" if parsed.venue == "TPEX" else "TW"
+        duplicate = db.query(Stock).filter(Stock.market == "TW", Stock.symbol.in_([parsed.code, f"{parsed.code}.{suffix}"])).first()
+        if duplicate:
+            raise HTTPException(400, f"股票 {stock.symbol} 已存在")
 
     max_order = db.query(func.max(Stock.sort_order)).scalar() or 0
     db_stock = Stock(**stock.model_dump(), sort_order=int(max_order) + 1)

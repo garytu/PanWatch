@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from marketdata import Quote
 import src.platform.marketdata.marketdata_client as mc
 
@@ -59,6 +61,7 @@ def test_db_config_provider_skips_tencent_us_kline(monkeypatch):
 
 
 def test_db_config_provider_tw_market_routing(monkeypatch):
+    monkeypatch.setenv("TW_DATA_PROVIDER", "external")
     monkeypatch.setenv("EXTERNAL_QUOTE_FEED_URL", "http://tw-feed:8088")
     monkeypatch.setenv("EXTERNAL_QUOTE_FEED_TOKEN", "test-token")
     monkeypatch.setenv("FINMIND_API_TOKEN", "test-fm-token")
@@ -80,3 +83,33 @@ def test_db_config_provider_tw_market_routing(monkeypatch):
     assert len(kline_sources) == 1
     assert kline_sources[0].vendor == "finmind"
     assert kline_sources[0].config["token"] == "test-fm-token"
+
+
+@pytest.mark.parametrize(
+    "primary, legacy, expected",
+    [(None, None, 5.0), (None, "8", 8.0), ("12.5", "8", 12.5), ("", "8", 8.0)],
+)
+def test_tw_quote_timeout_reaches_http_request(monkeypatch, primary, legacy, expected):
+    monkeypatch.setenv("TW_DATA_PROVIDER", "external")
+    from marketdata.symbol import Market, Symbol
+    from marketdata.vendors.external_feed import ExternalQuoteVendor
+
+    for key, value in (
+        ("EXTERNAL_QUOTE_FEED_TIMEOUT_SEC", primary),
+        ("TW_QUOTE_FEED_TIMEOUT_SEC", legacy),
+    ):
+        if value is None:
+            monkeypatch.delenv(key, raising=False)
+        else:
+            monkeypatch.setenv(key, value)
+
+    calls = []
+
+    def feed(url, **kwargs):
+        calls.append(kwargs["timeout"])
+        return {"ok": True, "data": []}
+
+    monkeypatch.setattr("marketdata.vendors.external_feed.market_get", feed)
+    source = mc.DbConfigProvider().sources_for("quote", "TW")[0]
+    ExternalQuoteVendor().fetch([Symbol(Market.TW, "2330")], source.config)
+    assert calls == [expected]

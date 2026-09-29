@@ -757,7 +757,7 @@ def _stock_meta_header(symbol: str) -> str:
     if isinstance(quote, dict):
         industry = quote.get("industry") or ""
 
-    market_label = {"CN": "中國 A 股", "HK": "港股", "US": "美股"}.get(market, market)
+    market_label = {"CN": "中國 A 股", "HK": "港股", "US": "美股", "TW": "台股"}.get(market, market)
     cur_price = _attr(quote, "current_price", "") or _attr(quote, "price", "")
     change_pct = _attr(quote, "change_pct", "")
 
@@ -766,6 +766,9 @@ def _stock_meta_header(symbol: str) -> str:
     ]
     if industry:
         lines.append(f"  Industry: {industry}")
+    if market == "TW":
+        lines.append(f"  Price kind: {_attr(quote, 'price_kind')} / trade date: {_attr(quote, 'trade_date')} / "
+                     f"freshness: {_attr(quote, 'freshness')} / units: {_attr(quote, 'units')}")
     if cur_price:
         try:
             lines.append(
@@ -976,7 +979,12 @@ def _quote_to_lightweight_fundamentals(symbol: str) -> str:
     if not isinstance(quote, dict):
         return f"[No lightweight fundamentals available for {symbol}]"
 
-    lines = ["[Lightweight Fundamentals (from PanWatch real-time quote)]"]
+    market = str(quote.get("market") or "CN")
+    currency = {"CN": "CNY", "HK": "HKD", "US": "USD", "TW": "TWD"}.get(market, "unknown")
+    lines = ["[Lightweight Fundamentals (from PanWatch quote)]"]
+    if market == "TW":
+        lines.append(f"Price kind: {quote.get('price_kind')}; trade date: {quote.get('trade_date')}; "
+                     f"freshness: {quote.get('freshness')}; adjustment: {quote.get('adjustment_mode')}")
     fields = [
         ("PE ratio", "pe_ratio"),
         ("Total market cap", "total_market_value"),
@@ -989,7 +997,7 @@ def _quote_to_lightweight_fundamentals(symbol: str) -> str:
         ("Today low", "low_price"),
         ("Prev close", "prev_close"),
         ("Volume (shares)", "volume"),
-        ("Turnover (CNY)", "turnover"),
+        (f"Turnover ({currency})", "turnover"),
     ]
     has_any = False
     for label, key in fields:
@@ -1001,7 +1009,7 @@ def _quote_to_lightweight_fundamentals(symbol: str) -> str:
         return f"[No lightweight fundamentals available for {symbol}]"
     lines.append("")
     lines.append(
-        "Note: This is real-time market data, NOT a substitute for full financial "
+        "Note: These are market observations; check the price kind and date. They are NOT a substitute for full financial "
         "statements. Use it as a sanity check (e.g. valuation level via P/E, liquidity "
         "via turnover) rather than as the basis for revenue/earnings claims."
     )
@@ -1047,6 +1055,10 @@ def _flow_to_text(flow) -> str:
         flow = flow[0] if flow else None
     if not flow:
         return "無資金流向資料"
+    if _attr(flow, "flow_kind") == "institutional_shares":
+        return (f"三大法人淨買賣超(股): {_attr(flow, 'institutional_net_shares')}，"
+                f"外資 {_attr(flow, 'foreign_net_shares')} / 投信 {_attr(flow, 'trust_net_shares')} / "
+                f"自營商 {_attr(flow, 'dealer_net_shares')}")
     main_net = _attr(flow, "main_net_inflow")
     main_pct = _attr(flow, "main_net_inflow_pct")
     return f"主力淨流入:{main_net} / {main_pct}%"

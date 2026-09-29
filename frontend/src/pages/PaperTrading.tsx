@@ -122,7 +122,7 @@ export default function PaperTradingPage() {
   // 資金配置
   const [configOpen, setConfigOpen] = useState(false)
   const [cfgTotal, setCfgTotal] = useState('')
-  const [cfgRatios, setCfgRatios] = useState<{ CN: string; HK: string; US: string }>({ CN: '', HK: '', US: '' })
+  const [cfgRatios, setCfgRatios] = useState<{ CN: string; HK: string; US: string; TW: string }>({ CN: '', HK: '', US: '', TW: '' })
   const [cfgSaving, setCfgSaving] = useState(false)
 
   // 通知設定
@@ -218,6 +218,7 @@ export default function PaperTradingPage() {
         CN: String(Math.round((a.CN ?? 0) * 100)),
         HK: String(Math.round((a.HK ?? 0) * 100)),
         US: String(Math.round((a.US ?? 0) * 100)),
+        TW: String(Math.round((a.TW ?? 0) * 100)),
       })
     } catch {
       toast('載入配置失敗', 'error')
@@ -229,11 +230,12 @@ export default function PaperTradingPage() {
     const cn = Number(cfgRatios.CN) || 0
     const hk = Number(cfgRatios.HK) || 0
     const us = Number(cfgRatios.US) || 0
+    const tw = Number(cfgRatios.TW) || 0
     if (!(total > 0)) {
       toast('總資金需大於 0', 'error')
       return
     }
-    if (cn + hk + us > 100) {
+    if (cn + hk + us + tw > 100) {
       toast('比例合計不能超過 100%', 'error')
       return
     }
@@ -241,7 +243,7 @@ export default function PaperTradingPage() {
     try {
       await paperTradingApi.updateSettings({
         initial_capital: total,
-        market_allocations: { CN: cn / 100, HK: hk / 100, US: us / 100 },
+        market_allocations: { CN: cn / 100, HK: hk / 100, US: us / 100, TW: tw / 100 },
       })
       toast('資金配置已儲存', 'success')
       setConfigOpen(false)
@@ -317,7 +319,7 @@ export default function PaperTradingPage() {
   }
 
   const totalPages = Math.ceil(tradesTotal / tradesPageSize)
-  const ratioSum = (Number(cfgRatios.CN) || 0) + (Number(cfgRatios.HK) || 0) + (Number(cfgRatios.US) || 0)
+  const ratioSum = (Number(cfgRatios.CN) || 0) + (Number(cfgRatios.HK) || 0) + (Number(cfgRatios.US) || 0) + (Number(cfgRatios.TW) || 0)
 
   return (
     <div className="space-y-5">
@@ -371,8 +373,8 @@ export default function PaperTradingPage() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground text-xs">交易市場:</span>
-            {(['ALL', 'CN', 'HK', 'US'] as const).map(m => {
-              const label = m === 'ALL' ? '全部' : m === 'CN' ? 'A股' : m === 'HK' ? '港股' : '美股'
+            {(['ALL', 'CN', 'HK', 'US', 'TW'] as const).map(m => {
+              const label = m === 'ALL' ? '全部' : m === 'CN' ? 'A股' : m === 'HK' ? '港股' : m === 'TW' ? '台股' : '美股'
               const active = marketView === m
               const ratio = m !== 'ALL' ? account.market_allocations?.[m] : undefined
               const isOff = m !== 'ALL' && (ratio ?? 0) <= 0
@@ -651,8 +653,8 @@ export default function PaperTradingPage() {
                   合計 {ratioSum}%{ratioSum > 100 ? '（超過 100%）' : ''}
                 </span>
               </div>
-              {(['CN', 'HK', 'US'] as const).map(m => {
-                const label = m === 'CN' ? 'A股' : m === 'HK' ? '港股' : '美股'
+              {(['CN', 'HK', 'US', 'TW'] as const).map(m => {
+                const label = m === 'CN' ? 'A股' : m === 'HK' ? '港股' : m === 'TW' ? '台股' : '美股'
                 const pct = Number(cfgRatios[m]) || 0
                 const amount = ((Number(cfgTotal) || 0) * pct) / 100
                 return (

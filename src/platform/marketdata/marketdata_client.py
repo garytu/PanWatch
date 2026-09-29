@@ -15,6 +15,45 @@ from marketdata import MarketData, Quote, SourceConfig
 logger = logging.getLogger(__name__)
 
 
+def twmd_config() -> dict:
+    from src.platform.runtime.config import Settings
+    settings = Settings()
+    return {"base_url": settings.twmd_base_url, "token": settings.twmd_api_token,
+            "timeout_sec": settings.twmd_timeout_sec}
+
+
+QUOTE_METADATA = (
+    "instrument_id", "venue", "price_kind", "provider", "trade_date", "reference_price",
+    "change_basis", "adjustment_mode", "availability", "freshness", "collection_health",
+    "usable_for_trading", "units", "volume_semantics", "eod_fallback",
+)
+
+
+def quote_usable_for_trading(quote: dict | None, market: str, *, now=None) -> bool:
+    """TW requires live freshness evidence, including expiry while cached by consumers."""
+    from datetime import datetime, timezone
+    from marketdata.vendors.twmd import number
+    quote = quote or {}
+    price = number(quote.get("current_price"))
+    if price is None or price <= 0:
+        return False
+    if market != "TW":
+        return quote.get("usable_for_trading") is not False
+    freshness = quote.get("freshness") or {}
+    if (quote.get("price_kind") != "live" or quote.get("usable_for_trading") is not True
+            or quote.get("availability") != "available" or freshness.get("status") != "fresh"):
+        return False
+    try:
+        timestamp = datetime.fromisoformat(str(quote.get("timestamp")))
+        if timestamp.tzinfo is None:
+            return False
+        age = ((now or datetime.now(timezone.utc)) - timestamp).total_seconds()
+        max_age = number(freshness.get("max_price_age_seconds")) or 30
+        return -5 <= age <= max_age
+    except (ValueError, TypeError):
+        return False
+
+
 class DbConfigProvider:
     """ConfigProvider 埠實現:從 DataSource 表按 priority 讀某型別的啟用源。"""
 
@@ -39,24 +78,32 @@ class DbConfigProvider:
 
         # 台股市場專用路由 (TW)
         if market_code == "TW":
+            from src.platform.runtime.config import Settings
+            settings = Settings()
+            if datatype in {"quote", "kline", "intraday_kline"} and settings.tw_data_provider != "external":
+                return [SourceConfig(vendor="twmd", priority=0, enabled=True,
+                                     config=twmd_config(), supports_batch=datatype == "quote")]
             # 1. 盤中即時行情/五檔: 僅支援單一外部 Provider，配置取自 .env
             if datatype == "quote":
-                feed_url = os.environ.get("EXTERNAL_QUOTE_FEED_URL") or os.environ.get("TW_QUOTE_FEED_URL") or "http://127.0.0.1:8088"
-                feed_token = os.environ.get("EXTERNAL_QUOTE_FEED_TOKEN") or os.environ.get("TW_QUOTE_FEED_TOKEN") or ""
+                feed_url = settings.external_quote_feed_url
+                feed_token = settings.external_quote_feed_token
+                feed_timeout = (os.environ.get("EXTERNAL_QUOTE_FEED_TIMEOUT_SEC")
+                                or os.environ.get("TW_QUOTE_FEED_TIMEOUT_SEC")
+                                or settings.external_quote_feed_timeout_sec or "5")
                 return [
                     SourceConfig(
                         vendor="external_quote",
                         priority=0,
                         enabled=True,
-                        config={"base_url": feed_url, "token": feed_token},
+                        config={"base_url": feed_url, "token": feed_token, "timeout_sec": feed_timeout},
                         supports_batch=True,
                     )
                 ]
 
             # 2. 盤中分K: 僅支援單一外部 Provider，配置取自 .env
             if datatype == "intraday_kline":
-                feed_url = os.environ.get("EXTERNAL_QUOTE_FEED_URL") or os.environ.get("TW_QUOTE_FEED_URL") or "http://127.0.0.1:8088"
-                feed_token = os.environ.get("EXTERNAL_QUOTE_FEED_TOKEN") or os.environ.get("TW_QUOTE_FEED_TOKEN") or ""
+                feed_url = settings.external_quote_feed_url
+                feed_token = settings.external_quote_feed_token
                 return [
                     SourceConfig(
                         vendor="external_kline",
@@ -69,7 +116,7 @@ class DbConfigProvider:
 
             # 3. 日K、基本面、三大法人、融資融券、除權息、新聞: FinMind Provider，配置取自 .env
             if datatype in {"kline", "fundamentals", "capital_flow", "margin", "dividend", "news"}:
-                fm_token = os.environ.get("FINMIND_API_TOKEN") or ""
+                fm_token = settings.finmind_api_token
                 return [
                     SourceConfig(
                         vendor="finmind",
@@ -126,7 +173,7 @@ def reset_market_data() -> None:
 
 def _quote_to_row(q: Quote) -> dict:
     """marketdata.Quote → 舊 orchestrator 同形 dict。"""
-    return {
+    row = {
         "symbol": q.symbol,
         "name": q.name,
         "market": q.market,
@@ -144,7 +191,12 @@ def _quote_to_row(q: Quote) -> dict:
         "pe_ratio": q.pe_ratio,
         "circulating_market_value": q.circulating_market_value,
         "total_market_value": q.total_market_value,
+        "timestamp": q.timestamp.isoformat() if q.timestamp else None,
+        **{key: getattr(q, key) for key in QUOTE_METADATA},
     }
+    if q.market == "TW":
+        row["usable_for_trading"] = quote_usable_for_trading(row, "TW")
+    return row
 
 
 def md_quote_rows(symbols: list[str], market: str) -> list[dict]:
@@ -156,7 +208,13 @@ def md_quote_rows(symbols: list[str], market: str) -> list[dict]:
     if not syms:
         return []
     quotes = get_market_data().quotes(syms, market=market)
-    return [_quote_to_row(q) for q in quotes]
+    rows = [_quote_to_row(q) for q in quotes]
+    if market == "TW":
+        from marketdata.symbol import Symbol
+        by_identity = {row["symbol"]: row for row in rows}
+        rows = [{**by_identity[Symbol.parse(raw, market).identity], "symbol": raw}
+                for raw in syms if Symbol.parse(raw, market).identity in by_identity]
+    return rows
 
 
 def _article_to_newsitem(a):
@@ -180,7 +238,7 @@ def _article_to_newsitem(a):
 
 
 def md_news(
-    symbols: list[str], since_hours: int = 2, names: dict[str, str] | None = None
+    symbols: list[str], since_hours: int = 2, names: dict[str, str] | None = None, *, market: str = "CN"
 ) -> list:
     """聚合新聞(個股新聞 + 公告),返回 list[NewsItem](與舊 NewsCollector.fetch_all 同形)。
 
@@ -194,7 +252,7 @@ def md_news(
     # 包內 news vendor 的 publish_time 是 aware(UTC);這裡的 now 也必須 aware,
     # 否則 since 過濾會 "can't compare offset-naive and offset-aware datetimes"。
     arts = get_market_data().news(
-        list(symbols or []), since_hours=since_hours, names=names,
+        list(symbols or []), market=market, since_hours=since_hours, names=names,
         now=datetime.now(timezone.utc),
     )
     return [_article_to_newsitem(a) for a in arts]
@@ -209,15 +267,13 @@ def md_news_by_keyword(keyword: str) -> list:
 def md_stock_data(symbols: list[str], market: str) -> list:
     """返回 list[StockData](舊 AkshareCollector.get_stock_data 同形)。同步。"""
     from src.platform.marketdata.models import MarketCode, StockData
-
-    syms = list(symbols)
-    if not syms:
-        return []
-    quotes = get_market_data().quotes(syms, market=market)
+    from datetime import datetime
+    rows = md_quote_rows(list(symbols), market)
     return [StockData(
-        symbol=q.symbol, name=q.name or "", market=MarketCode(q.market),
-        current_price=q.current_price or 0.0, change_pct=q.change_pct or 0.0,
-        change_amount=q.change_amount or 0.0, volume=q.volume or 0.0,
-        turnover=q.turnover or 0.0, open_price=q.open_price or 0.0,
-        high_price=q.high_price or 0.0, low_price=q.low_price or 0.0,
-        prev_close=q.prev_close or 0.0) for q in quotes]
+        symbol=row["symbol"], name=row.get("name") or "", market=MarketCode(row["market"]),
+        current_price=row.get("current_price"), change_pct=row.get("change_pct"),
+        change_amount=row.get("change_amount"), volume=row.get("volume"),
+        turnover=row.get("turnover"), open_price=row.get("open_price"),
+        high_price=row.get("high_price"), low_price=row.get("low_price"),
+        prev_close=row.get("prev_close"), timestamp=datetime.fromisoformat(row["timestamp"]) if row.get("timestamp") else None,
+        **{key: row.get(key) for key in QUOTE_METADATA}) for row in rows]

@@ -32,6 +32,7 @@ from src.platform.marketdata.collectors.discovery_collector import (
 )
 from src.platform.marketdata.collectors.kline_collector import KlineCollector
 from src.platform.marketdata.marketdata_client import (
+    QUOTE_METADATA,
     get_market_data,
     md_news,
     md_quote_rows,
@@ -199,7 +200,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 error_code="candidate_filter_invalid",
             )
         if (
-            (market and market not in {"CN", "HK", "US"})
+            (market and market not in {"CN", "HK", "US", "TW"})
             or holding not in {"all", "held", "unheld"}
             or (risk_level and risk_level not in {"all", "low", "medium", "high"})
             or not 0 <= min_score <= 100
@@ -284,17 +285,32 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "pe_ratio",
                 "total_market_value",
                 "circulating_market_value",
+                "timestamp",
+                *QUOTE_METADATA,
             )
         }
         name = data.get("name") or symbol
-        return ToolResult.success(
-            summary=(
+        summary = (
                 f"{name}（{market.value}:{symbol}）最新價 {data.get('current_price')}，"
                 f"漲跌幅 {data.get('change_pct')}%。"
-            ),
+        )
+        observed_at = datetime.now(UTC)
+        if market == MarketCode.TW:
+            summary = (
+                f"{name}（{data.get('instrument_id') or symbol}）{data.get('price_kind') or '未知'}價格 "
+                f"{data.get('current_price')}，資料日期 {data.get('trade_date') or '未知'}，"
+                f"可交易 {data.get('usable_for_trading') is True}。"
+            )
+            try:
+                observed_at = datetime.fromisoformat(str(data.get("timestamp")))
+            except (TypeError, ValueError):
+                observed_at = None
+        return ToolResult(
+            ok=True,
+            summary=summary,
             data=data,
-            sources=[{"name": "PanWatch 行情資料"}],
-            observed_at=datetime.now(UTC),
+            sources=[{"name": data.get("provider") or "PanWatch 行情資料"}],
+            observed_at=observed_at,
         )
 
     async def get_kline_summary(_request: RunRequest, arguments: dict) -> ToolResult:
@@ -924,7 +940,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "market": {
                         "type": "string",
-                        "enum": ["CN", "HK", "US"],
+                        "enum": ["CN", "HK", "US", "TW"],
                         "description": "可選市場程式碼；不填表示全部市場",
                     },
                     "holding": {
@@ -1025,7 +1041,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                     "query": {"type": "string", "description": "股票程式碼或名稱"},
                     "market": {
                         "type": "string",
-                        "enum": ["CN", "HK", "US"],
+                        "enum": ["CN", "HK", "US", "TW"],
                         "description": "可選市場程式碼；不填表示全部市場",
                     },
                     "limit": {
@@ -1060,7 +1076,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "market": {
                         "type": "string",
-                        "enum": ["CN", "HK", "US"],
+                        "enum": ["CN", "HK", "US", "TW"],
                         "default": "CN",
                     },
                     "mode": {
@@ -1090,7 +1106,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 "properties": {
                     "market": {
                         "type": "string",
-                        "enum": ["CN", "HK", "US"],
+                        "enum": ["CN", "HK", "US", "TW"],
                         "default": "CN",
                     },
                     "mode": {
@@ -1205,7 +1221,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                     },
                     "market": {
                         "type": "string",
-                        "enum": ["CN", "HK", "US"],
+                        "enum": ["CN", "HK", "US", "TW"],
                         "description": "可選市場程式碼",
                     },
                     "enabled": {

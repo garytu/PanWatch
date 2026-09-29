@@ -50,6 +50,7 @@ from marketdata.vendors.northbound import HexinNorthboundVendor
 from marketdata.vendors.sina import SinaQuoteVendor
 from marketdata.vendors.tencent import TencentQuoteVendor
 from marketdata.vendors.yfinance import YFinanceQuoteVendor
+from marketdata.vendors.twmd import TwmdQuoteVendor, TwmdKlineVendor, TwmdIntradayVendor
 
 # 各資料型別 → {vendor name: vendor 類}。注意:vendor 的 import 本身是廉價的
 # (可選三方依賴如 yfinance 均在 fetch() 內部惰性 import),模組級匯入不會引入重依賴。
@@ -60,6 +61,7 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
         "eastmoney": EastmoneyQuoteVendor,
         "yfinance": YFinanceQuoteVendor,
         "external_quote": ExternalQuoteVendor,
+        "twmd": TwmdQuoteVendor,
     },
     "kline": {
         "tencent": TencentKlineVendor,
@@ -67,9 +69,11 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
         "eastmoney": EastmoneyKlineVendor,
         "yahoo": YahooKlineVendor,
         "finmind": FinMindKlineVendor,
+        "twmd": TwmdKlineVendor,
     },
     "intraday_kline": {
         "external_kline": ExternalKlineVendor,
+        "twmd": TwmdIntradayVendor,
     },
     "capital_flow": {
         "eastmoney": EastmoneyCapitalFlowVendor,

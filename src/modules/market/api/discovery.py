@@ -68,7 +68,7 @@ def _pick_num(mapping: dict, keys: list[str]) -> float | None:
 
 def _normalize_market(market: str) -> str:
     m = (market or "CN").strip().upper()
-    return m if m in ("CN", "HK", "US") else "CN"
+    return m if m in ("CN", "HK", "US", "TW") else "CN"
 
 
 def _latest_snapshot_stocks(db: Session, market: str, limit: int = 120) -> list[dict]:
@@ -188,7 +188,7 @@ def _build_synthetic_boards(
             "turnover": _sum([_to_number(x.get("turnover")) for x in top]),
         }
 
-    market_name = {"CN": "A股", "HK": "港股", "US": "美股"}.get(mkt, mkt)
+    market_name = {"CN": "A股", "HK": "港股", "US": "美股", "TW": "台股"}.get(mkt, mkt)
     buckets = [
         build_bucket("GAINERS", f"{market_name}漲幅領先", gainers),
         build_bucket("TURNOVER", f"{market_name}成交額領先", turnover),
@@ -352,7 +352,7 @@ async def get_board_stocks(
     if cached is not None:
         return cached
 
-    if code.startswith(("CN_", "HK_", "US_")):
+    if code.startswith(("CN_", "HK_", "US_", "TW_")):
         proxy = _resolve_proxy() or None
         collector = EastMoneyDiscoveryCollector(proxy=proxy)
         market_from_code = code.split("_", 1)[0]

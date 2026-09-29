@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from marketdata.symbol import Market, Symbol
 from marketdata.vendors.external_feed import ExternalKlineVendor, ExternalQuoteVendor
 
@@ -54,6 +56,29 @@ def test_external_quote_vendor_error_fail_soft(monkeypatch):
     )
     quotes = vendor.fetch([Symbol(Market.TW, "2330")], config={})
     assert quotes == []
+
+
+def test_external_quote_default_timeout_allows_slow_batch(monkeypatch):
+    def slow_feed(url, **kwargs):
+        # 重現已觀察到的 3.2 秒批次延遲，無需真的等待。
+        if kwargs["timeout"] < 3.2:
+            return None
+        return {"ok": True, "data": [{"symbol": "2330", "current_price": 980}]}
+
+    monkeypatch.setattr("marketdata.vendors.external_feed.market_get", slow_feed)
+    quotes = ExternalQuoteVendor().fetch([Symbol(Market.TW, "2330")], config={})
+    assert len(quotes) == 1
+    assert quotes[0].current_price == 980
+
+
+@pytest.mark.parametrize("timeout", [1.5, "12"])
+def test_external_quote_timeout_override_is_honored(monkeypatch, timeout):
+    def feed(url, **kwargs):
+        assert kwargs["timeout"] == float(timeout)
+        return {"ok": True, "data": []}
+
+    monkeypatch.setattr("marketdata.vendors.external_feed.market_get", feed)
+    ExternalQuoteVendor().fetch([Symbol(Market.TW, "2330")], config={"timeout_sec": timeout})
 
 
 def test_external_kline_vendor_parses(monkeypatch):

@@ -44,7 +44,7 @@ def _format_datetime(dt) -> str:
 
 def _to_market(market: str) -> str:
     m = (market or "ALL").strip().upper()
-    return m if m in ("ALL", "CN", "HK", "US") else "ALL"
+    return m if m in ("ALL", "CN", "HK", "US", "TW") else "ALL"
 
 
 def _action_priority(item: dict) -> int:
@@ -144,7 +144,7 @@ def _load_latest_insights(db: Session) -> list[dict]:
 
 @router.get("/overview")
 def get_dashboard_overview(
-    market: str = Query("ALL", description="市場過濾: ALL/CN/HK/US"),
+    market: str = Query("ALL", description="市場過濾: ALL/CN/HK/US/TW"),
     action_limit: int = Query(6, ge=3, le=20),
     risk_limit: int = Query(6, ge=3, le=20),
     days: int = Query(45, ge=7, le=365),

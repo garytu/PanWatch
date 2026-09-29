@@ -30,7 +30,7 @@ class Quote:
 
     symbol: str
     market: str
-    current_price: float
+    current_price: float | None
     name: str = ""
     prev_close: float | None = None
     open_price: float | None = None
@@ -45,7 +45,22 @@ class Quote:
     pe_ratio: float | None = None
     circulating_market_value: float | None = None
     total_market_value: float | None = None
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime | None = field(default_factory=datetime.now)
+    instrument_id: str | None = None
+    venue: str | None = None
+    price_kind: str | None = None
+    provider: str | None = None
+    trade_date: str | None = None
+    reference_price: float | None = None
+    change_basis: str | None = None
+    adjustment_mode: str | None = None
+    availability: str | None = None
+    freshness: dict = field(default_factory=dict)
+    collection_health: dict = field(default_factory=dict)
+    usable_for_trading: bool | None = None
+    units: dict = field(default_factory=dict)
+    volume_semantics: str | None = None
+    eod_fallback: dict | None = None
 
 
 @dataclass
@@ -58,6 +73,9 @@ class Bar:
     high: float
     low: float
     volume: float = 0.0
+    provider: str | None = None
+    adjustment_mode: str | None = None
+    volume_unit: str | None = None
 
 
 @dataclass
@@ -73,6 +91,14 @@ class CapitalFlow:
     mid_net_inflow: float | None = None        # 中單淨流入
     small_net_inflow: float | None = None      # 小單淨流入
     main_net_5d: float | None = None           # 5日主力淨流入
+    flow_kind: str = "large_order_cash"
+    unit: str = "currency"
+    trade_date: str | None = None
+    foreign_net_shares: float | None = None
+    trust_net_shares: float | None = None
+    dealer_net_shares: float | None = None
+    institutional_net_shares: float | None = None
+    institutional_net_5d_shares: float | None = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +112,9 @@ class HotStock:
     change_pct: float | None
     turnover: float | None
     volume: float | None
+    price_kind: str | None = None
+    trade_date: str | None = None
+    freshness: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -174,6 +203,13 @@ class MarginItem:
     rq_sell_vol: float | None = None    # 融券賣出量(股)
     rq_repay_vol: float | None = None   # 融券償還量(股)
     total_balance: float | None = None  # 兩融餘額(元)
+    quantity_unit: str | None = None
+    margin_balance_lots: float | None = None
+    margin_buy_lots: float | None = None
+    margin_cash_repayment_lots: float | None = None
+    short_balance_lots: float | None = None
+    short_sell_lots: float | None = None
+    short_repayment_lots: float | None = None
 
 
 @dataclass
