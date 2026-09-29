@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.platform.marketdata.marketdata_client import md_quote_rows, quote_usable_for_trading
-from src.platform.marketdata.models import MarketCode, MARKETS
+from src.platform.marketdata.models import MarketCode, MARKETS, enabled_market_codes, is_market_enabled
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import (
     PaperTradingAccount,
@@ -142,9 +142,8 @@ def normalize_allocations(raw: dict | None) -> dict[str, float]:
 def market_allocations_or_default(account: Any) -> dict[str, float]:
     """帳戶未配置比例時回退預設配置，否則歸一化已配置的比例。"""
     raw = getattr(account, "market_allocations", None) or {}
-    if not raw:
-        return dict(DEFAULT_ALLOCATIONS)
-    return normalize_allocations(raw)
+    allocations = normalize_allocations(raw) if raw else dict(DEFAULT_ALLOCATIONS)
+    return {market: ratio if is_market_enabled(market) else 0.0 for market, ratio in allocations.items()}
 
 
 def allocations_from_excluded(excluded: list[str] | None) -> dict[str, float]:
@@ -272,6 +271,8 @@ class PaperTradingEngine:
         """
         grouped: dict[MarketCode, list[str]] = {}
         for symbol, market in symbols_markets:
+            if not is_market_enabled(market):
+                continue
             mc = _to_market(market)
             grouped.setdefault(mc, []).append(symbol)
 
@@ -702,6 +703,9 @@ class PaperTradingEngine:
             )
             if not pos:
                 return {"ok": False, "error": "持倉不存在或已平倉"}
+
+            if not is_market_enabled(pos.stock_market):
+                return {"ok": False, "error": "此市場目前未啟用"}
 
             # 獲取最新報價(走 flag 門控的 md_quote_rows,支援故障轉移)
             mc = _to_market(pos.stock_market)

@@ -12,12 +12,13 @@ EMA 平滑 + clamp 後寫入 `FactorWeight`(並審計到 `FactorWeightHistory`)�
 
 from __future__ import annotations
 
+from src.platform.marketdata.models import enabled_market_codes
+
 import logging
 
 from src.modules.strategy.factor_eval import evaluate_factor_ic
 from src.modules.strategy.factor_weights import (
     CALIBRATABLE_FACTORS,
-    MARKETS,
     PENALTY_FACTORS,
     get_factor_weights,
 )
@@ -138,14 +139,14 @@ def calibrate_factor_weights(
 
 
 def calibrate_all_markets(*, db=None, **kwargs) -> dict[str, dict]:
-    """對所有市場(CN/HK/US)各跑一輪因子標定;供排程器每日 outcome 評估後呼叫。
+    """對已啟用市場各跑一輪因子標定;供排程器每日 outcome 評估後呼叫。
 
     kwargs 透傳給 calibrate_factor_weights(alpha/beta/clamp/min_samples/horizon/days)。
     """
     own = db is None
     db = db or SessionLocal()
     try:
-        return {m: calibrate_factor_weights(m, db=db, **kwargs) for m in MARKETS}
+        return {m: calibrate_factor_weights(m, db=db, **kwargs) for m in enabled_market_codes()}
     finally:
         if own:
             db.close()

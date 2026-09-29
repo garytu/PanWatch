@@ -12,6 +12,24 @@ class MarketCode(str, Enum):
 
 
 
+# 暫時僅啟用台股；保留其他市場定義與歷史資料。
+# 恢復其他市場時同步更新 frontend/src/lib/markets.ts。
+ENABLED_MARKETS = (
+    # MarketCode.CN,
+    # MarketCode.HK,
+    # MarketCode.US,
+    MarketCode.TW,
+)
+
+
+def enabled_market_codes() -> tuple[str, ...]:
+    return tuple(m.value for m in ENABLED_MARKETS)
+
+
+def is_market_enabled(market: str | MarketCode) -> bool:
+    return market in ENABLED_MARKETS
+
+
 @dataclass
 class TradingSession:
     """一個交易時段"""
@@ -33,6 +51,8 @@ class MarketDef:
 
     def is_trading_time(self, dt: datetime | None = None) -> bool:
         """判斷給定時間是否在交易時段內"""
+        if not is_market_enabled(self.code):
+            return False
         if dt is None:
             dt = datetime.now(self.get_tz())
         else:

@@ -115,3 +115,10 @@ def mock_signal() -> dict:
         "confidence": 0.85,
         "reason": "趨勢向上突破",
     }
+
+
+@pytest.fixture(autouse=True)
+def _supported_markets_for_regression(monkeypatch):
+    """既有跨市場測試保留完整支援範圍；台股部署策略另有專用測試。"""
+    from src.platform.marketdata import models
+    monkeypatch.setattr(models, "ENABLED_MARKETS", tuple(models.MarketCode))

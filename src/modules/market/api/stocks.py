@@ -19,7 +19,7 @@ from src.platform.persistence.models import (
 )
 from src.platform.marketdata.stock_list import search_stocks, refresh_stock_list
 from src.platform.marketdata.marketdata_client import md_quote_rows
-from src.platform.marketdata.models import MarketCode, MARKETS
+from src.platform.marketdata.models import MarketCode, MARKETS, is_market_enabled
 from src.modules.automation.agent_catalog import AGENT_KIND_WORKFLOW, infer_agent_kind
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,8 @@ def get_market_status():
 
     result = []
     for market_code, market_def in MARKETS.items():
+        if not is_market_enabled(market_code):
+            continue
         try:
             now = datetime.now(market_def.get_tz())
             is_trading = market_def.is_trading_time()

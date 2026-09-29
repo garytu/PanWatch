@@ -13,7 +13,7 @@ from src.platform.persistence.json_safe import to_jsonable
 from src.platform.marketdata.marketdata_client import md_stock_data
 from src.platform.notifications.notifier import get_global_proxy
 from src.platform.scheduling.timezone import to_iso_with_tz, utc_now
-from src.platform.marketdata.models import MarketCode
+from src.platform.marketdata.models import MarketCode, enabled_market_codes, is_market_enabled
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import (
     EntryCandidate,
@@ -986,7 +986,7 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
     safe_limit = max(20, int(limit_per_market))
     min_required = min(max(12, int(safe_limit * 0.55)), safe_limit)
 
-    for market in ("CN", "HK", "US", "TW"):
+    for market in enabled_market_codes():
         try:
             turnover = _run_async(
                 collector.fetch_hot_stocks(
@@ -1111,7 +1111,7 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
                 )
 
     # Final per-market cap and stable ordering.
-    for market in ("CN", "HK", "US", "TW"):
+    for market in enabled_market_codes():
         keys = [k for k in result.keys() if k.startswith(f"{market}:")]
         if len(keys) <= safe_limit:
             continue
@@ -1272,6 +1272,8 @@ def refresh_entry_candidates(
     input_map: dict[str, dict] = dict(market_scan_map)
     for s in suggestions:
         market = _to_market(s.stock_market).value
+        if not is_market_enabled(market):
+            continue
         symbol = (s.stock_symbol or "").strip()
         if not symbol:
             continue

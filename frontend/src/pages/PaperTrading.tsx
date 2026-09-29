@@ -1,3 +1,4 @@
+import { DEFAULT_MARKET, ENABLED_MARKETS, MARKET_LABELS } from '@/lib/markets'
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, Power, RotateCcw, X, TrendingUp, TrendingDown, Trophy, BarChart3, Wallet, Activity, Play, Bell, SlidersHorizontal } from 'lucide-react'
 import {
@@ -117,7 +118,7 @@ export default function PaperTradingPage() {
   const tradesPageSize = 20
 
   // 市場檢視（分段單選，切換即按該市場口徑重新整理統計）
-  const [marketView, setMarketView] = useState<MarketView>('ALL')
+  const [marketView, setMarketView] = useState<MarketView>(DEFAULT_MARKET)
 
   // 資金配置
   const [configOpen, setConfigOpen] = useState(false)
@@ -235,7 +236,7 @@ export default function PaperTradingPage() {
       toast('總資金需大於 0', 'error')
       return
     }
-    if (cn + hk + us + tw > 100) {
+    if (ENABLED_MARKETS.reduce((sum, market) => sum + (Number(cfgRatios[market]) || 0), 0) > 100) {
       toast('比例合計不能超過 100%', 'error')
       return
     }
@@ -319,7 +320,7 @@ export default function PaperTradingPage() {
   }
 
   const totalPages = Math.ceil(tradesTotal / tradesPageSize)
-  const ratioSum = (Number(cfgRatios.CN) || 0) + (Number(cfgRatios.HK) || 0) + (Number(cfgRatios.US) || 0) + (Number(cfgRatios.TW) || 0)
+  const ratioSum = ENABLED_MARKETS.reduce((sum, market) => sum + (Number(cfgRatios[market]) || 0), 0)
 
   return (
     <div className="space-y-5">
@@ -373,11 +374,11 @@ export default function PaperTradingPage() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground text-xs">交易市場:</span>
-            {(['ALL', 'CN', 'HK', 'US', 'TW'] as const).map(m => {
-              const label = m === 'ALL' ? '全部' : m === 'CN' ? 'A股' : m === 'HK' ? '港股' : m === 'TW' ? '台股' : '美股'
+            {ENABLED_MARKETS.map(m => {
+              const label = MARKET_LABELS[m]
               const active = marketView === m
-              const ratio = m !== 'ALL' ? account.market_allocations?.[m] : undefined
-              const isOff = m !== 'ALL' && (ratio ?? 0) <= 0
+              const ratio = account.market_allocations?.[m]
+              const isOff = (ratio ?? 0) <= 0
               return (
                 <button
                   key={m}
@@ -390,7 +391,7 @@ export default function PaperTradingPage() {
                       : 'bg-primary/10 text-primary ring-1 ring-primary/20'
                   }`}
                 >
-                  {label}{m !== 'ALL' && ratio != null ? ` ${Math.round(ratio * 100)}%` : ''}
+                  {label}{ratio != null ? ` ${Math.round(ratio * 100)}%` : ''}
                 </button>
               )
             })}
@@ -631,7 +632,7 @@ export default function PaperTradingPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>資金配置</DialogTitle>
-            <DialogDescription>設定總資金與各市場投資比例，比例為 0 則不投入該市場（已有持倉不受影響，僅停止新建倉）</DialogDescription>
+            <DialogDescription>設定總資金與台股投資比例；停用市場的歷史持倉保留，暫停報價與交易</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -653,8 +654,8 @@ export default function PaperTradingPage() {
                   合計 {ratioSum}%{ratioSum > 100 ? '（超過 100%）' : ''}
                 </span>
               </div>
-              {(['CN', 'HK', 'US', 'TW'] as const).map(m => {
-                const label = m === 'CN' ? 'A股' : m === 'HK' ? '港股' : m === 'TW' ? '台股' : '美股'
+              {ENABLED_MARKETS.map(m => {
+                const label = MARKET_LABELS[m]
                 const pct = Number(cfgRatios[m]) || 0
                 const amount = ((Number(cfgTotal) || 0) * pct) / 100
                 return (

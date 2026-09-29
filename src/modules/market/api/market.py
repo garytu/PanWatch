@@ -5,7 +5,7 @@ import time
 from fastapi import APIRouter
 
 from src.platform.marketdata.collectors.kline_collector import get_index_klines
-from src.platform.marketdata.models import MarketCode
+from src.platform.marketdata.models import MarketCode, enabled_market_codes, is_market_enabled
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -71,12 +71,16 @@ def _spark_for(idx: dict) -> list[float]:
 @router.get("/indices")
 async def get_market_indices():
     """獲取主要市場指數（公共資料，無需認證）"""
+    active_indices = [idx for idx in MARKET_INDICES if is_market_enabled(idx["market"])]
+    if not active_indices:
+        return []
+    cache_key = ",".join(enabled_market_codes())
     now = time.time()
-    cached = _INDICES_CACHE.get("indices")
+    cached = _INDICES_CACHE.get(cache_key)
     if cached and now - cached[0] < _INDICES_CACHE_TTL_S:
         return cached[1]
 
-    tencent_symbols = [idx["tencent_symbol"] for idx in MARKET_INDICES]
+    tencent_symbols = [idx["tencent_symbol"] for idx in active_indices]
 
     try:
         quotes = get_market_data().index_quotes(tencent_symbols)
@@ -91,16 +95,16 @@ async def get_market_indices():
 
     # spark 並行取(快取未過期時零成本;冷啟動=最慢單個≈1s,而非 6 個序列累加)
     sparks = await asyncio.gather(
-        *[asyncio.to_thread(_spark_for, idx) for idx in MARKET_INDICES],
+        *[asyncio.to_thread(_spark_for, idx) for idx in active_indices],
         return_exceptions=True,
     )
     spark_map = {
         idx["symbol"]: (sp if isinstance(sp, list) else [])
-        for idx, sp in zip(MARKET_INDICES, sparks)
+        for idx, sp in zip(active_indices, sparks)
     }
 
     result = []
-    for idx in MARKET_INDICES:
+    for idx in active_indices:
         # 使用 response_symbol 匹配
         quote = quote_map.get(idx["response_symbol"])
         spark = spark_map.get(idx["symbol"], [])
@@ -129,5 +133,5 @@ async def get_market_indices():
                 "spark": spark,
             })
 
-    _INDICES_CACHE["indices"] = (now, result)
+    _INDICES_CACHE[cache_key] = (now, result)
     return result

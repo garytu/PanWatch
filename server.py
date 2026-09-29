@@ -21,7 +21,7 @@ from src.platform.persistence.models import (
 )
 from src.platform.observability.log_handler import DBLogHandler
 from src.platform.runtime.config import Settings, AppConfig, StockConfig
-from src.platform.marketdata.models import MarketCode
+from src.platform.marketdata.models import MarketCode, enabled_market_codes, is_market_enabled
 from src.platform.ai.ai_client import AIClient
 from src.platform.ai.ai_failover import build_failover_client
 from src.platform.notifications.notifier import NotifierManager
@@ -759,7 +759,7 @@ def load_watchlist_for_agent(agent_name: str) -> list[StockConfig]:
             return []
 
         # 繫結優先：只要綁定了 Agent，就納入執行範圍
-        stocks = db.query(Stock).filter(Stock.id.in_(stock_ids)).all()
+        stocks = db.query(Stock).filter(Stock.id.in_(stock_ids), Stock.market.in_(enabled_market_codes())).all()
         result = []
         for s in stocks:
             try:
@@ -810,7 +810,7 @@ def load_portfolio_for_agent(agent_name: str) -> PortfolioInfo:
             position_infos = []
             for pos in positions:
                 stock = pos.stock
-                if not stock:
+                if not stock or not is_market_enabled(stock.market):
                     continue
                 try:
                     market = MarketCode(stock.market)
@@ -1330,6 +1330,8 @@ async def trigger_agent_for_stock(
     force_refresh: bool = False,
 ) -> dict:
     """手動觸發 Agent 執行（單隻股票）"""
+    if not is_market_enabled(stock.market):
+        raise ValueError("此市場目前未啟用")
     start = time.monotonic()
     trace_id = trace_id or f"man-{agent_name}-{stock.symbol}-{int(time.time() * 1000)}"
     agent_cls = AGENT_REGISTRY.get(agent_name)

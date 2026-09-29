@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from src.platform.marketdata.collectors.kline_collector import KlineCollector, kline_source
 from src.platform.notifications.notifier import NotifierManager
 from src.platform.marketdata.marketdata_client import md_quote_rows, quote_usable_for_trading
-from src.platform.marketdata.models import MarketCode, MARKETS
+from src.platform.marketdata.models import MarketCode, MARKETS, is_market_enabled
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import NotifyChannel, PriceAlertHit, PriceAlertRule, Stock
 
@@ -226,6 +226,8 @@ class PriceAlertEngine:
     def _can_trigger(
         self, rule: PriceAlertRule, now: datetime, *, bypass_market_hours: bool = False
     ) -> tuple[bool, str]:
+        if not is_market_enabled(rule.stock.market):
+            return False, "market_disabled"
         if not rule.enabled:
             return False, "disabled"
 
@@ -331,7 +333,7 @@ class PriceAlertEngine:
             if not rules:
                 return {"total_rules": 0, "triggered": 0, "skipped": 0, "items": []}
 
-            stocks = [r.stock for r in rules if r.stock is not None]
+            stocks = [r.stock for r in rules if r.stock is not None and is_market_enabled(r.stock.market)]
             quote_map = await self._fetch_quotes_map(stocks)
 
             items: list[dict] = []

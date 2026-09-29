@@ -1,3 +1,4 @@
+import { MARKET_LABELS, isMarketEnabled } from '@/lib/markets'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Scale } from 'lucide-react'
 import { factorsApi, type FactorWeight } from '@panwatch/api'
@@ -11,13 +12,7 @@ const FACTOR_LABELS: Record<string, string> = {
   crowd_penalty: '擁擠度',
 }
 
-const MARKET_LABELS: Record<string, string> = {
-  CN: 'A股',
-  HK: '港股',
-  US: '美股',
-}
-
-const MARKET_ORDER: Record<string, number> = { CN: 0, HK: 1, US: 2 }
+const MARKET_ORDER: Record<string, number> = { TW: 0, CN: 1, HK: 2, US: 3 }
 const FACTOR_ORDER = ['alpha_score', 'catalyst_score', 'quality_score', 'risk_penalty', 'crowd_penalty']
 
 const factorLabel = (code: string) => FACTOR_LABELS[code] || code
@@ -41,7 +36,7 @@ export default function FactorWeightsPanel() {
     setError('')
     try {
       const res = await factorsApi.list()
-      setItems(res.items || [])
+      setItems((res.items || []).filter(item => isMarketEnabled(item.market)))
     } catch (e) {
       setError(e instanceof Error ? e.message : '載入失敗')
       setItems([])

@@ -1,3 +1,4 @@
+import { DEFAULT_MARKET, MARKET_OPTIONS } from '@/lib/markets'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layers, RefreshCw } from 'lucide-react'
@@ -26,7 +27,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
   const [portfolioRaw, setPortfolioRaw] = useState<DashboardPortfolioSummary | null>(null)
 
   const [discoverTab, setDiscoverTab] = useLocalStorage<'boards' | 'stocks'>('panwatch_dashboard_discoverTab', 'boards')
-  const [discoverMarket, setDiscoverMarket] = useLocalStorage<'CN' | 'HK' | 'US'>('panwatch_dashboard_discoverMarket', 'CN')
+  const [discoverMarket, setDiscoverMarket] = useLocalStorage<'CN' | 'HK' | 'US' | 'TW'>('panwatch_dashboard_discoverMarket_tw_v1', DEFAULT_MARKET)
   const [stocksMode, setStocksMode] = useLocalStorage<'turnover' | 'gainers' | 'for_you'>('panwatch_dashboard_stocksMode', 'for_you')
   const [boardsMode, setBoardsMode] = useLocalStorage<'gainers' | 'turnover'>('panwatch_dashboard_boardsMode', 'gainers')
   const [hotStocks, setHotStocks] = useState<HotStockItem[]>([])
@@ -185,14 +186,12 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
             <Button variant="outline" size="sm" onClick={() => navigate('/opportunities')} className="h-7 text-[12px]">
               進入機會頁
             </Button>
-            <Select value={discoverMarket} onValueChange={(v) => setDiscoverMarket(v as 'CN' | 'HK' | 'US')}>
+            <Select value={discoverMarket} onValueChange={(v) => setDiscoverMarket(v as 'CN' | 'HK' | 'US' | 'TW')}>
               <SelectTrigger className="h-7 w-[90px] text-[12px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CN">A股</SelectItem>
-                <SelectItem value="HK">港股</SelectItem>
-                <SelectItem value="US">美股</SelectItem>
+                {MARKET_OPTIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
               </SelectContent>
             </Select>
             <Button
@@ -356,7 +355,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
                     key={s.symbol}
                     onClick={() => {
                       setBoardDialogOpen(false)
-                      onOpenStock(s.symbol, s.market || 'CN', s.name, false)
+                      onOpenStock(s.symbol, s.market || DEFAULT_MARKET, s.name, false)
                     }}
                     className="flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-accent/20 p-3 text-left transition-colors hover:bg-accent/35"
                   >

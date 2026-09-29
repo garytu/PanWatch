@@ -1,3 +1,4 @@
+import { DEFAULT_MARKET, MARKET_OPTIONS, isMarketEnabled } from '@/lib/markets'
 import { TaiwanFeedStatus } from '@panwatch/biz-ui/components/taiwan-feed-status'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Plus, Trash2, Pencil, Search, X, TrendingUp, Bot, Play, RefreshCw, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Building2, ChevronDown, ChevronRight, Cpu, Bell, Clock, Newspaper, ExternalLink, BarChart3, Brain } from 'lucide-react'
@@ -236,13 +237,14 @@ interface PriceAlertRuleSummary {
   enabled: boolean
 }
 
-const emptyStockForm: StockForm = { symbol: '', name: '', market: 'CN' }
+const emptyStockForm: StockForm = { symbol: '', name: '', market: DEFAULT_MARKET }
 const emptyAccountForm: AccountForm = { name: '', available_funds: '0' }
 
 const buildQuoteItemsFrom = (stockList: Stock[], portfolio: PortfolioSummary | null): QuoteRequestItem[] => {
   const items: QuoteRequestItem[] = []
   const seen = new Set<string>()
   const add = (symbol: string, market: string) => {
+    if (!isMarketEnabled(market)) return
     const key = `${market}:${symbol}`
     if (seen.has(key)) return
     seen.add(key)
@@ -271,7 +273,7 @@ const toQuoteMap = (rows: QuoteResponse[]): Record<string, QuoteValue> => {
 const toPriceAlertSummaryMap = (rows: PriceAlertRuleSummary[]): Record<string, { total: number; enabled: number }> => {
   const map: Record<string, { total: number; enabled: number }> = {}
   for (const row of rows || []) {
-    const key = `${String(row.market || 'CN').toUpperCase()}:${String(row.stock_symbol || '').toUpperCase()}`
+    const key = `${String(row.market || DEFAULT_MARKET).toUpperCase()}:${String(row.stock_symbol || '').toUpperCase()}`
     if (!map[key]) map[key] = { total: 0, enabled: 0 }
     map[key].total += 1
     if (row.enabled) map[key].enabled += 1
@@ -452,13 +454,13 @@ export default function StocksPage() {
   // Kline Dialog
   const [klineDialogOpen, setKlineDialogOpen] = useState(false)
   const [klineDialogSymbol, setKlineDialogSymbol] = useState('')
-  const [klineDialogMarket, setKlineDialogMarket] = useState('CN')
+  const [klineDialogMarket, setKlineDialogMarket] = useState<string>(DEFAULT_MARKET)
   const [klineDialogName, setKlineDialogName] = useState<string | undefined>(undefined)
   const [klineDialogHasPosition, setKlineDialogHasPosition] = useState<boolean>(false)
   const [klineDialogInitialSummary, setKlineDialogInitialSummary] = useState<KlineSummary | null>(null)
   const [insightOpen, setInsightOpen] = useState(false)
   const [insightSymbol, setInsightSymbol] = useState('')
-  const [insightMarket, setInsightMarket] = useState('CN')
+  const [insightMarket, setInsightMarket] = useState<string>(DEFAULT_MARKET)
   const [insightName, setInsightName] = useState<string | undefined>(undefined)
   const [insightHasPosition, setInsightHasPosition] = useState(false)
 
@@ -474,7 +476,7 @@ export default function StocksPage() {
   const [showStockForm, setShowStockForm] = useState(false)
   const [stockForm, setStockForm] = useState<StockForm>(emptyStockForm)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchMarket, setSearchMarket] = useState('')  // 搜尋市場篩選
+  const [searchMarket, setSearchMarket] = useState<string>(DEFAULT_MARKET)  // 搜尋市場篩選
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [searching, setSearching] = useState(false)
@@ -487,11 +489,11 @@ export default function StocksPage() {
 
   // Position form
   const [positionDialogOpen, setPositionDialogOpen] = useState(false)
-  const [positionForm, setPositionForm] = useState<PositionForm>({ account_id: 0, stock_id: 0, cost_price: '', quantity: '', invested_amount: '', trading_style: '', stock_symbol: '', stock_name: '', stock_market: 'CN' })
+  const [positionForm, setPositionForm] = useState<PositionForm>({ account_id: 0, stock_id: 0, cost_price: '', quantity: '', invested_amount: '', trading_style: '', stock_symbol: '', stock_name: '', stock_market: DEFAULT_MARKET })
   const [editPositionId, setEditPositionId] = useState<number | null>(null)
   const [positionDialogAccountId, setPositionDialogAccountId] = useState<number | null>(null)
   const [positionSearchQuery, setPositionSearchQuery] = useState('')
-  const [positionSearchMarket, setPositionSearchMarket] = useState('')  // 搜尋市場篩選
+  const [positionSearchMarket, setPositionSearchMarket] = useState<string>(DEFAULT_MARKET)  // 搜尋市場篩選
   const [positionSearchResults, setPositionSearchResults] = useState<SearchResult[]>([])
   const [positionSearching, setPositionSearching] = useState(false)
   const [showPositionDropdown, setShowPositionDropdown] = useState(false)
@@ -518,7 +520,7 @@ export default function StocksPage() {
   const [agentResultDialog, setAgentResultDialog] = useState<{ title: string; content: string; should_alert: boolean; notified: boolean } | null>(null)
 
   // Stock list filter
-  const [stockListFilter, setStockListFilter] = useState('')  // '' = 全部, 'CN' = A股, 'HK' = 港股, 'US' = 美股
+  const [stockListFilter, setStockListFilter] = useState<string>(DEFAULT_MARKET)
   const [watchlistOnlyAlerts, setWatchlistOnlyAlerts] = useLocalStorage<boolean>('panwatch_watchlist_only_alerts', false)
 
   // Remove watchlist modal
@@ -753,7 +755,7 @@ export default function StocksPage() {
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const stockData = await fetchAPI<Stock[]>('/stocks', { signal })
-      setStocks(stockData)
+      setStocks(stockData.filter(s => isMarketEnabled(s.market)))
     } catch (e) {
       if (!signal?.aborted) console.error(e)
     } finally {
@@ -810,7 +812,7 @@ export default function StocksPage() {
       if (signal.aborted) return
 
       const quoteMap = toQuoteMap(quoteData.quotes)
-      setStocks(coreData.stocks)
+      setStocks(coreData.stocks.filter(s => isMarketEnabled(s.market)))
       setPortfolioRaw(coreData.portfolio)
       setQuotes(quoteMap)
       setKlineSummaries({})
@@ -844,7 +846,7 @@ export default function StocksPage() {
         loadKlines: requestKlineSummaries,
       }, coreData.stocks, coreData.portfolio, signal).then(data => {
         if (signal.aborted) return
-        setMarketStatus(data.marketStatus)
+        setMarketStatus(data.marketStatus.filter(s => isMarketEnabled(s.code)))
         setKlineSummaries(data.klines)
         setPoolSuggestions(data.suggestions)
         setPriceAlertSummaryMap(toPriceAlertSummaryMap(data.priceAlerts))
@@ -881,10 +883,10 @@ export default function StocksPage() {
 
   const openKlineDialog = useCallback((symbol: string, market: string, name?: string, hasPosition?: boolean) => {
     setKlineDialogSymbol(symbol)
-    setKlineDialogMarket(market || 'CN')
+    setKlineDialogMarket(market || DEFAULT_MARKET)
     setKlineDialogName(name)
     setKlineDialogHasPosition(!!hasPosition)
-    const m = market || 'CN'
+    const m = market || DEFAULT_MARKET
     setKlineDialogInitialSummary(klineSummaries[`${m}:${symbol}`] || null)
     setKlineDialogOpen(true)
   }, [klineSummaries])
@@ -898,7 +900,7 @@ export default function StocksPage() {
 
   const openStockDetail = useCallback((stockSymbol: string, stockMarket: string, stockName?: string, hasPosition?: boolean) => {
     setInsightSymbol(stockSymbol)
-    setInsightMarket(stockMarket || 'CN')
+    setInsightMarket(stockMarket || DEFAULT_MARKET)
     setInsightName(stockName)
     setInsightHasPosition(!!hasPosition)
     setInsightOpen(true)
@@ -1212,7 +1214,7 @@ export default function StocksPage() {
         trading_style: '',
         stock_symbol: '',
         stock_name: '',
-        stock_market: 'CN',
+        stock_market: DEFAULT_MARKET,
       })
       setEditPositionId(null)
     }
@@ -1454,13 +1456,13 @@ export default function StocksPage() {
   }
 
   const getPriceAlertSummary = (symbol: string, market: string) => {
-    const key = `${String(market || 'CN').toUpperCase()}:${String(symbol || '').toUpperCase()}`
+    const key = `${String(market || DEFAULT_MARKET).toUpperCase()}:${String(symbol || '').toUpperCase()}`
     return priceAlertSummaryMap[key] || { total: 0, enabled: 0 }
   }
 
   // 獲取股票的建議資訊（優先使用建議池，包含來源和時間資訊）
   const getSuggestionForStock = (symbol: string, market: string, hasPosition?: boolean): { suggestion: SuggestionInfo | null; kline: KlineSummary | null } => {
-    const key = `${market || 'CN'}:${symbol}`
+    const key = `${market || DEFAULT_MARKET}:${symbol}`
     // 優先使用建議池的建議（包含來源和時間資訊）
     const poolSug =
       poolSuggestions[key] ||
@@ -1468,7 +1470,7 @@ export default function StocksPage() {
         const fallback = poolSuggestions[symbol]
         if (!fallback) return null
         const fm = String(fallback.stock_market || '').toUpperCase()
-        return fm && fm !== String(market || 'CN').toUpperCase() ? null : fallback
+        return fm && fm !== String(market || DEFAULT_MARKET).toUpperCase() ? null : fallback
       })()
     if (poolSug) {
       const preloadedKline = klineSummaries[key] || (suggestions[symbol]?.kline as any) || null
@@ -1850,7 +1852,7 @@ export default function StocksPage() {
       </div>
 
       {/* Add Stock Dialog */}
-      <Dialog open={showStockForm} onOpenChange={(open) => { setShowStockForm(open); if (!open) { setSearchQuery(''); setSearchMarket('') } }}>
+      <Dialog open={showStockForm} onOpenChange={(open) => { setShowStockForm(open); if (!open) { setSearchQuery(''); setSearchMarket(DEFAULT_MARKET) } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>新增股票到自選</DialogTitle>
@@ -1861,12 +1863,7 @@ export default function StocksPage() {
               <div className="flex items-center gap-2 mb-2">
                 <Label className="mb-0">搜尋股票</Label>
                 <div className="flex items-center gap-1">
-                  {[
-                    { value: '', label: '全部' },
-                    { value: 'CN', label: 'A股' },
-                    { value: 'HK', label: '港股' },
-                    { value: 'US', label: '美股' },
-                  ].map(opt => (
+                  {MARKET_OPTIONS.map(opt => (
                     <button
                       key={opt.value}
                       type="button"
@@ -1905,7 +1902,7 @@ export default function StocksPage() {
                   value={searchQuery}
                   onChange={e => handleSearchInput(e.target.value)}
                   onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-                  placeholder={searchMarket === 'HK' ? '程式碼或名稱，如 00700 或 騰訊' : searchMarket === 'US' ? '程式碼或名稱，如 AAPL 或 蘋果' : '程式碼或名稱，如 600519 或 茅臺'}
+                  placeholder={searchMarket === 'TW' ? '代碼或名稱，如 2330 / 0050 / 台積電' : searchMarket === 'HK' ? '程式碼或名稱，如 00700 或 騰訊' : searchMarket === 'US' ? '程式碼或名稱，如 AAPL 或 蘋果' : '程式碼或名稱，如 600519 或 茅臺'}
                   className="pl-10"
                   autoComplete="off"
                 />
@@ -2389,13 +2386,7 @@ export default function StocksPage() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[13px] font-semibold text-foreground">關注列表</h3>
             <div className="flex items-center gap-1">
-              {[
-                { value: '', label: '全部', count: stocks.length },
-                { value: 'CN', label: 'A股', count: stocks.filter(s => s.market === 'CN').length },
-                { value: 'HK', label: '港股', count: stocks.filter(s => s.market === 'HK').length },
-                { value: 'US', label: '美股', count: stocks.filter(s => s.market === 'US').length },
-                { value: 'TW', label: '台股', count: stocks.filter(s => s.market === 'TW').length },
-              ].map(opt => (
+              {MARKET_OPTIONS.map(option => ({ ...option, count: stocks.filter(s => s.market === option.value).length })).map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => setStockListFilter(opt.value)}
@@ -2451,15 +2442,15 @@ export default function StocksPage() {
                 return (
                   <div
                     key={stock.id}
-                    draggable={stockListFilter === '' && !watchlistOnlyAlerts}
+                    draggable={isMarketEnabled(stockListFilter) && !watchlistOnlyAlerts}
                     onDragStart={(e) => {
-                      if (stockListFilter !== '' || watchlistOnlyAlerts) return
+                      if (!isMarketEnabled(stockListFilter) || watchlistOnlyAlerts) return
                       watchDragSnapshotRef.current = stocks
                       setDraggingWatchStockId(stock.id)
                       e.dataTransfer.effectAllowed = 'move'
                     }}
                     onDragOver={(e) => {
-                      if (stockListFilter !== '' || watchlistOnlyAlerts) return
+                      if (!isMarketEnabled(stockListFilter) || watchlistOnlyAlerts) return
                       e.preventDefault()
                       e.dataTransfer.dropEffect = 'move'
                       if (draggingWatchStockId != null) {
@@ -2467,7 +2458,7 @@ export default function StocksPage() {
                       }
                     }}
                     onDrop={(e) => {
-                      if (stockListFilter !== '' || watchlistOnlyAlerts) return
+                      if (!isMarketEnabled(stockListFilter) || watchlistOnlyAlerts) return
                       e.preventDefault()
                       if (draggingWatchStockId != null) commitWatchlistReorder()
                       setDraggingWatchStockId(null)
@@ -2726,7 +2717,7 @@ export default function StocksPage() {
             setPositionSearchQuery('')
             setPositionSearchResults([])
             setShowPositionDropdown(false)
-            setPositionSearchMarket('')
+            setPositionSearchMarket(DEFAULT_MARKET)
           }
         }}
       >
@@ -2751,12 +2742,7 @@ export default function StocksPage() {
                 <div className="flex items-center gap-2 mb-2">
                   <Label className="mb-0">搜尋股票</Label>
                   <div className="flex items-center gap-1">
-                    {[
-                      { value: '', label: '全部' },
-                      { value: 'CN', label: 'A股' },
-                      { value: 'HK', label: '港股' },
-                      { value: 'US', label: '美股' },
-                    ].map(opt => (
+                    {MARKET_OPTIONS.map(opt => (
                       <button
                         key={opt.value}
                         type="button"
@@ -2778,7 +2764,7 @@ export default function StocksPage() {
                     value={positionSearchQuery}
                     onChange={e => handlePositionSearchInput(e.target.value)}
                     onFocus={() => positionSearchResults.length > 0 && setShowPositionDropdown(true)}
-                    placeholder={positionSearchMarket === 'HK' ? '程式碼或名稱，如 00700 或 騰訊' : positionSearchMarket === 'US' ? '程式碼或名稱，如 LI 或 理想汽車' : positionSearchMarket === 'CN' ? '程式碼或名稱，如 600519 或 茅臺' : '程式碼或名稱，如 600519 / 00700 / AAPL'}
+                    placeholder={positionSearchMarket === 'TW' ? '代碼或名稱，如 2330 / 0050 / 台積電' : positionSearchMarket === 'HK' ? '程式碼或名稱，如 00700 或 騰訊' : positionSearchMarket === 'US' ? '程式碼或名稱，如 LI 或 理想汽車' : positionSearchMarket === 'CN' ? '程式碼或名稱，如 600519 或 茅臺' : '程式碼或名稱，如 600519 / 00700 / AAPL'}
                     className="pl-9"
                     autoComplete="off"
                   />

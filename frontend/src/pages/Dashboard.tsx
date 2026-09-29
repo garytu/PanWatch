@@ -1,3 +1,4 @@
+import { DEFAULT_MARKET, isMarketEnabled } from '@/lib/markets'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -127,7 +128,7 @@ export default function DashboardPage() {
   const [modal, setModal] = useState<{ open: boolean; symbol: string; market: string; name: string; hasPosition: boolean }>({
     open: false,
     symbol: '',
-    market: 'CN',
+    market: DEFAULT_MARKET,
     name: '',
     hasPosition: false,
   })
@@ -153,27 +154,27 @@ export default function DashboardPage() {
     // 快車道:DB/輕量查詢,先讓首屏(要緊事/體檢分佈/組合速覽)儘快出來
     const [sc, ov, dg, ht, td, ps, ms] = await Promise.allSettled([
       dashboardApi.intradayScan(),
-      dashboardApi.overview({ market: 'ALL', action_limit: 6, risk_limit: 6 }),
+      dashboardApi.overview({ market: DEFAULT_MARKET, action_limit: 6, risk_limit: 6 }),
       portfolioApi.diagnostics(),
       homeApi.alertHitsToday(),
       homeApi.todos(),
       dashboardApi.portfolioSummary(),
       dashboardApi.marketStatus(),
     ])
-    if (sc.status === 'fulfilled') setScan(sc.value.stocks || [])
+    if (sc.status === 'fulfilled') setScan((sc.value.stocks || []).filter(s => isMarketEnabled(s.market)))
     if (ov.status === 'fulfilled') setOverview(ov.value)
     if (dg.status === 'fulfilled') setDiag(dg.value)
     if (ht.status === 'fulfilled') setAlertHits(ht.value)
     if (td.status === 'fulfilled') setTodos(td.value.todos || [])
     if (ps.status === 'fulfilled') setPortfolioSummary(ps.value)
-    if (ms.status === 'fulfilled') setMarketStatus(ms.value)
+    if (ms.status === 'fulfilled') setMarketStatus(ms.value.filter(s => isMarketEnabled(s.code)))
     setLoading(false) // 首屏不再等基準/歸因(要拉全持倉 K 線)
     setRefreshedAt(new Date())
 
     // 機會兜底:overview 無機會時再取(不擋首屏)
     if (ov.status !== 'fulfilled' || !ov.value.action_center?.opportunities?.length) {
       recommendationsApi
-        .listStrategySignals({ status: 'active', limit: 5 })
+        .listStrategySignals({ status: 'active', market: DEFAULT_MARKET, limit: 5 })
         .then((r) => setOppFallback(r.items || []))
         .catch(() => {})
     }
@@ -202,7 +203,7 @@ export default function DashboardPage() {
   }
 
   const openStock = (symbol: string, market: string, name = '', hasPosition = false) =>
-    setModal({ open: true, symbol, market: market || 'CN', name, hasPosition })
+    setModal({ open: true, symbol, market: market || DEFAULT_MARKET, name, hasPosition })
 
   const runAiReview = async () => {
     setAiReviewLoading(true)
@@ -449,7 +450,7 @@ export default function DashboardPage() {
                   <div
                     key={i}
                     className={`flex items-center gap-2 py-1 text-[12px] ${t.symbol ? 'cursor-pointer hover:bg-accent/30' : ''}`}
-                    onClick={() => t.symbol && openStock(t.symbol, t.market || 'CN', '')}
+                    onClick={() => t.symbol && openStock(t.symbol, t.market || DEFAULT_MARKET, '')}
                   >
                     <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[9px] text-amber-600">
                       {t.type === 'no_alert' ? '加提醒' : '將到期'}
@@ -469,7 +470,7 @@ export default function DashboardPage() {
                   <div
                     key={i}
                     className={`flex items-center gap-3 py-2 ${it.symbol ? 'cursor-pointer hover:bg-accent/30' : ''}`}
-                    onClick={() => it.symbol && openStock(it.symbol, it.market || 'CN', it.name || '')}
+                    onClick={() => it.symbol && openStock(it.symbol, it.market || DEFAULT_MARKET, it.name || '')}
                   >
                     <span className={`shrink-0 rounded px-1 text-[9px] ${badge.cls}`}>{badge.label}</span>
                     <div className="min-w-0 flex-1">

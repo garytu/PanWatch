@@ -123,3 +123,29 @@ visually checked with an installed Chromium. `git diff --check` passed.
   cash-security workflows cover active equities, ETFs and preferred shares.
 - TWSE's annual calendar does not establish unscheduled typhoon closures. Supply
   emergency closures with `TW_EXTRA_CLOSED_DATES` when needed.
+
+
+## Taiwan-only deployment
+
+The active-market lists in `src/platform/marketdata/models.py` and
+`frontend/src/lib/markets.ts` now contain only `TW`; the CN/HK/US entries are
+commented out. Restore the entries in both files and restart PanWatch to enable
+other markets again. Their providers, market definitions and saved records remain.
+
+Selectors, stock search, opportunity discovery, market status and factor panels
+show Taiwan. Empty Taiwan opportunity results do not fall back to other markets.
+Automatic candidate scans, signal generation, factor calibration, agent contexts,
+price alerts and paper trading are limited to enabled markets. The quote adapter
+returns no quotes for disabled markets, and disabled market indexes are not fetched.
+Existing portfolio records and historical reporting remain available; this is not
+an account-data migration.
+
+Disabled paper allocations are treated as zero without automatically transferring
+money to Taiwan or modifying saved account allocations. An account with Taiwan at
+0% will continue to have no Taiwan buying budget until configured explicitly.
+Saving the Taiwan-only allocation form writes the effective allocation (other
+markets zero). Historical positions are retained, and manual closes in disabled
+markets are blocked while this policy is active.
+
+The regression suite explicitly enables all supported markets for existing tests;
+`tests/test_enabled_markets.py` exercises the Taiwan-only deployment separately.

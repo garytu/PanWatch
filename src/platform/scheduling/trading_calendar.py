@@ -21,6 +21,8 @@ A 股拿不到日曆時退回「只判週末」。台股日曆未知或超出年
 
 from __future__ import annotations
 
+from src.platform.marketdata.models import enabled_market_codes
+
 import asyncio
 import logging
 from datetime import date, datetime, timedelta
@@ -242,9 +244,8 @@ def calendar_status(market, d: date | datetime | None = None) -> dict:
 
 
 def any_market_trading_day(d: date | datetime | None = None) -> bool:
-    """CN/HK/US/TW 任一為交易日即 `True`。全市場休市(如週末)返回 `False`。"""
-    from src.platform.marketdata.models import MarketCode
+    """已啟用市場任一為交易日即 `True`。"""
 
     return any(
-        is_trading_day(m, d) for m in (MarketCode.CN, MarketCode.HK, MarketCode.US, MarketCode.TW)
+        is_trading_day(m, d) for m in enabled_market_codes()
     )

@@ -19,7 +19,7 @@ from src.modules.strategy.strategy_catalog import (
 )
 from src.modules.strategy.factor_weights import get_factor_weights
 from src.platform.scheduling.timezone import to_iso_with_tz, utc_now
-from src.platform.marketdata.models import MarketCode
+from src.platform.marketdata.models import MarketCode, enabled_market_codes
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import (
     EntryCandidate,
@@ -1226,7 +1226,7 @@ def refresh_strategy_signals(
 
         candidates = (
             db.query(EntryCandidate)
-            .filter(EntryCandidate.snapshot_date == snapshot)
+            .filter(EntryCandidate.snapshot_date == snapshot, EntryCandidate.stock_market.in_(enabled_market_codes()))
             .order_by(EntryCandidate.score.desc(), EntryCandidate.updated_at.desc())
             .limit(max(20, int(limit_candidates)))
             .all()
@@ -1789,7 +1789,7 @@ def rebalance_strategy_weights(
             default_weight = float(c.get("default_weight", 1.0))
             all_metrics = by_all.get(code, {"sample_size": 0, "wins": 0, "avg_return_pct": 0.0})
             targets.append((code, "ALL", {"default_weight": default_weight, **all_metrics}))
-            for market in ("CN", "HK", "US", "TW"):
+            for market in enabled_market_codes():
                 metrics = by_pair.get((code, market), {"sample_size": 0, "wins": 0, "avg_return_pct": 0.0})
                 targets.append((code, market, {"default_weight": default_weight, **metrics}))
 

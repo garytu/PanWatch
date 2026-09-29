@@ -204,8 +204,10 @@ def md_quote_rows(symbols: list[str], market: str) -> list[dict]:
 
     同步函式;async 呼叫方用 `await asyncio.to_thread(md_quote_rows, ...)`。
     """
+    from src.platform.marketdata.models import is_market_enabled
+
     syms = list(symbols)
-    if not syms:
+    if not syms or not is_market_enabled(market):
         return []
     quotes = get_market_data().quotes(syms, market=market)
     rows = [_quote_to_row(q) for q in quotes]
