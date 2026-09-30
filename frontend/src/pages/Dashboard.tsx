@@ -172,7 +172,7 @@ export default function DashboardPage() {
     setRefreshedAt(new Date())
 
     // 機會兜底:overview 無機會時再取(不擋首屏)
-    if (ov.status !== 'fulfilled' || !ov.value.action_center?.opportunities?.length) {
+    if (ov.status !== 'fulfilled' || !ov.value.action_center?.opportunities?.some(item => isMarketEnabled(item.stock_market))) {
       recommendationsApi
         .listStrategySignals({ status: 'active', market: DEFAULT_MARKET, limit: 5 })
         .then((r) => setOppFallback(r.items || []))
@@ -225,7 +225,8 @@ export default function DashboardPage() {
   }, [scan])
 
   const opportunities = useMemo(() => {
-    const list = overview?.action_center?.opportunities?.length ? overview.action_center.opportunities : oppFallback
+    const overviewItems = (overview?.action_center?.opportunities || []).filter(item => isMarketEnabled(item.stock_market))
+    const list = overviewItems.length ? overviewItems : oppFallback.filter(item => isMarketEnabled(item.stock_market))
     return list.slice(0, 5)
   }, [overview, oppFallback])
 
@@ -675,6 +676,7 @@ export default function DashboardPage() {
                         <span className="truncate text-[13px] font-medium">{o.stock_name || o.stock_symbol}</span>
                         {o.action_label && <span className="rounded bg-primary/10 px-1 text-[9px] text-primary">{o.action_label}</span>}
                       </div>
+                      <div className="truncate font-mono text-[10px] text-muted-foreground">{o.stock_symbol}</div>
                       {(o.signal || o.reason) && <div className="truncate text-[11px] text-muted-foreground">{o.signal || o.reason}</div>}
                     </div>
                     <div className="shrink-0 text-right">
