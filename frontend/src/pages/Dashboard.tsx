@@ -164,8 +164,8 @@ export default function DashboardPage() {
     if (sc.status === 'fulfilled') setScan((sc.value.stocks || []).filter(s => isMarketEnabled(s.market)))
     if (ov.status === 'fulfilled') setOverview(ov.value)
     if (dg.status === 'fulfilled') setDiag(dg.value)
-    if (ht.status === 'fulfilled') setAlertHits(ht.value)
-    if (td.status === 'fulfilled') setTodos(td.value.todos || [])
+    if (ht.status === 'fulfilled') setAlertHits(ht.value.filter(hit => isMarketEnabled(hit.market)))
+    if (td.status === 'fulfilled') setTodos((td.value.todos || []).filter(todo => isMarketEnabled(todo.market || '')))
     if (ps.status === 'fulfilled') setPortfolioSummary(ps.value)
     if (ms.status === 'fulfilled') setMarketStatus(ms.value.filter(s => isMarketEnabled(s.code)))
     setLoading(false) // 首屏不再等基準/歸因(要拉全持倉 K 線)
@@ -229,7 +229,7 @@ export default function DashboardPage() {
     return list.slice(0, 5)
   }, [overview, oppFallback])
 
-  // 今日必讀候選(多源)→ 交 AI 策展(失敗兜底原序)
+  // 今日要緊事只收自選、持倉和提醒；全市場機會留在「機會精選」。
   const candidates = useMemo<CurateCandidate[]>(() => {
     const out: CurateCandidate[] = []
     for (const h of alertHits) {
@@ -245,12 +245,8 @@ export default function DashboardPage() {
         signal: s.suggestion?.signal || (s.alert_type ? ALERT_LABEL[s.alert_type] || s.alert_type : ''),
       })
     }
-    for (const a of diag?.alerts || []) out.push({ type: 'risk', name: '組合風險', market: '', signal: a })
-    for (const o of opportunities.slice(0, 3)) {
-      out.push({ type: 'opportunity', symbol: o.stock_symbol, name: o.stock_name || o.stock_symbol, market: o.stock_market, signal: o.signal || o.reason || o.action_label || '' })
-    }
     return out
-  }, [alertHits, urgent, diag, opportunities])
+  }, [alertHits, urgent])
 
   const candKey = useMemo(
     () => candidates.map((c) => `${c.type}:${c.symbol}:${c.change_pct ?? ''}`).join('|'),
