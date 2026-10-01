@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     twmd_base_url: str = "http://127.0.0.1:8000"
     twmd_api_token: str = ""
     twmd_timeout_sec: float = Field(default=5, gt=0)
+    twmd_control_base_url: str = "http://127.0.0.1:9200"
+    twmd_control_agent_token: str = ""
     finmind_api_token: str = ""
     external_quote_feed_url: str = Field(default="http://127.0.0.1:8088", validation_alias=AliasChoices(
         "EXTERNAL_QUOTE_FEED_URL", "TW_QUOTE_FEED_URL"))

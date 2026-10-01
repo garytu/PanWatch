@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from src.platform.marketdata.marketdata_client import md_quote_rows, QUOTE_METADATA
 from src.platform.marketdata.models import MarketCode
+from src.platform.marketdata.twmd_control import TwmdControlClient, TwmdControlError
 
 router = APIRouter()
 
@@ -81,6 +82,13 @@ def get_taiwan_feed_status():
     from src.platform.persistence.database import SessionLocal
     from src.platform.persistence.models import Stock
     from src.platform.scheduling.trading_calendar import calendar_status
+    control = TwmdControlClient()
+    try:
+        subscription_state = control.subscriptions()
+        control_error = None
+    except TwmdControlError as exc:
+        subscription_state = None
+        control_error = str(exc)
     client = TwmdClient(twmd_config())
     with ThreadPoolExecutor(max_workers=3) as pool:
         futures = [pool.submit(client.get, path) for path in ("quotes/capabilities", "bars/capabilities", "readiness")]
@@ -100,11 +108,57 @@ def get_taiwan_feed_status():
         except ValueError:
             unresolved.append(symbol)
     confirmed = set(quotes.get("confirmed_instrument_ids") or [])
+    desired = set(subscription_state.get("instrument_ids") or []) if subscription_state else set()
+    watchlist = set(requested)
     return {"quotes": quotes, "intraday": bars, "storage": storage, "calendar": calendar_status("TW"),
-            "watchlist_instrument_ids": sorted(set(requested)), "unresolved_symbols": unresolved,
-            "unsubscribed_instrument_ids": sorted(set(requested) - confirmed),
+            "watchlist_instrument_ids": sorted(watchlist), "unresolved_symbols": unresolved,
+            "subscription_control": {"available": subscription_state is not None,
+                                     "error": control_error,
+                                     "instrument_ids": sorted(desired),
+                                     "count": subscription_state.get("count") if subscription_state else None,
+                                     "limit": subscription_state.get("limit") if subscription_state else None},
+            "unsubscribed_instrument_ids": sorted(watchlist - desired) if subscription_state else [],
+            "pending_subscription_instrument_ids": sorted((watchlist & desired) - confirmed) if subscription_state else [],
             "active_instrument_counts": active_counts,
-            "subscription_coverage_complete": not unresolved and set(requested) <= confirmed}
+            "subscription_coverage_complete": subscription_state is not None and not unresolved and watchlist <= confirmed}
+
+
+def _validated_instrument_id(instrument_id: str, *, require_active: bool) -> str:
+    from marketdata.symbol import Symbol
+    from marketdata.vendors.twmd import TwmdClient
+    from src.platform.marketdata.marketdata_client import twmd_config
+    try:
+        parsed = Symbol.parse(instrument_id)
+    except ValueError:
+        raise HTTPException(400, "請使用 TWSE: 或 TPEX: 股票代碼")
+    if parsed.identity != instrument_id or parsed.venue not in {"TWSE", "TPEX"}:
+        raise HTTPException(400, "請使用 TWSE: 或 TPEX: 股票代碼")
+    if require_active:
+        catalog = TwmdClient(twmd_config()).instruments()
+        if not catalog:
+            raise HTTPException(503, "twmd 標的目錄暫時無法連線")
+        if not any(row.get("instrument_id") == instrument_id and row.get("is_active")
+                   and row.get("security_type") in {"EQUITY", "ETF", "PREFERRED"} for row in catalog):
+            raise HTTPException(400, "標的不是有效的台股現貨證券")
+    return instrument_id
+
+
+def _change_subscription(method: str, instrument_id: str) -> dict:
+    canonical = _validated_instrument_id(instrument_id, require_active=method == "PUT")
+    try:
+        return TwmdControlClient().subscriptions(method, canonical)
+    except TwmdControlError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+@router.put("/taiwan/subscriptions/{instrument_id}")
+def subscribe_taiwan_quote(instrument_id: str):
+    return _change_subscription("PUT", instrument_id)
+
+
+@router.delete("/taiwan/subscriptions/{instrument_id}")
+def unsubscribe_taiwan_quote(instrument_id: str):
+    return _change_subscription("DELETE", instrument_id)
 
 
 @router.get("/{symbol}")

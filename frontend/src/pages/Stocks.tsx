@@ -2382,7 +2382,7 @@ export default function StocksPage() {
       {/* Watchlist */}
       {viewTab === 'watchlist' && (
         <div className="card p-4">
-          {stocks.some(stock => stock.market === 'TW') && <TaiwanFeedStatus />}
+          <TaiwanFeedStatus />
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[13px] font-semibold text-foreground">關注列表</h3>
             <div className="flex items-center gap-1">

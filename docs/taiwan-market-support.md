@@ -14,6 +14,8 @@ TW_DATA_PROVIDER=twmd
 TWMD_BASE_URL=http://127.0.0.1:8000
 TWMD_API_TOKEN=
 TWMD_TIMEOUT_SEC=5
+TWMD_CONTROL_BASE_URL=http://127.0.0.1:9200
+TWMD_CONTROL_AGENT_TOKEN=<agent token from twmd control service>
 PANWATCH_PORT=8001
 TW_PAPER_LOT_SIZE=1000
 TW_COMMISSION_RATE=0.001425
@@ -32,6 +34,8 @@ PANWATCH_API_TARGET=http://127.0.0.1:8001 make dev-web
 The frontend runs on 5183. `PANWATCH_API_TARGET` can also be set in
 `frontend/.env.local`. In Docker, use a twmd address reachable from the PanWatch
 container, such as a Compose service name; `127.0.0.1` refers to that container.
+The read-only twmd query API and authenticated control API use separate addresses.
+Keep the control agent token in PanWatch's private `.env`; it is never sent to the browser.
 Rebuild the frontend and restart PanWatch after deploying these changes.
 
 Charts use Playwright Chromium. Install the browser matching the project's
@@ -57,13 +61,20 @@ FinMind daily history. Native twmd integration is the default.
 | Costs | Stock sell tax 0.3%; ETF sell tax 0.1%; bond ETF exemption through 2026. Commission and minimum commission are configurable broker assumptions. Taiwan has no mainland transfer fee. |
 | Calendar | Validated TWSE annual schedule cached on disk, including settlement-only closures. Unknown/out-of-year coverage stops Taiwan trading-session jobs. `TW_EXTRA_CLOSED_DATES` adds emergency closure dates. |
 | Financial and chip data | FinMind remains the optional source for fundamentals, news, dividends, institutional flows and margin. Institutional flows use shares; margin quantities use lots and leave monetary fields null. |
-| Readiness | `/api/quotes/taiwan/status` reports collection health, subscription coverage, calendar status and active cash-instrument counts by venue. The watchlist displays degraded state and missing subscriptions. |
+| Readiness and subscriptions | `/api/quotes/taiwan/status` reports collection health, durable requested subscriptions, confirmed subscriptions, calendar status and active cash-instrument counts by venue. The watchlist can explicitly request or cancel a subscription through PanWatch's authenticated proxy to twmd control port 9200. Requested subscriptions may remain pending until the collector confirms them. |
 
 The cost assumptions follow the [TWSE securities guide](https://www.twse.com.tw/en/about/company/guide.html)
 and [ETF trading rules](https://www.twse.com.tw/en/products/securities/etf/overview/rules.html).
 The configured minimum commission is a simulation assumption, rather than an
 exchange requirement. The swing simulator does not apply stock day-trading tax
 relief. Margin quantities follow [FinMind's chip-data contract](https://finmind.github.io/tutor/TaiwanMarket/Chip/).
+
+On 2026-10-01, the rebuilt twmd control and collector services reported
+`TWSE:2330`, `TWSE:2303`, and `TWSE:4164` in both the durable requested set and
+the collector-confirmed set. PanWatch's status endpoint reported a connected
+collector. The watchlist also contained `TWSE:4958`, which had not been requested;
+the UI offers an explicit subscribe action for it. This check ran after the
+regular session and does not establish fresh trading-session delivery.
 
 ## Verification on 2026-09-29
 
@@ -106,8 +117,8 @@ visually checked with an installed Chromium. `git diff --check` passed.
 - Complete the active TPEX catalog in twmd, preserving canonical venue, security
   type, name and delisting state. See [the twmd handoff](twmd-taiwan-follow-up.md).
 - Validate live arrivals, quote expiry and recovery during a trading session.
-  Subscription management remains in twmd; PanWatch reports missing subscriptions
-  and does not silently subscribe every instrument discovered by its scanner.
+  PanWatch does not silently subscribe every instrument discovered by its scanner.
+  The twmd control service must be reachable with an agent token to edit subscriptions.
 - The deployed minute API serves stored historical acquisitions. Continuous live
   minute collection still requires a twmd enhancement before a streaming chart or
   minute-driven live strategy can be claimed.

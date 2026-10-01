@@ -12,6 +12,7 @@ from src.platform.marketdata import marketdata_client as mc
 from src.platform.marketdata.models import MarketCode
 from src.platform.scheduling import trading_calendar as tc
 from src.modules.market.api import quotes, klines
+from src.platform.marketdata.twmd_control import TwmdControlClient, TwmdControlError
 from src.modules.market.price_alert_engine import PriceAlertEngine
 from src.modules.paper_trading import paper_trading_engine as pt
 from src.modules.strategy.backtest.cost_model import cost_model_for_market, trading_lot
@@ -49,6 +50,59 @@ def test_taiwan_settings_use_env_file_and_explicit_environment_override(monkeypa
     assert Settings().panwatch_port == 8001
     monkeypatch.setenv("TWMD_BASE_URL", "http://override:8000")
     assert mc.twmd_config()["base_url"] == "http://override:8000"
+
+
+def test_twmd_control_uses_separate_authenticated_endpoint(monkeypatch):
+    import httpx
+    from src.platform.runtime.config import Settings
+    requests = []
+
+    def respond(request):
+        requests.append((request.method, str(request.url), request.headers.get("Authorization")))
+        return httpx.Response(200, json={"version": "v1", "data": {
+            "instrument_ids": ["TWSE:2330"], "count": 1, "limit": 200}})
+
+    transport = httpx.MockTransport(respond)
+    original_client = httpx.Client
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: original_client(transport=transport, **kwargs))
+    settings = Settings(twmd_control_base_url="http://twmd-control:9200",
+                        twmd_control_agent_token="private-test-token")
+    client = TwmdControlClient(settings)
+    for method in ("GET", "PUT", "DELETE"):
+        assert client.subscriptions(method, "TWSE:2330" if method != "GET" else None)["count"] == 1
+    assert [row[0] for row in requests] == ["GET", "PUT", "DELETE"]
+    assert all(row[1].startswith("http://twmd-control:9200/api/v1/control/quote-subscriptions")
+               and row[2] == "Bearer private-test-token" for row in requests)
+
+
+def test_twmd_control_errors_do_not_expose_token(monkeypatch):
+    import httpx
+    from src.platform.runtime.config import Settings
+    original_client = httpx.Client
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: original_client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(403, json={
+            "error": {"message": "private-test-token"}})), **kwargs))
+    with pytest.raises(TwmdControlError, match="拒絕憑證") as error:
+        TwmdControlClient(Settings(twmd_control_agent_token="private-test-token")).subscriptions()
+    assert "private-test-token" not in str(error.value)
+
+
+def test_taiwan_subscription_proxy_validates_cash_instrument(monkeypatch):
+    from fastapi import HTTPException
+    monkeypatch.setattr("marketdata.vendors.twmd.TwmdClient.instruments", lambda self: [
+        {"instrument_id": "TWSE:2330", "is_active": True, "security_type": "EQUITY"},
+        {"instrument_id": "TPEX:6488", "is_active": False, "security_type": "OTHER"},
+    ])
+    calls = []
+    monkeypatch.setattr(TwmdControlClient, "subscriptions", lambda self, method, instrument_id:
+                        calls.append((method, instrument_id)) or {"instrument_ids": [instrument_id]})
+    assert quotes.subscribe_taiwan_quote("TWSE:2330")["instrument_ids"] == ["TWSE:2330"]
+    with pytest.raises(HTTPException):
+        quotes.subscribe_taiwan_quote("TPEX:6488")
+    with pytest.raises(HTTPException):
+        quotes.subscribe_taiwan_quote("2330")
+    assert quotes.unsubscribe_taiwan_quote("TPEX:6488")["instrument_ids"] == ["TPEX:6488"]
+    assert calls == [("PUT", "TWSE:2330"), ("DELETE", "TPEX:6488")]
 
 
 @pytest.mark.parametrize("raw, canonical", [("6488.TWO", "TPEX:6488"), ("00878.TW", "TWSE:00878"),
