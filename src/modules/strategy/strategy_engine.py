@@ -6,7 +6,7 @@ import logging
 from datetime import date, datetime, timedelta
 from math import sqrt
 
-from sqlalchemy import and_, case, func
+from sqlalchemy import and_, case, exists, func, or_
 
 from src.platform.marketdata.collectors.kline_collector import KlineCollector
 from src.modules.strategy.entry_candidates import refresh_entry_candidates
@@ -289,6 +289,19 @@ def _strategy_codes_for_candidate(row: EntryCandidate) -> list[str]:
         out.append(c)
         seen.add(c)
     return out
+
+
+def _current_candidate_identity_filter():
+    """Hide signals whose candidate ID now belongs to another instrument."""
+    return or_(
+        StrategySignalRun.source_candidate_id.is_(None),
+        exists().where(and_(
+            EntryCandidate.id == StrategySignalRun.source_candidate_id,
+            EntryCandidate.snapshot_date == StrategySignalRun.snapshot_date,
+            EntryCandidate.stock_symbol == StrategySignalRun.stock_symbol,
+            EntryCandidate.stock_market == StrategySignalRun.stock_market,
+        )),
+    )
 
 
 def _compute_rank_score(
@@ -1232,6 +1245,10 @@ def refresh_strategy_signals(
             .all()
         )
         if not candidates:
+            db.query(StrategySignalRun).filter(
+                StrategySignalRun.snapshot_date == snapshot
+            ).delete(synchronize_session=False)
+            db.commit()
             return {"snapshot_date": snapshot, "count": 0, "items": []}
 
         profile_map = get_strategy_profile_map()
@@ -1252,17 +1269,19 @@ def refresh_strategy_signals(
             .filter(StrategySignalRun.snapshot_date == snapshot)
             .all()
         )
-        existing: dict[tuple[int, str], StrategySignalRun] = {}
+        # Candidate IDs can be reused when a day's candidate snapshot is rebuilt.
+        # A signal belongs to the instrument as well as to the numeric candidate ID.
+        existing: dict[tuple[int, str, str, str], StrategySignalRun] = {}
         for row in existing_rows:
             cand_id = row.source_candidate_id
             code = row.strategy_code
             if cand_id is None:
                 continue
-            existing[(int(cand_id), str(code or ""))] = row
+            existing[(int(cand_id), str(code or ""), row.stock_symbol, row.stock_market)] = row
 
         weight_cache: dict[str, dict[str, float]] = {}
         factor_weight_cache: dict[str, dict[str, float]] = {}
-        touched_keys: set[tuple[int, str]] = set()
+        reused_ids: set[int] = set()
         touched_rows: list[StrategySignalRun] = []
 
         for c in candidates:
@@ -1337,7 +1356,7 @@ def refresh_strategy_signals(
                     "cross_feature": cross_features.get(int(c.id)) if c.id is not None else {},
                     "news_metric": normalized_news_metric,
                 }
-                key = (int(c.id), str(code))
+                key = (int(c.id), str(code), c.stock_symbol, market)
                 row = existing.get(key)
                 if not row:
                     row = StrategySignalRun(
@@ -1350,7 +1369,12 @@ def refresh_strategy_signals(
                     )
                     db.add(row)
                     existing[key] = row
+                elif row.id is not None:
+                    reused_ids.add(int(row.id))
 
+                row.stock_symbol = c.stock_symbol
+                row.stock_market = market
+                row.stock_name = c.stock_name or c.stock_symbol
                 row.strategy_name = strategy_name
                 row.strategy_version = strategy_version
                 row.risk_level = risk_level
@@ -1378,7 +1402,6 @@ def refresh_strategy_signals(
                 row.context_quality_score = context_quality_score
                 row.payload = to_jsonable(payload)
                 row.updated_at = utc_now()
-                touched_keys.add(key)
                 touched_rows.append(row)
 
         constraint_stats = _apply_portfolio_constraints(rows=touched_rows)
@@ -1391,11 +1414,8 @@ def refresh_strategy_signals(
             )
 
         # Remove stale strategy rows for same candidate snapshot when strategy mapping changed.
-        stale_ids = [
-            int(row.id)
-            for key, row in existing.items()
-            if row.id is not None and key not in touched_keys
-        ]
+        stale_ids = [int(row.id) for row in existing_rows
+                     if row.id is not None and int(row.id) not in reused_ids]
         if stale_ids:
             db.query(StrategySignalRun).filter(
                 StrategySignalRun.id.in_(stale_ids)
@@ -1472,7 +1492,10 @@ def list_strategy_signals(
         if not snapshot:
             return {"snapshot_date": "", "count": 0, "items": []}
 
-        q = db.query(StrategySignalRun).filter(StrategySignalRun.snapshot_date == snapshot)
+        q = db.query(StrategySignalRun).filter(
+            StrategySignalRun.snapshot_date == snapshot,
+            _current_candidate_identity_filter(),
+        )
         mkt = (market or "").strip().upper()
         if mkt:
             q = q.filter(StrategySignalRun.stock_market == mkt)
@@ -2075,7 +2098,8 @@ def get_strategy_stats(*, days: int = 45) -> dict:
         if snapshot:
             rows = (
                 db.query(StrategySignalRun)
-                .filter(StrategySignalRun.snapshot_date == snapshot)
+                .filter(StrategySignalRun.snapshot_date == snapshot,
+                        _current_candidate_identity_filter())
                 .order_by(StrategySignalRun.rank_score.desc(), StrategySignalRun.updated_at.desc())
                 .limit(20)
                 .all()
