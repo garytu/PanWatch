@@ -1058,13 +1058,24 @@ export default function AgentsPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-[12px]">超時(分鐘)</Label>
+                  <Label className="text-[12px]">整輪分析超時(分鐘)</Label>
                   <Input
                     type="number"
                     min={1}
                     max={60}
-                    value={String(taConfigForm.timeout_minutes ?? 15)}
-                    onChange={e => setTaConfigForm({ ...taConfigForm, timeout_minutes: parseInt(e.target.value) || 15 })}
+                    value={String(taConfigForm.timeout_minutes ?? 45)}
+                    onChange={e => setTaConfigForm({ ...taConfigForm, timeout_minutes: parseInt(e.target.value) || 45 })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-[12px]">單次模型請求超時(秒)</Label>
+                  <Input
+                    type="number"
+                    min={30}
+                    max={900}
+                    step={30}
+                    value={String(taConfigForm.llm_timeout_seconds ?? 300)}
+                    onChange={e => setTaConfigForm({ ...taConfigForm, llm_timeout_seconds: parseInt(e.target.value) || 300 })}
                   />
                 </div>
               </div>

@@ -81,7 +81,7 @@ class TestLLMAdapter(unittest.TestCase):
 
         config = build_ta_llm_config(ai_client)
 
-        self.assertEqual(config["llm_timeout_seconds"], 120)
+        self.assertEqual(config["llm_timeout_seconds"], 300)
         self.assertEqual(config["llm_max_retries"], 0)
         self.assertEqual(config["max_tokens"], 4096)
 
@@ -469,7 +469,7 @@ class TestPhaseBFeatures(unittest.TestCase):
     def test_agent_init_has_bounded_llm_defaults(self):
         """TradingAgents 預設不能把供應商請求無限期掛起。"""
         agent = TradingAgentsAgent()
-        self.assertEqual(agent.llm_timeout_seconds, 120)
+        self.assertEqual(agent.llm_timeout_seconds, 300)
         self.assertEqual(agent.llm_max_retries, 0)
         self.assertEqual(agent.llm_max_tokens, 4096)
 

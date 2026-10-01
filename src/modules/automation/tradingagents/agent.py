@@ -114,12 +114,12 @@ class TradingAgentsAgent(BaseAgent):
         output_language: str = "Chinese",
         deep_model: str | None = None,    # 推理/辯論/PM 用的強模型 (留空走預設)
         quick_model: str | None = None,   # 分析師工具呼叫用的快模型 (留空 = deep_model)
-        timeout_minutes: int = 30,        # 整個流程硬超時;0.3.0 工具鏈更重,預設提到 30 min
+        timeout_minutes: int = 45,        # 本地大模型多節點串行執行，整輪保留 45 分鐘上限
         collection_timeout_seconds: int = 45,  # 單個外部資料來源採集硬超時
         emit_paper_trading_signal: bool = False,  # 是否把 BUY 決策寫入 StrategySignalRun 驅動模擬交易
         enable_sec_edgar: bool = False,   # 美股財報可顯式優先使用 SEC EDGAR
         holding_period_days: int = 5,     # 上游決策質量回測/持倉期限語義
-        llm_timeout_seconds: int = 120,   # 單次 LLM 請求硬超時,避免圖卡死
+        llm_timeout_seconds: int = 300,   # 本地 27B 模型長回覆可超過 120 秒
         llm_max_retries: int = 0,         # 深度分析不在圖內重複重試供應商請求
         llm_max_tokens: int = 4096,       # 限制推理/報告輸出,避免閘道器空閒超時
     ):

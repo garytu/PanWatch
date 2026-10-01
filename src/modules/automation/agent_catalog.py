@@ -147,8 +147,8 @@ AGENT_SEED_SPECS: tuple[AgentSeedSpec, ...] = (
             "output_language": "Chinese",
             "deep_model": "",       # 留空走預設 AI Service 的 model;可填如 "claude-sonnet-4"
             "quick_model": "",      # 留空 = deep_model;可填便宜模型如 "deepseek-chat"
-            "timeout_minutes": 15,
-            "llm_timeout_seconds": 120,  # 單次 LLM 請求超時，防止 analyst 永久阻塞
+            "timeout_minutes": 45,
+            "llm_timeout_seconds": 300,  # 本地大模型長回覆上限；每次請求仍受硬超時保護
             "llm_max_retries": 0,         # 深度分析失敗快速落終態，不在圖內重複重試
             "llm_max_tokens": 4096,       # 限制模型輸出，避免閘道器空閒超時
             "emit_paper_trading_signal": False,  # 是否把 BUY 決策寫入 StrategySignalRun
