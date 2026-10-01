@@ -46,6 +46,25 @@ logger = logging.getLogger(__name__)
 __all__ = ["TradingAgentsAgent", "TradingAgentsUnavailable"]
 
 
+def _tradingagents_ticker(symbol: str, market: str, instrument_id: str = "") -> str:
+    """Use a path-safe TA ticker while preserving PanWatch's canonical identity."""
+    if market != "TW":
+        return symbol
+    from marketdata.symbol import Symbol
+
+    parsed = Symbol.parse(symbol, "TW")
+    requested_code = parsed.code
+    if parsed.venue is None:
+        from marketdata.vendors.twmd import TwmdClient
+        from src.platform.marketdata.marketdata_client import twmd_config
+
+        canonical = instrument_id or TwmdClient(twmd_config()).resolve(parsed)
+        parsed = Symbol.parse(canonical, "TW")
+    if parsed.venue not in {"TWSE", "TPEX"} or parsed.code != requested_code:
+        raise ValueError(f"台股標的需要明確交易所：{symbol}")
+    return parsed.to_yfinance()
+
+
 def get_market_data():
     """lazy import,便於測試 monkeypatch(module 級)。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
@@ -577,10 +596,15 @@ class TradingAgentsAgent(BaseAgent):
                 patch_instrument_context(graph, stock_metadata_context)
 
             date_str = datetime.now().strftime("%Y-%m-%d")
+            quote = panwatch_data.get("quote") or {}
+            ta_ticker = _tradingagents_ticker(symbol, market, str(quote.get("instrument_id") or ""))
+            ticker_aliases = {symbol: ta_ticker}
+            if quote.get("instrument_id"):
+                ticker_aliases[str(quote["instrument_id"])] = ta_ticker
             final_state, decision = graph.propagate(
-                symbol,
+                ta_ticker,
                 date_str,
-                portfolio=to_tradingagents_portfolio(portfolio),
+                portfolio=to_tradingagents_portfolio(portfolio, ticker_aliases=ticker_aliases),
             )
 
         # 成本提取(TradingAgents 內部 token 統計;若上游未暴露,fallback 用 estimate)

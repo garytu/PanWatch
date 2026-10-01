@@ -282,7 +282,7 @@ def _finite_number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def to_tradingagents_portfolio(portfolio: Any):
+def to_tradingagents_portfolio(portfolio: Any, *, ticker_aliases: dict[str, str] | None = None):
     """把 ``PortfolioInfo`` 轉為 TradingAgents 0.5.0 的 ``PortfolioContext``。
 
     多帳戶中同一 ticker 的倉位按數量加權平均成本價聚合。沒有帳戶快照時返回
@@ -304,6 +304,7 @@ def to_tradingagents_portfolio(portfolio: Any):
 
         for position in getattr(account, "positions", ()) or ():
             ticker = str(getattr(position, "symbol", "") or "").strip().upper()
+            ticker = (ticker_aliases or {}).get(ticker, ticker)
             quantity = _finite_number(getattr(position, "quantity", None))
             # TradingAgents 0.5.0 用正數表示多頭、負數表示空頭；這裡只過濾
             # 零數量和髒資料，不能把空頭當成“無持倉”丟掉。

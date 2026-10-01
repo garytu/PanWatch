@@ -128,13 +128,31 @@ def is_hk_share(symbol: str) -> bool:
     return bool(symbol) and len(symbol) == 5 and symbol.isdigit()
 
 
+def _taiwan_identity(symbol: str) -> str | None:
+    if not isinstance(symbol, str) or not re.fullmatch(
+        r"(?:(?:TWSE|TPEX):\d{4,6}[A-Z]?|\d{4,6}[A-Z]?\.TW(?:O)?)", symbol.upper()
+    ):
+        return None
+    from marketdata.symbol import Symbol
+    try:
+        parsed = Symbol.parse(symbol)
+    except ValueError:
+        return None
+    return parsed.identity if parsed.venue in {"TWSE", "TPEX"} else None
+
+
+def _same_snapshot_symbol(symbol: str, cached_symbol: str) -> bool:
+    identity = _taiwan_identity(symbol)
+    return identity == _taiwan_identity(cached_symbol) if identity else symbol == cached_symbol
+
+
 def is_panwatch_routable(symbol: str) -> bool:
     """該 ticker 是否應該走 PanWatch 資料(而不是上游 yfinance)。
 
     A 股(6 位數字)yfinance 拉不到,港股(5 位數字)yfinance 也要 .HK 字尾,
     都需要 PanWatch 兜底。美股(字母 ticker)繼續走 yfinance。
     """
-    return is_a_share(symbol) or is_hk_share(symbol)
+    return is_a_share(symbol) or is_hk_share(symbol) or _taiwan_identity(symbol) is not None
 
 
 def _looks_like_cn_keyword(symbol: str) -> bool:
@@ -227,7 +245,12 @@ def _extract_requested_symbol(args: tuple[Any, ...], kwargs: dict[str, Any]) -> 
 
 def _cached_symbol() -> str:
     stock = _cache().get("stock")
-    return str(getattr(stock, "symbol", "") or "").strip()
+    symbol = str(getattr(stock, "symbol", "") or "").strip()
+    quote = _cache().get("quote") or {}
+    market = getattr(getattr(stock, "market", None), "value", "")
+    if market == "TW" and isinstance(quote, dict):
+        return str(quote.get("instrument_id") or symbol).strip()
+    return symbol
 
 
 def _patched_route_to_vendor(method_name: str, *args, **kwargs):
@@ -261,10 +284,10 @@ def _patched_route_to_vendor(method_name: str, *args, **kwargs):
         symbol
         and is_panwatch_routable(symbol)
         and cached_symbol
-        and symbol != cached_symbol
+        and not _same_snapshot_symbol(symbol, cached_symbol)
         and _cache()
     )
-    if snapshot_symbol_mismatch and is_a_share(symbol):
+    if snapshot_symbol_mismatch and (is_a_share(symbol) or _taiwan_identity(symbol)):
         message = _data_unavailable_message(
             method_name,
             symbol,
@@ -281,7 +304,7 @@ def _patched_route_to_vendor(method_name: str, *args, **kwargs):
         return message
 
     # A 股:yfinance/finnhub 拉不到,直接走 PanWatch
-    if is_a_share(symbol) and _cache():
+    if (is_a_share(symbol) or _taiwan_identity(symbol)) and _cache():
         try:
             result = _serve_from_panwatch(method_name, symbol, kwargs, args=args)
             _emit_toolkit_log(
@@ -293,6 +316,8 @@ def _patched_route_to_vendor(method_name: str, *args, **kwargs):
             )
             return result
         except NotImplementedError:
+            if _taiwan_identity(symbol):
+                return _data_unavailable_message(method_name, symbol, RuntimeError("PanWatch has no backing data"))
             _emit_toolkit_log(
                 "info", "MISS", method_name, symbol,
                 reason="PanWatch 未實現該 method,放行到上游",
@@ -495,6 +520,8 @@ def _market_for_symbol(symbol: str):
         return MarketCode.CN
     if is_hk_share(symbol):
         return MarketCode.HK
+    if _taiwan_identity(symbol):
+        return MarketCode.TW
     return MarketCode.US
 
 
@@ -509,12 +536,12 @@ def _build_panwatch_ohlcv_df(symbol: str, curr_date: str):
     # 不應因為上游預設 lookback=750 再向東財發起一輪可能阻塞的請求。
     cached_klines = _cache().get("klines")
     cached_stock = _cache().get("stock")
-    cached_symbol = getattr(cached_stock, "symbol", "") if cached_stock is not None else ""
-    cache_matches_symbol = bool(cached_symbol) and str(cached_symbol) == str(symbol)
+    cached_symbol = _cached_symbol() if cached_stock is not None else ""
+    cache_matches_symbol = bool(cached_symbol) and _same_snapshot_symbol(str(symbol), str(cached_symbol))
     if cache_matches_symbol and isinstance(cached_klines, (list, tuple)):
         klines = list(cached_klines)
     else:
-        klines = KlineCollector(market).get_klines(symbol, days=750)
+        klines = KlineCollector(market).get_klines(_taiwan_identity(symbol) or symbol, days=750)
     if not klines:
         return None
     df = pd.DataFrame(
