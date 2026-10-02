@@ -43,6 +43,11 @@ def market_label(market: MarketCode) -> str:
     return market.value
 
 
+def format_change_pct(value: float | None) -> str:
+    """Keep an unavailable price change distinct from an actual zero move."""
+    return f"{value:+.2f}%" if value is not None else "N/A"
+
+
 # 標準化操作建議
 SUGGESTION_TYPES = {
     "建倉": "buy",  # 新開倉位
@@ -215,7 +220,7 @@ class IntradayMonitorAgent(BaseAgent):
 
         # 股票行情
         current_price = safe_num(stock.current_price)
-        change_pct = safe_num(stock.change_pct)
+        change_pct = stock.change_pct
         change_amount = safe_num(stock.change_amount)
         open_price = safe_num(stock.open_price)
         high_price = safe_num(stock.high_price)
@@ -227,7 +232,7 @@ class IntradayMonitorAgent(BaseAgent):
         lines.append("## 股票行情")
         lines.append(f"- 股票：{stock.name}（{stock.symbol}）")
         lines.append(f"- 現價：{format_num(stock.current_price)}")
-        lines.append(f"- 漲跌幅：{format_num(stock.change_pct)}%")
+        lines.append(f"- 漲跌幅：{format_change_pct(stock.change_pct)}")
         lines.append(f"- 漲跌額：{format_num(stock.change_amount)}")
         lines.append(f"- 今開：{format_num(stock.open_price)}")
         lines.append(f"- 最高：{format_num(stock.high_price)}")
@@ -270,7 +275,7 @@ class IntradayMonitorAgent(BaseAgent):
         lines.append(f"- 量能異動：量比 ≥ {self.volume_alert_ratio:.1f}")
         lines.append(f"- 停損預警：未實現損失 ≤ {self.stop_loss_warning:.1f}%")
         lines.append(f"- 停利提醒：未實現獲利 ≥ {self.take_profit_warning:.1f}%")
-        price_hit = (
+        price_hit = "資料不足" if change_pct is None else (
             "觸發"
             if is_abnormal_move(
                 change_pct,
@@ -280,7 +285,7 @@ class IntradayMonitorAgent(BaseAgent):
             )
             else "未觸發"
         )
-        lines.append(f"- 當前漲跌幅：{change_pct:+.2f}%（{price_hit}）")
+        lines.append(f"- 當前漲跌幅：{format_change_pct(change_pct)}（{price_hit}）")
 
         symbol_ctx = data.get("symbol_context") or {}
         quality = (symbol_ctx.get("data_quality") or {})
@@ -382,15 +387,12 @@ class IntradayMonitorAgent(BaseAgent):
             atr_pct_val = kline.get("atr_pct")
             if atr_pct_val is not None:
                 atr_line = f"波動率：ATR={format_num(atr_val)}（ATR%={format_num(atr_pct_val)}%）"
-                atr_line += (
-                    f"，今日漲跌幅{change_pct:+.2f}% "
-                    + (
-                        "超出"
-                        if abs(change_pct) >= adaptive_threshold
-                        else "處於"
+                if change_pct is not None:
+                    atr_line += (
+                        f"，今日漲跌幅{format_change_pct(change_pct)} "
+                        + ("超出" if abs(change_pct) >= adaptive_threshold else "處於")
+                        + f"自適應異動閾值{adaptive_threshold:.2f}%"
                     )
-                    + f"自適應異動閾值{adaptive_threshold:.2f}%"
-                )
                 lines.append(f"- {atr_line}")
 
             # 均線
@@ -723,7 +725,7 @@ class IntradayMonitorAgent(BaseAgent):
         price = (
             f"{stock.current_price:.2f}" if getattr(stock, "current_price", None) else "N/A"
         )
-        chg = f"{(stock.change_pct or 0):+.2f}%"
+        chg = format_change_pct(stock.change_pct)
         lines = [
             f"{stock.name}（{stock.symbol}）",
             f"現價：{price}  漲跌：{chg}",
@@ -767,6 +769,8 @@ class IntradayMonitorAgent(BaseAgent):
                 content="未獲取到股票資料",
                 raw_data=data,
             )
+
+        title = f"【{self.display_name}】{stock.name} {format_change_pct(stock.change_pct)}"
 
         system_prompt, user_content = self.build_prompt(data, context)
 
@@ -862,9 +866,6 @@ class IntradayMonitorAgent(BaseAgent):
             },
             quality={"score": quality_score or 0},
         )
-
-        # 構建標題
-        title = f"【{self.display_name}】{stock.name} {stock.change_pct:+.2f}%"
 
         # 附 AI 模型資訊
         if context.model_label:
