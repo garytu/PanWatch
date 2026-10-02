@@ -18,12 +18,12 @@ def test_task_snapshot_contains_completed_tool_after_stream_expiry():
     conversation = repo.create_conversation(stock_symbol=None, stock_market=None, initial_context=None)
 
     task = repo.create_task(conversation_id=conversation.id, user_message_id=None, context={"sourcePage": "portfolio"})
-    repo.record_tool_completed(task.id, call_id="call-1", tool_name="get_portfolio", summary="2 个持仓")
+    repo.record_tool_completed(task.id, call_id="call-1", tool_name="get_portfolio", summary="2 個持倉")
     repo.finish_task(task.id, status="completed", final_message_id=None)
 
     snapshot = repo.get_task_snapshot(task.id)
     assert snapshot["status"] == "completed"
-    assert snapshot["tools"] == [{"call_id": "call-1", "tool": "get_portfolio", "status": "completed", "summary": "2 个持仓"}]
+    assert snapshot["tools"] == [{"call_id": "call-1", "tool": "get_portfolio", "status": "completed", "summary": "2 個持倉"}]
     session.close()
 
 

@@ -20,13 +20,13 @@ def test_assistant_service_creates_reads_and_deletes_legacy_chat_history():
     service = AssistantService(AssistantRepository(session))
 
     created = service.create_conversation(
-        CreateConversationCommand(stock_symbol="600519", stock_market="CN", initial_context="来自个股页")
+        CreateConversationCommand(stock_symbol="600519", stock_market="CN", initial_context="來自個股頁")
     )
-    service.record_user_message(created.id, "帮我看看")
+    service.record_user_message(created.id, "幫我看看")
 
     detail = service.get_conversation(created.id)
     assert detail.conversation.stock_symbol == "600519"
-    assert detail.messages[0].content == "帮我看看"
+    assert detail.messages[0].content == "幫我看看"
 
     service.delete_conversation(created.id)
     assert service.list_conversations() == []
@@ -45,19 +45,19 @@ def test_service_policy_hides_tools_outside_an_action_allowlist():
     policy = AssistantService(AssistantRepository(session)).build_tool_policy()
     write_tool = ToolSpec(
         name="create_alert",
-        title="创建提醒",
+        title="建立提醒",
         description="write",
         risk=ToolRisk.WRITE,
     )
     read_tool = ToolSpec(
         name="get_portfolio",
-        title="查询持仓",
+        title="查詢持倉",
         description="read",
         risk=ToolRisk.READ,
     )
     request = RunRequest(
         run_id="action",
-        messages=[ModelMessage(role="user", content="创建提醒")],
+        messages=[ModelMessage(role="user", content="建立提醒")],
         context={"allowed_tool_names": ["create_alert"]},
     )
 

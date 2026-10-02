@@ -57,7 +57,7 @@ export const insightApi = {
     fetchAPI<AddPositionEvalResult>('/insights/add-position-eval', {
       method: 'POST',
       body: JSON.stringify(params),
-      timeoutMs: 60000, // AI 评估较慢,放宽超时
+      timeoutMs: 60000, // AI 評估較慢,放寬超時
     }),
 
   announcementEval: (params: { symbol: string; market: string; model_id?: number }) =>
@@ -94,12 +94,12 @@ export interface AddPositionEvalParams {
 export interface AddPositionEvalResult {
   symbol: string
   market: string
-  action: string // 加仓 / 建仓
+  action: string // 加碼 / 建倉
   new_cost: number
   dilute_abs: number
   dilute_pct: number
   total_quantity: number
   total_invested: number
-  verdict: string // 适合 / 谨慎 / 不适合 / 未知
-  content: string // markdown 结论
+  verdict: string // 適合 / 謹慎 / 不適合 / 未知
+  content: string // markdown 結論
 }

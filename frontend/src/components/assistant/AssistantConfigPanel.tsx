@@ -63,7 +63,7 @@ export function AssistantConfigPanel() {
         setForm(toForm(next))
       })
       .catch(() => {
-        if (active) setError('无法加载上下文配置，请稍后重试。')
+        if (active) setError('無法載入上下文配置，請稍後重試。')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -86,7 +86,7 @@ export function AssistantConfigPanel() {
       setForm(toForm(next))
       setSaved(true)
     } catch {
-      setError('保存上下文配置失败，请检查阈值后重试。')
+      setError('儲存上下文配置失敗，請檢查閾值後重試。')
     } finally {
       setSaving(false)
     }
@@ -98,7 +98,7 @@ export function AssistantConfigPanel() {
         <Cpu className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div>
           <h3 className="text-[13px] font-semibold text-foreground">上下文工程</h3>
-          <p className="mt-1 text-[11px] text-muted-foreground">配置自动压缩所使用的模型和上下文预算。</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">配置自動壓縮所使用的模型和上下文預算。</p>
         </div>
       </div>
 
@@ -106,19 +106,19 @@ export function AssistantConfigPanel() {
       {loading ? (
         <div className="flex items-center gap-2 py-6 text-[12px] text-muted-foreground">
           <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" />
-          正在加载上下文配置…
+          正在載入上下文配置…
         </div>
       ) : config ? (
         <div className="space-y-3">
           <label className="block text-[11px] text-muted-foreground">
-            <span className="mb-1 block">上下文压缩模型</span>
+            <span className="mb-1 block">上下文壓縮模型</span>
             <select
-              aria-label="上下文压缩模型"
+              aria-label="上下文壓縮模型"
               value={form.compression_model_id}
               onChange={(event) => update('compression_model_id', event.target.value)}
               className="h-9 w-full rounded-lg border border-border/60 bg-background px-2 text-[12px] text-foreground outline-none focus:ring-1 focus:ring-primary/30"
             >
-              <option value="">跟随系统默认模型</option>
+              <option value="">跟隨系統預設模型</option>
               {config.models.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.service_name} / {model.name} ({model.model})
@@ -128,9 +128,9 @@ export function AssistantConfigPanel() {
           </label>
 
           <label className="block text-[11px] text-muted-foreground">
-            <span className="mb-1 block">压缩温度</span>
+            <span className="mb-1 block">壓縮溫度</span>
             <input
-              aria-label="压缩温度"
+              aria-label="壓縮溫度"
               type="number"
               min="0"
               max="2"
@@ -145,9 +145,9 @@ export function AssistantConfigPanel() {
             {([
               ['summary_max_tokens', '摘要最大 Token'],
               ['max_tokens', '最大上下文 Token'],
-              ['soft_limit_tokens', '自动压缩阈值'],
+              ['soft_limit_tokens', '自動壓縮閾值'],
               ['hard_limit_tokens', '硬上限 Token'],
-              ['keep_recent_messages', '保留最近消息数'],
+              ['keep_recent_messages', '保留最近訊息數'],
             ] as const).map(([key, label]) => (
               <label key={key} className="block text-[11px] text-muted-foreground">
                 <span className="mb-1 block">{label}</span>
@@ -170,7 +170,7 @@ export function AssistantConfigPanel() {
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Check className="h-3.5 w-3.5" />
-            {saving ? '保存中…' : saved ? '已保存' : '保存上下文配置'}
+            {saving ? '儲存中…' : saved ? '已儲存' : '儲存上下文配置'}
           </button>
         </div>
       ) : null}

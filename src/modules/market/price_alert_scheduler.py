@@ -1,4 +1,4 @@
-"""价格提醒调度器：独立于 Agent 调度。"""
+"""價格提醒排程器：獨立於 Agent 排程。"""
 
 from __future__ import annotations
 
@@ -20,23 +20,23 @@ class PriceAlertScheduler:
 
     async def _scan_job(self):
         if self._running:
-            logger.debug("[价格提醒] 上轮扫描仍在执行，跳过本轮")
+            logger.debug("[價格提醒] 上輪掃描仍在執行，跳過本輪")
             return
         self._running = True
         try:
             result = await ENGINE.scan_once()
             triggered = result.get("triggered", 0)
-            # 实际触发了告警才是业务事件,否则只是心跳。
+            # 實際觸發了告警才是業務事件,否則只是心跳。
             level = logging.INFO if triggered else logging.DEBUG
             logger.log(
                 level,
-                "[价格提醒] 扫描完成: rules=%s triggered=%s skipped=%s",
+                "[價格提醒] 掃描完成: rules=%s triggered=%s skipped=%s",
                 result.get("total_rules", 0),
                 triggered,
                 result.get("skipped", 0),
             )
         except Exception as e:
-            logger.exception(f"[价格提醒] 扫描异常: {e}")
+            logger.exception(f"[價格提醒] 掃描異常: {e}")
         finally:
             self._running = False
 
@@ -50,7 +50,7 @@ class PriceAlertScheduler:
             self._scan_job,
             "interval",
             seconds=self.interval_seconds,
-            jitter=20,  # 抖动错峰,避免与模拟盘扫描每 60s 同刻并发写 SQLite
+            jitter=20,  # 抖動錯峰,避免與模擬交易掃描每 60s 同刻併發寫 SQLite
             id="price_alert_scan",
             replace_existing=True,
             coalesce=True,
@@ -59,11 +59,11 @@ class PriceAlertScheduler:
         self.scheduler.start()
         from src.platform.scheduling.scheduler_registry import register
         register("price_alert", self.scheduler)
-        logger.info(f"价格提醒调度器已启动，扫描间隔 {self.interval_seconds}s")
+        logger.info(f"價格提醒排程器已啟動，掃描間隔 {self.interval_seconds}s")
 
     def shutdown(self):
         try:
             self.scheduler.shutdown(wait=False)
         except Exception:
             pass
-        logger.info("价格提醒调度器已关闭")
+        logger.info("價格提醒排程器已關閉")

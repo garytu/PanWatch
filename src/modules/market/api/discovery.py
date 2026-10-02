@@ -68,7 +68,7 @@ def _pick_num(mapping: dict, keys: list[str]) -> float | None:
 
 def _normalize_market(market: str) -> str:
     m = (market or "CN").strip().upper()
-    return m if m in ("CN", "HK", "US") else "CN"
+    return m if m in ("CN", "HK", "US", "TW") else "CN"
 
 
 def _latest_snapshot_stocks(db: Session, market: str, limit: int = 120) -> list[dict]:
@@ -188,12 +188,12 @@ def _build_synthetic_boards(
             "turnover": _sum([_to_number(x.get("turnover")) for x in top]),
         }
 
-    market_name = {"CN": "A股", "HK": "港股", "US": "美股"}.get(mkt, mkt)
+    market_name = {"CN": "A股", "HK": "港股", "US": "美股", "TW": "台股"}.get(mkt, mkt)
     buckets = [
-        build_bucket("GAINERS", f"{market_name}涨幅领先", gainers),
-        build_bucket("TURNOVER", f"{market_name}成交额领先", turnover),
-        build_bucket("VOLATILITY", f"{market_name}波动活跃", volatility),
-        build_bucket("WATCHLIST", f"{market_name}自选关联", watch_related),
+        build_bucket("GAINERS", f"{market_name}漲幅領先", gainers),
+        build_bucket("TURNOVER", f"{market_name}成交額領先", turnover),
+        build_bucket("VOLATILITY", f"{market_name}波動活躍", volatility),
+        build_bucket("WATCHLIST", f"{market_name}自選關聯", watch_related),
     ]
     result = [x for x in buckets if x]
     return result[: max(1, min(int(limit), 20))]
@@ -239,7 +239,7 @@ async def get_hot_stocks(
     market = _normalize_market(market)
     mode = (mode or "turnover").lower()
     if mode not in ("turnover", "gainers"):
-        raise HTTPException(400, f"不支持的 mode: {mode}")
+        raise HTTPException(400, f"不支援的 mode: {mode}")
 
     key = f"stocks:{market}:{mode}:{int(limit)}"
     cached = _cache_get(key, ttl_s=45)
@@ -257,7 +257,7 @@ async def get_hot_stocks(
     )
     if not data:
         raise HTTPException(
-            503, "热门股票数据源不可用（实时源与本地快照均不可用）"
+            503, "熱門股票資料來源不可用（即時源與本地快照均不可用）"
         )
     _cache_set(key, data)
     return data
@@ -278,7 +278,7 @@ async def get_hot_boards(
     market = _normalize_market(market)
     mode = (mode or "gainers").lower()
     if mode not in ("gainers", "turnover", "hot"):
-        raise HTTPException(400, f"不支持的 mode: {mode}")
+        raise HTTPException(400, f"不支援的 mode: {mode}")
 
     key = f"boards:{market}:{mode}:{int(limit)}"
     cached = _cache_get(key, ttl_s=60)
@@ -323,7 +323,7 @@ async def get_hot_boards(
             limit=limit,
         )
     if not data:
-        raise HTTPException(503, "热门板块/主题数据源不可用")
+        raise HTTPException(503, "熱門板塊/主題資料來源不可用")
     _cache_set(key, data)
     return data
 
@@ -340,19 +340,19 @@ async def get_board_stocks(
 
     code = (board_code or "").strip()
     if not code:
-        raise HTTPException(400, "缺少板块代码")
+        raise HTTPException(400, "缺少板塊程式碼")
 
     mkt = _normalize_market(market)
     mode = (mode or "gainers").lower()
     if mode not in ("gainers", "turnover", "hot"):
-        raise HTTPException(400, f"不支持的 mode: {mode}")
+        raise HTTPException(400, f"不支援的 mode: {mode}")
 
     key = f"board_stocks:{mkt}:{code}:{mode}:{int(limit)}"
     cached = _cache_get(key, ttl_s=60)
     if cached is not None:
         return cached
 
-    if code.startswith(("CN_", "HK_", "US_")):
+    if code.startswith(("CN_", "HK_", "US_", "TW_")):
         proxy = _resolve_proxy() or None
         collector = EastMoneyDiscoveryCollector(proxy=proxy)
         market_from_code = code.split("_", 1)[0]
@@ -383,11 +383,11 @@ async def get_board_stocks(
     except (httpx.ConnectTimeout, httpx.ConnectError, httpx.ProxyError) as e:
         logger.warning(f"discovery board_stocks connect timeout: {e!r}")
         raise HTTPException(
-            503, "板块成分股数据源连接超时（可能需要配置代理 http_proxy）"
+            503, "板塊成分股資料來源連線超時（可能需要配置代理 http_proxy）"
         )
     except Exception as e:
         logger.warning(f"discovery board_stocks failed: {type(e).__name__}: {e!r}")
-        raise HTTPException(503, "板块成分股数据源不可用")
+        raise HTTPException(503, "板塊成分股資料來源不可用")
     data = [
         {
             "symbol": it.symbol,

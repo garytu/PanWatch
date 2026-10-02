@@ -1,9 +1,9 @@
-"""marketdata 异常类型。"""
+"""marketdata 異常型別。"""
 
 
 class MarketDataError(Exception):
-    """本包所有异常的基类。"""
+    """本包所有異常的基類。"""
 
 
 class VendorError(MarketDataError):
-    """单个 vendor 抓取失败(Engine 捕获后转移到下一个源)。"""
+    """單個 vendor 抓取失敗(Engine 捕獲後轉移到下一個源)。"""

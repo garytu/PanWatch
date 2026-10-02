@@ -31,36 +31,36 @@ const {
 } = routePages
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: '首页' },
-  { to: '/portfolio', icon: List, label: '持仓' },
-  { to: '/opportunities', icon: Sparkles, label: '机会' },
-  { to: '/paper-trading', icon: Activity, label: '模拟盘' },
+  { to: '/', icon: LayoutDashboard, label: '首頁' },
+  { to: '/portfolio', icon: List, label: '持倉' },
+  { to: '/opportunities', icon: Sparkles, label: '機會' },
+  { to: '/paper-trading', icon: Activity, label: '模擬交易' },
   { to: '/assistant', icon: MessageCircle, label: '助手' },
   { to: '/alerts', icon: BellRing, label: '提醒' },
   { to: '/agents', icon: Bot, label: 'Agent' },
-  { to: '/evaluations', icon: ClipboardCheck, label: '验证中心' },
-  { to: '/history', icon: Clock, label: '历史' },
-  { to: '/datasources', icon: Database, label: '数据源' },
-  { to: '/settings', icon: Settings, label: '设置' },
+  { to: '/evaluations', icon: ClipboardCheck, label: '驗證中心' },
+  { to: '/history', icon: Clock, label: '歷史' },
+  { to: '/datasources', icon: Database, label: '資料來源' },
+  { to: '/settings', icon: Settings, label: '設定' },
 ]
 const desktopPrimaryNavItems = navItems.slice(0, 5)
 const desktopMoreNavItems = navItems.slice(5)
 const mobilePrimaryNavItems = navItems.slice(0, 5)
 const mobileMoreNavItems = navItems.slice(5)
 
-// 认证守卫组件
+// 認證守衛元件
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking')
   const location = useLocation()
 
   useEffect(() => {
-    // 检查本地 token
+    // 檢查本地 token
     if (isAuthenticated()) {
       setAuthState('authenticated')
       return
     }
 
-    // 没有 token，需要去登录页（设置密码或登录）
+    // 沒有 token，需要去登入頁（設定密碼或登入）
     setAuthState('unauthenticated')
   }, [])
 
@@ -117,7 +117,7 @@ function App() {
       .catch(() => {})
   }, [version])
 
-  // 登录页面不显示导航
+  // 登入頁面不顯示導航
   if (location.pathname === '/login') {
     return (
       <RouteErrorBoundary>
@@ -185,19 +185,19 @@ function App() {
               })}
             </nav>
 
-            {/* action wrapper:GitHub + 日志 + 头像(头像下拉含更多导航/主题色/退出) */}
+            {/* action wrapper:GitHub + 日誌 + 頭像(頭像下拉含更多導航/主題色/退出) */}
             <div className="flex items-center gap-1.5 px-1.5 py-1 rounded-2xl bg-accent/20 border border-border/40">
               <button
                 onClick={() => window.open(repoUrl, '_blank', 'noopener,noreferrer')}
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/70 transition-all"
-                title="GitHub 项目"
+                title="GitHub 專案"
               >
                 <Github className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setLogsOpen(true)}
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/70 transition-all"
-                title="查看日志"
+                title="檢視日誌"
               >
                 <ScrollText className="w-4 h-4" />
               </button>
@@ -227,14 +227,14 @@ function App() {
               <button
                 onClick={() => window.open(repoUrl, '_blank', 'noopener,noreferrer')}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/70 transition-all"
-                title="GitHub 项目"
+                title="GitHub 專案"
               >
                 <Github className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setLogsOpen(true)}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-background/70 transition-all"
-                title="查看日志"
+                title="檢視日誌"
               >
                 <ScrollText className="w-4 h-4" />
               </button>
@@ -305,13 +305,13 @@ function App() {
       <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>发现新版本</DialogTitle>
+            <DialogTitle>發現新版本</DialogTitle>
             <DialogDescription>
-              当前版本 v{version}，可升级到 v{upgradeInfo?.latest}。
+              當前版本 v{version}，可升級到 v{upgradeInfo?.latest}。
             </DialogDescription>
           </DialogHeader>
           <div className="text-[12px] text-muted-foreground">
-            建议升级以获取最新功能和修复。
+            建議升級以獲取最新功能和修復。
           </div>
           <div className="flex items-center justify-end gap-2">
             <Button
@@ -321,7 +321,7 @@ function App() {
                 setUpgradeOpen(false)
               }}
             >
-              稍后提醒
+              稍後提醒
             </Button>
             <Button
               onClick={() => {
@@ -329,7 +329,7 @@ function App() {
                 window.open(url, '_blank', 'noopener,noreferrer')
               }}
             >
-              去升级
+              去升級
             </Button>
           </div>
         </DialogContent>

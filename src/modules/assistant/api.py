@@ -62,20 +62,20 @@ logger = logging.getLogger(__name__)
 # cut off while the browser is still receiving events.
 ASSISTANT_RUN_TIMEOUT_SECONDS = 180
 ASSISTANT_TOOL_TIMEOUT_SECONDS = 15
-# 研究型请求可能需要行情、K 线、新闻和持仓多轮组合调用；同时由
-# PanAgent runtime 的重复调用保护避免小模型陷入同一工具循环。
+# 研究型請求可能需要行情、K 線、新聞和持倉多輪組合呼叫；同時由
+# PanAgent runtime 的重複呼叫保護避免小模型陷入同一工具迴圈。
 ASSISTANT_MAX_STEPS = 12
 ASSISTANT_MAX_TOOL_CALLS = 24
 
 _ERROR_MESSAGES = {
-    "run_timeout": "助手响应超时，请稍后重试。",
-    "tool_call_limit": "助手调用步骤过多，请缩小问题范围后重试。",
-    "repeated_tool_call": "助手检测到重复工具调用，请重试或换一种问法。",
-    "runtime_failed": "助手暂时不可用，请稍后重试。",
-    "required_tool_call_missing": "我还没有执行这次修改，请确认目标后重试。",
-    "transport_timeout": "助手响应超时，请稍后重试。",
-    "transport_failed": "助手任务执行失败，请稍后重试。",
-    "transport_setup_failed": "助手任务执行失败，请稍后重试。",
+    "run_timeout": "助手回應超時，請稍後重試。",
+    "tool_call_limit": "助手呼叫步驟過多，請縮小問題範圍後重試。",
+    "repeated_tool_call": "助手檢測到重複工具呼叫，請重試或換一種問法。",
+    "runtime_failed": "助手暫時不可用，請稍後重試。",
+    "required_tool_call_missing": "我還沒有執行這次修改，請確認目標後重試。",
+    "transport_timeout": "助手回應超時，請稍後重試。",
+    "transport_failed": "助手任務執行失敗，請稍後重試。",
+    "transport_setup_failed": "助手任務執行失敗，請稍後重試。",
 }
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -84,7 +84,7 @@ _SSE_HEADERS = {
 }
 
 def _error_message(error_code: str) -> str:
-    return _ERROR_MESSAGES.get(error_code, "助手暂时不可用，请稍后重试。")
+    return _ERROR_MESSAGES.get(error_code, "助手暫時不可用，請稍後重試。")
 
 
 def _encode_sse(event: str, data: dict) -> str:

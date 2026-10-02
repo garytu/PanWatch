@@ -39,7 +39,7 @@ def test_create_task_endpoint_returns_before_worker_execution(monkeypatch):
     async def run():
         return await assistant_api.create_assistant_task(
             conversation.id,
-            assistant_api.SendAssistantMessageCommand(content="分析市场"),
+            assistant_api.SendAssistantMessageCommand(content="分析市場"),
             service,
         )
 

@@ -1,4 +1,4 @@
-"""marketdata —— 多市场行情数据抓取层(可插拔数据源)。"""
+"""marketdata —— 多市場行情資料抓取層(可插拔資料來源)。"""
 
 from marketdata.client import MarketData
 from marketdata.defaults import InMemoryMetricsSink, StaticConfigProvider

@@ -1,4 +1,4 @@
-"""分析历史 API"""
+"""分析歷史 API"""
 
 import logging
 from datetime import timezone
@@ -21,7 +21,7 @@ from src.modules.automation.agent_catalog import (
 
 
 def _format_datetime(dt) -> str:
-    """格式化时间为当前时区的 ISO 格式。"""
+    """格式化時間為當前時區的 ISO 格式。"""
     if not dt:
         return ""
 
@@ -54,7 +54,7 @@ class HistoryResponse(BaseModel):
     title: str
     content: str
     suggestions: dict | None = (
-        None  # 个股建议 {symbol: {action, action_label, reason, should_alert}}
+        None  # 個股建議 {symbol: {action, action_label, reason, should_alert}}
     )
     news: list[dict] | None = None
     quality_overview: dict | None = None
@@ -78,7 +78,7 @@ def list_history(
     limit: int = Query(default=30, le=100),
     db: Session = Depends(get_db),
 ) -> list[HistoryResponse]:
-    """获取分析历史列表"""
+    """獲取分析歷史列表"""
     query = db.query(AnalysisHistory)
 
     if agent_name:
@@ -151,12 +151,12 @@ def list_history(
 def get_history_detail(
     history_id: int, db: Session = Depends(get_db)
 ) -> HistoryResponse:
-    """获取单条分析详情"""
+    """獲取單條分析詳細資訊"""
     record = db.query(AnalysisHistory).filter(AnalysisHistory.id == history_id).first()
     if not record:
         from fastapi import HTTPException
 
-        raise HTTPException(404, "记录不存在")
+        raise HTTPException(404, "記錄不存在")
 
     return HistoryResponse(
         id=record.id,
@@ -193,12 +193,12 @@ def get_history_detail(
 
 @router.delete("/{history_id}")
 def delete_history(history_id: int, db: Session = Depends(get_db)):
-    """删除单条历史记录"""
+    """刪除單條歷史記錄"""
     record = db.query(AnalysisHistory).filter(AnalysisHistory.id == history_id).first()
     if not record:
         from fastapi import HTTPException
 
-        raise HTTPException(404, "记录不存在")
+        raise HTTPException(404, "記錄不存在")
 
     db.delete(record)
     db.commit()

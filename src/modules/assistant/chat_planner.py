@@ -1,12 +1,12 @@
-"""Planning 试点 —— "全面诊断我的持仓"计划驱动编排。
+"""Planning 試點 —— "全面診斷我的持倉"計劃驅動編排。
 
-范围刻意小:只覆盖单一场景(全面诊断持仓)。识别到该意图后走计划驱动:
-LLM 生成结构化计划(逐持仓股分析 → 组合风险 → 汇总建议)→ 计划经 SSE `plan` 事件
-推给前端 → 逐步执行(每步复用现有工具/LLM)→ 步骤失败重规划(上限 1 次,超限带失败
-信息直接汇总)。
+範圍刻意小:只覆蓋單一場景(全面診斷持倉)。識別到該意圖後走計劃驅動:
+LLM 生成結構化計劃(逐持倉股分析 → 組合風險 → 彙總建議)→ 計劃經 SSE `plan` 事件
+推給前端 → 逐步執行(每步複用現有工具/LLM)→ 步驟失敗重規劃(上限 1 次,超限帶失敗
+資訊直接彙總)。
 
-这是**试点**:验证"计划驱动"相对固定流程的价值,不做过度泛化。编排函数把工具执行器
-(execute_tool)与 SSE 流(stream)作为依赖注入,便于单测全 mock。
+這是**試點**:驗證"計劃驅動"相對固定流程的價值,不做過度泛化。編排函式把工具執行器
+(execute_tool)與 SSE 流(stream)作為依賴注入,便於單測全 mock。
 """
 
 import json
@@ -15,21 +15,21 @@ import re
 
 logger = logging.getLogger(__name__)
 
-# 触发词:显式命中即走计划驱动(简单启发式,试点足够)
+# 觸發詞:顯式命中即走計劃驅動(簡單啟發式,試點足夠)
 _PLANNING_TRIGGERS = (
-    "全面诊断",
-    "诊断我的持仓",
-    "诊断一下我的持仓",
-    "持仓诊断",
-    "组合诊断",
-    "全面体检",
-    "持仓体检",
-    "全面分析我的持仓",
+    "全面診斷",
+    "診斷我的持倉",
+    "診斷一下我的持倉",
+    "持倉診斷",
+    "組合診斷",
+    "全面體檢",
+    "持倉體檢",
+    "全面分析我的持倉",
 )
 
 
 def should_use_planning(content: str) -> bool:
-    """判断用户输入是否命中"全面诊断持仓"场景。"""
+    """判斷使用者輸入是否命中"全面診斷持倉"場景。"""
     if not content:
         return False
     text = content.replace(" ", "")
@@ -37,20 +37,20 @@ def should_use_planning(content: str) -> bool:
 
 
 _PLAN_SYSTEM = (
-    "你是投资组合诊断规划助手。根据用户持仓,产出一个结构化诊断计划。"
-    "只输出 JSON,形如:"
-    '{"steps":[{"title":"分析 贵州茅台(600519)","action":"analyze_stock",'
+    "你是投資組合診斷規劃助手。根據使用者持倉,產出一個結構化診斷計劃。"
+    "只輸出 JSON,形如:"
+    '{"steps":[{"title":"分析 貴州茅臺(600519)","action":"analyze_stock",'
     '"params":{"symbol":"600519","market":"CN"}},'
-    '{"title":"组合整体风险","action":"portfolio_risk"}]}。'
-    "action 取值:analyze_stock(逐只持仓,params 带 symbol/market)、portfolio_risk(组合风险)。"
-    "不要包含汇总步骤,汇总由系统自动追加。"
+    '{"title":"組合整體風險","action":"portfolio_risk"}]}。'
+    "action 取值:analyze_stock(逐只持倉,params 帶 symbol/market)、portfolio_risk(組合風險)。"
+    "不要包含彙總步驟,彙總由系統自動追加。"
 )
 
 
 def _plan_messages(portfolio_text: str) -> list[dict]:
     return [
         {"role": "system", "content": _PLAN_SYSTEM},
-        {"role": "user", "content": f"我的持仓如下,请产出诊断计划:\n{portfolio_text}"},
+        {"role": "user", "content": f"我的持倉如下,請產出診斷計劃:\n{portfolio_text}"},
     ]
 
 
@@ -62,19 +62,19 @@ def _replan_messages(
         {
             "role": "user",
             "content": (
-                f"我的持仓:\n{portfolio_text}\n\n"
-                f'上一版计划里的步骤「{failed_title}」执行失败({error}),'
-                "请重新产出一份可执行的诊断计划(跳过或替换失败步骤)。"
+                f"我的持倉:\n{portfolio_text}\n\n"
+                f'上一版計劃裡的步驟「{failed_title}」執行失敗({error}),'
+                "請重新產出一份可執行的診斷計劃(跳過或替換失敗步驟)。"
             ),
         },
     ]
 
 
 def parse_plan(text: str) -> list[dict] | None:
-    """从 LLM 文本里容错解析计划步骤列表。
+    """從 LLM 文本里容錯解析計劃步驟列表。
 
-    支持:纯 JSON、```json 围栏包裹、前后有解释文字、尾部截断等常见脏输出。
-    解析失败返回 None(交由调用方回退默认计划)。
+    支援:純 JSON、```json 圍欄包裹、前後有解釋文字、尾部截斷等常見髒輸出。
+    解析失敗返回 None(交由呼叫方回退預設計劃)。
     """
     if not text:
         return None
@@ -109,12 +109,12 @@ def parse_plan(text: str) -> list[dict] | None:
 
 
 def build_default_plan(portfolio_text: str) -> list[dict]:
-    """LLM 计划不可用时的降级默认计划(仅做组合风险,汇总由系统追加)。"""
-    return [{"title": "组合整体风险评估", "action": "portfolio_risk"}]
+    """LLM 計劃不可用時的降級預設計劃(僅做組合風險,彙總由系統追加)。"""
+    return [{"title": "組合整體風險評估", "action": "portfolio_risk"}]
 
 
 def normalize_steps(steps: list[dict], start_id: int = 1) -> list[dict]:
-    """规范化步骤:补 id/title/action/params/status。过滤 summarize(汇总系统自动做)。"""
+    """規範化步驟:補 id/title/action/params/status。過濾 summarize(彙總系統自動做)。"""
     out = []
     sid = start_id
     for s in steps:
@@ -126,7 +126,7 @@ def normalize_steps(steps: list[dict], start_id: int = 1) -> list[dict]:
         out.append(
             {
                 "id": sid,
-                "title": s.get("title") or f"步骤 {sid}",
+                "title": s.get("title") or f"步驟 {sid}",
                 "action": action,
                 "params": s.get("params") or {},
                 "status": "pending",
@@ -147,15 +147,15 @@ async def _publish_plan(stream, steps: list[dict], status: str, current=None) ->
     await stream.publish("plan", data)
 
 
-_STEP_SYSTEM = "你是资深投研分析师。基于给定数据,给出精炼、有据的分析(150 字内)。"
+_STEP_SYSTEM = "你是資深投研分析師。基於給定資料,給出精煉、有據的分析(150 字內)。"
 _SUMMARY_SYSTEM = (
-    "你是资深投资顾问。基于各步骤的分析结果,给出全面的持仓诊断结论:"
-    "整体健康度、主要风险、可执行的调仓建议。分点、精炼、有据。"
+    "你是資深投資顧問。基於各步驟的分析結果,給出全面的持倉診斷結論:"
+    "整體健康度、主要風險、可執行的調倉建議。分點、精煉、有據。"
 )
 
 
 async def _execute_step(db, ai_client, execute_tool, step: dict, portfolio_text: str) -> str:
-    """执行单个计划步骤,返回该步的分析文本。"""
+    """執行單個計劃步驟,返回該步的分析文本。"""
     action = step["action"]
     if action == "analyze_stock":
         p = step.get("params") or {}
@@ -167,15 +167,15 @@ async def _execute_step(db, ai_client, execute_tool, step: dict, portfolio_text:
             {"role": "system", "content": _STEP_SYSTEM},
             {
                 "role": "user",
-                "content": f"分析持仓「{step['title']}」。\n技术面:\n{tech}\n\nAI 建议:\n{sug}",
+                "content": f"分析持倉「{step['title']}」。\n技術面:\n{tech}\n\nAI 建議:\n{sug}",
             },
         ]
         return await ai_client.chat_multi(msgs, temperature=0.4)
 
-    # portfolio_risk 及其它未知 action:统一按组合风险处理
+    # portfolio_risk 及其它未知 action:統一按組合風險處理
     msgs = [
         {"role": "system", "content": _STEP_SYSTEM},
-        {"role": "user", "content": f"评估以下持仓组合的整体风险:\n{portfolio_text}"},
+        {"role": "user", "content": f"評估以下持倉組合的整體風險:\n{portfolio_text}"},
     ]
     return await ai_client.chat_multi(msgs, temperature=0.4)
 
@@ -184,30 +184,30 @@ def _summary_messages(results: list[tuple[str, str]]) -> list[dict]:
     body = "\n\n".join(f"【{title}】\n{res}" for title, res in results)
     return [
         {"role": "system", "content": _SUMMARY_SYSTEM},
-        {"role": "user", "content": f"以下是各步骤的诊断结果,请汇总:\n\n{body}"},
+        {"role": "user", "content": f"以下是各步驟的診斷結果,請彙總:\n\n{body}"},
     ]
 
 
 async def run_portfolio_diagnosis(db, stream, ai_client, execute_tool) -> str:
-    """计划驱动的"全面诊断持仓"编排,返回最终汇总文本(已通过 SSE 流式推送)。
+    """計劃驅動的"全面診斷持倉"編排,返回最終彙總文本(已透過 SSE 流式推送)。
 
     Args:
         db: DB session。
-        stream: SSEStream(需支持 async publish(event, data))。
-        ai_client: AI 客户端(chat_multi / chat_stream)。
-        execute_tool: async (db, name, args) -> str 工具执行器。
+        stream: SSEStream(需支援 async publish(event, data))。
+        ai_client: AI 使用者端(chat_multi / chat_stream)。
+        execute_tool: async (db, name, args) -> str 工具執行器。
     """
     await stream.publish("plan", {"status": "planning", "steps": []})
 
     portfolio_text = await execute_tool(db, "get_portfolio", {})
 
-    # 1) 生成计划(失败/解析不了则回退默认计划)
+    # 1) 生成計劃(失敗/解析不了則回退預設計劃)
     steps = None
     try:
         raw = await ai_client.chat_multi(_plan_messages(portfolio_text), temperature=0.3)
         steps = parse_plan(raw)
     except Exception:
-        logger.warning("生成诊断计划失败,回退默认计划", exc_info=True)
+        logger.warning("生成診斷計劃失敗,回退預設計劃", exc_info=True)
     if not steps:
         steps = build_default_plan(portfolio_text)
     steps = normalize_steps(steps)
@@ -216,7 +216,7 @@ async def run_portfolio_diagnosis(db, stream, ai_client, execute_tool) -> str:
 
     await _publish_plan(stream, steps, status="running")
 
-    # 2) 逐步执行,失败重规划(上限 1 次)
+    # 2) 逐步執行,失敗重規劃(上限 1 次)
     results: list[tuple[str, str]] = []
     replanned = False
     i = 0
@@ -231,7 +231,7 @@ async def run_portfolio_diagnosis(db, stream, ai_client, execute_tool) -> str:
         except Exception as e:  # noqa: BLE001
             if not replanned:
                 replanned = True
-                logger.info("步骤「%s」失败,触发重规划: %s", step["title"], e)
+                logger.info("步驟「%s」失敗,觸發重規劃: %s", step["title"], e)
                 try:
                     raw = await ai_client.chat_multi(
                         _replan_messages(portfolio_text, step["title"], str(e)),
@@ -243,14 +243,14 @@ async def run_portfolio_diagnosis(db, stream, ai_client, execute_tool) -> str:
                 if new_steps:
                     steps = steps[:i] + normalize_steps(new_steps, start_id=step["id"])
                     await _publish_plan(stream, steps, status="running")
-                    continue  # 从当前位置用新计划重试
-            # 已重规划过或重规划失败:标记失败,带失败信息继续汇总
+                    continue  # 從當前位置用新計劃重試
+            # 已重規劃過或重規劃失敗:標記失敗,帶失敗資訊繼續彙總
             step["status"] = "failed"
-            results.append((step["title"], f"(该步执行失败:{e})"))
+            results.append((step["title"], f"(該步執行失敗:{e})"))
         await _publish_plan(stream, steps, status="running")
         i += 1
 
-    # 3) 汇总(流式推 token)
+    # 3) 彙總(流式推 token)
     summary = ""
     try:
         parts: list[str] = []
@@ -261,13 +261,13 @@ async def run_portfolio_diagnosis(db, stream, ai_client, execute_tool) -> str:
                 parts.append(payload)
                 await stream.publish("token", {"text": payload})
         summary = "".join(parts)
-    except Exception as e:  # noqa: BLE001 — 流式汇总失败降级为非流式
-        logger.warning("流式汇总失败,降级非流式: %s", e)
+    except Exception as e:  # noqa: BLE001 — 流式彙總失敗降級為非流式
+        logger.warning("流式彙總失敗,降級非流式: %s", e)
         try:
             summary = await ai_client.chat_multi(_summary_messages(results), temperature=0.4)
             await stream.publish("token", {"text": summary})
         except Exception:
-            summary = "抱歉,诊断汇总失败。"
+            summary = "抱歉,診斷彙總失敗。"
             await stream.publish("token", {"text": summary})
 
     await _publish_plan(stream, steps, status="done")

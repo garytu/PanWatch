@@ -18,9 +18,9 @@ export default function KlineModal(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>{props.title || (symbol ? `K线：${symbol}` : 'K线')}</DialogTitle>
+          <DialogTitle>{props.title || (symbol ? `K線：${symbol}` : 'K線')}</DialogTitle>
           <DialogDescription>
-            {props.description || '日K/周K/月K切换，含MA/成交量/MACD。'}
+            {props.description || '日K/周K/月K切換，含MA/成交量/MACD。'}
           </DialogDescription>
         </DialogHeader>
         {symbol ? (
@@ -31,7 +31,7 @@ export default function KlineModal(props: {
             initialDays={props.initialDays}
           />
         ) : (
-          <div className="text-[12px] text-muted-foreground py-8 text-center">未选择股票</div>
+          <div className="text-[12px] text-muted-foreground py-8 text-center">未選擇股票</div>
         )}
       </DialogContent>
     </Dialog>

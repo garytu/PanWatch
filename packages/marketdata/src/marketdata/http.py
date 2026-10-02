@@ -1,7 +1,7 @@
-"""统一 HTTP 工具:走系统代理(trust_env=True)+ 按 host 节流 + 退避重试 + 来源标记。
+"""統一 HTTP 工具:走系統代理(trust_env=True)+ 按 host 節流 + 退避重試 + 來源標記。
 
-默认 trust_env=True —— 遵循进程 env 的 HTTP_PROXY/NO_PROXY(宿主按 UI 的 http_proxy 设置统一注入);
-没配代理时即直连。个别调用可用 proxy= 显式覆盖。
+預設 trust_env=True —— 遵循程式 env 的 HTTP_PROXY/NO_PROXY(宿主按 UI 的 http_proxy 設定統一注入);
+沒配代理時即直連。個別呼叫可用 proxy= 顯式覆蓋。
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ _FETCH_SOURCE: contextvars.ContextVar[str] = contextvars.ContextVar("fetch_sourc
 
 @contextmanager
 def fetch_source(name: str):
-    """标注取数来源,写入失败日志便于定位触发方。"""
+    """標註取數來源,寫入失敗日誌便於定位觸發方。"""
     token = _FETCH_SOURCE.set(name or "")
     try:
         yield
@@ -36,14 +36,14 @@ def source_suffix() -> str:
     return f" [src={src}]" if src else ""
 
 
-# 失败原因收集:默认 None = 不收集(生产热路径零开销)。数据源"测试"按钮用 capture_errors()
-# 包住取数调用,把 market_get / vendor 的真实失败原因收上来透到 UI,而不是只显示"无数据"。
+# 失敗原因收集:預設 None = 不收集(生產熱路徑零開銷)。資料來源"測試"按鈕用 capture_errors()
+# 包住取數呼叫,把 market_get / vendor 的真實失敗原因收上來透到 UI,而不是隻顯示"無資料"。
 _ERROR_SINK: contextvars.ContextVar[list | None] = contextvars.ContextVar("md_error_sink", default=None)
 
 
 @contextmanager
 def capture_errors():
-    """进入后,market_get / record_error 的失败原因会被收集到 yield 出的 list。"""
+    """進入後,market_get / record_error 的失敗原因會被收集到 yield 出的 list。"""
     errs: list[str] = []
     token = _ERROR_SINK.set(errs)
     try:
@@ -53,8 +53,8 @@ def capture_errors():
 
 
 def record_error(msg: str) -> None:
-    """把一条失败原因写入当前 capture_errors 上下文(无上下文则忽略)。
-    供 vendor 自己 catch 异常(如 yfinance 走库、不经 market_get)时也能上报真因。"""
+    """把一條失敗原因寫入當前 capture_errors 上下文(無上下文則忽略)。
+    供 vendor 自己 catch 異常(如 yfinance 走庫、不經 market_get)時也能上報真因。"""
     sink = _ERROR_SINK.get()
     if sink is not None and msg:
         sink.append(msg)
@@ -65,7 +65,7 @@ _last_call: dict[str, float] = {}
 
 
 def throttle(host_key: str, min_interval_s: float) -> None:
-    """保证对同一 host 的请求间隔 ≥ min_interval_s。"""
+    """保證對同一 host 的請求間隔 ≥ min_interval_s。"""
     if min_interval_s <= 0:
         return
     with _THROTTLE_LOCK:
@@ -96,9 +96,9 @@ def market_get(
     verify: bool = True,
     proxy: str | None = None,
 ) -> Any | None:
-    """走系统代理(env)+ 按 host 节流 + 退避重试。成功返回解析结果,失败返回 None 并打带来源日志。
+    """走系統代理(env)+ 按 host 節流 + 退避重試。成功返回解析結果,失敗返回 None 並打帶來源日誌。
 
-    proxy: 显式代理,仅在给了值时传给 httpx.Client 覆盖 env 代理;不传则遵循 trust_env(env)。
+    proxy: 顯式代理,僅在給了值時傳給 httpx.Client 覆蓋 env 代理;不傳則遵循 trust_env(env)。
     """
     effective_proxy = proxy
     last_err: Any = None
@@ -131,6 +131,6 @@ def market_get(
     if last_err is not None:
         label = log_label or host_key
         sym = f" symbol={symbol}" if symbol else ""
-        logger.warning(f"{label} 获取失败{sym}: {last_err}{source_suffix()}")
+        logger.warning(f"{label} 獲取失敗{sym}: {last_err}{source_suffix()}")
         record_error(f"{label}{sym}: {type(last_err).__name__}: {last_err}")
     return None

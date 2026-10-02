@@ -1,4 +1,4 @@
-"""详情报告导出 PDF(后台直出:xhtml2pdf + reportlab STSong-Light 中文字体)。"""
+"""詳細資訊報告匯出 PDF(後臺直出:xhtml2pdf + reportlab STSong-Light 中文字型)。"""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ import io
 
 
 def _weasyprint_renders() -> bool:
-    """WeasyPrint 能否真正渲染(需 pango 等系统库)。不可用时回退 xhtml2pdf,中文走 CID 字体不进文本层。"""
+    """WeasyPrint 能否真正渲染(需 pango 等系統庫)。不可用時回退 xhtml2pdf,中文走 CID 字型不進文本層。"""
     try:
         from weasyprint import HTML
 
-        HTML(string="<p>测试</p>").write_pdf()
+        HTML(string="<p>測試</p>").write_pdf()
         return True
     except Exception:
         return False
@@ -20,55 +20,55 @@ _WEASY = _weasyprint_renders()
 
 
 def test_render_pdf_returns_valid_bytes_with_chinese():
-    """markdown→PDF:返回合法 PDF 字节,且中文进入文本层(非豆腐块、可复制)。"""
+    """markdown→PDF:返回合法 PDF 位元組,且中文進入文本層(非豆腐塊、可複製)。"""
     from src.modules.reporting.pdf_export import render_analysis_pdf
 
-    md = "# 广汽集团(601238)深度分析\n\n**最终决策:持有**\n\n- 多头:业绩拐点确认\n- 空头:估值偏高"
-    data = render_analysis_pdf("【深度】广汽集团(601238):持有", md)
+    md = "# 廣汽集團(601238)深度分析\n\n**最終決策:持有**\n\n- 多頭:業績拐點確認\n- 空頭:估值偏高"
+    data = render_analysis_pdf("【深度】廣汽集團(601238):持有", md)
     assert isinstance(data, (bytes, bytearray))
     assert bytes(data[:4]) == b"%PDF"
     assert len(data) > 1500
 
     if not _WEASY:
-        return  # xhtml2pdf 回退:中文走 STSong-Light CID,不进文本层;仅 WeasyPrint 路径保证可复制中文
+        return  # xhtml2pdf 回退:中文走 STSong-Light CID,不進文本層;僅 WeasyPrint 路徑保證可複製中文
 
     from pypdf import PdfReader
 
     txt = PdfReader(io.BytesIO(bytes(data))).pages[0].extract_text() or ""
-    assert "广汽集团" in txt
+    assert "廣汽集團" in txt
     assert "持有" in txt
 
 
 def test_render_pdf_handles_empty_markdown():
-    """空正文也不崩,仍返回合法 PDF(至少有标题)。"""
+    """空正文也不崩,仍返回合法 PDF(至少有標題)。"""
     from src.modules.reporting.pdf_export import render_analysis_pdf
 
-    data = render_analysis_pdf("标题", "")
+    data = render_analysis_pdf("標題", "")
     assert bytes(data[:4]) == b"%PDF"
 
 
 def test_assemble_report_markdown_mirrors_detail_page_sections():
-    """从 raw_data 拼出的报告含详情页全部分节:PM/交易员/4分析师全文/多空辩论全文/风控辩论全文。"""
+    """從 raw_data 拼出的報告含詳細資訊頁全部分節:PM/交易員/4分析師全文/多空辯論全文/風控辯論全文。"""
     from src.modules.reporting.pdf_export import assemble_report_markdown
 
     raw = {
         "suggestion": {"action_label": "持有", "confidence": 5.0},
-        "final_decision": "PM决策正文XYZ",
-        "trader_plan": "交易员计划正文XYZ",
+        "final_decision": "PM決策正文XYZ",
+        "trader_plan": "交易員計劃正文XYZ",
         "analyst_reports": {
-            "market": "技术面分析正文XYZ", "social": "情绪面分析正文XYZ",
-            "news": "新闻面分析正文XYZ", "fundamentals": "基本面分析正文XYZ",
+            "market": "技術面分析正文XYZ", "social": "情緒面分析正文XYZ",
+            "news": "新聞面分析正文XYZ", "fundamentals": "基本面分析正文XYZ",
         },
-        "debate_history": {"history": "多头观点AAA 空头观点BBB", "judge_decision": "研究主管裁决XYZ"},
-        "risk_debate": {"history": "激进CCC 保守DDD", "judge_decision": "风控裁决XYZ"},
+        "debate_history": {"history": "多頭觀點AAA 空頭觀點BBB", "judge_decision": "研究主管裁決XYZ"},
+        "risk_debate": {"history": "激進CCC 保守DDD", "judge_decision": "風控裁決XYZ"},
     }
     md = assemble_report_markdown(raw)
     for must in [
-        "PM决策正文XYZ", "交易员计划正文XYZ",
-        "技术面分析正文XYZ", "情绪面分析正文XYZ", "新闻面分析正文XYZ", "基本面分析正文XYZ",
-        "多头观点AAA", "空头观点BBB", "研究主管裁决XYZ",
-        "激进CCC", "风控裁决XYZ",
-        "技术分析师", "看多看空辩论", "风控辩论",
+        "PM決策正文XYZ", "交易員計劃正文XYZ",
+        "技術面分析正文XYZ", "情緒面分析正文XYZ", "新聞面分析正文XYZ", "基本面分析正文XYZ",
+        "多頭觀點AAA", "空頭觀點BBB", "研究主管裁決XYZ",
+        "激進CCC", "風控裁決XYZ",
+        "技術分析師", "看多看空辯論", "風控辯論",
     ]:
         assert must in md, f"缺少: {must}"
 
@@ -86,7 +86,7 @@ def _mem_db():
 
 
 def test_pdf_endpoint_returns_full_detail_content():
-    """端点:返回 application/pdf 附件,且含详情页完整内容(分析师/辩论全文,来自 raw_data,非仅 content 摘要)。"""
+    """端點:返回 application/pdf 附件,且含詳細資訊頁完整內容(分析師/辯論全文,來自 raw_data,非僅 content 摘要)。"""
     from src.modules.automation.api import agents
     from src.platform.persistence.models import AnalysisHistory
 
@@ -94,14 +94,14 @@ def test_pdf_endpoint_returns_full_detail_content():
     try:
         db.add(AnalysisHistory(
             agent_name="tradingagents", stock_symbol="601238",
-            analysis_date="2026-06-20", title="【深度】广汽集团(601238):持有",
-            content="# 摘要\n\n**持有**",  # content 是精简版,不含下面这些
+            analysis_date="2026-06-20", title="【深度】廣汽集團(601238):持有",
+            content="# 摘要\n\n**持有**",  # content 是精簡版,不含下面這些
             raw_data={
                 "suggestion": {"action_label": "持有", "confidence": 5.0},
-                "final_decision": "PM决策正文",
-                "analyst_reports": {"market": "技术面分析正文UNIQUE", "fundamentals": "基本面正文"},
-                "debate_history": {"history": "多头观点UNIQUE 空头观点", "judge_decision": "研究主管裁决"},
-                "risk_debate": {"history": "激进 保守", "judge_decision": "风控裁决"},
+                "final_decision": "PM決策正文",
+                "analyst_reports": {"market": "技術面分析正文UNIQUE", "fundamentals": "基本面正文"},
+                "debate_history": {"history": "多頭觀點UNIQUE 空頭觀點", "judge_decision": "研究主管裁決"},
+                "risk_debate": {"history": "激進 保守", "judge_decision": "風控裁決"},
             },
         ))
         db.commit()
@@ -112,21 +112,21 @@ def test_pdf_endpoint_returns_full_detail_content():
         assert "attachment" in resp.headers["content-disposition"]
 
         if not _WEASY:
-            return  # 中文文本层仅 WeasyPrint 路径可提取;content 组装由 test_assemble_* 覆盖
+            return  # 中文文本層僅 WeasyPrint 路徑可提取;content 組裝由 test_assemble_* 覆蓋
 
         from pypdf import PdfReader
 
         reader = PdfReader(io.BytesIO(bytes(resp.body)))
         txt = "\n".join((p.extract_text() or "") for p in reader.pages)
-        # content 摘要里没有的「分析师全文 / 辩论全文」确实进了 PDF
-        assert "技术面分析正文UNIQUE" in txt
-        assert "多头观点UNIQUE" in txt
+        # content 摘要裡沒有的「分析師全文 / 辯論全文」確實進了 PDF
+        assert "技術面分析正文UNIQUE" in txt
+        assert "多頭觀點UNIQUE" in txt
     finally:
         db.close()
 
 
 def test_pdf_endpoint_404_when_missing():
-    """端点:无记录 → HTTP 404。"""
+    """端點:無記錄 → HTTP 404。"""
     import pytest
     from fastapi import HTTPException
 

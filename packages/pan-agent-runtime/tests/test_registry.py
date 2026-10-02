@@ -77,7 +77,7 @@ def test_registry_keeps_explicitly_allowlisted_deferred_tool_visible():
     registry.register(read_spec("deferred", exposure=ToolExposure.DEFERRED), fake_executor)
     allowed_request = RunRequest(
         run_id="registry-action",
-        messages=[{"role": "user", "content": "执行指定操作"}],
+        messages=[{"role": "user", "content": "執行指定操作"}],
         context={"allowed_tool_names": ["deferred"]},
     )
 

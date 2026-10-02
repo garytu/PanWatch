@@ -1,7 +1,7 @@
-"""北向资金(同花顺 hexin)vendor + client 方法测试。
+"""北向資金(同花順 hexin)vendor + client 方法測試。
 
-离线 monkeypatch marketdata.vendors.northbound.market_get,不实抓(沙箱代理拦截 hexin)。
-真实响应结构未经实抓校验,构造样例按背景描述(当日分钟序列,hgt/sgt 累计值)搭建。
+離線 monkeypatch marketdata.vendors.northbound.market_get,不實抓(沙箱代理攔截 hexin)。
+真實回應結構未經實抓校驗,構造樣例按背景描述(當日分鐘序列,hgt/sgt 累計值)搭建。
 """
 from __future__ import annotations
 
@@ -101,12 +101,12 @@ class TestHexinNorthboundVendor:
         item = out[0]
         assert item.hgt_net == 8.76
         assert item.sgt_net is None
-        assert item.total_net is None  # sgt 缺失,不臆造合计
+        assert item.total_net is None  # sgt 缺失,不臆造合計
 
     def test_sgt_extreme_magnitude_treated_as_invalid(self, monkeypatch):
         payload = _hexin_payload(
             hgt=[["10:15", 8.76]],
-            sgt=[["10:15", 123456789.0]],  # 明显超出"亿元"合理范围的脏值
+            sgt=[["10:15", 123456789.0]],  # 明顯超出"億元"合理範圍的髒值
             date="2026-07-16",
         )
         monkeypatch.setattr(nb, "market_get", lambda *a, **k: payload)
@@ -115,7 +115,7 @@ class TestHexinNorthboundVendor:
         item = out[0]
         assert item.sgt_net is None
         assert item.total_net is None
-        assert item.hgt_net == 8.76  # hgt 不受 sgt 异常污染
+        assert item.hgt_net == 8.76  # hgt 不受 sgt 異常汙染
 
     def test_none_response_returns_empty(self, monkeypatch):
         monkeypatch.setattr(nb, "market_get", lambda *a, **k: None)
@@ -126,7 +126,7 @@ class TestHexinNorthboundVendor:
         assert nb.HexinNorthboundVendor().fetch([], {}) == []
 
     def test_unexpected_structure_returns_empty(self, monkeypatch):
-        # data 不是 dict,或没有 hgt/sgt 键 —— 防御性返回 []
+        # data 不是 dict,或沒有 hgt/sgt 鍵 —— 防禦性返回 []
         monkeypatch.setattr(nb, "market_get", lambda *a, **k: {"data": "unexpected string"})
         assert nb.HexinNorthboundVendor().fetch([], {}) == []
 
@@ -138,7 +138,7 @@ class TestHexinNorthboundVendor:
         assert nb.HexinNorthboundVendor().fetch([], {}) == []
 
     def test_date_falls_back_to_config_when_missing_in_response(self, monkeypatch):
-        payload = _hexin_payload(hgt=[["10:15", 8.76]], sgt=[["10:15", 2.34]])  # 无 date 字段
+        payload = _hexin_payload(hgt=[["10:15", 8.76]], sgt=[["10:15", 2.34]])  # 無 date 欄位
         monkeypatch.setattr(nb, "market_get", lambda *a, **k: payload)
 
         out = nb.HexinNorthboundVendor().fetch([], {"date": "2026-07-16"})
@@ -169,7 +169,7 @@ class TestHexinNorthboundVendor:
 
 
 # ---------------------------------------------------------------------------
-# MarketData.northbound() —— 走单源 Engine 出数
+# MarketData.northbound() —— 走單源 Engine 出數
 # ---------------------------------------------------------------------------
 
 class TestClientMethod:

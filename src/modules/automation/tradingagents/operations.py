@@ -1,16 +1,16 @@
-"""盘中急涨/急跌联动:自动触发 TradingAgents 深度分析。
+"""盤中急漲/急跌聯動:自動觸發 TradingAgents 深度分析。
 
-设计:
-- intraday_monitor 完成单只股票分析后,调用 `try_auto_trigger`
-- 触发条件(MVP):|change_pct| >= threshold(默认 5%,从 tradingagents 配置读)
-- 护栏:冷却时间(默认 24h)+ 月度预算(复用 cost_tracker)
-- 默认关闭(enabled=false),需在 Agents 列表「深度配置」里显式打开
+設計:
+- intraday_monitor 完成單隻股票分析後,呼叫 `try_auto_trigger`
+- 觸發條件(MVP):|change_pct| >= threshold(預設 5%,從 tradingagents 配置讀)
+- 護欄:冷卻時間(預設 24h)+ 月度預算(複用 cost_tracker)
+- 預設關閉(enabled=false),需在 Agents 列表「深度配置」裡顯式開啟
 
-同一文件下半部承载历史建议回填和历史决策比较；这些能力不参与 TradingAgents 主图执行。
+同一檔案下半部承載歷史建議回填和歷史決策比較；這些能力不參與 TradingAgents 主圖執行。
 
-为什么不直接复用 BaseAgent.run:
-- intraday_monitor 是单次循环里跑很多股票,每只都可能触发,需要 fire-and-forget
-- 触发后的 TA 分析走 trigger_agent_for_stock 自身的异步队列,避免阻塞主循环
+為什麼不直接複用 BaseAgent.run:
+- intraday_monitor 是單次迴圈裡跑很多股票,每隻都可能觸發,需要 fire-and-forget
+- 觸發後的 TA 分析走 trigger_agent_for_stock 自身的非同步佇列,避免阻塞主迴圈
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from src.platform.persistence.models import (
 
 logger = logging.getLogger(__name__)
 
-# 这些函数是 API/盘中监控使用的外围运维入口，不参与主图执行。
+# 這些函式是 API/盤中監控使用的外圍運維入口，不參與主圖執行。
 __all__ = [
     "backfill_tradingagents_suggestions",
     "build_history_comparison",
@@ -47,14 +47,14 @@ DEFAULT_COOLDOWN_HOURS = 24
 
 
 def _read_auto_trigger_config(db: Session) -> dict | None:
-    """从 AgentConfig.raw_config 读 auto_trigger 配置。
+    """從 AgentConfig.raw_config 讀 auto_trigger 配置。
 
     Returns:
         {
             "enabled": bool,
             "change_pct_threshold": float,
             "cooldown_hours": int,
-        } 或 None(未配置/未启用)
+        } 或 None(未配置/未啟用)
     """
     agent = db.query(AgentConfig).filter(AgentConfig.name == "tradingagents").first()
     if not agent:
@@ -71,7 +71,7 @@ def _read_auto_trigger_config(db: Session) -> dict | None:
 
 
 def _within_cooldown(db: Session, stock_symbol: str, cooldown_hours: int) -> bool:
-    """检查最近 N 小时内是否已为该股触发过 TA 分析(任何来源)。"""
+    """檢查最近 N 小時內是否已為該股觸發過 TA 分析(任何來源)。"""
     cutoff = datetime.utcnow() - timedelta(hours=cooldown_hours)
     recent = (
         db.query(AnalysisHistory)
@@ -86,7 +86,7 @@ def _within_cooldown(db: Session, stock_symbol: str, cooldown_hours: int) -> boo
 
 
 def _budget_allows(db: Session) -> bool:
-    """检查月度预算是否还有余量。预算从 tradingagents 的 raw_config.monthly_budget_usd 读。"""
+    """檢查月度預算是否還有餘量。預算從 tradingagents 的 raw_config.monthly_budget_usd 讀。"""
     try:
         from src.modules.automation.tradingagents.observability import check_budget
     except ImportError:
@@ -98,13 +98,13 @@ def _budget_allows(db: Session) -> bool:
     raw = agent.raw_config or {}
     budget = float(raw.get("monthly_budget_usd") or 0.0)
     if budget <= 0:
-        return True  # 没设上限 = 不限制
+        return True  # 沒設上限 = 不限制
 
     try:
         status = check_budget(budget)
         return not status.get("exceeded", False)
     except Exception as e:
-        logger.warning(f"[auto_trigger] 预算检查失败,放行: {e}")
+        logger.warning(f"[auto_trigger] 預算檢查失敗,放行: {e}")
         return True
 
 
@@ -112,50 +112,50 @@ def should_auto_trigger(
     stock_symbol: str,
     change_pct: float | None,
 ) -> tuple[bool, str]:
-    """判断是否应该触发 TA 深度分析。
+    """判斷是否應該觸發 TA 深度分析。
 
     Returns:
         (should_trigger, reason)
     """
     if change_pct is None:
-        return False, "无涨跌幅数据"
+        return False, "無漲跌幅資料"
 
     db = SessionLocal()
     try:
         cfg = _read_auto_trigger_config(db)
         if not cfg:
-            return False, "auto_trigger 未启用"
+            return False, "auto_trigger 未啟用"
 
         if abs(change_pct) < cfg["change_pct_threshold"]:
-            return False, f"涨跌幅 {change_pct:+.2f}% 未达阈值 {cfg['change_pct_threshold']}%"
+            return False, f"漲跌幅 {change_pct:+.2f}% 未達閾值 {cfg['change_pct_threshold']}%"
 
         if _within_cooldown(db, stock_symbol, cfg["cooldown_hours"]):
-            return False, f"冷却中(最近 {cfg['cooldown_hours']}h 已触发过)"
+            return False, f"冷卻中(最近 {cfg['cooldown_hours']}h 已觸發過)"
 
         if not _budget_allows(db):
-            return False, "月度预算已用完"
+            return False, "月度預算已用完"
 
-        return True, f"涨跌幅 {change_pct:+.2f}% 达阈值 {cfg['change_pct_threshold']}%"
+        return True, f"漲跌幅 {change_pct:+.2f}% 達閾值 {cfg['change_pct_threshold']}%"
     finally:
         db.close()
 
 
 def fire_and_forget_trigger(stock: Any, source_agent: str = "intraday_monitor") -> str | None:
-    """异步触发 TA 深度分析,不阻塞调用方。
+    """非同步觸發 TA 深度分析,不阻塞呼叫方。
 
     Args:
-        stock: 至少包含 symbol/name/market 的对象(StockData 或 ORM Stock)
-        source_agent: 触发源 agent 名(用于日志/trace_id)
+        stock: 至少包含 symbol/name/market 的物件(StockData 或 ORM Stock)
+        source_agent: 觸發源 agent 名(用於日誌/trace_id)
 
     Returns:
-        trace_id 或 None(触发失败)
+        trace_id 或 None(觸發失敗)
     """
     import time as _time
 
     try:
         from server import trigger_agent_for_stock
     except ImportError:
-        logger.warning("[auto_trigger] server.trigger_agent_for_stock 不可用,跳过")
+        logger.warning("[auto_trigger] server.trigger_agent_for_stock 不可用,跳過")
         return None
 
     symbol = getattr(stock, "symbol", None)
@@ -176,12 +176,12 @@ def fire_and_forget_trigger(stock: Any, source_agent: str = "intraday_monitor") 
                 trace_id=trace_id,
                 force_refresh=False,
             )
-            logger.info(f"[auto_trigger] TA 联动触发完成 - {symbol} (trace={trace_id})")
+            logger.info(f"[auto_trigger] TA 聯動觸發完成 - {symbol} (trace={trace_id})")
         except Exception:
-            logger.exception(f"[auto_trigger] TA 联动触发失败 - {symbol}")
+            logger.exception(f"[auto_trigger] TA 聯動觸發失敗 - {symbol}")
 
     try:
-        # 优先在当前事件循环 schedule;无 loop 则起新线程兜底
+        # 優先在當前事件迴圈 schedule;無 loop 則起新執行緒兜底
         loop = asyncio.get_event_loop()
         if loop.is_running():
             asyncio.create_task(_run())
@@ -198,19 +198,19 @@ def fire_and_forget_trigger(stock: Any, source_agent: str = "intraday_monitor") 
 
 
 def try_auto_trigger(stock: Any, source_agent: str = "intraday_monitor") -> str | None:
-    """组合调用:判断 + 触发。
+    """組合呼叫:判斷 + 觸發。
 
-    供 intraday_monitor.analyze 完成后调用。返回 trace_id 或 None。
+    供 intraday_monitor.analyze 完成後呼叫。返回 trace_id 或 None。
     """
     symbol = getattr(stock, "symbol", "") or ""
     change_pct = getattr(stock, "change_pct", None)
 
     ok, reason = should_auto_trigger(symbol, change_pct)
     if not ok:
-        logger.debug(f"[auto_trigger] 不触发 {symbol}: {reason}")
+        logger.debug(f"[auto_trigger] 不觸發 {symbol}: {reason}")
         return None
 
-    logger.info(f"[auto_trigger] 触发 TA 深度分析 - {symbol} ({reason})")
+    logger.info(f"[auto_trigger] 觸發 TA 深度分析 - {symbol} ({reason})")
     return fire_and_forget_trigger(stock, source_agent)
 
 
@@ -219,7 +219,7 @@ def try_auto_trigger(stock: Any, source_agent: str = "intraday_monitor") -> str 
 # ============================================================================
 
 def backfill_tradingagents_suggestions(days: int = 7) -> dict:
-    """把最近 N 天 analysis_history 里的 tradingagents 记录回填到 stock_suggestions。
+    """把最近 N 天 analysis_history 裡的 tradingagents 記錄回填到 stock_suggestions。
 
     Returns:
         {"checked": int, "written": int, "skipped": int}
@@ -248,8 +248,8 @@ def backfill_tradingagents_suggestions(days: int = 7) -> dict:
             action_label = sug.get("action_label") or "持有"
             confidence = sug.get("confidence")
 
-            # 检查 stock_suggestions 中是否已有(同股票 + 同 agent + 同 action + 近 24h)
-            # 简化:直接尝试 save,save_suggestion 会判重
+            # 檢查 stock_suggestions 中是否已有(同股票 + 同 agent + 同 action + 近 24h)
+            # 簡化:直接嘗試 save,save_suggestion 會判重
             existing = (
                 db.query(StockSuggestion)
                 .filter(
@@ -269,7 +269,7 @@ def backfill_tradingagents_suggestions(days: int = 7) -> dict:
                 else ""
             )
 
-            # 推断 market(分析记录里没存,从 stock_symbol 简单推断)
+            # 推斷 market(分析記錄裡沒存,從 stock_symbol 簡單推斷)
             symbol = r.stock_symbol
             if symbol.isdigit() and len(symbol) == 6:
                 market = "CN"
@@ -280,7 +280,7 @@ def backfill_tradingagents_suggestions(days: int = 7) -> dict:
             else:
                 market = "CN"
 
-            # 从 AnalysisHistory record 拿股票名(如果存在)
+            # 從 AnalysisHistory record 拿股票名(如果存在)
             stock_name = ""
             try:
                 from src.platform.persistence.models import Stock
@@ -316,11 +316,11 @@ def backfill_tradingagents_suggestions(days: int = 7) -> dict:
                 skipped += 1
 
         logger.info(
-            f"[TA backfill] 检查 {checked} 条历史记录,写入 {written} 条建议,跳过 {skipped} 条"
+            f"[TA backfill] 檢查 {checked} 條歷史記錄,寫入 {written} 條建議,跳過 {skipped} 條"
         )
         return {"checked": checked, "written": written, "skipped": skipped}
     except Exception as e:
-        logger.warning(f"[TA backfill] 失败,跳过: {e}")
+        logger.warning(f"[TA backfill] 失敗,跳過: {e}")
         return {"checked": checked, "written": written, "skipped": skipped, "error": str(e)}
     finally:
         db.close()
@@ -341,7 +341,7 @@ def _resolve_market(market: str) -> MarketCode:
 
 
 def _classify_hit(action: str, ret_pct: float | None) -> bool | None:
-    """根据 action 和后续收益率判断决策是否"命中"。"""
+    """根據 action 和後續報酬率判斷決策是否"命中"。"""
     if ret_pct is None:
         return None
     if action == "buy":
@@ -354,7 +354,7 @@ def _classify_hit(action: str, ret_pct: float | None) -> bool | None:
 
 
 def _find_close_on_or_after(klines_by_date: dict[str, float], target: str) -> tuple[str, float] | None:
-    """从 target 日期起向后找最近一个交易日的收盘价。最多回查 7 天(节假日)。"""
+    """從 target 日期起向後找最近一個交易日的收盤價。最多回查 7 天(節假日)。"""
     base = date.fromisoformat(target)
     for offset in range(8):
         d = (base + timedelta(days=offset)).isoformat()
@@ -369,7 +369,7 @@ def _find_close_after_n_trading_days(
     n: int,
     klines_by_date: dict[str, float],
 ) -> float | None:
-    """从 base_date 之后 N 个交易日的收盘价。base_date 必须已是交易日。"""
+    """從 base_date 之後 N 個交易日的收盤價。base_date 必須已是交易日。"""
     try:
         idx = sorted_dates.index(base_date)
     except ValueError:
@@ -385,12 +385,12 @@ def build_history_comparison(
     market: str = "CN",
     days: int = 90,
 ) -> dict:
-    """构建某只股票 TradingAgents 历史决策对比数据。
+    """構建某隻股票 TradingAgents 歷史決策對比資料。
 
     Args:
-        stock_symbol: 股票代码
+        stock_symbol: 股票程式碼
         market: CN / US / HK
-        days: 回溯多少天的 TA 历史
+        days: 回溯多少天的 TA 歷史
 
     Returns:
         {
@@ -417,7 +417,7 @@ def build_history_comparison(
             .all()
         )
     except Exception as e:
-        logger.warning(f"[TA history] 查询失败: {e}")
+        logger.warning(f"[TA history] 查詢失敗: {e}")
         db.close()
         return {"items": [], "stats": _empty_stats()}
     finally:
@@ -426,12 +426,12 @@ def build_history_comparison(
     if not records:
         return {"items": [], "stats": _empty_stats()}
 
-    # 拉历史 K线(回溯天数 + 30 天缓冲让最早的决策也能算 20 日收益)
+    # 拉歷史 K線(回溯天數 + 30 天緩衝讓最早的決策也能算 20 日收益)
     try:
         collector = KlineCollector(_resolve_market(market))
         klines = collector.get_klines(symbol, days=days + 40)
     except Exception as e:
-        logger.warning(f"[TA history] 拉 K线失败: {e}")
+        logger.warning(f"[TA history] 拉 K線失敗: {e}")
         klines = []
 
     klines_by_date = {k.date: k.close for k in klines}
@@ -444,7 +444,7 @@ def build_history_comparison(
         action = (sug.get("action") or "hold").lower()
         confidence = sug.get("confidence")
         cost_usd = raw.get("cost_usd")
-        # 分析价优先用落库时存的"分析时实时价"(立即显示),K线 close 作 fallback
+        # 分析價優先用落庫時存的"分析時即時價"(立即顯示),K線 close 作 fallback
         stored_price = raw.get("price_at_analysis")
         stored_price = round(float(stored_price), 2) if isinstance(stored_price, (int, float)) else None
 
@@ -491,7 +491,7 @@ def build_history_comparison(
 
 
 def _action_to_label(action: str) -> str:
-    return {"buy": "买入", "sell": "卖出", "hold": "持有"}.get(action, action)
+    return {"buy": "買入", "sell": "賣出", "hold": "持有"}.get(action, action)
 
 
 def _empty_stats() -> dict:
@@ -509,7 +509,7 @@ def _empty_stats() -> dict:
 
 
 def _compute_stats(items: list[dict]) -> dict:
-    """统计:仅基于已有 20 日收益的条目。"""
+    """統計:僅基於已有 20 日收益的條目。"""
     scored = [x for x in items if x.get("return_20d_pct") is not None]
     if not scored:
         return {**_empty_stats(), "total": len(items)}

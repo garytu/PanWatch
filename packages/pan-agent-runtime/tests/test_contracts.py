@@ -14,7 +14,7 @@ from pan_agent import (
 def test_tool_schema_and_default_runtime_limits_are_stable():
     spec = ToolSpec(
         name="lookup",
-        title="查询",
+        title="查詢",
         description="Read a value",
         risk=ToolRisk.READ,
         input_schema={"type": "object", "properties": {"key": {"type": "string"}}},
@@ -33,7 +33,7 @@ def test_tool_schema_and_default_runtime_limits_are_stable():
 def test_successful_tool_results_require_freshness_and_provenance():
     observed_at = datetime.now(UTC)
     result = ToolResult.success(
-        summary="查询完成",
+        summary="查詢完成",
         data={"price": 1},
         sources=[{"name": "行情源", "url": "https://example.test/quote"}],
         observed_at=observed_at,

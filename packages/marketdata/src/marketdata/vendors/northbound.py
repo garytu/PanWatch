@@ -1,16 +1,16 @@
-"""北向资金 vendor:同花顺(ths/hexin)当日分钟累计净买入,市场级(symbols 恒空)。
+"""北向資金 vendor:同花順(ths/hexin)當日分鐘累計淨買入,市場級(symbols 恆空)。
 
-背景:东财 datacenter/push2 的北向资金接口(kamt)自 2024-08 起断供(返回 NaN/0),
-不可用。改走同花顺 hexin 私有接口 `data.hexin.cn/market/hsgtApi/method/dayChart/`,
-返回当日分钟级累计净买入序列,`hgt`(沪股通)/`sgt`(深股通),单位均为"亿元"。
+背景:東財 datacenter/push2 的北向資金介面(kamt)自 2024-08 起斷供(返回 NaN/0),
+不可用。改走同花順 hexin 私有介面 `data.hexin.cn/market/hsgtApi/method/dayChart/`,
+返回當日分鐘級累計淨買入序列,`hgt`(滬股通)/`sgt`(深股通),單位均為"億元"。
 
-**待实抓校准**:沙箱代理会拦截 hexin,无法实抓验证真实响应结构。以下解析按背景描述
-("响应含当日分钟序列,每点有时间 + hgt/sgt 累计值")尽力构造 + 逐层防御 `.get()`,
-拿不到就返回 []。真实结构上线前需用真实响应复核。
+**待實抓校準**:沙箱代理會攔截 hexin,無法實抓驗證真實回應結構。以下解析按背景描述
+("回應含當日分鐘序列,每點有時間 + hgt/sgt 累計值")盡力構造 + 逐層防禦 `.get()`,
+拿不到就返回 []。真實結構上線前需用真實回應複核。
 
-已知坑(SKILL 标注):`sgt`(深股通)近期数据不可靠,可能是 NaN 或量级异常(远超合理的
-"亿元"范围),必须容错——异常时 sgt_net=None,不参与 total_net 计算,也不让异常值污染
-hgt_net。绝不用无参 now()/time()/random 填充缺失的 date/time。
+已知坑(SKILL 標註):`sgt`(深股通)近期資料不可靠,可能是 NaN 或量級異常(遠超合理的
+"億元"範圍),必須容錯——異常時 sgt_net=None,不參與 total_net 計算,也不讓異常值汙染
+hgt_net。絕不用無參 now()/time()/random 填充缺失的 date/time。
 """
 from __future__ import annotations
 
@@ -34,13 +34,13 @@ _HEADERS = {
     "User-Agent": _UA,
 }
 
-# sgt(深股通)近期不可靠,可能出现量级异常(远超合理"亿元"净买入范围)的脏值;
-# 超过此绝对值阈值一律视为异常丢弃。阈值本身是防御性经验值,非精确业务规则。
+# sgt(深股通)近期不可靠,可能出現量級異常(遠超合理"億元"淨買入範圍)的髒值;
+# 超過此絕對值閾值一律視為異常丟棄。閾值本身是防禦性經驗值,非精確業務規則。
 _SGT_MAX_ABS = 2000.0
 
 
 def _to_float(value) -> float | None:
-    """宽松转 float;None/无法转换/NaN 一律 None(NaN 用 f != f 判定,不额外 import math)。"""
+    """寬鬆轉 float;None/無法轉換/NaN 一律 None(NaN 用 f != f 判定,不額外 import math)。"""
     if value is None:
         return None
     try:
@@ -53,7 +53,7 @@ def _to_float(value) -> float | None:
 
 
 def _sgt_valid(value) -> float | None:
-    """sgt 专用:在 _to_float 基础上再做量级容错(近期不可靠,可能 NaN/异常大)。"""
+    """sgt 專用:在 _to_float 基礎上再做量級容錯(近期不可靠,可能 NaN/異常大)。"""
     f = _to_float(value)
     if f is None:
         return None
@@ -63,8 +63,8 @@ def _sgt_valid(value) -> float | None:
 
 
 def _unwrap_payload(resp) -> dict:
-    """防御性剥离外层包裹:hexin 响应可能是 {"data": {...}} 或再套一层
-    {"data": {"data": {...}}}——具体结构待实抓校准,逐层 .get() 兜底,拿不到就 {}。
+    """防禦性剝離外層包裹:hexin 回應可能是 {"data": {...}} 或再套一層
+    {"data": {"data": {...}}}——具體結構待實抓校準,逐層 .get() 兜底,拿不到就 {}。
     """
     if not isinstance(resp, dict):
         return {}
@@ -78,8 +78,8 @@ def _unwrap_payload(resp) -> dict:
 
 
 def _last_point(series) -> tuple[object, object]:
-    """从分钟序列取末值(当日最新累计净买入)。序列元素可能是 [time, value] 或
-    {"time":.., "value":..}(键名待实抓校准,防御多种常见键名)。取不到返回 (None, None)。
+    """從分鐘序列取末值(當日最新累計淨買入)。序列元素可能是 [time, value] 或
+    {"time":.., "value":..}(鍵名待實抓校準,防禦多種常見鍵名)。取不到返回 (None, None)。
     """
     if not isinstance(series, (list, tuple)) or not series:
         return None, None
@@ -94,7 +94,7 @@ def _last_point(series) -> tuple[object, object]:
 
 
 class HexinNorthboundVendor(_NorthboundVendorBase):
-    """北向资金(同花顺 hexin):市场级,fetch 忽略 symbols。取当日分钟序列末值组装 1 条。"""
+    """北向資金(同花順 hexin):市場級,fetch 忽略 symbols。取當日分鐘序列末值組裝 1 條。"""
 
     name = "ths"
     supports_markets = {"CN"}
@@ -107,7 +107,7 @@ class HexinNorthboundVendor(_NorthboundVendorBase):
             parse="json",
             retries=2,
             timeout=8,
-            log_label="北向资金",
+            log_label="北向資金",
         )
         if not data:
             return []

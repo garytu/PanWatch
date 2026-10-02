@@ -1,27 +1,27 @@
-"""信号可解释化(Phase 3):rank_score → 1-10 AI Score + 正负因子拆解。
+"""訊號可解釋化(Phase 3):rank_score → 1-10 AI Score + 正負因子拆解。
 
-对标 Danelfin 的 1-10 AI Score 与 green/red AI Factors:把 strategy_engine 已算出的
-score_breakdown(alpha/catalyst/quality/source_bonus 加分项,risk/crowd penalty 扣分项)
-拆成「正向(绿,提升)/ 负向(红,拖累)」两组,供机会页展示。
+對標 Danelfin 的 1-10 AI Score 與 green/red AI Factors:把 strategy_engine 已算出的
+score_breakdown(alpha/catalyst/quality/source_bonus 加分項,risk/crowd penalty 扣分項)
+拆成「正向(綠,提升)/ 負向(紅,拖累)」兩組,供機會頁展示。
 
-纯函数,不依赖 DB;在 API 层对 list_strategy_signals 的结果做后处理注入。
+純函式,不依賴 DB;在 API 層對 list_strategy_signals 的結果做後處理注入。
 """
 
 from __future__ import annotations
 
-# 因子中文标签
+# 因子中文標籤
 FACTOR_LABELS = {
-    "alpha_score": "选股α",
+    "alpha_score": "選股α",
     "catalyst_score": "催化",
-    "quality_score": "计划质量",
-    "source_bonus": "来源加成",
-    "risk_penalty": "风险",
-    "crowd_penalty": "拥挤度",
+    "quality_score": "計劃質量",
+    "source_bonus": "來源加成",
+    "risk_penalty": "風險",
+    "crowd_penalty": "擁擠度",
 }
 
-# 加分类因子(正值=提升,负值=拖累)
+# 加分類因子(正值=提升,負值=拖累)
 ADDITIVE_FACTORS = ("alpha_score", "catalyst_score", "quality_score", "source_bonus")
-# 惩罚类因子(正值=拖累,score_breakdown 中以正数表示惩罚强度)
+# 懲罰類因子(正值=拖累,score_breakdown 中以正數表示懲罰強度)
 PENALTY_FACTORS = ("risk_penalty", "crowd_penalty")
 
 _EPS = 0.01
@@ -37,7 +37,7 @@ def to_ai_score(rank_score) -> int:
 
 
 def explain_factors(score_breakdown) -> dict:
-    """拆成正向(绿)/负向(红)两组,各按贡献绝对值排序取前 5。"""
+    """拆成正向(綠)/負向(紅)兩組,各按貢獻絕對值排序取前 5。"""
     sb = score_breakdown if isinstance(score_breakdown, dict) else {}
     positive: list[dict] = []
     negative: list[dict] = []
@@ -61,16 +61,16 @@ def explain_factors(score_breakdown) -> dict:
         v = _f(key)
         if v is None:
             continue
-        if v > _EPS:  # 惩罚为正 = 拖累,贡献记为负
+        if v > _EPS:  # 懲罰為正 = 拖累,貢獻記為負
             negative.append({"factor": key, "label": FACTOR_LABELS.get(key, key), "contribution": round(-v, 2)})
 
     positive.sort(key=lambda x: x["contribution"], reverse=True)
-    negative.sort(key=lambda x: x["contribution"])  # 最负在前
+    negative.sort(key=lambda x: x["contribution"])  # 最負在前
     return {"positive": positive[:5], "negative": negative[:5]}
 
 
 def enrich_signal(item: dict) -> dict:
-    """给一条信号 item 注入 ai_score + factor_explain(原地修改并返回)。"""
+    """給一條訊號 item 注入 ai_score + factor_explain(原地修改並返回)。"""
     if not isinstance(item, dict):
         return item
     item["ai_score"] = to_ai_score(item.get("rank_score"))

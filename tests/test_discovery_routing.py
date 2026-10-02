@@ -1,11 +1,11 @@
-"""发现(东财热门榜)取数路由测试:统一走 marketdata 包"""
+"""發現(東財熱門榜)取數路由測試:統一走 marketdata 包"""
 import asyncio
 
 import src.platform.marketdata.collectors.discovery_collector as dc
 
 
 def test_fetch_hot_stocks_uses_marketdata(monkeypatch):
-    """fetch_hot_stocks 走 marketdata 包的 hot_stocks,转换为本模块 HotStock,且透传 proxy。"""
+    """fetch_hot_stocks 走 marketdata 包的 hot_stocks,轉換為本模組 HotStock,且透傳 proxy。"""
     from marketdata.types import HotStock as MdHotStock
 
     captured: dict = {}
@@ -20,7 +20,7 @@ def test_fetch_hot_stocks_uses_marketdata(monkeypatch):
                 MdHotStock(
                     symbol="600519",
                     market="CN",
-                    name="贵州茅台",
+                    name="貴州茅臺",
                     price=1700.0,
                     change_pct=1.23,
                     turnover=999999.0,
@@ -43,7 +43,7 @@ def test_fetch_hot_stocks_uses_marketdata(monkeypatch):
     assert isinstance(item, dc.HotStock)
     assert item.symbol == "600519"
     assert item.market == "CN"
-    assert item.name == "贵州茅台"
+    assert item.name == "貴州茅臺"
     assert item.price == 1700.0
     assert item.change_pct == 1.23
     assert item.turnover == 999999.0
@@ -51,7 +51,7 @@ def test_fetch_hot_stocks_uses_marketdata(monkeypatch):
 
 
 def test_fetch_hot_boards_uses_marketdata(monkeypatch):
-    """fetch_hot_boards 走 marketdata 包的 hot_boards,转换为本模块 HotBoard,且透传 proxy。"""
+    """fetch_hot_boards 走 marketdata 包的 hot_boards,轉換為本模組 HotBoard,且透傳 proxy。"""
     from marketdata.types import HotBoard as MdHotBoard
 
     captured: dict = {}
@@ -93,7 +93,7 @@ def test_fetch_hot_boards_uses_marketdata(monkeypatch):
 
 
 def test_fetch_board_stocks_uses_marketdata(monkeypatch):
-    """fetch_board_stocks 走 marketdata 包的 board_stocks,转换为本模块 HotStock,且透传 proxy。"""
+    """fetch_board_stocks 走 marketdata 包的 board_stocks,轉換為本模組 HotStock,且透傳 proxy。"""
     from marketdata.types import HotStock as MdHotStock
 
     captured: dict = {}
@@ -108,7 +108,7 @@ def test_fetch_board_stocks_uses_marketdata(monkeypatch):
                 MdHotStock(
                     symbol="000858",
                     market="CN",
-                    name="五粮液",
+                    name="五糧液",
                     price=150.0,
                     change_pct=3.3,
                     turnover=55555.0,
@@ -131,7 +131,7 @@ def test_fetch_board_stocks_uses_marketdata(monkeypatch):
     assert isinstance(item, dc.HotStock)
     assert item.symbol == "000858"
     assert item.market == "CN"
-    assert item.name == "五粮液"
+    assert item.name == "五糧液"
     assert item.price == 150.0
     assert item.change_pct == 3.3
     assert item.turnover == 55555.0

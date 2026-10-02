@@ -1,17 +1,17 @@
 # PanAgent Tool Research
 
-`pan-agent-tool-research` 是 `pan-agent-runtime` 的可选插件，用于在工具数量增长
-时提供渐进式工具发现能力。它不属于 runtime 核心，M0 不连接数据库、Redis、向量服务
-或模型供应商。
+`pan-agent-tool-research` 是 `pan-agent-runtime` 的可選外掛，用於在工具數量增長
+時提供漸進式工具發現能力。它不屬於 runtime 核心，M0 不連線資料庫、Redis、向量服務
+或模型供應商。
 
 ## 能力
 
-- `ToolDescriptor`：工具用途、关键词、别名、能力域、风险和数据新鲜度；
-- `ToolCatalog`：进程内、版本化的描述元数据目录；
-- `KeywordToolRetriever`：无模型调用的关键词和别名检索；
-- `ToolResearchService`：应用启用状态、能力域和宿主 `ToolPolicy` 后返回候选；
-- `ToolResearchPlugin`：以 shadow 或 active 模式接入 runtime；active 模式提供模型可调用
-  的 `tool_search` 虚拟工具。
+- `ToolDescriptor`：工具用途、關鍵詞、別名、能力域、風險和資料新鮮度；
+- `ToolCatalog`：程式內、版本化的描述後設資料目錄；
+- `KeywordToolRetriever`：無模型呼叫的關鍵詞和別名檢索；
+- `ToolResearchService`：應用啟用狀態、能力域和宿主 `ToolPolicy` 後返回候選；
+- `ToolResearchPlugin`：以 shadow 或 active 模式接入 runtime；active 模式提供模型可呼叫
+  的 `tool_search` 虛擬工具。
 
 ## 接入
 
@@ -31,44 +31,44 @@ runtime = AgentRuntime(
 )
 ```
 
-`shadow` 模式只发出 `extension_event`，不改变模型看到的工具集合；`active` 模式会：
+`shadow` 模式只發出 `extension_event`，不改變模型看到的工具集合；`active` 模式會：
 
-1. 保留 Registry 标记为 `direct` 的工具；
-2. 暴露一个模型可调用的 `tool_search`；
-3. 搜索结果进入下一轮消息，并将选中的 Deferred 工具按完整 schema 暴露；
-4. 每次执行仍由 Runtime Policy 和 Registry 再次校验。
+1. 保留 Registry 標記為 `direct` 的工具；
+2. 暴露一個模型可呼叫的 `tool_search`；
+3. 搜尋結果進入下一輪訊息，並將選中的 Deferred 工具按完整 schema 暴露；
+4. 每次執行仍由 Runtime Policy 和 Registry 再次校驗。
 
-Registry 中的工具可以通过 `ToolSpec.exposure` 设置为 `direct`、`deferred` 或 `hidden`：
+Registry 中的工具可以透過 `ToolSpec.exposure` 設定為 `direct`、`deferred` 或 `hidden`：
 
 ```python
 from pan_agent import ToolExposure, ToolSpec
 
 ToolSpec(
     name="get_special_report",
-    title="专项报告",
-    description="查询专项报告。",
+    title="專項報告",
+    description="查詢專項報告。",
     exposure=ToolExposure.DEFERRED,
 )
 ```
 
-插件失败默认回退到当前 Direct 工具集合，不会因为目录或检索服务异常而清空模型工具空间。
-M0 的 active 检索仍然使用进程内关键词、别名和结构化元数据，不强制调用意图模型。
+外掛失敗預設回退到當前 Direct 工具集合，不會因為目錄或檢索服務異常而清空模型工具空間。
+M0 的 active 檢索仍然使用程式內關鍵詞、別名和結構化後設資料，不強制呼叫意圖模型。
 
 ## 事件
 
-插件通过 runtime 的通用扩展事件发出：
+外掛透過 runtime 的通用擴充套件事件發出：
 
 - `extension=tool_research, event=started`；
-- `exposure`：当前 Direct 工具和已经加载的工具；
+- `exposure`：當前 Direct 工具和已經載入的工具；
 - `candidates_scored`；
 - `completed`；
-- `searched`：模型实际调用 `tool_search` 后的结果；
+- `searched`：模型實際呼叫 `tool_search` 後的結果；
 - `fallback`。
 
-宿主可以把 `RuntimeEvent` 直接写入自己的任务事件表，也可以忽略插件事件。插件不会把
-用户原文写入事件，搜索事件只记录查询哈希、候选数量、工具名和版本信息。
+宿主可以把 `RuntimeEvent` 直接寫入自己的任務事件表，也可以忽略外掛事件。外掛不會把
+使用者原文寫入事件，搜尋事件只記錄查詢雜湊、候選數量、工具名和版本資訊。
 
-## 开发
+## 開發
 
 ```bash
 python -m pip install -e packages/pan-agent-runtime

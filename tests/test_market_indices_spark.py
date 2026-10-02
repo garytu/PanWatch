@@ -1,18 +1,18 @@
-"""首页指数 spark(近20日收盘) 注入 + 60s 缓存 + fail-soft 测试"""
+"""首頁指數 spark(近20日收盤) 注入 + 60s 快取 + fail-soft 測試"""
 import asyncio
 
 import src.modules.market.api.market as mkt
 
 
 class _K:
-    """极简 K 线桩,只需 .close 供 spark 取值。"""
+    """極簡 K 線樁,只需 .close 供 spark 取值。"""
 
     def __init__(self, close: float):
         self.close = close
 
 
 def test_spark_injected_for_each_index(monkeypatch):
-    """每个指数都应附上 spark(近20日收盘价列表),与 get_index_klines 返回的 close 序列一致。"""
+    """每個指數都應附上 spark(近20日收盤價列表),與 get_index_klines 返回的 close 序列一致。"""
     mkt.clear_indices_cache()
 
     captured_days: dict[str, int] = {}
@@ -21,7 +21,7 @@ def test_spark_injected_for_each_index(monkeypatch):
         return [
             {
                 "symbol": "000001",
-                "name": "上证指数",
+                "name": "上證指數",
                 "current_price": 3200.0,
                 "change_pct": 0.63,
                 "change_amount": 20.0,
@@ -45,12 +45,12 @@ def test_spark_injected_for_each_index(monkeypatch):
     assert len(out) == len(mkt.MARKET_INDICES)
     for item in out:
         assert item["spark"] == [100 + i for i in range(20)]
-    # 近20日收盘:days=20 原样透传
+    # 近20日收盤:days=20 原樣透傳
     assert all(d == 20 for d in captured_days.values())
 
 
 def test_spark_failsoft_on_error_or_unmapped(monkeypatch):
-    """单指数取 spark 异常(如美股指数无 INDEX_SECID 映射)→ spark=[],不影响 quote 主体也不抛异常。"""
+    """單指數取 spark 異常(如美股指數無 INDEX_SECID 對映)→ spark=[],不影響 quote 主體也不拋異常。"""
     mkt.clear_indices_cache()
 
     class _MD:
@@ -58,7 +58,7 @@ def test_spark_failsoft_on_error_or_unmapped(monkeypatch):
             return [
                 {
                     "symbol": "000001",
-                    "name": "上证指数",
+                    "name": "上證指數",
                     "current_price": 3200.0,
                     "change_pct": 0.63,
                     "change_amount": 20.0,
@@ -74,17 +74,17 @@ def test_spark_failsoft_on_error_or_unmapped(monkeypatch):
 
     out = asyncio.run(mkt.get_market_indices())
 
-    # quote 主体不受影响:上证指数仍返回正确行情
+    # quote 主體不受影響:上證指數仍返回正確行情
     sh = next(i for i in out if i["symbol"] == "000001")
     assert sh["current_price"] == 3200.0
     assert sh["spark"] == []
-    # 未映射/取数失败的指数(如美股)同样 spark=[] 且仍在结果里
+    # 未對映/取數失敗的指數(如美股)同樣 spark=[] 且仍在結果裡
     assert all(i["spark"] == [] for i in out)
     assert len(out) == len(mkt.MARKET_INDICES)
 
 
 def test_indices_response_cached_60s(monkeypatch):
-    """整个 indices 响应加 60s 进程内缓存:短时间内重复调用不应重复拉取 quote/K线。"""
+    """整個 indices 回應加 60s 程式內快取:短時間內重複呼叫不應重複拉取 quote/K線。"""
     mkt.clear_indices_cache()
 
     call_count = {"quotes": 0, "klines": 0}
@@ -95,7 +95,7 @@ def test_indices_response_cached_60s(monkeypatch):
             return [
                 {
                     "symbol": "000001",
-                    "name": "上证指数",
+                    "name": "上證指數",
                     "current_price": 3200.0,
                     "change_pct": 0.63,
                     "change_amount": 20.0,
@@ -115,4 +115,4 @@ def test_indices_response_cached_60s(monkeypatch):
 
     assert out1 == out2
     assert call_count["quotes"] == 1
-    assert call_count["klines"] == len(mkt.MARKET_INDICES)  # 只在第一次调用时逐指数拉取一次
+    assert call_count["klines"] == len(mkt.MARKET_INDICES)  # 只在第一次呼叫時逐指數拉取一次

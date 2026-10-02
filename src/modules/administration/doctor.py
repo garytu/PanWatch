@@ -1,8 +1,8 @@
-"""命令行系统自检:`python -m src.modules.administration.doctor` 或 `make doctor`。
+"""命令列系統自檢:`python -m src.modules.administration.doctor` 或 `make doctor`。
 
-终端跑一遍 系统基础项(DB/磁盘/调度)+ 数据源/AI/通知,打印结果与中文修复建议。
-CLI 进程内无运行中的调度器 → 调度项会优雅跳过(显示说明,不误报)。
-退出码:有异常项返回 1,全通返回 0(便于 CI/脚本判断)。
+終端跑一遍 系統基礎項(DB/磁碟/排程)+ 資料來源/AI/通知,列印結果與中文修復建議。
+CLI 程式內無執行中的排程器 → 排程項會優雅跳過(顯示說明,不誤報)。
+退出碼:有異常項返回 1,全通返回 0(便於 CI/指令碼判斷)。
 """
 
 from __future__ import annotations
@@ -13,14 +13,14 @@ import sys
 from src.modules.administration.selfcheck import run_selfcheck
 
 _ICON = {"ok": "✅", "slow": "⚠️", "fail": "❌"}
-_CAT = {"system": "系统", "datasource": "数据源", "ai": "AI模型", "notify": "通知渠道"}
+_CAT = {"system": "系統", "datasource": "資料來源", "ai": "AI模型", "notify": "通知管道"}
 _ORDER = ["system", "datasource", "ai", "notify"]
 
 
 def _print_report(res: dict) -> None:
     s = res["summary"]
-    print("\n===== PanWatch 系统自检 =====")
-    print(f"共 {s['total']} · ✅通 {s['ok']} · ⚠️慢 {s['slow']} · ❌断 {s['fail']}\n")
+    print("\n===== PanWatch 系統自檢 =====")
+    print(f"共 {s['total']} · ✅通 {s['ok']} · ⚠️慢 {s['slow']} · ❌斷 {s['fail']}\n")
     items = res.get("items", [])
     for cat in _ORDER:
         cat_items = [i for i in items if i["category"] == cat]
@@ -34,14 +34,14 @@ def _print_report(res: dict) -> None:
             print(f"  {icon} {grp}{i['name']}{lat}")
             if i["status"] == "fail":
                 if i.get("error"):
-                    print(f"       错误: {i['error']}")
+                    print(f"       錯誤: {i['error']}")
                 if i.get("hint"):
-                    print(f"       建议: {i['hint']}")
+                    print(f"       建議: {i['hint']}")
             elif i.get("note"):
                 print(f"       {i['note']}")
         print()
     if s["fail"]:
-        print(f"⚠️  发现 {s['fail']} 项异常,见上方建议。")
+        print(f"⚠️  發現 {s['fail']} 項異常,見上方建議。")
     else:
         print("✅ 全部正常。")
 

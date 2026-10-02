@@ -1,8 +1,8 @@
-"""事件 vendor:东财公告(单源)。移植自 PanWatch EastMoneyEventsCollector.fetch_events 抓取核
+"""事件 vendor:東財公告(單源)。移植自 PanWatch EastMoneyEventsCollector.fetch_events 抓取核
 (src/collectors/events_collector.py:fetch_events/_parse_item/_guess_event_type/_guess_importance)。
 
-原实现是 async(httpx.AsyncClient);此处改为同步 market_get,URL/params/headers/
-A股过滤/解析/类型与重要度启发式/排序/去重全部照搬。无 vendor 内缓存(由 Engine 统一管)。
+原實現是 async(httpx.AsyncClient);此處改為同步 market_get,URL/params/headers/
+A股過濾/解析/型別與重要度啟發式/排序/去重全部照搬。無 vendor 內快取(由 Engine 統一管)。
 """
 from __future__ import annotations
 
@@ -23,31 +23,31 @@ def _guess_event_type(title: str, column_names: list[str]) -> str:
     if any(
         k in t
         for k in [
-            "业绩预告",
-            "业绩快报",
-            "年报",
-            "半年报",
-            "季报",
-            "三季报",
-            "一季报",
+            "業績預告",
+            "業績快報",
+            "年報",
+            "半年報",
+            "季報",
+            "三季報",
+            "一季報",
         ]
     ):
         return "earnings"
-    if any(k in t for k in ["分红", "派息", "除权", "除息", "送转", "股权登记"]):
+    if any(k in t for k in ["分紅", "派息", "除權", "除息", "送轉", "股權登記"]):
         return "dividend"
-    if any(k in t for k in ["停牌", "复牌"]):
+    if any(k in t for k in ["停牌", "復牌"]):
         return "suspension"
-    if any(k in t for k in ["回购", "股份回购"]):
+    if any(k in t for k in ["回購", "股份回購"]):
         return "repurchase"
-    if any(k in t for k in ["增发", "配股", "定向增发", "发行"]):
+    if any(k in t for k in ["增發", "配股", "定向增發", "發行"]):
         return "financing"
-    if any(k in t for k in ["减持", "增持", "股东", "董监高", "持股变动"]):
+    if any(k in t for k in ["減持", "增持", "股東", "董監高", "持股變動"]):
         return "insider"
-    if any(k in t for k in ["诉讼", "仲裁", "立案", "处罚", "监管", "问询函"]):
+    if any(k in t for k in ["訴訟", "仲裁", "立案", "處罰", "監管", "問詢函"]):
         return "regulatory"
-    if any(k in t for k in ["重组", "并购", "收购", "出售资产", "重大资产"]):
+    if any(k in t for k in ["重組", "併購", "收購", "出售資產", "重大資產"]):
         return "restructuring"
-    if any(k in column_names for k in ["临时公告", "重大事项"]):
+    if any(k in column_names for k in ["臨時公告", "重大事項"]):
         return "major"
     return "notice"
 
@@ -58,21 +58,21 @@ def _guess_importance(title: str, column_names: list[str]) -> int:
         k in t
         for k in [
             "重大",
-            "业绩预告",
-            "业绩快报",
-            "年报",
-            "半年报",
-            "重组",
+            "業績預告",
+            "業績快報",
+            "年報",
+            "半年報",
+            "重組",
             "停牌",
-            "复牌",
+            "復牌",
         ]
     ):
         return 3
     if any(
-        k in t for k in ["季报", "分红", "回购", "增持", "减持", "问询函", "处罚"]
+        k in t for k in ["季報", "分紅", "回購", "增持", "減持", "問詢函", "處罰"]
     ):
         return 2
-    if any("临时" in k for k in column_names):
+    if any("臨時" in k for k in column_names):
         return 1
     return 0
 
@@ -157,7 +157,7 @@ class EventsVendor(_EventsVendorBase):
             timeout=10,
             retries=1,
             parse="json",
-            verify=False,  # 对齐原 EastMoneyEventsCollector 的 verify_ssl=False(东财 ann 端点 SSL 关闭)
+            verify=False,  # 對齊原 EastMoneyEventsCollector 的 verify_ssl=False(東財 ann 端點 SSL 關閉)
             log_label="事件",
         )
         if not data or not data.get("success"):

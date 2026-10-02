@@ -12,9 +12,9 @@ describe('ApprovalCard', () => {
       <ApprovalCard
         approval={{
           id: 'approval-1',
-          tool_title: '创建提醒',
+          tool_title: '建立提醒',
           risk: 'write',
-          summary: '为贵州茅台创建价格提醒',
+          summary: '為貴州茅臺建立價格提醒',
           expires_at: '2026-09-11T00:10:00Z',
           status: 'pending',
         }}
@@ -22,12 +22,12 @@ describe('ApprovalCard', () => {
       />,
     )
 
-    expect(screen.getByText('为贵州茅台创建价格提醒')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: '本次允许' }))
+    expect(screen.getByText('為貴州茅臺建立價格提醒')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '本次允許' }))
 
     expect(onDecision).toHaveBeenCalledTimes(1)
     expect(onDecision).toHaveBeenCalledWith('approved')
-    expect((screen.getByRole('button', { name: '拒绝' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '拒絕' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('keeps a decided card visible with its execution status', () => {
@@ -35,9 +35,9 @@ describe('ApprovalCard', () => {
       <ApprovalCard
         approval={{
           id: 'approval-1',
-          tool_title: '创建提醒',
+          tool_title: '建立提醒',
           risk: 'write',
-          summary: '为贵州茅台创建价格提醒',
+          summary: '為貴州茅臺建立價格提醒',
           expires_at: '2026-09-11T00:10:00Z',
           status: 'approved',
         }}
@@ -45,8 +45,8 @@ describe('ApprovalCard', () => {
       />,
     )
 
-    expect(screen.getByText('已允许，已执行')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '本次允许' })).toBeNull()
+    expect(screen.getByText('已允許，已執行')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '本次允許' })).toBeNull()
   })
 
   it('shows a rejected card as a terminal decision without actions', () => {
@@ -54,9 +54,9 @@ describe('ApprovalCard', () => {
       <ApprovalCard
         approval={{
           id: 'approval-2',
-          tool_title: '创建提醒',
+          tool_title: '建立提醒',
           risk: 'write',
-          summary: '为贵州茅台创建价格提醒',
+          summary: '為貴州茅臺建立價格提醒',
           expires_at: '2026-09-11T00:10:00Z',
           status: 'rejected',
         }}
@@ -64,8 +64,8 @@ describe('ApprovalCard', () => {
       />,
     )
 
-    const status = screen.getByText('已拒绝，不会执行')
+    const status = screen.getByText('已拒絕，不會執行')
     expect(status.className).toContain('text-destructive')
-    expect(screen.queryByRole('button', { name: '拒绝' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '拒絕' })).toBeNull()
   })
 })

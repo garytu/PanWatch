@@ -1,8 +1,8 @@
-"""daily_report 大盘指数取数测试。
+"""daily_report 大盤指數取數測試。
 
-覆盖:
-- CN 市场走 marketdata 新包 index_quotes,产出正确的 IndexData 列表。
-- 非 CN 市场返回空 list（与旧 _get_cn_index 口径一致），且不调用 md。
+覆蓋:
+- CN 市場走 marketdata 新包 index_quotes,產出正確的 IndexData 列表。
+- 非 CN 市場返回空 list（與舊 _get_cn_index 口徑一致），且不呼叫 md。
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ def _fake_index_items() -> list[dict]:
     return [
         {
             "symbol": "000001",
-            "name": "上证指数",
+            "name": "上證指數",
             "current_price": 3123.45,
             "change_pct": 1.23,
             "change_amount": 12.3,
@@ -27,7 +27,7 @@ def _fake_index_items() -> list[dict]:
         },
         {
             "symbol": "399001",
-            "name": "深证成指",
+            "name": "深證成指",
             "current_price": 10234.5,
             "change_pct": -0.5,
             "change_amount": -51.2,
@@ -49,7 +49,7 @@ class _FakeMarketData:
 
 
 def test_uses_marketdata_index_quotes(monkeypatch):
-    """CN 指数走 md.index_quotes,产出正确的 IndexData 列表。"""
+    """CN 指數走 md.index_quotes,產出正確的 IndexData 列表。"""
     fake_md = _FakeMarketData(_fake_index_items())
     monkeypatch.setattr(daily_report, "get_market_data", lambda: fake_md)
 
@@ -60,7 +60,7 @@ def test_uses_marketdata_index_quotes(monkeypatch):
     assert len(indices) == 2
     assert all(isinstance(i, IndexData) for i in indices)
     assert indices[0].symbol == "000001"
-    assert indices[0].name == "上证指数"
+    assert indices[0].name == "上證指數"
     assert indices[0].market == MarketCode.CN
     assert indices[0].current_price == 3123.45
     assert indices[0].change_pct == 1.23
@@ -70,7 +70,7 @@ def test_uses_marketdata_index_quotes(monkeypatch):
 
 
 def test_non_cn_market_returns_empty(monkeypatch):
-    """非 CN 市场应返回空 list（与旧 _get_cn_index 口径一致），且不调用 md。"""
+    """非 CN 市場應返回空 list（與舊 _get_cn_index 口徑一致），且不呼叫 md。"""
     fake_md = _FakeMarketData(_fake_index_items())
     monkeypatch.setattr(daily_report, "get_market_data", lambda: fake_md)
 

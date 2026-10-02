@@ -1,6 +1,6 @@
-"""市场/资金面(龙虎榜/融资融券/股东户数/分红)vendor + client 方法测试。
+"""市場/資金面(龍虎榜/融資融券/股東戶數/分紅)vendor + client 方法測試。
 
-离线 monkeypatch marketdata.vendors.market_flow.market_get,不实抓(沙箱拦东财 datacenter)。
+離線 monkeypatch marketdata.vendors.market_flow.market_get,不實抓(沙箱攔東財 datacenter)。
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ class TestDatacenterGetHelper:
 
 
 # ---------------------------------------------------------------------------
-# 龙虎榜(市场级)
+# 龍虎榜(市場級)
 # ---------------------------------------------------------------------------
 
 class TestDragonTiger:
@@ -67,8 +67,8 @@ class TestDragonTiger:
         return {
             "TRADE_DATE": "2026-07-16 00:00:00",
             "SECURITY_CODE": "600519",
-            "SECURITY_NAME_ABBR": "贵州茅台",
-            "EXPLANATION": "日振幅值达15%的证券",
+            "SECURITY_NAME_ABBR": "貴州茅臺",
+            "EXPLANATION": "日振幅值達15%的證券",
             "CLOSE_PRICE": 1700.5,
             "CHANGE_RATE": 3.2,
             "BILLBOARD_NET_AMT": 12345678.9,
@@ -96,8 +96,8 @@ class TestDragonTiger:
         item = out[0]
         assert item.trade_date == "2026-07-16"
         assert item.symbol == "600519"
-        assert item.name == "贵州茅台"
-        assert item.reason == "日振幅值达15%的证券"
+        assert item.name == "貴州茅臺"
+        assert item.reason == "日振幅值達15%的證券"
         assert item.close == 1700.5
         assert item.change_pct == 3.2
         assert item.net_buy == 12345678.9
@@ -132,7 +132,7 @@ class TestDragonTiger:
 
 
 # ---------------------------------------------------------------------------
-# 融资融券(按 symbol)
+# 融資融券(按 symbol)
 # ---------------------------------------------------------------------------
 
 class TestMargin:
@@ -149,7 +149,7 @@ class TestMargin:
         }
 
     def test_takes_latest_of_multiple_days(self, monkeypatch):
-        # 构造某只多日(sortTypes=-1 已降序,data[0] 即最新)
+        # 構造某隻多日(sortTypes=-1 已降序,data[0] 即最新)
         rows = [self._row("2026-07-16"), self._row("2026-07-15"), self._row("2026-07-14")]
         monkeypatch.setattr(mf, "market_get", lambda *a, **k: _datacenter_payload(rows))
         out = mf.EastmoneyMarginVendor().fetch([Symbol.parse("600519", market="CN")], {})
@@ -201,7 +201,7 @@ class TestMargin:
 
     def test_exception_on_one_symbol_skipped_not_raised(self, monkeypatch):
         def fake_market_get(*a, **k):
-            raise RuntimeError("网络异常")
+            raise RuntimeError("網路異常")
 
         monkeypatch.setattr(mf, "market_get", fake_market_get)
         out = mf.EastmoneyMarginVendor().fetch([Symbol.parse("600519", market="CN")], {})
@@ -209,7 +209,7 @@ class TestMargin:
 
 
 # ---------------------------------------------------------------------------
-# 股东户数(按 symbol)
+# 股東戶數(按 symbol)
 # ---------------------------------------------------------------------------
 
 class TestShareholders:
@@ -255,7 +255,7 @@ class TestShareholders:
 
 
 # ---------------------------------------------------------------------------
-# 分红(按 symbol,返回全部历史)
+# 分紅(按 symbol,返回全部歷史)
 # ---------------------------------------------------------------------------
 
 class TestDividend:
@@ -266,14 +266,14 @@ class TestDividend:
                 "PRETAX_BONUS_RMB": 2.38,
                 "TRANSFER_RATIO": 0.0,
                 "BONUS_RATIO": 0.0,
-                "ASSIGN_PROGRESS": "实施分配",
+                "ASSIGN_PROGRESS": "實施分配",
             },
             {
                 "EX_DIVIDEND_DATE": "2025-06-21 00:00:00",
                 "PRETAX_BONUS_RMB": 2.19,
                 "TRANSFER_RATIO": 3.0,
                 "BONUS_RATIO": 0.0,
-                "ASSIGN_PROGRESS": "实施分配",
+                "ASSIGN_PROGRESS": "實施分配",
             },
         ]
 
@@ -288,7 +288,7 @@ class TestDividend:
         assert first.dividend_per_share == 2.38
         assert first.transfer_ratio == 0.0
         assert first.bonus_ratio == 0.0
-        assert first.progress == "实施分配"
+        assert first.progress == "實施分配"
         second = out[1]
         assert second.ex_date == "2025-06-21"
         assert second.transfer_ratio == 3.0
@@ -321,7 +321,7 @@ class TestDividend:
 
 
 # ---------------------------------------------------------------------------
-# MarketData 客户端方法(单源 Engine 出数)
+# MarketData 使用者端方法(單源 Engine 出數)
 # ---------------------------------------------------------------------------
 
 class TestClientMethods:
@@ -329,8 +329,8 @@ class TestClientMethods:
         row = {
             "TRADE_DATE": "2026-07-16 00:00:00",
             "SECURITY_CODE": "600519",
-            "SECURITY_NAME_ABBR": "贵州茅台",
-            "EXPLANATION": "日振幅值达15%的证券",
+            "SECURITY_NAME_ABBR": "貴州茅臺",
+            "EXPLANATION": "日振幅值達15%的證券",
             "CLOSE_PRICE": 1700.5,
             "CHANGE_RATE": 3.2,
             "BILLBOARD_NET_AMT": 12345678.9,
@@ -397,7 +397,7 @@ class TestClientMethods:
                 "PRETAX_BONUS_RMB": 2.38,
                 "TRANSFER_RATIO": 0.0,
                 "BONUS_RATIO": 0.0,
-                "ASSIGN_PROGRESS": "实施分配",
+                "ASSIGN_PROGRESS": "實施分配",
             }
         ]
         monkeypatch.setattr(mf, "market_get", lambda *a, **k: _datacenter_payload(rows))
@@ -407,7 +407,7 @@ class TestClientMethods:
         }))
         out = md.dividend([Symbol.parse("600519", market="CN")])
         assert len(out) == 1 and isinstance(out[0], DividendItem)
-        assert out[0].progress == "实施分配"
+        assert out[0].progress == "實施分配"
 
     def test_margin_no_sources_returns_empty(self):
         md = MarketData(config=StaticConfigProvider({}))

@@ -1,4 +1,4 @@
-"""带 TTL 的轻量内存缓存,线程安全,过期 key 在下次 get 时被动剔除。"""
+"""帶 TTL 的輕量記憶體快取,執行緒安全,過期 key 在下次 get 時被動剔除。"""
 
 from __future__ import annotations
 

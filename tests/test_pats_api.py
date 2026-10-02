@@ -1,10 +1,10 @@
-"""PAT 管理 API 单测:创建(明文仅一次)/列出/吊销，以及吊销后 MCP 端点拒绝。
+"""PAT 管理 API 單測:建立(明文僅一次)/列出/吊銷，以及吊銷後 MCP 端點拒絕。
 
-全自包含:内存 SQLite + TestClient，不连外部。
+全自包含:記憶體 SQLite + TestClient，不連外部。
 """
 
 import src.modules.administration.api.mcp as mcp_module
-import src.modules.administration.api.pats as pats_module  # noqa: F401 (确保模块可导入)
+import src.modules.administration.api.pats as pats_module  # noqa: F401 (確保模組可匯入)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -42,7 +42,7 @@ def _setup(monkeypatch):
 
 
 def test_create_pat_returns_plaintext_once(monkeypatch):
-    """创建 PAT 返回明文令牌(pwmcp_ 前缀)，列表不含明文"""
+    """建立 PAT 返回明文令牌(pwmcp_ 字首)，列表不含明文"""
     client, _ = _setup(monkeypatch)
     resp = client.post("/api/pats", json={"name": "claude-desktop"})
     assert resp.status_code == 200
@@ -57,20 +57,20 @@ def test_create_pat_returns_plaintext_once(monkeypatch):
 
 
 def test_create_pat_rejects_unknown_scope(monkeypatch):
-    """创建 PAT 拒绝不支持的 scope"""
+    """建立 PAT 拒絕不支援的 scope"""
     client, _ = _setup(monkeypatch)
     resp = client.post("/api/pats", json={"name": "x", "scopes": ["mcp:write"]})
     assert resp.status_code == 400
 
 
 def test_revoke_then_mcp_rejects(monkeypatch):
-    """吊销 PAT 后，MCP 端点立即拒绝该令牌"""
+    """吊銷 PAT 後，MCP 端點立即拒絕該令牌"""
     client, _ = _setup(monkeypatch)
     created = client.post("/api/pats", json={"name": "temp"}).json()
     token = created["token"]
     pat_id = created["id"]
 
-    # 吊销前可用
+    # 吊銷前可用
     ok = client.post(
         "/mcp",
         json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
@@ -78,11 +78,11 @@ def test_revoke_then_mcp_rejects(monkeypatch):
     )
     assert ok.status_code == 200
 
-    # 吊销
+    # 吊銷
     dele = client.delete(f"/api/pats/{pat_id}")
     assert dele.status_code == 200
 
-    # 吊销后被拒
+    # 吊銷後被拒
     denied = client.post(
         "/mcp",
         json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
@@ -90,6 +90,6 @@ def test_revoke_then_mcp_rejects(monkeypatch):
     )
     assert denied.status_code == 401
 
-    # 列表中标记为已吊销
+    # 列表中標記為已吊銷
     listed = client.get("/api/pats").json()["items"]
     assert listed[0]["revoked"] is True

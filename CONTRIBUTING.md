@@ -1,45 +1,45 @@
-# 贡献指南
+# 貢獻指南
 
-感谢你对 PanWatch 的兴趣！本文档将指导你如何贡献代码，特别是如何编写 Agent 和数据源。
+感謝你對 PanWatch 的興趣！本檔案將指導你如何貢獻程式碼，特別是如何編寫 Agent 和資料來源。
 
-## 目录
+## 目錄
 
-- [项目结构](#项目结构)
-- [开发环境](#开发环境)
-- [编写 Agent](#编写-agent)
-- [编写数据源](#编写数据源)
-- [提交规范](#提交规范)
+- [專案結構](#專案結構)
+- [開發環境](#開發環境)
+- [編寫 Agent](#編寫-agent)
+- [編寫資料來源](#編寫資料來源)
+- [提交規範](#提交規範)
 
 ---
 
-## 项目结构
+## 專案結構
 
 ```
 PanWatch/
 ├── src/
-│   ├── agents/           # Agent 实现
-│   │   ├── base.py       # 基类和数据结构
+│   ├── agents/           # Agent 實現
+│   │   ├── base.py       # 基類和資料結構
 │   │   ├── daily_report.py
 │   │   └── ...
-│   ├── collectors/       # 数据采集器
+│   ├── collectors/       # 資料採集器
 │   │   ├── news_collector.py
 │   │   ├── kline_collector.py
 │   │   └── ...
-│   ├── core/             # 核心模块
+│   ├── core/             # 核心模組
 │   │   ├── ai_client.py
 │   │   └── notifier.py
 │   └── web/              # Web API
 ├── prompts/              # AI Prompt 模板
 ├── frontend/             # React 前端
-└── server.py             # 入口文件
+└── server.py             # 入口檔案
 ```
 
 ---
 
-## 开发环境
+## 開發環境
 
 ```bash
-# 后端
+# 後端
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -53,13 +53,13 @@ pnpm dev
 
 ---
 
-## 编写 Agent
+## 編寫 Agent
 
-Agent 是 PanWatch 的核心分析单元，负责采集数据、调用 AI 分析、发送通知。
+Agent 是 PanWatch 的核心分析單元，負責採集資料、呼叫 AI 分析、傳送通知。
 
-### 1. 创建 Agent 文件
+### 1. 建立 Agent 檔案
 
-在 `src/modules/automation/` 目录创建新文件，例如 `my_agent.py`：
+在 `src/modules/automation/` 目錄建立新檔案，例如 `my_agent.py`：
 
 ```python
 import logging
@@ -69,169 +69,169 @@ from src.modules.automation.base import BaseAgent, AgentContext, AnalysisResult
 
 logger = logging.getLogger(__name__)
 
-# Prompt 文件路径
+# Prompt 檔案路徑
 PROMPT_PATH = Path(__file__).resolve().parents[3] / "prompts" / "my_agent.txt"
 
 
 class MyAgent(BaseAgent):
-    """我的自定义 Agent"""
+    """我的自定義 Agent"""
 
-    # 必填：Agent 标识（英文，用于数据库和 API）
+    # 必填：Agent 標識（英文，用於資料庫和 API）
     name = "my_agent"
 
-    # 必填：显示名称（中文，用于界面展示）
+    # 必填：顯示名稱（中文，用於介面展示）
     display_name = "我的 Agent"
 
     # 必填：描述
-    description = "这是一个自定义 Agent 的示例"
+    description = "這是一個自定義 Agent 的示例"
 
     async def collect(self, context: AgentContext) -> dict:
         """
-        采集数据
+        採集資料
 
         Args:
-            context: 包含 watchlist（自选股列表）、portfolio（持仓信息）等
+            context: 包含 watchlist（自選股列表）、portfolio（持倉資訊）等
 
         Returns:
-            采集到的数据字典，将传递给 build_prompt
+            採集到的資料字典，將傳遞給 build_prompt
         """
         data = {
             "stocks": [],
             "timestamp": datetime.now().isoformat(),
         }
 
-        # 遍历自选股采集数据
+        # 遍歷自選股採集資料
         for stock in context.watchlist:
-            # stock.symbol: 股票代码
-            # stock.name: 股票名称
-            # stock.market: 市场（CN/HK/US）
+            # stock.symbol: 股票程式碼
+            # stock.name: 股票名稱
+            # stock.market: 市場（CN/HK/US）
             pass
 
-        # 获取持仓信息
-        # context.portfolio.all_positions: 所有持仓列表
-        # context.portfolio.get_aggregated_position(symbol): 获取某只股票的汇总持仓
+        # 獲取持倉資訊
+        # context.portfolio.all_positions: 所有持倉列表
+        # context.portfolio.get_aggregated_position(symbol): 獲取某隻股票的彙總持倉
 
         return data
 
     def build_prompt(self, data: dict, context: AgentContext) -> tuple[str, str]:
         """
-        构建 AI Prompt
+        構建 AI Prompt
 
         Args:
-            data: collect() 返回的数据
+            data: collect() 返回的資料
             context: Agent 上下文
 
         Returns:
-            (system_prompt, user_content) 元组
+            (system_prompt, user_content) 元組
         """
-        # 读取 Prompt 模板
+        # 讀取 Prompt 模板
         system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
-        # 构建用户输入
+        # 構建使用者輸入
         lines = []
-        lines.append("## 数据")
-        # ... 格式化数据
+        lines.append("## 資料")
+        # ... 格式化資料
 
         user_content = "\n".join(lines)
         return system_prompt, user_content
 
     async def should_notify(self, result: AnalysisResult) -> bool:
         """
-        是否发送通知（可选重写）
+        是否傳送通知（可選重寫）
 
-        默认返回 True，可根据分析结果决定是否通知
+        預設返回 True，可根據分析結果決定是否通知
         """
-        # 例如：只有重要信号才通知
+        # 例如：只有重要訊號才通知
         # return "重要" in result.content
         return True
 ```
 
-### 2. 创建 Prompt 模板
+### 2. 建立 Prompt 模板
 
-在 `prompts/` 目录创建对应的 Prompt 文件 `my_agent.txt`：
+在 `prompts/` 目錄建立對應的 Prompt 檔案 `my_agent.txt`：
 
 ```
-你是一个专业的股票分析师。
+你是一個專業的股票分析師。
 
-## 任务
-根据提供的数据进行分析...
+## 任務
+根據提供的資料進行分析...
 
-## 输出格式
-请按以下格式输出：
+## 輸出格式
+請按以下格式輸出：
 1. 概述
-2. 详细分析
-3. 建议
+2. 詳細分析
+3. 建議
 ```
 
-### 3. 注册 Agent
+### 3. 註冊 Agent
 
-在 `server.py` 中注册：
+在 `server.py` 中註冊：
 
 ```python
-# 1. 导入
+# 1. 匯入
 from src.modules.automation.my_agent import MyAgent
 
-# 2. 添加到 AGENT_REGISTRY
+# 2. 新增到 AGENT_REGISTRY
 AGENT_REGISTRY: dict[str, type] = {
     "daily_report": DailyReportAgent,
     # ...
-    "my_agent": MyAgent,  # 添加这行
+    "my_agent": MyAgent,  # 新增這行
 }
 
-# 3. 在 seed_agents() 中添加配置
+# 3. 在 seed_agents() 中新增配置
 def seed_agents():
     agents = [
         # ...
         {
             "name": "my_agent",
             "display_name": "我的 Agent",
-            "description": "这是一个自定义 Agent",
-            "enabled": False,  # 默认禁用，用户手动启用
-            "schedule": "0 16 * * 1-5",  # cron 表达式
-            "execution_mode": "batch",  # batch: 批量分析 / single: 逐只分析
+            "description": "這是一個自定義 Agent",
+            "enabled": False,  # 預設停用，使用者手動啟用
+            "schedule": "0 16 * * 1-5",  # cron 表示式
+            "execution_mode": "batch",  # batch: 批次分析 / single: 逐只分析
         },
     ]
 ```
 
-### 4. Agent 上下文说明
+### 4. Agent 上下文說明
 
-`AgentContext` 提供以下信息：
+`AgentContext` 提供以下資訊：
 
-| 属性 | 类型 | 说明 |
+| 屬性 | 型別 | 說明 |
 |------|------|------|
-| `watchlist` | `list[StockConfig]` | 关联的自选股列表 |
-| `portfolio` | `PortfolioInfo` | 持仓组合信息 |
-| `ai_client` | `AIClient` | AI 客户端 |
+| `watchlist` | `list[StockConfig]` | 關聯的自選股列表 |
+| `portfolio` | `PortfolioInfo` | 持倉組合資訊 |
+| `ai_client` | `AIClient` | AI 使用者端 |
 | `notifier` | `NotifierManager` | 通知管理器 |
-| `model_label` | `str` | 当前使用的模型标签 |
+| `model_label` | `str` | 當前使用的模型標籤 |
 
-### 5. 执行模式
+### 5. 執行模式
 
-- **batch**：所有股票一起分析，适合日报类
-- **single**：逐只股票分析，适合实时监控类
+- **batch**：所有股票一起分析，適合日報類
+- **single**：逐只股票分析，適合即時監控類
 
 ---
 
-## 编写数据源
+## 編寫資料來源
 
-数据源负责从外部 API 获取数据（行情、新闻、K线等）。
+資料來源負責從外部 API 獲取資料（行情、新聞、K線等）。
 
-### 1. 数据源类型
+### 1. 資料來源型別
 
-| 类型 | 说明 | 示例 |
+| 型別 | 說明 | 示例 |
 |------|------|------|
-| `quote` | 实时行情 | 腾讯行情 |
-| `kline` | K线数据 | 腾讯K线 |
-| `news` | 新闻资讯 | 东方财富新闻 |
-| `capital_flow` | 资金流向 | 东方财富资金 |
-| `chart` | K线截图 | 雪球截图 |
+| `quote` | 即時行情 | 騰訊行情 |
+| `kline` | K線資料 | 騰訊K線 |
+| `news` | 新聞資訊 | 東方財富新聞 |
+| `capital_flow` | 資金流向 | 東方財富資金 |
+| `chart` | K線截圖 | 雪球截圖 |
 
-### 2. 创建数据采集器
+### 2. 建立資料採集器
 
-以新闻采集器为例，在 `src/collectors/` 创建文件：
+以新聞採集器為例，在 `src/collectors/` 建立檔案：
 
 ```python
-"""我的新闻采集器"""
+"""我的新聞採集器"""
 import logging
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -243,8 +243,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class NewsItem:
-    """新闻数据结构"""
-    source: str           # 数据源标识
+    """新聞資料結構"""
+    source: str           # 資料來源標識
     external_id: str      # 外部唯一ID
     title: str
     content: str
@@ -254,7 +254,7 @@ class NewsItem:
 
 
 class MyNewsCollector:
-    """我的新闻采集器"""
+    """我的新聞採集器"""
 
     source = "my_news"
 
@@ -263,7 +263,7 @@ class MyNewsCollector:
         初始化
 
         Args:
-            config: 数据源配置（来自数据库 DataSource.config）
+            config: 資料來源配置（來自資料庫 DataSource.config）
         """
         self.config = config or {}
         self.api_key = self.config.get("api_key", "")
@@ -274,11 +274,11 @@ class MyNewsCollector:
         since: datetime | None = None,
     ) -> list[NewsItem]:
         """
-        获取新闻
+        獲取新聞
 
         Args:
-            symbols: 股票代码列表（可选，用于过滤）
-            since: 起始时间（可选）
+            symbols: 股票程式碼列表（可選，用於過濾）
+            since: 起始時間（可選）
 
         Returns:
             NewsItem 列表
@@ -286,7 +286,7 @@ class MyNewsCollector:
         results = []
 
         async with httpx.AsyncClient() as client:
-            # 调用 API
+            # 呼叫 API
             resp = await client.get("https://api.example.com/news")
             data = resp.json()
 
@@ -304,30 +304,30 @@ class MyNewsCollector:
         return results
 ```
 
-### 3. 注册数据源
+### 3. 註冊資料來源
 
-在 `server.py` 的 `seed_data_sources()` 中添加：
+在 `server.py` 的 `seed_data_sources()` 中新增：
 
 ```python
 def seed_data_sources():
     sources = [
         # ...
         {
-            "name": "我的新闻源",
+            "name": "我的新聞源",
             "type": "news",
-            "provider": "my_news",  # 对应 collector 的 source
+            "provider": "my_news",  # 對應 collector 的 source
             "config": {
-                "api_key": "",  # 用户在界面配置
+                "api_key": "",  # 使用者在介面配置
             },
             "enabled": False,
-            "priority": 10,  # 优先级，数字越小优先级越高
-            "supports_batch": True,  # 是否支持批量查询
-            "test_symbols": ["600519"],  # 测试用股票代码
+            "priority": 10,  # 優先順序，數字越小優先順序越高
+            "supports_batch": True,  # 是否支援批次查詢
+            "test_symbols": ["600519"],  # 測試用股票程式碼
         },
     ]
 ```
 
-### 4. 在 Agent 中使用数据源
+### 4. 在 Agent 中使用資料來源
 
 ```python
 from src.platform.marketdata.collectors.my_collector import MyNewsCollector
@@ -343,7 +343,7 @@ class MyAgent(BaseAgent):
 
 ---
 
-## 提交规范
+## 提交規範
 
 ### Commit 格式
 
@@ -353,32 +353,32 @@ class MyAgent(BaseAgent):
 <body>
 ```
 
-**Type 类型：**
+**Type 型別：**
 - `feat`: 新功能
-- `fix`: Bug 修复
-- `docs`: 文档更新
-- `refactor`: 重构
-- `style`: 格式调整
-- `test`: 测试相关
+- `fix`: Bug 修復
+- `docs`: 檔案更新
+- `refactor`: 重構
+- `style`: 格式調整
+- `test`: 測試相關
 
 **示例：**
 ```
-feat: 添加盘中监控 Agent
+feat: 新增盤中監控 Agent
 
-- 支持价格异动检测
-- 支持成交量异动检测
-- AI 智能判断是否需要通知
+- 支援價格異動檢測
+- 支援成交量異動檢測
+- AI 智慧判斷是否需要通知
 ```
 
 ### PR 要求
 
-1. 确保代码通过 lint 检查
-2. 新增功能需要更新文档
+1. 確保程式碼透過 lint 檢查
+2. 新增功能需要更新檔案
 3. Agent 需要提供 Prompt 模板
-4. 数据源需要说明 API 来源和限制
+4. 資料來源需要說明 API 來源和限制
 
 ---
 
-## 问题反馈
+## 問題回饋
 
-如有问题，请提交 Issue 或 PR。
+如有問題，請提交 Issue 或 PR。

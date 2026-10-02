@@ -1,4 +1,4 @@
-"""端口的内置默认实现:静态配置 + 内存指标(供独立使用与测试)。"""
+"""埠的內建預設實現:靜態配置 + 記憶體指標(供獨立使用與測試)。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from marketdata.ports import SourceConfig
 
 
 class StaticConfigProvider:
-    """从一个 {datatype: [SourceConfig]} 字典提供配置。"""
+    """從一個 {datatype: [SourceConfig]} 字典提供配置。"""
 
     def __init__(self, mapping: dict[str, list[SourceConfig]]):
         self._mapping = mapping
@@ -21,7 +21,7 @@ class StaticConfigProvider:
 
 
 class _Metrics:
-    """单 vendor 的滚动统计(最近 100 次),对齐 orchestrator._Metrics。"""
+    """單 vendor 的滾動統計(最近 100 次),對齊 orchestrator._Metrics。"""
 
     def __init__(self):
         self.window: collections.deque = collections.deque(maxlen=100)
@@ -52,7 +52,7 @@ class _Metrics:
 
 
 class InMemoryMetricsSink:
-    """内存指标沉淀(不落库)。health via snapshot()。"""
+    """記憶體指標沉澱(不落庫)。health via snapshot()。"""
 
     def __init__(self):
         self._by_vendor: dict[str, _Metrics] = {}

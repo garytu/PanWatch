@@ -1,6 +1,6 @@
-"""价格提醒的量比条件应优先用报价字段,不再无谓地拉 K线(批量整治 P2)。
+"""價格提醒的量比條件應優先用報價欄位,不再無謂地拉 K線(批次整治 P2)。
 
-CN/HK 报价已带量比(腾讯 parts[49]);仅当报价缺量比(如美股)才回退 K线摘要。
+CN/HK 報價已帶量比(騰訊 parts[49]);僅當報價缺量比(如美股)才回退 K線摘要。
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from src.platform.marketdata.models import MarketCode
 
 
 def test_volume_ratio_uses_quote_not_kline(monkeypatch):
-    """报价带量比时,量比条件直接用报价,不应再拉 K线。"""
+    """報價帶量比時,量比條件直接用報價,不應再拉 K線。"""
     eng = PriceAlertEngine()
     called = {"kline": 0}
 
@@ -34,11 +34,11 @@ def test_volume_ratio_uses_quote_not_kline(monkeypatch):
 
     assert ok is True
     assert detail["actual"] == 2.5
-    assert called["kline"] == 0, "有报价量比时不应再拉 K线"
+    assert called["kline"] == 0, "有報價量比時不應再拉 K線"
 
 
 def test_volume_ratio_falls_back_to_kline_when_quote_missing(monkeypatch):
-    """报价无量比(如美股)时,量比条件回退到 K线摘要。"""
+    """報價無量比(如美股)時,量比條件回退到 K線摘要。"""
     eng = PriceAlertEngine()
     called = {"kline": 0}
 
@@ -48,7 +48,7 @@ def test_volume_ratio_falls_back_to_kline_when_quote_missing(monkeypatch):
 
     monkeypatch.setattr(eng, "_get_kline_summary_cached", fake_kline)
 
-    quote = {"current_price": 200.0}  # 无 volume_ratio 字段
+    quote = {"current_price": 200.0}  # 無 volume_ratio 欄位
     ok, detail = asyncio.run(
         eng._eval_condition(
             {"type": "volume_ratio", "op": ">", "value": 2.0},
@@ -60,4 +60,4 @@ def test_volume_ratio_falls_back_to_kline_when_quote_missing(monkeypatch):
 
     assert ok is True
     assert detail["actual"] == 3.0
-    assert called["kline"] == 1, "报价缺量比时应回退 K线一次"
+    assert called["kline"] == 1, "報價缺量比時應回退 K線一次"

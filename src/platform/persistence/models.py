@@ -18,12 +18,12 @@ from src.platform.persistence.database import Base
 
 
 class AIService(Base):
-    """AI 服务商（base_url + api_key）"""
+    """AI 服務商（base_url + api_key）"""
 
     __tablename__ = "ai_services"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # "OpenAI", "智谱", "DeepSeek"
+    name = Column(String, nullable=False)  # "OpenAI", "智譜", "DeepSeek"
     base_url = Column(String, nullable=False)
     api_key = Column(String, default="")
     created_at = Column(DateTime, server_default=func.now())
@@ -34,16 +34,16 @@ class AIService(Base):
 
 
 class AIModel(Base):
-    """AI 模型（属于某个服务商）"""
+    """AI 模型（屬於某個服務商）"""
 
     __tablename__ = "ai_models"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # 显示名，如 "GLM-4-Flash"
+    name = Column(String, nullable=False)  # 顯示名，如 "GLM-4-Flash"
     service_id = Column(
         Integer, ForeignKey("ai_services.id", ondelete="CASCADE"), nullable=False
     )
-    model = Column(String, nullable=False)  # 实际模型标识，如 "glm-4-flash"
+    model = Column(String, nullable=False)  # 實際模型標識，如 "glm-4-flash"
     is_default = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
@@ -63,13 +63,13 @@ class NotifyChannel(Base):
 
 
 class Account(Base):
-    """交易账户"""
+    """交易帳戶"""
 
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # 账户名称，如 "招商证券"、"华泰证券"
-    available_funds = Column(Float, default=0)  # 可用资金
+    name = Column(String, nullable=False)  # 帳戶名稱，如 "招商證券"、"華泰證券"
+    available_funds = Column(Float, default=0)  # 可用資金
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -86,7 +86,7 @@ class Stock(Base):
     symbol = Column(String, nullable=False)
     name = Column(String, nullable=False)
     market = Column(String, nullable=False)  # CN / HK / US
-    # 以下字段已废弃，持仓信息移至 Position 表
+    # 以下欄位已廢棄，持倉資訊移至 Position 表
     cost_price = Column(Float, nullable=True)
     quantity = Column(Integer, nullable=True)
     invested_amount = Column(Float, nullable=True)
@@ -103,7 +103,7 @@ class Stock(Base):
 
 
 class Position(Base):
-    """持仓记录（多账户多股票）"""
+    """持倉記錄（多帳戶多股票）"""
 
     __tablename__ = "positions"
     __table_args__ = (
@@ -117,13 +117,13 @@ class Position(Base):
     stock_id = Column(
         Integer, ForeignKey("stocks.id", ondelete="CASCADE"), nullable=False
     )
-    cost_price = Column(Float, nullable=False)  # 成本价
-    quantity = Column(Integer, nullable=False)  # 持仓数量
-    invested_amount = Column(Float, nullable=True)  # 投入资金（用于盘中监控）
+    cost_price = Column(Float, nullable=False)  # 成本價
+    quantity = Column(Integer, nullable=False)  # 持倉數量
+    invested_amount = Column(Float, nullable=True)  # 投入資金（用於盤中監控）
     sort_order = Column(Integer, default=0)
     trading_style = Column(
         String, default="swing"
-    )  # short: 短线, swing: 波段, long: 长线
+    )  # short: 短線, swing: 波段, long: 長線
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -132,7 +132,7 @@ class Position(Base):
 
 
 class StockAgent(Base):
-    """多对多: 每只股票可被多个 Agent 监控"""
+    """多對多: 每隻股票可被多個 Agent 監控"""
 
     __tablename__ = "stock_agents"
     __table_args__ = (
@@ -168,7 +168,7 @@ class AgentConfig(Base):
     display_order = Column(Integer, default=0)
     enabled = Column(Boolean, default=True)
     schedule = Column(String, default="")
-    # 执行模式: batch=批量(多只股票一起分析发送) / single=单只(逐只分析发送，实时性高)
+    # 執行模式: batch=批次(多隻股票一起分析傳送) / single=單隻(逐只分析傳送，即時性高)
     execution_mode = Column(String, default="batch")
     ai_model_id = Column(
         Integer, ForeignKey("ai_models.id", ondelete="SET NULL"), nullable=True
@@ -230,26 +230,26 @@ class AppSettings(Base):
 
 
 class DataSource(Base):
-    """数据源配置（新闻、K线图、行情）"""
+    """資料來源配置（新聞、K線圖、行情）"""
 
     __tablename__ = "data_sources"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # "雪球资讯"
+    name = Column(String, nullable=False)  # "雪球資訊"
     type = Column(
         String, nullable=False
     )  # "news" / "chart" / "quote" / "kline" / "capital_flow"
     provider = Column(String, nullable=False)  # "xueqiu" / "eastmoney" / "tencent"
-    config = Column(JSON, default={})  # 配置参数
+    config = Column(JSON, default={})  # 配置引數
     enabled = Column(Boolean, default=True)
-    priority = Column(Integer, default=0)  # 越小优先级越高
-    supports_batch = Column(Boolean, default=False)  # 是否支持批量查询
-    test_symbols = Column(JSON, default=[])  # 测试用股票代码列表
+    priority = Column(Integer, default=0)  # 越小優先順序越高
+    supports_batch = Column(Boolean, default=False)  # 是否支援批次查詢
+    test_symbols = Column(JSON, default=[])  # 測試用股票程式碼列表
     created_at = Column(DateTime, server_default=func.now())
 
 
 class NewsCache(Base):
-    """新闻缓存（用于去重）"""
+    """新聞快取（用於去重）"""
 
     __tablename__ = "news_cache"
     __table_args__ = (
@@ -258,17 +258,17 @@ class NewsCache(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(String, nullable=False)  # "cls" / "eastmoney"
-    external_id = Column(String, nullable=False)  # 来源侧 ID
+    external_id = Column(String, nullable=False)  # 來源側 ID
     title = Column(String, nullable=False)
     content = Column(String, default="")
     publish_time = Column(DateTime, nullable=False)
-    symbols = Column(JSON, default=[])  # 关联股票代码列表
+    symbols = Column(JSON, default=[])  # 關聯股票程式碼列表
     importance = Column(Integer, default=0)  # 0-3 重要性
     created_at = Column(DateTime, server_default=func.now())
 
 
 class NotifyThrottle(Base):
-    """通知节流记录（防止同一股票短时间内重复通知）"""
+    """通知節流記錄（防止同一股票短時間內重複通知）"""
 
     __tablename__ = "notify_throttle"
     __table_args__ = (
@@ -279,11 +279,11 @@ class NotifyThrottle(Base):
     agent_name = Column(String, nullable=False)
     stock_symbol = Column(String, nullable=False)
     last_notify_at = Column(DateTime, nullable=False)
-    notify_count = Column(Integer, default=1)  # 当日通知次数
+    notify_count = Column(Integer, default=1)  # 當日通知次數
 
 
 class AnalysisHistory(Base):
-    """分析历史记录（盘后分析、盘前分析等）"""
+    """分析歷史記錄（盤後分析、盤前分析等）"""
 
     __tablename__ = "analysis_history"
     __table_args__ = (
@@ -294,18 +294,18 @@ class AnalysisHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     agent_name = Column(String, nullable=False)  # "daily_report" / "premarket_outlook"
-    stock_symbol = Column(String, nullable=False)  # 股票代码，"*" 表示全部
+    stock_symbol = Column(String, nullable=False)  # 股票程式碼，"*" 表示全部
     analysis_date = Column(String, nullable=False)  # 分析日期 "YYYY-MM-DD"
-    title = Column(String, default="")  # 分析标题
-    content = Column(String, nullable=False)  # AI 分析结果
-    raw_data = Column(JSON, default={})  # 原始数据快照
+    title = Column(String, default="")  # 分析標題
+    content = Column(String, nullable=False)  # AI 分析結果
+    raw_data = Column(JSON, default={})  # 原始資料快照
     agent_kind_snapshot = Column(String, default="workflow")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class StockContextSnapshot(Base):
-    """按股票/日期保存结构化上下文快照（用于跨天记忆）"""
+    """按股票/日期儲存結構化上下文快照（用於跨天記憶）"""
 
     __tablename__ = "stock_context_snapshots"
     __table_args__ = (
@@ -335,7 +335,7 @@ class StockContextSnapshot(Base):
 
 
 class NewsTopicSnapshot(Base):
-    """新闻主题快照（按日期和窗口聚合）"""
+    """新聞主題快照（按日期和視窗聚合）"""
 
     __tablename__ = "news_topic_snapshots"
     __table_args__ = (
@@ -359,7 +359,7 @@ class NewsTopicSnapshot(Base):
 
 
 class AgentContextRun(Base):
-    """每次 Agent 执行时使用的上下文摘要"""
+    """每次 Agent 執行時使用的上下文摘要"""
 
     __tablename__ = "agent_context_runs"
     __table_args__ = (
@@ -377,7 +377,7 @@ class AgentContextRun(Base):
 
 
 class AgentPredictionOutcome(Base):
-    """建议后验评估记录（用于回放与效果统计）"""
+    """建議後驗評估記錄（用於回放與效果統計）"""
 
     __tablename__ = "agent_prediction_outcomes"
     __table_args__ = (
@@ -397,12 +397,12 @@ class AgentPredictionOutcome(Base):
     stock_market = Column(String, nullable=False, default="CN")
     prediction_date = Column(String, nullable=False)  # YYYY-MM-DD
     horizon_days = Column(Integer, nullable=False, default=1)  # 1/5/10...
-    # 同一次建议的各 horizon 共用 UUID；历史记录为空时由查询侧兼容聚合。
+    # 同一次建議的各 horizon 共用 UUID；歷史記錄為空時由查詢側相容聚合。
     prediction_group_id = Column(String, nullable=True)
-    # 旧数据按自然日评估；新写入统一按实际 K 线交易日评估。
+    # 舊資料按自然日評估；新寫入統一按實際 K 線交易日評估。
     horizon_unit = Column(String, nullable=False, default="trading_days")
     action = Column(String, nullable=False, default="watch")
-    action_label = Column(String, nullable=False, default="观望")
+    action_label = Column(String, nullable=False, default="觀望")
     confidence = Column(Float, nullable=True)
     trigger_price = Column(Float, nullable=True)
     outcome_price = Column(Float, nullable=True)
@@ -414,7 +414,7 @@ class AgentPredictionOutcome(Base):
 
 
 class StockSuggestion(Base):
-    """股票建议池 - 汇总各 Agent 建议"""
+    """股票建議池 - 彙總各 Agent 建議"""
 
     __tablename__ = "stock_suggestions"
 
@@ -423,34 +423,34 @@ class StockSuggestion(Base):
     stock_market = Column(String, nullable=False, default="CN", index=True)
     stock_name = Column(String, default="")
 
-    # 建议内容
+    # 建議內容
     action = Column(
         String, nullable=False
     )  # buy/add/reduce/sell/hold/watch/alert/avoid
     action_label = Column(
         String, nullable=False
-    )  # 中文标签：建仓/加仓/减仓/清仓/持有/观望
-    signal = Column(String, default="")  # 信号描述
-    reason = Column(String, default="")  # 建议理由
+    )  # 中文標籤：建倉/加碼/減碼/出清/持有/觀望
+    signal = Column(String, default="")  # 訊號描述
+    reason = Column(String, default="")  # 建議理由
 
-    # 来源追踪
+    # 來源追蹤
     agent_name = Column(
         String, nullable=False
     )  # intraday_monitor/daily_report/premarket_outlook
-    agent_label = Column(String, default="")  # 盘中监测/盘后日报/盘前分析
+    agent_label = Column(String, default="")  # 盤中監測/盤後日報/盤前分析
 
-    # 上下文信息
+    # 上下文資訊
     prompt_context = Column(String, default="")  # Prompt 上下文摘要
-    ai_response = Column(String, default="")  # AI 原始响应
+    ai_response = Column(String, default="")  # AI 原始回應
 
-    # 元数据（输入快照/触发原因等）
+    # 後設資料（輸入快照/觸發原因等）
     meta = Column(JSON, default={})
 
-    # 时间信息
+    # 時間資訊
     created_at = Column(DateTime, server_default=func.now())
-    expires_at = Column(DateTime, nullable=True)  # 建议过期时间
+    expires_at = Column(DateTime, nullable=True)  # 建議過期時間
 
-    # 索引：按市场+股票+时间快速查询
+    # 索引：按市場+股票+時間快速查詢
     __table_args__ = (
         Index(
             "ix_suggestion_market_symbol_time",
@@ -463,7 +463,7 @@ class StockSuggestion(Base):
 
 
 class EntryCandidate(Base):
-    """入场候选榜快照（按天去重，可追溯来源建议与证据）。"""
+    """入場候選榜快照（按天去重，可追溯來源建議與證據）。"""
 
     __tablename__ = "entry_candidates"
     __table_args__ = (
@@ -486,7 +486,7 @@ class EntryCandidate(Base):
     score = Column(Float, nullable=False, default=0)
     confidence = Column(Float, nullable=True)
     action = Column(String, nullable=False, default="watch")
-    action_label = Column(String, nullable=False, default="观望")
+    action_label = Column(String, nullable=False, default="觀望")
     signal = Column(String, default="")
     reason = Column(String, default="")
     candidate_source = Column(String, nullable=False, default="watchlist")  # watchlist / market_scan
@@ -509,7 +509,7 @@ class EntryCandidate(Base):
 
 
 class MarketScanSnapshot(Base):
-    """市场池候选快照（用于多源回退与覆盖诊断）。"""
+    """市場池候選快照（用於多源回退與覆蓋診斷）。"""
 
     __tablename__ = "market_scan_snapshots"
     __table_args__ = (
@@ -537,7 +537,7 @@ class MarketScanSnapshot(Base):
 
 
 class EntryCandidateFeedback(Base):
-    """入场候选反馈（用于策略迭代与质量评估）。"""
+    """入場候選回饋（用於策略迭代與質量評估）。"""
 
     __tablename__ = "entry_candidate_feedback"
     __table_args__ = (
@@ -558,7 +558,7 @@ class EntryCandidateFeedback(Base):
 
 
 class EntryCandidateOutcome(Base):
-    """入场候选后验结果（自动评估）。"""
+    """入場候選後驗結果（自動評估）。"""
 
     __tablename__ = "entry_candidate_outcomes"
     __table_args__ = (
@@ -592,7 +592,7 @@ class EntryCandidateOutcome(Base):
 
 
 class StrategyCatalog(Base):
-    """策略目录（可版本化、可启停、可调权重）。"""
+    """策略目錄（可版本化、可啟停、可調權重）。"""
 
     __tablename__ = "strategy_catalog"
     __table_args__ = (
@@ -615,7 +615,7 @@ class StrategyCatalog(Base):
 
 
 class StrategySignalRun(Base):
-    """策略信号执行快照（按日/股票/策略去重）。"""
+    """策略訊號執行快照（按日/股票/策略去重）。"""
 
     __tablename__ = "strategy_signal_runs"
     __table_args__ = (
@@ -649,7 +649,7 @@ class StrategySignalRun(Base):
     confidence = Column(Float, nullable=True)
     status = Column(String, default="active")  # active/inactive/invalidated
     action = Column(String, default="watch")
-    action_label = Column(String, default="观望")
+    action_label = Column(String, default="觀望")
     signal = Column(String, default="")
     reason = Column(String, default="")
     evidence = Column(JSON, default=[])
@@ -674,7 +674,7 @@ class StrategySignalRun(Base):
 
 
 class StrategyOutcome(Base):
-    """策略后验结果。"""
+    """策略後驗結果。"""
 
     __tablename__ = "strategy_outcomes"
     __table_args__ = (
@@ -711,7 +711,7 @@ class StrategyOutcome(Base):
 
 
 class BacktestRun(Base):
-    """一次可回看的策略历史回测。"""
+    """一次可回看的策略歷史回測。"""
 
     __tablename__ = "backtest_runs"
     __table_args__ = (
@@ -736,7 +736,7 @@ class BacktestRun(Base):
 
 
 class StrategyWeight(Base):
-    """策略权重（当前生效值）。"""
+    """策略權重（當前生效值）。"""
 
     __tablename__ = "strategy_weights"
     __table_args__ = (
@@ -762,7 +762,7 @@ class StrategyWeight(Base):
 
 
 class StrategyWeightHistory(Base):
-    """策略调权历史。"""
+    """策略調權歷史。"""
 
     __tablename__ = "strategy_weight_history"
     __table_args__ = (
@@ -784,10 +784,10 @@ class StrategyWeightHistory(Base):
 
 
 class FactorWeight(Base):
-    """因子权重（当前生效值）——每因子 × 市场,由 IC/IR 自动标定 + 可手动覆盖。
+    """因子權重（當前生效值）——每因子 × 市場,由 IC/IR 自動標定 + 可手動覆蓋。
 
-    镜像 StrategyWeight,但作用于因子级(alpha/catalyst/quality/risk/crowd),
-    让信号合成从「隐式权重=1 的黑盒」变成「外置可标定」。
+    映象 StrategyWeight,但作用於因子級(alpha/catalyst/quality/risk/crowd),
+    讓訊號合成從「隱式權重=1 的黑盒」變成「外接可標定」。
     """
 
     __tablename__ = "factor_weights"
@@ -800,8 +800,8 @@ class FactorWeight(Base):
     factor_code = Column(String, nullable=False)
     market = Column(String, nullable=False, default="CN")  # CN/HK/US
     weight = Column(Float, nullable=False, default=1.0)
-    is_pinned = Column(Boolean, nullable=False, default=False)  # 手动锁定,标定跳过
-    auto_calibrate = Column(Boolean, nullable=False, default=True)  # 关掉则标定跳过
+    is_pinned = Column(Boolean, nullable=False, default=False)  # 手動鎖定,標定跳過
+    auto_calibrate = Column(Boolean, nullable=False, default=True)  # 關掉則標定跳過
     reason = Column(String, default="")
     meta = Column(JSON, default={})
     effective_from = Column(DateTime, server_default=func.now())
@@ -810,7 +810,7 @@ class FactorWeight(Base):
 
 
 class FactorWeightHistory(Base):
-    """因子调权历史(审计)。"""
+    """因子調權歷史(審計)。"""
 
     __tablename__ = "factor_weight_history"
     __table_args__ = (
@@ -832,7 +832,7 @@ class FactorWeightHistory(Base):
 
 
 class MarketRegimeSnapshot(Base):
-    """市场状态快照（用于按市场动态调权与解释）。"""
+    """市場狀態快照（用於按市場動態調權與解釋）。"""
 
     __tablename__ = "market_regime_snapshots"
     __table_args__ = (
@@ -862,7 +862,7 @@ class MarketRegimeSnapshot(Base):
 
 
 class StrategyFactorSnapshot(Base):
-    """每条策略信号的因子分解快照。"""
+    """每條策略訊號的因子分解快照。"""
 
     __tablename__ = "strategy_factor_snapshots"
     __table_args__ = (
@@ -893,7 +893,7 @@ class StrategyFactorSnapshot(Base):
 
 
 class PortfolioRiskSnapshot(Base):
-    """按快照/市场聚合的组合风险画像。"""
+    """按快照/市場聚合的組合風險畫像。"""
 
     __tablename__ = "portfolio_risk_snapshots"
     __table_args__ = (
@@ -922,7 +922,7 @@ class PortfolioRiskSnapshot(Base):
 
 
 class SuggestionFeedback(Base):
-    """建议反馈（匿名、轻量）"""
+    """建議回饋（匿名、輕量）"""
 
     __tablename__ = "suggestion_feedback"
 
@@ -938,7 +938,7 @@ class SuggestionFeedback(Base):
 
 
 class PriceAlertRule(Base):
-    """价格提醒规则"""
+    """價格提醒規則"""
 
     __tablename__ = "price_alert_rules"
     __table_args__ = (
@@ -970,7 +970,7 @@ class PriceAlertRule(Base):
 
 
 class PriceAlertHit(Base):
-    """价格提醒命中记录"""
+    """價格提醒命中記錄"""
 
     __tablename__ = "price_alert_hits"
     __table_args__ = (
@@ -1001,7 +1001,7 @@ class PriceAlertHit(Base):
 
 
 class PaperTradingAccount(Base):
-    """模拟盘账户（单例）"""
+    """模擬交易帳戶（單例）"""
 
     __tablename__ = "paper_trading_account"
 
@@ -1014,15 +1014,15 @@ class PaperTradingAccount(Base):
     max_drawdown_pct = Column(Float, nullable=False, default=0.0)
     peak_capital = Column(Float, nullable=False, default=1000000.0)
     enabled = Column(Boolean, default=True)
-    excluded_markets = Column(JSON, default=[])  # 排除的市场，如 ["US"]（兼容旧字段，由 market_allocations 派生）
-    # 各市场投资比例 {"CN":0.5,"HK":0.3,"US":0.2}，比例 0~1、合计 ≤ 1；比例 0 表示不投入该市场
+    excluded_markets = Column(JSON, default=[])  # 排除的市場，如 ["US"]（相容舊欄位，由 market_allocations 派生）
+    # 各市場投資比例 {"CN":0.5,"HK":0.3,"US":0.2}，比例 0~1、合計 ≤ 1；比例 0 表示不投入該市場
     market_allocations = Column(JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class PaperTradingPosition(Base):
-    """模拟盘持仓"""
+    """模擬交易持倉"""
 
     __tablename__ = "paper_trading_positions"
     __table_args__ = (
@@ -1039,7 +1039,7 @@ class PaperTradingPosition(Base):
     stop_loss = Column(Float, nullable=True)
     target_price = Column(Float, nullable=True)
     current_price = Column(Float, nullable=True)
-    highest_price = Column(Float, nullable=True)  # 持仓期最高价(移动止损用)
+    highest_price = Column(Float, nullable=True)  # 持倉期最高價(移動停損用)
     unrealized_pnl = Column(Float, nullable=False, default=0.0)
     status = Column(String, nullable=False, default="open")  # open/closed
     signal_run_id = Column(Integer, nullable=True)
@@ -1052,7 +1052,7 @@ class PaperTradingPosition(Base):
 
 
 class PaperTradingTrade(Base):
-    """模拟盘已平仓记录"""
+    """模擬交易已平倉記錄"""
 
     __tablename__ = "paper_trading_trades"
     __table_args__ = (
@@ -1080,7 +1080,7 @@ class PaperTradingTrade(Base):
 
 
 class ChatConversation(Base):
-    """AI 对话会话"""
+    """AI 對話會話"""
 
     __tablename__ = "chat_conversations"
     __table_args__ = (
@@ -1099,7 +1099,7 @@ class ChatConversation(Base):
 
 
 class ChatMessage(Base):
-    """AI 对话消息"""
+    """AI 對話訊息"""
 
     __tablename__ = "chat_messages"
     __table_args__ = (
@@ -1287,11 +1287,11 @@ class AssistantArtifact(Base):
 
 
 class PersonalAccessToken(Base):
-    """个人访问令牌(PAT)—— MCP 端点专用的独立长期凭据。
+    """個人訪問令牌(PAT)—— MCP 端點專用的獨立長期憑據。
 
-    与登录 JWT 分流:JWT 是单用户会话态(30 天、不可吊销、无 scope),不适合作为
-    分发给外部 MCP client 的长期凭据;PAT 可独立吊销/审计、天然只读 scope。
-    库里只存 sha256(token_hash),明文仅创建时返回一次。单用户应用,不设 user_id。
+    與登入 JWT 分流:JWT 是單使用者會話態(30 天、不可吊銷、無 scope),不適合作為
+    分發給外部 MCP client 的長期憑據;PAT 可獨立吊銷/審計、天然只讀 scope。
+    庫裡只存 sha256(token_hash),明文僅建立時返回一次。單使用者應用,不設 user_id。
     """
 
     __tablename__ = "personal_access_tokens"
@@ -1300,19 +1300,19 @@ class PersonalAccessToken(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False, default="")  # 用户可读的用途备注
+    name = Column(String, nullable=False, default="")  # 使用者可讀的用途備註
     token_hash = Column(String(128), nullable=False, unique=True, index=True)
-    prefix = Column(String(32), nullable=False, default="")  # 明文前缀,列表展示用
+    prefix = Column(String(32), nullable=False, default="")  # 明文字首,列表展示用
     scopes_json = Column(Text, nullable=False, default="[]")  # JSON: ["mcp:read"]
-    expires_at = Column(DateTime, nullable=True)  # None = 永不过期
+    expires_at = Column(DateTime, nullable=True)  # None = 永不過期
     last_used_at = Column(DateTime, nullable=True)
     last_used_ip = Column(String, nullable=True)
-    revoked_at = Column(DateTime, nullable=True)  # 非空即已吊销
+    revoked_at = Column(DateTime, nullable=True)  # 非空即已吊銷
     created_at = Column(DateTime, server_default=func.now())
 
 
 class MCPCallLog(Base):
-    """每次 MCP tool 调用的审计记录(只存元数据,不存参数/结果明文)。"""
+    """每次 MCP tool 呼叫的審計記錄(只存後設資料,不存引數/結果明文)。"""
 
     __tablename__ = "mcp_call_logs"
     __table_args__ = (
@@ -1321,12 +1321,12 @@ class MCPCallLog(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    pat_id = Column(Integer, nullable=True)  # 软引用,PAT 删除后仍保留历史
+    pat_id = Column(Integer, nullable=True)  # 軟引用,PAT 刪除後仍保留歷史
     pat_prefix = Column(String, nullable=True)
     tool_name = Column(String, nullable=False, default="")
     status = Column(String, nullable=False, default="ok")  # ok / error
     error_message = Column(Text, nullable=True)
-    args_summary = Column(Text, nullable=True)  # 脱敏摘要,截断
+    args_summary = Column(Text, nullable=True)  # 脫敏摘要,截斷
     duration_ms = Column(Integer, default=0)
     client_ip = Column(String, nullable=True)
     called_at = Column(DateTime, server_default=func.now())

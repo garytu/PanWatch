@@ -33,7 +33,7 @@ const DECISION_COLOR: Record<string, string> = {
   sell: 'text-emerald-500',
 }
 
-/** 各 section 配图标(决策/技术/情绪/新闻/基本面/辩论/风控),与 buildAnalysisSections 的 id 对齐 */
+/** 各 section 配圖示(決策/技術/情緒/新聞/基本面/辯論/風控),與 buildAnalysisSections 的 id 對齊 */
 const SECTION_ICON: Record<string, LucideIcon> = {
   decision: Target,
   market: TrendingUp,
@@ -44,10 +44,10 @@ const SECTION_ICON: Record<string, LucideIcon> = {
   risk: ShieldAlert,
 }
 
-/** 二级目录显示开关的 localStorage 键(记住用户选择) */
+/** 二級目錄顯示開關的 localStorage 鍵(記住使用者選擇) */
 const TOC_SUB_KEY = 'panwatch_toc_show_sub'
 
-/** 从代码粗略推断市场:6 位数字=A股, 5 位数字=港股, 其余=美股 */
+/** 從程式碼粗略推斷市場:6 位數字=A股, 5 位數字=港股, 其餘=美股 */
 function inferMarket(symbol: string): string {
   if (/^\d{6}$/.test(symbol)) return 'CN'
   if (/^\d{5}$/.test(symbol)) return 'HK'
@@ -64,8 +64,8 @@ function fmtPct(v: number | null | undefined): string {
   return `${v > 0 ? '+' : ''}${v.toFixed(2)}%`
 }
 
-/** 标题 → 锚点 slug(去掉 markdown 强调/井号/emoji,空白转连字符)。
- *  解析目录与渲染标题两侧用同一份逻辑,保证 id 一致、点击可跳。 */
+/** 標題 → 錨點 slug(去掉 markdown 強調/井號/emoji,空白轉連字元)。
+ *  解析目錄與渲染標題兩側用同一份邏輯,保證 id 一致、點選可跳。 */
 function slugify(text: string): string {
   return text
     .trim()
@@ -77,7 +77,7 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, '')
 }
 
-/** 从 ReactMarkdown 标题节点的 children 里递归取纯文本(用于算锚点 id)。 */
+/** 從 ReactMarkdown 標題節點的 children 裡遞迴取純文本(用於算錨點 id)。 */
 function nodeText(children: ReactNode): string {
   if (typeof children === 'string') return children
   if (typeof children === 'number') return String(children)
@@ -88,7 +88,7 @@ function nodeText(children: ReactNode): string {
   return ''
 }
 
-/** 从一段 markdown 里抽出 2~4 级标题(用于二级目录)。 */
+/** 從一段 markdown 裡抽出 2~4 級標題(用於二級目錄)。 */
 function parseHeadings(markdown: string): { text: string; slug: string }[] {
   const out: { text: string; slug: string }[] = []
   for (const raw of markdown.split('\n')) {
@@ -124,7 +124,7 @@ export default function AnalysisDetailPage() {
     try {
       await tradingAgentsApi.downloadAnalysisPdf(symbol, date)
     } catch (e) {
-      alert(e instanceof Error ? e.message : '导出失败')
+      alert(e instanceof Error ? e.message : '匯出失敗')
     } finally {
       setPdfBusy(false)
     }
@@ -143,7 +143,7 @@ export default function AnalysisDetailPage() {
       .catch(() => setHistory(null))
   }, [symbol, date])
 
-  // 记住二级目录开关
+  // 記住二級目錄開關
   useEffect(() => {
     try {
       localStorage.setItem(TOC_SUB_KEY, showSub ? '1' : '0')
@@ -155,13 +155,13 @@ export default function AnalysisDetailPage() {
   const rawData = (result?.raw_data || {}) as Partial<DeepAnalysisResult['raw_data']>
   const sug = rawData.suggestion
   const reviewRequired = sug?.review_required === true || sug?.rating_raw === 'review'
-  const decisionLabel = reviewRequired ? '待人工复核' : sug?.action_label
+  const decisionLabel = reviewRequired ? '待人工複核' : sug?.action_label
   const decisionColor = reviewRequired ? 'text-orange-500' : (sug ? DECISION_COLOR[sug.action] || '' : '')
   const sections = buildAnalysisSections(rawData)
   const stats = history?.stats
   const items = history?.items || []
 
-  // 完整目录:每个 section(一级) + 其 markdown 内 2~4 级标题(二级) + 历史决策对比
+  // 完整目錄:每個 section(一級) + 其 markdown 內 2~4 級標題(二級) + 歷史決策對比
   const fullToc: { id: string; title: string; level: 0 | 1 }[] = []
   for (const s of sections) {
     fullToc.push({ id: `sec-${s.id}`, title: s.title, level: 0 })
@@ -169,11 +169,11 @@ export default function AnalysisDetailPage() {
       fullToc.push({ id: `h-${s.id}-${h.slug}`, title: h.text, level: 1 })
     }
   }
-  fullToc.push({ id: 'sec-history', title: '历史决策对比', level: 0 })
-  // 开关决定是否展示/联动二级目录
+  fullToc.push({ id: 'sec-history', title: '歷史決策對比', level: 0 })
+  // 開關決定是否展示/聯動二級目錄
   const toc = showSub ? fullToc : fullToc.filter((t) => t.level === 0)
 
-  // 滚动联动:正文滚动时自动高亮当前段(取视口内最靠上、避开顶部导航的标题)
+  // 滾動聯動:正文滾動時自動高亮當前段(取視口內最靠上、避開頂部導航的標題)
   useEffect(() => {
     if (!result) return
     const els = toc
@@ -195,12 +195,12 @@ export default function AnalysisDetailPage() {
   }, [result, toc.length])
 
   if (loading) {
-    return <div className="p-12 text-center text-muted-foreground">加载中...</div>
+    return <div className="p-12 text-center text-muted-foreground">載入中...</div>
   }
   if (!result) {
     return (
       <div className="p-12 text-center text-muted-foreground space-y-3">
-        <div>未找到 {symbol} 在 {date} 的深度分析记录</div>
+        <div>未找到 {symbol} 在 {date} 的深度分析記錄</div>
         <button onClick={() => navigate(-1)} className="text-primary hover:underline">
           返回
         </button>
@@ -212,10 +212,10 @@ export default function AnalysisDetailPage() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // 当前所在段标题(移动端折叠条上显示,让用户知道读到哪了)
+  // 當前所在段標題(移動端摺疊條上顯示,讓使用者知道讀到哪了)
   const currentTitle = toc.find((t) => t.id === activeId)?.title || ''
 
-  // markdown 标题渲染:挂上与目录一致的锚点 id + 顶部留白(避开吸顶导航)
+  // markdown 標題渲染:掛上與目錄一致的錨點 id + 頂部留白(避開吸頂導航)
   const headingComponents = (sectionId: string) => {
     const make = (Tag: 'h2' | 'h3' | 'h4') =>
       function Heading({ children }: { children?: ReactNode }) {
@@ -229,20 +229,20 @@ export default function AnalysisDetailPage() {
     return { h2: make('h2'), h3: make('h3'), h4: make('h4') }
   }
 
-  // 目录头(标题 + 二级目录开关),桌面右栏 / 移动下拉共用
+  // 目錄頭(標題 + 二級目錄開關),桌面右欄 / 移動下拉共用
   const tocHeader = (
     <div className="flex items-center justify-between gap-2 mb-2 px-2">
-      <span className="text-[11px] font-medium text-muted-foreground/70">目录</span>
+      <span className="text-[11px] font-medium text-muted-foreground/70">目錄</span>
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <span className="cursor-pointer select-none" onClick={() => setShowSub((v) => !v)}>
-          二级目录
+          二級目錄
         </span>
         <Switch checked={showSub} onCheckedChange={setShowSub} />
       </div>
     </div>
   )
 
-  // 目录列表(桌面右栏 / 移动下拉共用);onAfter 用于移动端选完自动收起
+  // 目錄列表(桌面右欄 / 移動下拉共用);onAfter 用於移動端選完自動收起
   const tocNav = (onAfter?: () => void) => (
     <nav className="space-y-0.5 text-[13px]">
       {toc.map((t) => (
@@ -269,9 +269,9 @@ export default function AnalysisDetailPage() {
   return (
     <div className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 pb-12 flex gap-8">
-        {/* 左列:标题栏 + 正文(标题栏只占左列宽度,不压到右侧目录) */}
+        {/* 左列:標題欄 + 正文(標題欄只佔左列寬度,不壓到右側目錄) */}
         <div className="flex-1 min-w-0 max-w-3xl">
-          {/* 顶部栏 */}
+          {/* 頂部欄 */}
           <div className="border-b border-border/40 pb-3 mb-4 flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
@@ -285,31 +285,31 @@ export default function AnalysisDetailPage() {
             <button
               onClick={() => setShareOpen(true)}
               className="ml-auto shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 text-[12.5px] text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
-              title="生成可分享的结论卡片图"
+              title="生成可分享的結論卡片圖"
             >
               <ImageDown className="w-3.5 h-3.5" />
-              分享图
+              分享圖
             </button>
             <button
               onClick={handleExportPdf}
               disabled={pdfBusy}
               className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 text-[12.5px] text-muted-foreground hover:text-foreground hover:bg-accent transition-all disabled:opacity-50"
-              title="导出 PDF 文件"
+              title="匯出 PDF 檔案"
             >
               <FileDown className="w-3.5 h-3.5" />
-              {pdfBusy ? '导出中…' : '导出 PDF'}
+              {pdfBusy ? '匯出中…' : '匯出 PDF'}
             </button>
           </div>
 
           {/* 正文 */}
           <article>
-          {/* 决策摘要(移动端在正文顶部;桌面端移到右侧目录区,见下方 aside) */}
+          {/* 決策摘要(移動端在正文頂部;桌面端移到右側目錄區,見下方 aside) */}
           {sug && (
             <div className="lg:hidden rounded-xl bg-accent/30 p-4 mb-6 flex items-center gap-3 flex-wrap">
               <span className={`text-[24px] font-bold ${decisionColor}`}>
                 {decisionLabel}
               </span>
-              {reviewRequired && <span className="text-[12px] text-orange-600">数据或结论存在不确定性，请人工核验后再决策</span>}
+              {reviewRequired && <span className="text-[12px] text-orange-600">資料或結論存在不確定性，請人工核驗後再決策</span>}
               <span className="text-[13px] text-muted-foreground">
                 置信度 {sug.confidence?.toFixed(1) ?? '-'} / 10
               </span>
@@ -319,7 +319,7 @@ export default function AnalysisDetailPage() {
             </div>
           )}
 
-          {/* 移动端目录:吸顶折叠条,显示当前段,展开下拉(覆盖式),选完/点外部收起(桌面隐藏) */}
+          {/* 移動端目錄:吸頂摺疊條,顯示當前段,展開下拉(覆蓋式),選完/點外部收起(桌面隱藏) */}
           <div className="lg:hidden sticky top-16 z-30 mb-6">
             <div className="relative">
               <button
@@ -327,7 +327,7 @@ export default function AnalysisDetailPage() {
                 className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-border/50 bg-card/95 backdrop-blur text-[13px] font-medium shadow-sm"
               >
                 <List className="w-4 h-4 shrink-0" />
-                <span className="truncate">{currentTitle || '目录'}</span>
+                <span className="truncate">{currentTitle || '目錄'}</span>
                 <ChevronDown
                   className={`w-4 h-4 ml-auto shrink-0 transition-transform ${tocOpen ? 'rotate-180' : ''}`}
                 />
@@ -344,7 +344,7 @@ export default function AnalysisDetailPage() {
             </div>
           </div>
 
-          {/* 各部分长文 */}
+          {/* 各部分長文 */}
           {sections.map((s) => {
             const Icon = SECTION_ICON[s.id]
             return (
@@ -362,24 +362,24 @@ export default function AnalysisDetailPage() {
             )
           })}
 
-          {/* 历史决策对比 */}
+          {/* 歷史決策對比 */}
           <section id="sec-history" className="mb-10 scroll-mt-24">
             <h2 className="flex items-center gap-2 text-[18px] font-bold mb-4 pb-2 border-b border-border/40">
               <History className="w-[18px] h-[18px] text-primary/70 shrink-0" />
-              历史决策 vs 实际涨跌
+              歷史決策 vs 實際漲跌
             </h2>
             {stats && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-[13px]">
                 <div className="rounded-lg bg-accent/30 p-3">
-                  <div className="text-[11px] text-muted-foreground mb-1">总命中率</div>
+                  <div className="text-[11px] text-muted-foreground mb-1">總命中率</div>
                   <div className="font-bold">{stats.overall_hit_rate != null ? `${(stats.overall_hit_rate * 100).toFixed(0)}%` : '-'}</div>
                 </div>
                 <div className="rounded-lg bg-accent/30 p-3">
-                  <div className="text-[11px] text-muted-foreground mb-1">买入命中</div>
+                  <div className="text-[11px] text-muted-foreground mb-1">買入命中</div>
                   <div className="font-bold">{stats.buy_hit_rate != null ? `${(stats.buy_hit_rate * 100).toFixed(0)}%` : '-'}</div>
                 </div>
                 <div className="rounded-lg bg-accent/30 p-3">
-                  <div className="text-[11px] text-muted-foreground mb-1">卖出命中</div>
+                  <div className="text-[11px] text-muted-foreground mb-1">賣出命中</div>
                   <div className="font-bold">{stats.sell_hit_rate != null ? `${(stats.sell_hit_rate * 100).toFixed(0)}%` : '-'}</div>
                 </div>
                 <div className="rounded-lg bg-accent/30 p-3">
@@ -394,8 +394,8 @@ export default function AnalysisDetailPage() {
                   <thead>
                     <tr className="border-b border-border text-muted-foreground text-[12px]">
                       <th className="text-left py-2 pr-3">日期</th>
-                      <th className="text-left py-2 px-2">决策</th>
-                      <th className="text-right py-2 px-2">分析价</th>
+                      <th className="text-left py-2 px-2">決策</th>
+                      <th className="text-right py-2 px-2">分析價</th>
                       <th className="text-right py-2 px-2">1日</th>
                       <th className="text-right py-2 px-2">5日</th>
                       <th className="text-right py-2 px-2">20日</th>
@@ -418,21 +418,21 @@ export default function AnalysisDetailPage() {
                 </table>
               </div>
             ) : (
-              <div className="text-[13px] text-muted-foreground py-4">暂无历史决策记录</div>
+              <div className="text-[13px] text-muted-foreground py-4">暫無歷史決策記錄</div>
             )}
           </section>
 
-          {/* 免责 */}
+          {/* 免責 */}
           <div className="text-[11px] text-muted-foreground/70 italic border-t border-border/30 pt-4">
-            本分析由 AI 多 Agent 框架生成,仅供学习研究参考,不构成任何投资建议。投资有风险,决策需自主判断。
+            本分析由 AI 多 Agent 框架生成,僅供學習研究參考,不構成任何投資建議。投資有風險,決策需自主判斷。
           </div>
           </article>
         </div>
 
-        {/* 右列:最终决策 + 目录合并到同一张卡片(与标题同高起始,不被标题压住;主题 token 适配日/夜) */}
+        {/* 右列:最終決策 + 目錄合併到同一張卡片(與標題同高起始,不被標題壓住;主題 token 適配日/夜) */}
         <aside className="hidden lg:block w-52 shrink-0">
           <div className="sticky top-24 rounded-xl border border-border bg-card overflow-hidden">
-            {/* 最终决策摘要 */}
+            {/* 最終決策摘要 */}
             {sug && (
               <div className="p-3.5 border-b border-border">
                 <div className="flex items-baseline justify-between gap-2">
@@ -445,7 +445,7 @@ export default function AnalysisDetailPage() {
                 </div>
                 {reviewRequired && (
                   <p className="mt-2 text-[11px] leading-4 text-orange-600">
-                    上游无法安全生成可执行评级，请人工核验数据与报告。
+                    上游無法安全生成可執行評級，請人工核驗資料與報告。
                   </p>
                 )}
                 {sug.confidence != null && (
@@ -470,7 +470,7 @@ export default function AnalysisDetailPage() {
                 )}
               </div>
             )}
-            {/* 目录 */}
+            {/* 目錄 */}
             <div className="p-2">
               {tocHeader}
               <div className="max-h-[calc(100vh-19rem)] overflow-y-auto scrollbar">{tocNav()}</div>
@@ -479,7 +479,7 @@ export default function AnalysisDetailPage() {
         </aside>
       </div>
 
-      {/* 分享卡片(导出 PNG) */}
+      {/* 分享卡片(匯出 PNG) */}
       <ShareCardModal
         open={shareOpen}
         onClose={() => setShareOpen(false)}

@@ -40,7 +40,7 @@ describe('portfolio page loading', () => {
       buildQuoteItems: vi.fn().mockReturnValue(items),
       loadSuggestions: vi.fn().mockResolvedValue({}),
       loadPriceAlerts: vi.fn().mockResolvedValue({}),
-      loadKlines: vi.fn().mockResolvedValue({ 'CN:600519': { trend: '多头排列' } }),
+      loadKlines: vi.fn().mockResolvedValue({ 'CN:600519': { trend: '多頭排列' } }),
     }
     const stocks = [{ symbol: '600519', market: 'CN' }]
     const portfolio = { accounts: [{ positions: [] }] }
@@ -56,7 +56,7 @@ describe('portfolio page loading', () => {
       marketStatus: [{ code: 'CN' }],
       suggestions: {},
       priceAlerts: {},
-      klines: { 'CN:600519': { trend: '多头排列' } },
+      klines: { 'CN:600519': { trend: '多頭排列' } },
     })
   })
 
