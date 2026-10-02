@@ -4,9 +4,11 @@ import asyncio
 from datetime import datetime, timezone
 
 from src.platform.marketdata.collectors import news_collector
+from src.platform.marketdata import models
 
 
 def test_news_collector_routes_taiwan_symbols(monkeypatch):
+    monkeypatch.setattr(models, "ENABLED_MARKETS", (models.MarketCode.TW,))
     calls = []
 
     def fake_news(symbols, since_hours, names, *, market):
@@ -21,7 +23,7 @@ def test_news_collector_routes_taiwan_symbols(monkeypatch):
         "src.platform.marketdata.marketdata_client.md_news", fake_news,
     )
     result = asyncio.run(news_collector.NewsCollector().fetch_all(
-        symbols=["TWSE:2330"], since_hours=24,
+        symbols=["600519", "TWSE:2330"], since_hours=24,
         symbol_names={"TWSE:2330": "台積電"},
     ))
 

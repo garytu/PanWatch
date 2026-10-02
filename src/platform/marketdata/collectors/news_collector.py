@@ -48,12 +48,15 @@ class NewsCollector:
             按時間倒序排列的新聞列表
         """
         from src.platform.marketdata.marketdata_client import md_news
+        from src.platform.marketdata.models import is_market_enabled
 
         from marketdata.symbol import Symbol
 
         grouped: dict[str, list[str]] = {}
         for raw in symbols or []:
             market = Symbol.parse(raw).market.value
+            if not is_market_enabled(market):
+                continue
             grouped.setdefault(market, []).append(raw)
 
         if not grouped:

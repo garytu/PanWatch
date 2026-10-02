@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from src.platform.persistence.database import get_db
 from src.platform.persistence.models import Stock, DataSource
 from src.platform.marketdata.collectors.news_collector import NewsCollector, NewsItem
+from src.platform.marketdata.models import enabled_market_codes
 
 router = APIRouter()
 
@@ -53,7 +54,7 @@ async def get_news(
     - filter_related: 是否只顯示與自選股相關的新聞
     """
     # 獲取所有自選股（用於匹配）
-    all_stocks = db.query(Stock).all()
+    all_stocks = db.query(Stock).filter(Stock.market.in_(enabled_market_codes())).all()
     stock_map = {s.symbol: s.name for s in all_stocks}
     name_to_symbol = {s.name: s.symbol for s in all_stocks}
 
