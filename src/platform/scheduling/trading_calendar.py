@@ -114,41 +114,43 @@ def _fetch_tw_trading_dates() -> frozenset[date]:
 
 
 def refresh_blocking() -> bool:
-    """同步重新整理交易日曆(A股 + 台股)。返回是否至少有一個成功;失敗不拋異常(保持降級行為)。"""
+    """只重新整理已啟用市場的交易日曆；失敗不拋異常。"""
     global _CN_TRADING_DATES, _CN_RANGE, _TW_TRADING_DATES, _TW_RANGE
 
     cn_ok = False
     tw_ok = False
-    try:
-        dates = _fetch_cn_trading_dates()
-        if dates:
-            _CN_TRADING_DATES = dates
-            _CN_RANGE = (min(dates), max(dates))
-            logger.info(
-                "[交易日曆] A股日曆已載入: %s 個交易日 (%s ~ %s)",
-                len(dates),
-                _CN_RANGE[0],
-                _CN_RANGE[1],
-            )
-            cn_ok = True
-    except Exception as e:
-        logger.warning("[交易日曆] A股日曆拉取失敗,降級為只判週末: %s", e)
+    if "CN" in enabled_market_codes():
+        try:
+            dates = _fetch_cn_trading_dates()
+            if dates:
+                _CN_TRADING_DATES = dates
+                _CN_RANGE = (min(dates), max(dates))
+                logger.info(
+                    "[交易日曆] A股日曆已載入: %s 個交易日 (%s ~ %s)",
+                    len(dates),
+                    _CN_RANGE[0],
+                    _CN_RANGE[1],
+                )
+                cn_ok = True
+        except Exception as e:
+            logger.warning("[交易日曆] A股日曆拉取失敗,降級為只判週末: %s", e)
 
-    try:
-        tw_dates = _fetch_tw_trading_dates()
-        if tw_dates:
-            _TW_TRADING_DATES = tw_dates
-            year = min(tw_dates).year
-            _TW_RANGE = (date(year, 1, 1), date(year, 12, 31))
-            tw_ok = True
-            logger.info(
-                "[交易日曆] 台股日曆已載入: %s 個交易日 (%s ~ %s)",
-                len(tw_dates),
-                _TW_RANGE[0],
-                _TW_RANGE[1],
-            )
-    except Exception as e:
-        logger.warning("[交易日曆] 台股日曆拉取失敗，覆蓋未知時暫停交易: %s", e)
+    if "TW" in enabled_market_codes():
+        try:
+            tw_dates = _fetch_tw_trading_dates()
+            if tw_dates:
+                _TW_TRADING_DATES = tw_dates
+                year = min(tw_dates).year
+                _TW_RANGE = (date(year, 1, 1), date(year, 12, 31))
+                tw_ok = True
+                logger.info(
+                    "[交易日曆] 台股日曆已載入: %s 個交易日 (%s ~ %s)",
+                    len(tw_dates),
+                    _TW_RANGE[0],
+                    _TW_RANGE[1],
+                )
+        except Exception as e:
+            logger.warning("[交易日曆] 台股日曆拉取失敗，覆蓋未知時暫停交易: %s", e)
 
     return cn_ok or tw_ok
 

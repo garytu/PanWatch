@@ -301,59 +301,66 @@ def _fetch_from_akshare() -> list[dict]:
 
 
 def refresh_stock_list() -> list[dict]:
-    """拉取 A 股和港股列表並快取"""
+    """只拉取已啟用市場的標的列表並快取。"""
+    from src.platform.marketdata.models import is_market_enabled
+
     stocks = []
 
     # A 股: 東方財富優先，akshare 備用
-    try:
-        cn_stocks = _fetch_from_eastmoney()
-        stocks.extend(cn_stocks)
-        logger.info(f"東方財富獲取 A 股列表成功: {len(cn_stocks)} 只")
-    except Exception as e:
-        logger.warning(f"東方財富獲取 A 股失敗: {e}")
+    if is_market_enabled("CN"):
         try:
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(_fetch_from_akshare)
-                cn_stocks = future.result(timeout=15)
-                stocks.extend(cn_stocks)
-            logger.info(f"akshare 獲取 A 股列表成功: {len(cn_stocks)} 只")
-        except concurrent.futures.TimeoutError:
-            logger.error("akshare 獲取超時（15s）")
-        except Exception as e2:
-            logger.error(f"A 股資料來源獲取失敗: {e2}")
+            cn_stocks = _fetch_from_eastmoney()
+            stocks.extend(cn_stocks)
+            logger.info(f"東方財富獲取 A 股列表成功: {len(cn_stocks)} 只")
+        except Exception as e:
+            logger.warning(f"東方財富獲取 A 股失敗: {e}")
+            try:
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(_fetch_from_akshare)
+                    cn_stocks = future.result(timeout=15)
+                    stocks.extend(cn_stocks)
+                logger.info(f"akshare 獲取 A 股列表成功: {len(cn_stocks)} 只")
+            except concurrent.futures.TimeoutError:
+                logger.error("akshare 獲取超時（15s）")
+            except Exception as e2:
+                logger.error(f"A 股資料來源獲取失敗: {e2}")
 
     # 港股: 東方財富
-    try:
-        hk_stocks = _fetch_hk_from_eastmoney()
-        stocks.extend(hk_stocks)
-        logger.info(f"東方財富獲取港股列表成功: {len(hk_stocks)} 只")
-    except Exception as e:
-        logger.warning(f"東方財富獲取港股失敗: {e}")
+    if is_market_enabled("HK"):
+        try:
+            hk_stocks = _fetch_hk_from_eastmoney()
+            stocks.extend(hk_stocks)
+            logger.info(f"東方財富獲取港股列表成功: {len(hk_stocks)} 只")
+        except Exception as e:
+            logger.warning(f"東方財富獲取港股失敗: {e}")
 
     # 美股: 東方財富
-    try:
-        us_stocks = _fetch_us_from_eastmoney()
-        stocks.extend(us_stocks)
-        logger.info(f"東方財富獲取美股列表成功: {len(us_stocks)} 只")
-    except Exception as e:
-        logger.warning(f"東方財富獲取美股失敗: {e}")
+    if is_market_enabled("US"):
+        try:
+            us_stocks = _fetch_us_from_eastmoney()
+            stocks.extend(us_stocks)
+            logger.info(f"東方財富獲取美股列表成功: {len(us_stocks)} 只")
+        except Exception as e:
+            logger.warning(f"東方財富獲取美股失敗: {e}")
 
     # 北交所: 東方財富
-    try:
-        bj_stocks = _fetch_bj_from_eastmoney()
-        stocks.extend(bj_stocks)
-        logger.info(f"東方財富獲取北交所列表成功: {len(bj_stocks)} 只")
-    except Exception as e:
-        logger.warning(f"東方財富獲取北交所失敗: {e}")
+    if is_market_enabled("CN"):
+        try:
+            bj_stocks = _fetch_bj_from_eastmoney()
+            stocks.extend(bj_stocks)
+            logger.info(f"東方財富獲取北交所列表成功: {len(bj_stocks)} 只")
+        except Exception as e:
+            logger.warning(f"東方財富獲取北交所失敗: {e}")
 
     # 台股: twmd instrument catalog 優先，FinMind / 內建清單兜底
-    try:
-        tw_stocks = _fetch_tw_from_twmd() or _fetch_tw_from_finmind()
-        stocks.extend(tw_stocks)
-        logger.info(f"獲取台股列表成功: {len(tw_stocks)} 只")
-    except Exception as e:
-        logger.warning(f"獲取台股列表失敗: {e}")
-        stocks.extend(list(_BUNDLED_TW_STOCKS))
+    if is_market_enabled("TW"):
+        try:
+            tw_stocks = _fetch_tw_from_twmd() or _fetch_tw_from_finmind()
+            stocks.extend(tw_stocks)
+            logger.info(f"獲取台股列表成功: {len(tw_stocks)} 只")
+        except Exception as e:
+            logger.warning(f"獲取台股列表失敗: {e}")
+            stocks.extend(list(_BUNDLED_TW_STOCKS))
 
     if stocks:
         _save_cache(stocks)
@@ -399,9 +406,11 @@ def _fetch_tw_from_finmind() -> list[dict]:
 
 def get_stock_list() -> list[dict]:
     """獲取股票列表(優先快取)"""
+    from src.platform.marketdata.models import is_market_enabled
+
     cached = _load_cache()
     if cached:
-        return cached
+        return [stock for stock in cached if is_market_enabled(stock.get("market", ""))]
     return refresh_stock_list()
 
 
@@ -517,9 +526,15 @@ def _realtime_search(query: str, market: str = "", limit: int = 20) -> list[dict
 
 def search_stocks(query: str, market: str = "", limit: int = 20) -> list[dict]:
     """搜尋股票 - 優先使用即時搜尋，失敗則使用快取"""
+    from src.platform.marketdata.models import enabled_market_codes, is_market_enabled
+
     q = query.strip()
     if not q:
         return []
+    if market and not is_market_enabled(market):
+        return []
+    if not market and enabled_market_codes() == ("TW",):
+        market = "TW"
     if market == "TW":
         rows = _fetch_tw_from_twmd()
         if not rows:
@@ -527,7 +542,8 @@ def search_stocks(query: str, market: str = "", limit: int = 20) -> list[dict]:
         return [row for row in rows if q.upper() in row["symbol"].upper() or q in row["name"]][:limit]
 
     # 嘗試即時搜尋
-    results = _realtime_search(q, market, limit)
+    results = [row for row in _realtime_search(q, market, limit)
+               if is_market_enabled(row.get("market", ""))]
     if len(results) >= limit:
         return results[:limit]
 
@@ -552,8 +568,10 @@ def search_stocks(query: str, market: str = "", limit: int = 20) -> list[dict]:
 
 def _cached_search(query: str, market: str = "", limit: int = 20) -> list[dict]:
     """從快取中模糊搜尋股票"""
+    from src.platform.marketdata.models import is_market_enabled
+
     stocks = list(get_stock_list() or [])
-    if not any(s.get("market") == "TW" for s in stocks):
+    if is_market_enabled("TW") and not any(s.get("market") == "TW" for s in stocks):
         stocks.extend(_BUNDLED_TW_STOCKS)
     if not stocks:
         return []

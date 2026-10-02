@@ -77,3 +77,53 @@ def test_market_scan_never_fetches_disabled_markets(monkeypatch):
     candidates._load_market_scan_inputs(20)
     assert fetch.call_count == 2
     assert all(call.kwargs['market'] == 'TW' for call in fetch.call_args_list)
+
+
+def test_stock_list_refresh_only_uses_taiwan_source(monkeypatch):
+    from src.platform.marketdata import stock_list
+
+    forbidden = Mock(side_effect=AssertionError('disabled source contacted'))
+    for name in ('_fetch_from_eastmoney', '_fetch_from_akshare',
+                 '_fetch_bj_from_eastmoney', '_fetch_hk_from_eastmoney',
+                 '_fetch_us_from_eastmoney'):
+        monkeypatch.setattr(stock_list, name, forbidden)
+    monkeypatch.setattr(stock_list, '_fetch_tw_from_twmd', lambda: [
+        {'symbol': 'TWSE:2330', 'name': '台積電', 'market': 'TW'}
+    ])
+    save = Mock()
+    monkeypatch.setattr(stock_list, '_save_cache', save)
+
+    rows = stock_list.refresh_stock_list()
+    assert [row['market'] for row in rows] == ['TW']
+    forbidden.assert_not_called()
+    save.assert_called_once_with(rows)
+
+
+def test_stock_list_cache_and_search_hide_disabled_markets(monkeypatch):
+    from src.platform.marketdata import stock_list
+
+    monkeypatch.setattr(stock_list, '_load_cache', lambda: [
+        {'symbol': '600519', 'name': '貴州茅臺', 'market': 'CN'},
+        {'symbol': 'TWSE:2330', 'name': '台積電', 'market': 'TW'},
+    ])
+    assert [row['market'] for row in stock_list.get_stock_list()] == ['TW']
+    monkeypatch.setattr(stock_list, '_fetch_tw_from_twmd', lambda: [
+        {'symbol': 'TWSE:2330', 'name': '台積電', 'market': 'TW'}
+    ])
+    realtime = Mock(side_effect=AssertionError('disabled search contacted'))
+    monkeypatch.setattr(stock_list, '_realtime_search', realtime)
+    assert stock_list.search_stocks('2330')[0]['symbol'] == 'TWSE:2330'
+    assert stock_list.search_stocks('600519', market='CN') == []
+    realtime.assert_not_called()
+
+
+def test_calendar_refresh_skips_a_share_source(monkeypatch):
+    from datetime import date
+    from src.platform.scheduling import trading_calendar as calendar
+
+    cn_fetch = Mock(side_effect=AssertionError('A-share calendar contacted'))
+    monkeypatch.setattr(calendar, '_fetch_cn_trading_dates', cn_fetch)
+    monkeypatch.setattr(calendar, '_fetch_tw_trading_dates',
+                        lambda: frozenset({date(2026, 10, 2)}))
+    assert calendar.refresh_blocking() is True
+    cn_fetch.assert_not_called()

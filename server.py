@@ -290,11 +290,16 @@ def seed_sample_stocks():
             {"symbol": "300750", "name": "寧德時代", "market": "CN"},
             {"symbol": "00700", "name": "騰訊控股", "market": "HK"},
             {"symbol": "AAPL", "name": "蘋果", "market": "US"},
+            {"symbol": "TWSE:2330", "name": "台積電", "market": "TW"},
+            {"symbol": "TWSE:2303", "name": "聯電", "market": "TW"},
         ]
-        for s in samples:
+        from src.platform.marketdata.models import is_market_enabled
+
+        active_samples = [s for s in samples if is_market_enabled(s["market"])]
+        for s in active_samples:
             db.add(Stock(**s))
         db.commit()
-        logger.info("已新增 5 只示例股票（首次啟動）")
+        logger.info("已新增 %s 只示例股票（首次啟動）", len(active_samples))
     finally:
         db.close()
 
@@ -1511,9 +1516,12 @@ async def lifespan(app):
     from src.platform.marketdata.stock_list import get_stock_list, refresh_stock_list
 
     def refresh_stock_cache():
+        from src.platform.marketdata.models import enabled_market_codes
+
         stocks = get_stock_list()
-        if not stocks or len([s for s in stocks if s["market"] == "CN"]) == 0:
-            logger.info("股票列表快取為空或缺少 A 股，後臺重新整理中...")
+        enabled = enabled_market_codes()
+        if any(not any(stock.get("market") == market for stock in stocks) for market in enabled):
+            logger.info("股票列表快取缺少已啟用市場，後臺重新整理中: %s", enabled)
             refresh_stock_list()
 
     threading.Thread(target=refresh_stock_cache, daemon=True).start()
