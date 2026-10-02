@@ -250,6 +250,11 @@ class ContextBuilder:
         if mkt in self._index_cache:
             return self._index_cache[mkt]
 
+        # Markets without a configured benchmark must not query the CN index.
+        if mkt not in _INDEX_BY_MARKET:
+            self._index_cache[mkt] = None
+            return None
+
         sym, _label = self._index_for_market(market)
         ctx = self._fetch_index_context(sym, market)
         # A股 000300 取不到時兜底上證指數

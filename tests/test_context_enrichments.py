@@ -202,6 +202,16 @@ def test_index_returns_cached_once_per_build(monkeypatch):
     assert calls["n"] == 1
 
 
+def test_taiwan_context_does_not_fetch_china_index(monkeypatch):
+    cb = ContextBuilder()
+    calls = []
+    monkeypatch.setattr(cb, "_fetch_index_context", lambda *args: calls.append(args))
+
+    assert cb._get_index_context(MarketCode.TW) is None
+    assert cb._get_index_context(MarketCode.TW) is None
+    assert calls == []
+
+
 # --------------------------------------------------------------------------- #
 # ① 公告全文 + 頭部新聞正文保留
 # --------------------------------------------------------------------------- #
