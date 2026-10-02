@@ -131,6 +131,20 @@ def test_finmind_dividend_vendor(monkeypatch):
     assert d.dividend_per_share == 4.0
 
 
+def test_finmind_news_keeps_taiwan_venue_identity(monkeypatch):
+    monkeypatch.setattr(
+        "marketdata.vendors.finmind._finmind_get",
+        lambda dataset, **kwargs: [{
+            "date": "2026-10-02 09:30:00", "title": "聯電消息",
+            "link": "https://example.com/news", "source": "FinMind",
+        }] if dataset == "TaiwanStockNews" else [],
+    )
+
+    articles = FinMindNewsVendor().fetch([Symbol.parse("TWSE:2303", "TW")], config={})
+    assert len(articles) == 1
+    assert articles[0].symbols == ["TWSE:2303"]
+
+
 def test_finmind_calendar_and_fx(monkeypatch):
     def mock_get(dataset, **kwargs):
         if dataset == "TaiwanStockTradingDate":

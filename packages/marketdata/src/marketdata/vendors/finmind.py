@@ -402,7 +402,7 @@ class FinMindNewsVendor(NewsVendor):
                         title=title,
                         content=content,
                         publish_time=dt,
-                        symbols=[sym.code],
+                        symbols=[sym.identity],
                         url=link,
                     )
                 )
