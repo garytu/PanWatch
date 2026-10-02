@@ -84,6 +84,10 @@ def test_db_config_provider_tw_market_routing(monkeypatch):
     assert kline_sources[0].vendor == "finmind"
     assert kline_sources[0].config["token"] == "test-fm-token"
 
+    news_sources = cp.sources_for("news", "TW")
+    assert [source.vendor for source in news_sources] == ["yahoo_tw", "finmind"]
+    assert news_sources[1].config["token"] == "test-fm-token"
+
 
 @pytest.mark.parametrize(
     "primary, legacy, expected",

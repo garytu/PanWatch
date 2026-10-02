@@ -17,7 +17,7 @@ def test_package_vendors_by_type_content():
         "capital_flow": frozenset({"eastmoney", "sina", "finmind"}),
         "events": frozenset({"eastmoney"}),
         "flash_news": frozenset({"cls", "sina", "eastmoney"}),
-        "news": frozenset({"xueqiu", "eastmoney_news", "eastmoney", "finmind"}),
+        "news": frozenset({"xueqiu", "eastmoney_news", "eastmoney", "finmind", "yahoo_tw"}),
         "fundamentals": frozenset({"tencent", "eastmoney", "finmind"}),
         "dragon_tiger": frozenset({"eastmoney"}),
         "margin": frozenset({"eastmoney", "finmind"}),

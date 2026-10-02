@@ -121,6 +121,7 @@ class NewsDigestAgent(BaseAgent):
         news_list = await collector.fetch_all(
             symbols=symbols,
             since_hours=self.since_hours,
+            symbol_names={stock.symbol: stock.name for stock in context.watchlist},
         )
         if (
             not news_list
@@ -134,6 +135,7 @@ class NewsDigestAgent(BaseAgent):
             news_list = await collector.fetch_all(
                 symbols=symbols,
                 since_hours=self.fallback_since_hours,
+                symbol_names={stock.symbol: stock.name for stock in context.watchlist},
             )
 
         # 跨次去重：只保留“新新聞”，避免 agent 看起來一直在重複同樣內容

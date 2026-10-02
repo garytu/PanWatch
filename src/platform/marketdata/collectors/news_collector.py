@@ -49,4 +49,18 @@ class NewsCollector:
         """
         from src.platform.marketdata.marketdata_client import md_news
 
-        return await asyncio.to_thread(md_news, symbols or [], since_hours, symbol_names)
+        from marketdata.symbol import Symbol
+
+        grouped: dict[str, list[str]] = {}
+        for raw in symbols or []:
+            market = Symbol.parse(raw).market.value
+            grouped.setdefault(market, []).append(raw)
+
+        if not grouped:
+            return []
+        batches = await asyncio.gather(*(
+            asyncio.to_thread(md_news, group, since_hours, symbol_names, market=market)
+            for market, group in grouped.items()
+        ))
+        return sorted((item for batch in batches for item in batch),
+                      key=lambda item: item.publish_time, reverse=True)

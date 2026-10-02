@@ -114,8 +114,16 @@ class DbConfigProvider:
                     )
                 ]
 
-            # 3. 日K、基本面、三大法人、融資融券、除權息、新聞: FinMind Provider，配置取自 .env
-            if datatype in {"kline", "fundamentals", "capital_flow", "margin", "dividend", "news"}:
+            # 3. 台股新聞: Yahoo 股市 RSS 與 FinMind 聚合；後者仍使用設定的 token。
+            if datatype == "news":
+                return [
+                    SourceConfig(vendor="yahoo_tw", priority=0, enabled=True),
+                    SourceConfig(vendor="finmind", priority=10, enabled=True,
+                                 config={"token": settings.finmind_api_token}),
+                ]
+
+            # 4. 日K、基本面、三大法人、融資融券、除權息: FinMind Provider，配置取自 .env
+            if datatype in {"kline", "fundamentals", "capital_flow", "margin", "dividend"}:
                 fm_token = settings.finmind_api_token
                 return [
                     SourceConfig(

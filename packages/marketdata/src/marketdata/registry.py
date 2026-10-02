@@ -50,6 +50,7 @@ from marketdata.vendors.northbound import HexinNorthboundVendor
 from marketdata.vendors.sina import SinaQuoteVendor
 from marketdata.vendors.tencent import TencentQuoteVendor
 from marketdata.vendors.yfinance import YFinanceQuoteVendor
+from marketdata.vendors.yahoo_tw_news import YahooTwNewsVendor
 from marketdata.vendors.twmd import TwmdQuoteVendor, TwmdKlineVendor, TwmdIntradayVendor
 
 # 各資料型別 → {vendor name: vendor 類}。注意:vendor 的 import 本身是廉價的
@@ -98,6 +99,7 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
         "eastmoney_news": EastmoneyStockNewsVendor,
         "eastmoney": EastmoneyAnnNewsVendor,
         "finmind": FinMindNewsVendor,
+        "yahoo_tw": YahooTwNewsVendor,
     },
     "dragon_tiger": {
         "eastmoney": EastmoneyDragonTigerVendor,

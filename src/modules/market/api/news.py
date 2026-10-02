@@ -16,6 +16,8 @@ SOURCE_LABELS = {
     "xueqiu": "雪球",
     "eastmoney_news": "東財資訊",
     "eastmoney": "東財公告",
+    "yahoo_tw": "Yahoo 股市",
+    "finmind": "FinMind",
 }
 
 
@@ -38,7 +40,7 @@ async def get_news(
     hours: int = Query(default=168, ge=1, le=720, description="時間範圍（小時，預設7天）"),
     limit: int = Query(default=50, ge=1, le=200, description="返回數量"),
     filter_related: bool = Query(default=True, description="只顯示相關新聞"),
-    source: str = Query(default="", description="來源過濾，逗號分隔：xueqiu/eastmoney_news/eastmoney"),
+    source: str = Query(default="", description="來源過濾，逗號分隔：yahoo_tw/finmind/xueqiu/eastmoney_news/eastmoney"),
     db: Session = Depends(get_db),
 ):
     """
