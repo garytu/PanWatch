@@ -481,3 +481,54 @@ def test_build_symbol_contexts_failsoft_when_index_missing(monkeypatch):
     payload = result["symbols"]["00700"]
     assert payload["relative_strength"] is None
     assert payload["ta_verdict"] is None
+
+
+def test_taiwan_structured_research_is_injected_and_snapshotted_without_cn_reads(monkeypatch):
+    stock = SimpleNamespace(symbol="2330", market=MarketCode.TW, name="台積電")
+    context = _FakeContext([stock])
+    pack = SimpleNamespace(
+        quote=SimpleNamespace(instrument_id="TPEX:2330"),
+        technical={},
+        news=SimpleNamespace(items=[]),
+        events=SimpleNamespace(days=7, items=[]),
+    )
+    research_payload = {
+        "instrument_id": "TPEX:2330",
+        "selectors": {"start_date": "2026-10-02", "end_date": "2026-10-06"},
+        "blocks": {
+            name: {"data": {"period": name}, "status": "available", "reason": "", "evidence": {"provider": "twmd"}}
+            for name in ("valuation", "institutional_flows", "company_profile", "monthly_revenues")
+        },
+        "limitations": {"financial_statements": {"status": "not_integrated", "data": None}},
+    }
+    calls = []
+    saved = []
+
+    class FakeResearchService:
+        def collect(self, instrument_id):
+            calls.append(instrument_id)
+            return research_payload
+
+    monkeypatch.setattr(context_builder, "build_kline_history_context", lambda **kwargs: {"available": False})
+    monkeypatch.setattr(context_builder, "is_market_enabled", lambda _market: True)
+    monkeypatch.setattr(context_builder, "get_latest_ta_verdict", lambda *a, **k: None)
+    monkeypatch.setattr(ContextBuilder, "_load_history_news", staticmethod(lambda *a, **k: []))
+    monkeypatch.setattr(ContextBuilder, "_build_snapshot_memory", staticmethod(lambda *a, **k: {}))
+    monkeypatch.setattr(context_builder, "save_stock_context_snapshot", lambda **kwargs: saved.append(kwargs))
+    monkeypatch.setattr(context_builder, "save_news_topic_snapshot", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "src.modules.research.taiwan_research.TaiwanResearchService", FakeResearchService
+    )
+
+    result = asyncio.run(ContextBuilder().build_symbol_contexts(
+        agent_name="premarket_outlook",
+        context=context,
+        packs={"2330": pack},
+        persist_snapshot=True,
+    ))
+    payload = result["symbols"]["2330"]
+
+    assert calls == ["TPEX:2330"]
+    assert payload["taiwan_research"] == research_payload
+    assert saved[0]["payload"]["taiwan_research"] == research_payload
+    assert payload["relative_strength"] is None

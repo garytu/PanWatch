@@ -25,9 +25,23 @@ def test_tool_schema_and_default_runtime_limits_are_stable():
         "max_steps": 6,
         "max_tool_calls": 8,
         "tool_timeout_seconds": 20,
+        "tool_timeout_overrides": {},
         "run_timeout_seconds": 90,
         "step_retry_count": 1,
     }
+
+
+def test_per_tool_timeout_override_is_bounded_and_scoped():
+    limits = RunLimits(tool_timeout_seconds=15, tool_timeout_overrides={"research": 28})
+    assert limits.tool_timeout_overrides == {"research": 28}
+
+    for invalid in ({"research": 0}, {"research": 121}, {"Bad Name": 20}):
+        try:
+            RunLimits(tool_timeout_overrides=invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid override accepted: {invalid}")
 
 
 def test_successful_tool_results_require_freshness_and_provenance():
@@ -63,3 +77,10 @@ def test_pending_approval_round_trips_through_a_json_checkpoint():
 
     assert restored.pending_approvals[0].call_id == "call-1"
     assert restored.pending_approvals[0].arguments == {"symbol": "CN:601238"}
+
+
+def test_timeout_overrides_reject_boolean_and_fractional_values():
+    import pytest
+    for value in (True, 1.5):
+        with pytest.raises(ValueError):
+            RunLimits(tool_timeout_overrides={"research": value})

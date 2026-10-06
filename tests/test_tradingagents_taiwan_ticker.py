@@ -66,3 +66,23 @@ def test_graph_receives_safe_ticker_and_matching_portfolio(monkeypatch):
     assert result["decision"] == "HOLD"
     assert captured["ticker"] == "4164.TW"
     assert captured["portfolio"].positions[0].ticker == "4164.TW"
+
+
+def test_taiwan_research_tools_share_evidence_and_keep_three_statements_unavailable(monkeypatch):
+    stock = SimpleNamespace(symbol="TWSE:2330", name="台積電", market=SimpleNamespace(value="TW"))
+    research = {"instrument_id": "TWSE:2330", "blocks": {
+        "institutional_flows": {"status": "partial", "evidence": {"receipt": "source-receipt"}, "data": {"shares": 123}},
+    }, "limitations": {"financial_statements": {"status": "not_integrated"}}}
+    monkeypatch.setattr(ta, "_emit_toolkit_log", lambda *a, **kw: None)
+    monkeypatch.setattr(ta, "_real_route_to_vendor", lambda *a, **kw: pytest.fail("TW financial tools must not reach upstream finance"))
+    with ta.panwatch_data_context({"stock": stock, "quote": {"instrument_id": "TPEX:2330"}, "taiwan_research": research}):
+        fundamentals = ta._patched_route_to_vendor("get_fundamentals", "2330.TW")
+        flows = ta._patched_route_to_vendor("get_capital_flow", "2330.TW")
+        assert "source-receipt" in fundamentals and "source-receipt" in flows
+        assert "not_integrated" in fundamentals
+        for name in ("get_income_statement", "get_balance_sheet", "get_cashflow"):
+            assert "not available" in ta._patched_route_to_vendor(name, "2330.TW")
+        assert "DATA_UNAVAILABLE" in ta._patched_route_to_vendor("get_fundamentals", "2330.TWO")
+    research["instrument_id"] = "TPEX:2330"
+    with ta.panwatch_data_context({"stock": stock, "taiwan_research": research}):
+        assert "source-receipt" not in ta._patched_route_to_vendor("get_fundamentals", "2330.TW")

@@ -421,6 +421,11 @@ def test_taiwan_market_tools_forward_official_source_dates_and_coverage(monkeypa
             )
 
     monkeypatch.setattr(assistant_tools, "get_market_data", lambda: _MarketData())
+    monkeypatch.setattr(
+        assistant_tools,
+        "Settings",
+        lambda: SimpleNamespace(tw_fundamentals_provider="finmind", tw_capital_flow_provider="finmind"),
+    )
     registry = assistant_tools.build_panwatch_tool_registry(session)
 
     fundamentals = asyncio.run(registry.execute(
@@ -434,6 +439,64 @@ def test_taiwan_market_tools_forward_official_source_dates_and_coverage(monkeypa
     assert fundamentals.data["valuation_evidence"]["rows"][0]["pe_ratio"] == "28.98"
     assert capital_flow.data["evidence"]["coverage"][0]["trade_date"] == "2026-10-02"
     assert capital_flow.data["evidence"]["rows"][0]["source_received_at_utc"] == "2026-10-03T02:00:00Z"
+    session.close()
+    engine.dispose()
+
+
+def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_service(monkeypatch):
+    engine, session = _session()
+    payload = {
+        "instrument_id": "TWSE:2330",
+        "instrument": {"security_type": "EQUITY"},
+        "selectors": {"start_date": "2026-10-02", "end_date": "2026-10-06"},
+        "blocks": {
+            name: {
+                "data": {"marker": name},
+                "status": "available",
+                "reason": "",
+                "evidence": {"provider": "twmd", "endpoint": f"/{name}"},
+            }
+            for name in (
+                "valuation", "institutional_flows", "company_profile", "monthly_revenues"
+            )
+        },
+        "limitations": {
+            "financial_statements": {"status": "not_integrated", "data": None}
+        },
+    }
+    calls = []
+
+    class FakeResearchService:
+        def collect(self, instrument_id, **selectors):
+            calls.append((instrument_id, selectors))
+            return payload
+
+    monkeypatch.setattr(
+        assistant_tools,
+        "Settings",
+        lambda: SimpleNamespace(tw_fundamentals_provider="twmd", tw_capital_flow_provider="twmd"),
+    )
+    monkeypatch.setattr(
+        "src.modules.research.taiwan_research.TaiwanResearchService",
+        FakeResearchService,
+    )
+    registry = assistant_tools.build_panwatch_tool_registry(session)
+
+    fundamentals = asyncio.run(registry.execute(
+        "get_stock_fundamentals", _request(), {"symbol": "TWSE:2330", "market": "TW"}
+    ))
+    capital_flow = asyncio.run(registry.execute(
+        "get_capital_flow", _request(), {"symbol": "TWSE:2330", "market": "TW"}
+    ))
+    research = asyncio.run(registry.execute(
+        "get_taiwan_stock_research", _request(),
+        {"symbol": "TWSE:2330", "market": "TW", "start_month": "2026-07", "end_month": "2026-08"},
+    ))
+
+    assert fundamentals.data == capital_flow.data == research.data == payload
+    assert research.data["limitations"]["financial_statements"]["status"] == "not_integrated"
+    assert [instrument_id for instrument_id, _ in calls] == ["TWSE:2330"] * 3
+    assert calls[2][1] == {"start_month": "2026-07", "end_month": "2026-08"}
     session.close()
     engine.dispose()
 

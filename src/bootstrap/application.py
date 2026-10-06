@@ -42,6 +42,7 @@ from src.modules.research.api import (
     feedback,
     insights,
     recommendations,
+    taiwan,
 )
 from src.modules.strategy.api import factors
 from src.web.response import ResponseWrapperMiddleware
@@ -157,6 +158,12 @@ app.include_router(
     recommendations.router,
     prefix="/api/recommendations",
     tags=["recommendations"],
+    dependencies=protected,
+)
+app.include_router(
+    taiwan.router,
+    prefix="/api/research",
+    tags=["research"],
     dependencies=protected,
 )
 app.include_router(

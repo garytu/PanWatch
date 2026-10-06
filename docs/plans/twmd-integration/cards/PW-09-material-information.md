@@ -1,6 +1,6 @@
 # PW-09：官方重大訊息與事件分析
 
-狀態：waiting。依賴：PW-01、PW-04。Owner：unassigned。
+狀態：ready。依賴：PW-01、PW-04。Owner：unassigned。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -43,4 +43,4 @@ current/history scope、空／missing／truncated、revision 去重、publicatio
 
 ## 進度與交接
 
-尚未開始。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。
+2026-10-07 協調查核：所列任務依賴已 completed；ready 僅表示可開始，尚未指派或實作。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。

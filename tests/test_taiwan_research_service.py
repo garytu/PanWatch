@@ -1,0 +1,454 @@
+from __future__ import annotations
+
+import copy
+import json
+import time
+from datetime import date
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from marketdata.errors import TwmdReadError
+from marketdata.vendors import twmd
+from src.modules.research.taiwan_research import (
+    TaiwanResearchService,
+    _empty_evidence,
+    _status_error,
+    _scope,
+    clear_taiwan_research_cache,
+)
+
+FIXTURES = Path(__file__).parent.parent / "packages/marketdata/tests/fixtures/twmd"
+
+
+def _captured(label: str) -> dict:
+    fixture = json.loads((FIXTURES / "captured/2026-10-06.json").read_text())
+    return copy.deepcopy(next(item for item in fixture["cases"] if item["label"] == label))
+
+
+def _profile(instrument_id: str) -> dict:
+    fixture = json.loads((FIXTURES / "captured/2026-10-06.json").read_text())
+    return copy.deepcopy(next(
+        item["response"]
+        for item in fixture["company_profile_attempts"]["successful_extended_reads"]["results"]
+        if item["instrument_id"] == instrument_id
+    ))
+
+
+@pytest.fixture(autouse=True)
+def clear_research_caches():
+    clear_taiwan_research_cache()
+    twmd._company_profile_cache.clear()
+    twmd._monthly_revenue_cache.clear()
+    yield
+    clear_taiwan_research_cache()
+    twmd._company_profile_cache.clear()
+    twmd._monthly_revenue_cache.clear()
+
+
+def _catalog(instrument_id="TWSE:2330", security_type="EQUITY"):
+    venue, symbol = instrument_id.split(":", 1)
+    return [{
+        "instrument_id": instrument_id,
+        "symbol": symbol,
+        "venue": venue,
+        "security_type": security_type,
+        "is_active": True,
+        "name": "台積電" if symbol == "2330" else "ETF",
+    }]
+
+
+def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(monkeypatch):
+    catalog = _catalog() + [
+        {"instrument_id": "TWSE:00999", "venue": "TWSE", "symbol": "00999", "security_type": "ETN", "is_active": True, "name": "測試 ETN"},
+        {"instrument_id": "TPEX:00000", "venue": "TPEX", "symbol": "00000", "security_type": "OTHER", "is_active": False, "name": "測試其他商品"},
+    ]
+    valuation = _captured("TWSE:2330 valuation 2026-10-02")
+    flow = _captured("TWSE:2330 institutional flow 2026-10-02 available")
+    revenue = _captured("TWSE:2330 monthly revenue 2026-07..08 partial coverage")
+    profile = _profile("TWSE:2330")
+    calls = []
+
+    def response(_self, path, **params):
+        calls.append((path, params))
+        if path == "instruments":
+            return catalog, {}
+        if path == "valuations":
+            return valuation["response"], valuation["response_headers"]
+        if path == "institutional-flows":
+            return flow["response"], flow["response_headers"]
+        if path == "company-profiles":
+            return profile, {}
+        if path == "monthly-revenues":
+            return revenue["response"], {}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
+    payload = TaiwanResearchService(config={"base_url": "http://fixture", "timeout_sec": 5}).collect(
+        "2330", start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
+    )
+
+    blocks = payload["blocks"]
+    assert payload["instrument_id"] == "TWSE:2330"
+    assert payload["instrument"]["security_type"] == "EQUITY"
+    assert payload["limitations"]["financial_statements"]["status"] == "not_integrated"
+    assert payload["limitations"]["financial_statements"]["data"] is None
+    assert "not income" in payload["limitations"]["financial_statements"]["message"]
+    assert blocks["valuation"]["data"]["observations"][0]["pe_ratio"] == "28.98"
+    assert blocks["valuation"]["evidence"]["period"]["trade_dates"] == ["2026-10-02"]
+    assert blocks["institutional_flows"]["data"]["observations"][0]["native_unit"] == "shares"
+    assert blocks["institutional_flows"]["evidence"]["per_period_coverage"][0]["trade_date"] == "2026-10-02"
+    assert blocks["company_profile"]["data"]["profile"]["paid_in_capital"] == "259323700670"
+    assert blocks["monthly_revenues"]["status"] == "partial"
+    assert blocks["monthly_revenues"]["data"]["months"][0]["presence"] == "missing"
+    assert blocks["monthly_revenues"]["data"]["months"][1]["row"]["monthly_revenue"] == "514805337"
+    assert blocks["monthly_revenues"]["evidence"]["publication_time"] is None
+    assert len(calls) == 5
+
+
+def test_one_provider_failure_does_not_erase_other_blocks(monkeypatch):
+    catalog = _catalog()
+    valuation = _captured("TWSE:2330 valuation 2026-10-02")
+    flow = _captured("TWSE:2330 institutional flow 2026-10-02 available")
+    revenue = _captured("TWSE:2330 monthly revenue 2026-07..08 partial coverage")
+    profile = _profile("TWSE:2330")
+
+    def response(_self, path, **params):
+        if path == "instruments": return catalog, {}
+        if path == "valuations": return valuation["response"], valuation["response_headers"]
+        if path == "institutional-flows": raise TwmdReadError("private URL/token details", status_code=503, reason_code="http_503")
+        if path == "company-profiles": return profile, {}
+        if path == "monthly-revenues": return revenue["response"], {}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
+    payload = TaiwanResearchService(config={"base_url": "http://fixture"}).collect(
+        "TWSE:2330", start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
+    )
+
+    assert payload["blocks"]["institutional_flows"]["status"] == "error"
+    assert payload["blocks"]["institutional_flows"]["reason"] == "http_503"
+    assert "private URL" not in json.dumps(payload)
+    assert payload["blocks"]["valuation"]["data"] is not None
+    assert payload["blocks"]["company_profile"]["data"] is not None
+    assert payload["blocks"]["monthly_revenues"]["data"] is not None
+
+
+def test_ambiguous_bare_code_stops_before_dataset_reads(monkeypatch):
+    rows = _catalog("TWSE:1111") + _catalog("TPEX:1111")
+    calls = []
+
+    def response(_self, path, **params):
+        calls.append(path)
+        return rows, {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
+    payload = TaiwanResearchService(config={"base_url": "http://fixture"}).collect(
+        "1111", start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
+    )
+
+    assert calls == ["instruments"]
+    assert all(block["reason"] == "ambiguous_instrument" for block in payload["blocks"].values())
+    assert all(block["status"] == "error" for block in payload["blocks"].values())
+
+
+def test_known_unsupported_catalog_type_does_not_invalidate_catalog_and_not_found_is_explicit(monkeypatch):
+    rows = _catalog("TWSE:2330") + _catalog("TPEX:1111", "ETN")
+
+    class FakeClient:
+        def get_response(self, path, **params):
+            assert path == "instruments"
+            return rows, {}
+
+    service = TaiwanResearchService(client=FakeClient(), config={"base_url": "http://fixture"})
+    unsupported = service.collect(
+        "TPEX:1111", start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-08", end_month="2026-08", today_taipei=date(2026, 10, 7),
+    )
+    missing = service.collect(
+        "TWSE:9999", start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-08", end_month="2026-08", today_taipei=date(2026, 10, 7),
+    )
+
+    assert all(block["status"] == "unsupported" for block in unsupported["blocks"].values())
+    assert all(block["reason"] == "unsupported_security_type" for block in unsupported["blocks"].values())
+    assert all(block["status"] == "unsupported" for block in missing["blocks"].values())
+    assert all(block["reason"] == "instrument_not_found" for block in missing["blocks"].values())
+
+
+def test_etf_preflight_keeps_available_blocks_and_marks_profile_revenue_unsupported(monkeypatch):
+    from marketdata.types import TwmdMonthlyRevenueMonth
+
+    catalog = _catalog("TWSE:00878", "ETF")
+
+    class FakeClient:
+        def get_response(self, path, **params):
+            assert path == "instruments"
+            return catalog, {}
+
+        def valuation_history(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                instrument_id="TWSE:00878", endpoint="/api/v1/valuations",
+                start_date="2026-10-02", end_date="2026-10-02", data=[],
+                status="unknown", reason="coverage_not_returned", coverage_header=None,
+                selected_instrument_presence="unknown", response_headers={},
+            )
+
+        def institutional_flows(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                instrument_id="TWSE:00878", endpoint="/api/v1/institutional-flows",
+                start_date="2026-10-02", end_date="2026-10-02", data=[], coverage=[],
+                source_contract="twse_institutional_flows/v1", native_unit="shares",
+                status="missing", reason="coverage_missing",
+            )
+
+        def company_profile(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                profile=None, latest_snapshot=None, instrument_id="TWSE:00878",
+                qualification="unsupported_etf", qualification_reason="current_catalog_security_type_etf",
+                latest_snapshot_presence="absent", units={}, endpoint="/api/v1/company-profiles",
+                source_contract="twse_profile/v1", coverage_status="AVAILABLE",
+                status="unsupported", reason="unsupported_etf",
+            )
+
+        def monthly_revenues(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                instrument_id="TWSE:00878", endpoint="/api/v1/monthly-revenues",
+                dataset="twse_monthly_revenue", start_month="2026-08-01", end_month="2026-08-01",
+                schema_ready=True, coverage_status="AVAILABLE", qualification="unsupported_etf",
+                qualification_reason="current_catalog_security_type_etf", current_catalog_evidence={},
+                units={"monthly_revenue": "TWD thousands (inferred)"}, coverage=[],
+                months=[TwmdMonthlyRevenueMonth("2026-08-01", "not_in_captured_report", None)],
+                served_at="2026-10-06T10:00:00Z", status="unsupported", reason="unsupported_etf",
+            )
+
+    payload = TaiwanResearchService(client=FakeClient(), config={"base_url": "http://fixture"}).collect(
+        "TWSE:00878", start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-08", end_month="2026-08", today_taipei=date(2026, 10, 7),
+    )
+
+    assert payload["instrument"]["security_type"] == "ETF"
+    assert payload["blocks"]["valuation"]["status"] == "unknown"
+    assert payload["blocks"]["company_profile"]["status"] == "unsupported"
+    assert payload["blocks"]["monthly_revenues"]["reason"] == "unsupported_etf"
+
+
+def test_tpex_six_digit_etf_skips_unsupported_valuation_selector_and_keeps_flows():
+    from marketdata.types import (
+        InstitutionalFlowCoverage,
+        InstitutionalFlowObservation,
+        TwmdMonthlyRevenueMonth,
+    )
+
+    instrument_id = "TPEX:006201"
+    catalog = _catalog(instrument_id, "ETF")
+    flow_row = InstitutionalFlowObservation(
+        instrument_id=instrument_id,
+        symbol="006201",
+        name="ETF",
+        trade_date="2026-10-02",
+        native_unit="shares",
+        native_values={"total_institutional_net_shares": 1000},
+        source_contract="tpex_institutional_flows/v1",
+    )
+
+    class FakeClient:
+        calls = []
+
+        def get_response(self, path, **params):
+            assert path == "instruments"
+            return catalog, {}
+
+        def valuation_history(self, *_args, **_kwargs):
+            raise AssertionError("the incompatible TPEx selector must be preflighted")
+
+        def institutional_flows(self, *_args, **_kwargs):
+            self.calls.append("flows")
+            return SimpleNamespace(
+                instrument_id=instrument_id, endpoint="/api/v1/institutional-flows",
+                start_date="2026-10-02", end_date="2026-10-02",
+                source_contract="tpex_institutional_flows/v1", native_unit="shares",
+                schema_ready=True, coverage=[InstitutionalFlowCoverage(
+                    trade_date="2026-10-02", status="AVAILABLE", record_count=1
+                )], data=[flow_row], status="available", reason="selected_record_present",
+                response_headers={},
+            )
+
+        def company_profile(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                profile=None, latest_snapshot=None, instrument_id=instrument_id,
+                qualification="unsupported_etf", qualification_reason="current_catalog_security_type_etf",
+                latest_snapshot_presence="absent", units={}, endpoint="/api/v1/company-profiles",
+                source_contract="tpex_profile/v1", coverage_status="AVAILABLE",
+                status="unsupported", reason="unsupported_etf",
+            )
+
+        def monthly_revenues(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                instrument_id=instrument_id, endpoint="/api/v1/monthly-revenues",
+                dataset="tpex_monthly_revenue_latest", start_month="2026-08-01", end_month="2026-08-01",
+                schema_ready=True, coverage_status="AVAILABLE", qualification="unsupported_etf",
+                qualification_reason="current_catalog_security_type_etf", current_catalog_evidence={},
+                units={"revenue": "TWD thousands (inferred)"}, coverage=[],
+                months=[TwmdMonthlyRevenueMonth("2026-08-01", "not_in_captured_report", None)],
+                served_at="2026-10-06T10:00:00Z", status="unsupported", reason="unsupported_etf",
+            )
+
+    client = FakeClient()
+    payload = TaiwanResearchService(client=client, config={"base_url": "http://fixture"}).collect(
+        instrument_id, start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-08", end_month="2026-08", today_taipei=date(2026, 10, 7),
+    )
+
+    assert client.calls == ["flows"]
+    assert payload["blocks"]["valuation"]["status"] == "unsupported"
+    assert payload["blocks"]["valuation"]["reason"] == "unsupported_valuation_selector"
+    assert payload["blocks"]["institutional_flows"]["status"] == "available"
+    assert payload["blocks"]["institutional_flows"]["data"]["observations"][0]["native_values"]["total_institutional_net_shares"] == 1000
+    assert payload["blocks"]["monthly_revenues"]["status"] == "unsupported"
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"start_date": "2026-10-06", "end_date": "2026-10-07"},
+    {"start_date": "2023-12-31", "end_date": "2024-01-01"},
+    {"start_month": "2026-09", "end_month": "2026-11"},
+    {"start_month": "2023-12", "end_month": "2024-01"},
+])
+def test_api_rejects_future_dates_months_and_ranges_outside_contract(kwargs):
+    with pytest.raises(ValueError):
+        TaiwanResearchService(config={"base_url": "http://fixture"}).collect(
+            "TWSE:2330", today_taipei=date(2026, 10, 7), **kwargs
+        )
+
+
+def test_cache_scope_hashes_credentials_without_storing_token_text():
+    one = _scope({"base_url": "http://fixture", "token": "secret-one"})
+    two = _scope({"base_url": "http://fixture", "token": "secret-two"})
+    assert one != two
+    assert "secret-one" not in repr(one)
+    assert "secret-two" not in repr(two)
+
+
+def test_unknown_provider_reason_codes_are_sanitized():
+    reason, status = _status_error(
+        TwmdReadError("private token path", status_code=503, reason_code="secret-token-value")
+    )
+    assert (reason, status) == ("http_503", 503)
+    assert _status_error(TwmdReadError("secret", reason_code="private_value")) == (
+        "provider_error", None
+    )
+
+
+def test_public_evidence_scope_omits_url_credentials_path_and_query():
+    evidence = _empty_evidence(
+        "TWSE:2330", "/api/v1/valuations", {},
+        {
+            "base_url": "https://user:password@query.example:8443/private/path?api_key=url-secret#frag",
+            "token": "bearer-secret",
+        },
+    )
+    assert evidence["provider_scope"] == "https://query.example:8443"
+    assert "password" not in json.dumps(evidence)
+    assert "url-secret" not in json.dumps(evidence)
+    assert "bearer-secret" not in json.dumps(evidence)
+
+
+def test_catalog_deadline_keeps_actual_read_permits_until_workers_finish(monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import src.modules.research.taiwan_research as research
+
+    released = threading.Event()
+    pool = ThreadPoolExecutor(max_workers=4)
+    calls = []
+
+    class StalledCatalog:
+        def get_response(self, path, **params):
+            calls.append(path)
+            assert released.wait(2)
+            return _catalog(), {}
+
+    monkeypatch.setattr(research, "_READ_POOL", pool)
+    monkeypatch.setattr(research, "_READ_SLOTS", threading.BoundedSemaphore(4))
+    monkeypatch.setattr(research, "_REQUEST_DEADLINE_SECONDS", 0.02)
+    try:
+        service = TaiwanResearchService(client=StalledCatalog(), config={"base_url": "http://fixture"})
+        began = time.monotonic()
+        results = [service.collect("TWSE:2330", today_taipei=date(2026, 10, 7)) for _ in range(5)]
+        assert time.monotonic() - began < 0.5
+        assert len(calls) == 4
+        assert all(block["reason"] == "timeout" for result in results[:4] for block in result["blocks"].values())
+        assert all(block["reason"] == "concurrency_limit" for block in results[4]["blocks"].values())
+    finally:
+        released.set()
+        pool.shutdown(wait=True)
+
+
+def test_valuation_evidence_exports_only_contract_headers():
+    from src.modules.research.taiwan_research import _valuation_block
+
+    read = SimpleNamespace(
+        instrument_id="TPEX:5347", data=[], status="missing", reason="coverage_missing",
+        endpoint="/api/v1/valuations", start_date="2026-10-02", end_date="2026-10-02",
+        coverage_header="available=0;missing=1;selected=missing",
+        selected_instrument_presence="missing", response_headers={
+            "x-twmd-schema-ready": "true", "x-twmd-coverage": "available=0;missing=1;selected=missing",
+            "authorization": "Bearer private-token", "set-cookie": "session=private-cookie",
+        },
+    )
+    block = _valuation_block(read)
+    assert set(block.evidence["response_headers"]) == {"x-twmd-schema-ready", "x-twmd-coverage"}
+    assert "private" not in json.dumps(block.evidence)
+
+
+@pytest.mark.parametrize("symbol,quote,expected", [
+    ("TWSE:2330", "TPEX:2330", "TWSE:2330"),
+    ("2330", "TPEX:2330", "TPEX:2330"),
+    ("2330", "TWSE:5347", "2330"),
+    ("2330", "bad", "2330"),
+])
+def test_quote_hint_cannot_override_requested_canonical_identity(symbol, quote, expected):
+    from src.modules.research.taiwan_research import taiwan_research_identity
+    assert taiwan_research_identity(symbol, quote) == expected
+
+
+def test_service_cache_isolated_by_venue_credentials_service_and_range(monkeypatch):
+    import src.modules.research.taiwan_research as research
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+
+    monkeypatch.setattr(research, "_instrument_catalog", lambda *_: _catalog("TWSE:2330") + _catalog("TPEX:2330"))
+    for adapter in ("_valuation_block", "_flow_block", "company_profile_block", "monthly_revenue_block"):
+        monkeypatch.setattr(research, adapter, lambda read: ResearchDataBlock(read, "available", "selected_record_present", {"instrument_id": read["identity"]}))
+    calls = []
+
+    class Client:
+        def __init__(self, marker):
+            self.marker = marker
+
+        def read(self, identity, *args, **kwargs):
+            calls.append((self.marker, identity))
+            return {"identity": identity, "marker": self.marker}
+
+        valuation_history = institutional_flows = company_profile = monthly_revenues = read
+
+    def collect(marker, *, token="one", url="http://fixture", identity="TWSE:2330", month="2026-08"):
+        return TaiwanResearchService(client=Client(marker), config={"base_url": url, "token": token}).collect(
+            identity, start_date="2026-10-02", end_date="2026-10-02",
+            start_month=month, end_month=month, today_taipei=date(2026, 10, 7),
+        )
+
+    first = collect(1)
+    first["blocks"]["valuation"]["data"]["marker"] = "mutated"
+    assert collect(9)["blocks"]["valuation"]["data"]["marker"] == 1
+    assert len(calls) == 4
+    assert collect(2, token="two")["blocks"]["valuation"]["data"]["marker"] == 2
+    assert collect(3, url="http://other")["blocks"]["valuation"]["data"]["marker"] == 3
+    assert collect(4, identity="TPEX:2330")["blocks"]["valuation"]["data"]["marker"] == 4
+    changed_range = collect(5, month="2026-07")
+    assert changed_range["blocks"]["valuation"]["data"]["marker"] == 1
+    assert changed_range["blocks"]["monthly_revenues"]["data"]["marker"] == 5
+    assert len(calls) == 17

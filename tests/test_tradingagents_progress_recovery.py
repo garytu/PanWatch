@@ -408,3 +408,61 @@ def test_empty_required_market_source_is_visible_as_error(monkeypatch):
         )
 
     asyncio.run(_run())
+
+
+def test_taiwan_research_source_timeout_exceeds_service_deadline(monkeypatch):
+    """The research aggregate must return partial timeout blocks before TA cancels it."""
+    import asyncio
+    from contextlib import nullcontext
+
+    from src.modules.automation.tradingagents import agent as agent_module
+    from src.modules.automation.tradingagents.agent import TradingAgentsAgent
+
+    async def _run():
+        agent = TradingAgentsAgent(collection_timeout_seconds=5)
+        stock = MagicMock(symbol="TWSE:2330", name="台積電")
+        stock.market.value = "TW"
+        context = MagicMock()
+        context.watchlist = [stock]
+        context._trace_id = "man-tradingagents-TWSE-2330-timeout"
+
+        market_data = MagicMock()
+        market_data.quotes.return_value = []
+        market_data.klines.return_value = []
+        market_data.capital_flow.return_value = None
+        market_data.events.return_value = []
+        timeouts = []
+        real_wait_for = asyncio.wait_for
+
+        async def capture_timeout(awaitable, *, timeout):
+            timeouts.append(timeout)
+            return await real_wait_for(awaitable, timeout=timeout)
+
+        monkeypatch.setattr(agent_module.asyncio, "wait_for", capture_timeout)
+        monkeypatch.setattr(agent_module, "get_market_data", lambda: market_data)
+        monkeypatch.setattr(
+            "src.platform.marketdata.collectors.kline_collector.kline_source",
+            lambda _source: nullcontext(),
+        )
+        monkeypatch.setattr(
+            "src.platform.marketdata.collectors.kline_collector.KlineCollector.get_technical_indicators",
+            lambda self, symbol, klines=None: {},
+        )
+        monkeypatch.setattr(
+            "src.platform.marketdata.models.is_market_enabled", lambda market: True
+        )
+
+        class FakeResearchService:
+            def collect(self, instrument_id):
+                return {"instrument_id": instrument_id, "blocks": {}}
+
+        monkeypatch.setattr(
+            "src.modules.research.taiwan_research.TaiwanResearchService",
+            FakeResearchService,
+        )
+        result = await agent.collect(context)
+        assert result["taiwan_research"]["instrument_id"] == "TWSE:2330"
+        assert agent_module._TAIWAN_RESEARCH_SOURCE_TIMEOUT_SECONDS in timeouts
+        assert agent_module._TAIWAN_RESEARCH_SOURCE_TIMEOUT_SECONDS > 25
+
+    asyncio.run(_run())

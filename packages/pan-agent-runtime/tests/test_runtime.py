@@ -394,6 +394,30 @@ def test_tool_timeout_returns_partial_result():
     assert result.error_code == "tool_timeout"
 
 
+def test_per_tool_timeout_override_only_extends_named_tool():
+    async def slow_tool(_request, _arguments):
+        await asyncio.sleep(1.1)
+        return ToolResult.success(
+            summary="read",
+            data={},
+            sources=[],
+            observed_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
+        )
+
+    model = FixedModel([
+        ModelTurn(tool_calls=[ToolCall(id="call-1", name="lookup")]),
+        ModelTurn(content="完成"),
+    ])
+    result = asyncio.run(
+        AgentRuntime(model, registry(slow_tool)).run(
+            request(tool_timeout_seconds=1, tool_timeout_overrides={"lookup": 2}),
+            CollectingSink(),
+        )
+    )
+
+    assert result.status is RunStatus.COMPLETED
+
+
 def test_run_timeout_bounds_a_tool_call_even_when_tool_timeout_is_longer():
     async def slow_tool(_request, _arguments):
         await asyncio.sleep(1.2)

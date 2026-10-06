@@ -22,6 +22,7 @@ import { buildKlineSuggestion } from '@/lib/kline-scorer'
 import StockPriceAlertPanel from '@panwatch/biz-ui/components/stock-price-alert-panel'
 import { TechnicalBadge } from '@panwatch/biz-ui/components/technical-badge'
 import AddPositionCalculator from '@panwatch/biz-ui/components/add-position-calculator'
+import { TaiwanResearchPanel } from './taiwan-research-panel'
 
 interface QuoteResponse {
   symbol: string
@@ -1422,6 +1423,7 @@ export default function StockInsightModal(props: {
           <div className="max-h-[68vh] overflow-y-auto overflow-x-hidden pr-1 scrollbar">
             {tab === 'overview' && (
               <div className="space-y-3">
+                <TaiwanResearchPanel symbol={symbol} market={market} open={props.open} />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
                   <div className="card p-4 h-full">
                     <div className="mt-1 flex items-end justify-between gap-3">

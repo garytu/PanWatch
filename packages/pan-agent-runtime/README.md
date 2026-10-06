@@ -364,11 +364,13 @@ runtime 只負責這組 provider-neutral contracts。摘要模型選擇、snapsh
 | <code>max_steps</code> | 6 | 1–32 |
 | <code>max_tool_calls</code> | 8 | 1–64 |
 | <code>tool_timeout_seconds</code> | 20 | 1–120 |
+| <code>tool_timeout_overrides</code> | {} | Tool identifiers mapped to 1–120 seconds |
 | <code>run_timeout_seconds</code> | 90 | 1–600 |
 | <code>step_retry_count</code> | 1 | 0–3 |
 
 runtime 還會檢測連續重複的相同工具呼叫。達到閾值後返回
 <code>repeated_tool_call</code>，防止模型在錯誤引數上無限迴圈。
+Named overrides affect only the listed tool and remain capped by the run deadline.
 
 ## 事件與流式輸出
 

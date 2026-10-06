@@ -50,6 +50,7 @@ from .service import (
     AssistantNotFoundError,
     AssistantService,
 )
+from .tool_policy import ASSISTANT_TOOL_TIMEOUT_OVERRIDES
 from .task_runner import assistant_task_runner
 
 router = APIRouter()
@@ -473,6 +474,7 @@ async def stream_assistant_message(
                 max_tool_calls=ASSISTANT_MAX_TOOL_CALLS,
                 run_timeout_seconds=ASSISTANT_RUN_TIMEOUT_SECONDS,
                 tool_timeout_seconds=ASSISTANT_TOOL_TIMEOUT_SECONDS,
+                tool_timeout_overrides=ASSISTANT_TOOL_TIMEOUT_OVERRIDES,
             ),
         )
     except AssistantNotFoundError as exc:
@@ -553,6 +555,7 @@ async def stream_assistant_approval_decision(
                 max_tool_calls=ASSISTANT_MAX_TOOL_CALLS,
                 run_timeout_seconds=ASSISTANT_RUN_TIMEOUT_SECONDS,
                 tool_timeout_seconds=ASSISTANT_TOOL_TIMEOUT_SECONDS,
+                tool_timeout_overrides=ASSISTANT_TOOL_TIMEOUT_OVERRIDES,
             ),
         )
     except Exception:

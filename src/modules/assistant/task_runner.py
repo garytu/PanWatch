@@ -28,6 +28,7 @@ from src.platform.tasking.contracts import TaskEventType, TaskStatus
 from .prompt import build_assistant_messages
 from .repository import AssistantRepository
 from .service import AssistantService
+from .tool_policy import ASSISTANT_TOOL_TIMEOUT_OVERRIDES
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +258,7 @@ class AssistantTaskRunner:
                     max_tool_calls=ASSISTANT_MAX_TOOL_CALLS,
                     run_timeout_seconds=ASSISTANT_RUN_TIMEOUT_SECONDS,
                     tool_timeout_seconds=ASSISTANT_TOOL_TIMEOUT_SECONDS,
+                    tool_timeout_overrides=ASSISTANT_TOOL_TIMEOUT_OVERRIDES,
                 ),
             )
             sink = DurableRuntimeEventSink(service, task_id, context_result)
@@ -307,6 +309,7 @@ class AssistantTaskRunner:
                     max_tool_calls=ASSISTANT_MAX_TOOL_CALLS,
                     run_timeout_seconds=ASSISTANT_RUN_TIMEOUT_SECONDS,
                     tool_timeout_seconds=ASSISTANT_TOOL_TIMEOUT_SECONDS,
+                    tool_timeout_overrides=ASSISTANT_TOOL_TIMEOUT_OVERRIDES,
                 ),
             )
             sink = DurableRuntimeEventSink(service, task_id)

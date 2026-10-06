@@ -79,6 +79,20 @@ financial `report_date` stays separate. Flow evidence preserves each date's
 coverage, selected presence, native share categories and source receipts. Neither
 provider claims a five-trading-day sum without proven complete session coverage.
 
+The stock research panel and `GET /api/research/taiwan` use the shared, read-only
+TWMD research service for four independent blocks: official valuation,
+institutional share counts, company profile and monthly revenue. The dedicated
+`get_taiwan_stock_research` assistant tool uses this same service regardless of
+the legacy provider selectors; `get_stock_fundamentals` and `get_capital_flow`
+continue to respect their individual `TW_*_PROVIDER` setting. TradingAgents
+receives the same structured research payload when Taiwan is enabled. Requests
+use canonical `TWSE:` / `TPEX:` identities, completed Taipei dates, bounded
+date/month windows, isolated block errors, a 25-second aggregate deadline,
+bounded transport attempts and server-side cache/concurrency limits. Provider
+credentials remain on the server. The current service does not integrate complete
+financial statements: monthly revenue and quotes are not income, balance-sheet,
+or cash-flow statements.
+
 ## Implemented behavior
 
 | Area | Taiwan behavior |
@@ -259,4 +273,38 @@ the separate 20-second timeout (14.02/10.40 seconds), July missing and August pr
 for both venue revenue ranges, and unsupported/no rows for TPEX:006201. All five
 GETs returned 200; this is local read-only evidence, not a deployment or future
 latency guarantee. The final backend suite passed 1151 tests with 3 skipped.
-The complete research page and AI/TradingAgents wiring remain PW-04 work.
+The research page and AI/TradingAgents wiring are now implemented by PW-04 below.
+
+
+## Shared stock research and AI integration (2026-10-07)
+
+PW-04 connects the stock insight overview, protected research API, official
+assistant tools, TradingAgents and research context to the same four-block service.
+Latest-only profiles and retained monthly disclosures keep their own periods;
+partial data and unsupported ETF blocks do not erase available institutional data.
+Complete Taiwan financial statements remain unavailable. Named assistant tool
+budgets are 28 seconds, the aggregate wall deadline is 25 seconds including the
+catalog, and TradingAgents allows this source 30 seconds independently of its
+other collection sources. Underlying reads retain their concurrency permits until
+completion, including after callers time out. The cache holds at most 256 entries
+with dataset TTLs: catalog/valuation/flows 5 minutes, profile 6 hours, revenue
+30 minutes. Failed reads are not cached. Credentials and unrelated HTTP headers
+are excluded from public evidence.
+
+At 06:43–06:44 Taipei, a bounded local read-only smoke used date 2026-10-02 and
+months 2026-07..08 for TWSE:2330, TPEX:5347 and ETF TPEX:006201. All 12 GETs
+returned HTTP 200. Stock aggregates took 10.618/12.048 seconds with available
+valuation/flows/profile and partial revenue (July missing, August present).
+The ETF aggregate took 12.061 seconds: flows were available, profile/revenue
+unsupported, and the incompatible non-four-digit TPEx valuation selector was
+preflighted without a request. Profile GETs took 9.811–11.952 seconds. The formal
+stock/ETF panel was visually checked against these real serialized payloads in
+an isolated preview, which was removed afterward. These checks do not establish
+future latency, full market coverage, deployment or intraday freshness.
+
+Final verification: backend 1177 passed/3 skipped; agent runtime 42 passed;
+frontend 20 files/50 tests passed; TypeScript and production build passed;
+working and staged whitespace checks passed. The next default task is PW-05 for
+update responsibility, age/coverage hints and first-batch operational acceptance.
+No collection, schedules, deployment, control mutations or paid LLM run were
+executed for PW-04.

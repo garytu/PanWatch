@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import date, datetime, timedelta
 
@@ -17,7 +18,7 @@ from src.modules.market.news_ranker import (
     rank_news_items,
     summarize_news_topics,
 )
-from src.platform.marketdata.models import MarketCode
+from src.platform.marketdata.models import MarketCode, is_market_enabled
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import AnalysisHistory
 from src.platform.persistence.json_safe import to_jsonable
@@ -263,6 +264,21 @@ class ContextBuilder:
         self._index_cache[mkt] = ctx
         return ctx
 
+    @staticmethod
+    async def _get_taiwan_research(symbol: str, market, pack) -> dict | None:
+        market_value = market.value if isinstance(market, MarketCode) else str(market or "")
+        if market_value != MarketCode.TW.value or not is_market_enabled(MarketCode.TW):
+            return None
+        quote = getattr(pack, "quote", None) if pack else None
+        try:
+            from src.modules.research.taiwan_research import TaiwanResearchService, taiwan_research_identity
+
+            instrument_id = taiwan_research_identity(symbol, getattr(quote, "instrument_id", None))
+            return await asyncio.to_thread(TaiwanResearchService().collect, instrument_id)
+        except Exception:  # noqa: BLE001 - research availability must not block context assembly
+            logger.warning("台股官方研究資料無法加入研究上下文：%s", symbol)
+            return None
+
     def _compute_relative_strength(
         self,
         *,
@@ -504,6 +520,7 @@ class ContextBuilder:
                 kline_history=kline_history,
                 index_ctx=self._get_index_context(market),
             )
+            taiwan_research = await self._get_taiwan_research(symbol, market, pack)
 
             # ④ 最近一次 TradingAgents 深度結論(高權重先驗,僅緊湊版本)
             try:
@@ -531,6 +548,8 @@ class ContextBuilder:
                 "memory": snapshot_memory,
                 "data_quality": quality,
             }
+            if taiwan_research is not None:
+                payload["taiwan_research"] = taiwan_research
             symbol_contexts[symbol] = payload
             all_news_for_topic.extend(realtime_ranked[:5] + hist_ranked[:5])
 

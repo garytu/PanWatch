@@ -30,6 +30,15 @@ from .registry import ToolRegistry
 
 _MAX_IDENTICAL_TOOL_CALLS = 2
 _REQUIRED_TOOL_CHOICE = "required"
+
+
+def _tool_timeout(request: RunRequest, tool_name: str, remaining: float) -> float:
+    configured = request.limits.tool_timeout_overrides.get(
+        tool_name, request.limits.tool_timeout_seconds
+    )
+    return min(configured, remaining)
+
+
 _REQUIRED_TOOL_REPAIR_MESSAGE = (
     "本輪請求需要執行寫入操作。不要用自然語言代替操作結果，"
     "必須呼叫可用的寫入工具；如果缺少必要資訊，請明確說明。"
@@ -526,7 +535,7 @@ class AgentRuntime:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError
-            async with asyncio.timeout(min(request.limits.tool_timeout_seconds, remaining)):
+            async with asyncio.timeout(_tool_timeout(request, call.name, remaining)):
                 result = await handler(
                     ExtensionToolContext(
                         request=request,
@@ -606,7 +615,7 @@ class AgentRuntime:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError
-                timeout = min(request.limits.tool_timeout_seconds, remaining)
+                timeout = _tool_timeout(request, call.name, remaining)
                 async with asyncio.timeout(timeout):
                     result = await self._tools.execute(
                         call.name, request, call.arguments

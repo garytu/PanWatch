@@ -22,6 +22,7 @@ TradingAgents 上游(0.2.x)預設透過 `tradingagents.dataflows.interface.route
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 import re
 import threading
@@ -249,8 +250,18 @@ def _cached_symbol() -> str:
     quote = _cache().get("quote") or {}
     market = getattr(getattr(stock, "market", None), "value", "")
     if market == "TW" and isinstance(quote, dict):
-        return str(quote.get("instrument_id") or symbol).strip()
+        from src.modules.research.taiwan_research import taiwan_research_identity
+        return taiwan_research_identity(symbol, quote.get("instrument_id"))
     return symbol
+
+
+def _taiwan_research_snapshot(symbol: str) -> dict | None:
+    research = _cache().get("taiwan_research")
+    if not isinstance(research, dict):
+        return None
+    if not _same_snapshot_symbol(symbol, str(research.get("instrument_id") or "")):
+        return None
+    return research
 
 
 def _patched_route_to_vendor(method_name: str, *args, **kwargs):
@@ -857,6 +868,12 @@ def _serve_from_panwatch(method_name: str, symbol: str, kwargs: dict, args: tupl
 
     # 3) 資金流(主力資金淨流入)— 注意:不要匹配 "cashflow" / "cash_flow",那是現金流量表
     if "capital" in method or ("flow" in method and "cash" not in method):
+        if _taiwan_identity(symbol):
+            research = _taiwan_research_snapshot(symbol) or {}
+            block = (research.get("blocks") or {}).get("institutional_flows")
+            if block:
+                return f"{header}\n\n{json.dumps(block, ensure_ascii=False, separators=(',', ':'))}"
+            return f"{header}\n\n[Official Taiwan institutional-share data is unavailable. Do not substitute cash flow.]"
         flow = _cache().get("capital_flow")
         if flow:
             return f"{header}\n\n{_flow_to_text(flow)}"
@@ -865,11 +882,24 @@ def _serve_from_panwatch(method_name: str, symbol: str, kwargs: dict, args: tupl
     # 4) 基本面 / 財報:有真實 akshare 財務資料時返回完整指標,否則 fallback 到 quote
     financial = _cache().get("financial")
     if "fundamental" in method or "financial" in method:
+        if _taiwan_identity(symbol):
+            research = _taiwan_research_snapshot(symbol)
+            if research:
+                return f"{header}\n\n{json.dumps(research, ensure_ascii=False, separators=(',', ':'))}"
+            return (
+                f"{header}\n\n[Official Taiwan issuer research is unavailable. "
+                "A quote is not a financial statement; do not invent financial values.]"
+            )
         if financial:
             from src.modules.automation.tradingagents.data_context import render_fundamentals_summary
             return f"{header}\n\n{render_fundamentals_summary(financial)}"
         return f"{header}\n\n{_quote_to_lightweight_fundamentals(symbol)}"
     if "income" in method:
+        if _taiwan_identity(symbol):
+            return (
+                f"{header}\n\n[Financial statements are not available for this Taiwan issuer. "
+                "Monthly revenue is not a quarterly income statement.]"
+            )
         if financial:
             from src.modules.automation.tradingagents.data_context import render_income_statement
             return f"{header}\n\n{render_income_statement(financial)}"
@@ -878,6 +908,8 @@ def _serve_from_panwatch(method_name: str, symbol: str, kwargs: dict, args: tupl
             "Avoid invented revenue/earnings numbers.]"
         )
     if "balance" in method or "sheet" in method:
+        if _taiwan_identity(symbol):
+            return f"{header}\n\n[Balance sheet data is not available for this Taiwan issuer.]"
         if financial:
             from src.modules.automation.tradingagents.data_context import render_balance_sheet
             return f"{header}\n\n{render_balance_sheet(financial)}"
@@ -886,6 +918,8 @@ def _serve_from_panwatch(method_name: str, symbol: str, kwargs: dict, args: tupl
             "Avoid invented assets/liabilities numbers.]"
         )
     if "cashflow" in method or "cash_flow" in method:
+        if _taiwan_identity(symbol):
+            return f"{header}\n\n[Cash flow statement data is not available for this Taiwan issuer.]"
         if financial:
             from src.modules.automation.tradingagents.data_context import render_cashflow
             return f"{header}\n\n{render_cashflow(financial)}"

@@ -42,6 +42,7 @@ from src.modules.automation.tradingagents.toolkit_adapter import (
 from src.modules.research.analysis_history import get_analysis, save_analysis
 
 logger = logging.getLogger(__name__)
+_TAIWAN_RESEARCH_SOURCE_TIMEOUT_SECONDS = 30
 
 __all__ = ["TradingAgentsAgent", "TradingAgentsUnavailable"]
 
@@ -170,12 +171,12 @@ class TradingAgentsAgent(BaseAgent):
         setattr(context, "_progress_handler", progress_handler)
         progress_handler.emit("data_collection", "stage_start", symbol=stock.symbol)
 
-        async def _source(name: str, fn, fallback):
+        async def _source(name: str, fn, fallback, *, timeout_seconds: int | None = None):
             progress_handler.emit("data_collection", "source_start", source=name)
             try:
                 value = await asyncio.wait_for(
                     asyncio.to_thread(fn),
-                    timeout=self.collection_timeout_seconds,
+                    timeout=(timeout_seconds or self.collection_timeout_seconds),
                 )
                 if name in {"quote", "klines"} and not value:
                     progress_handler.emit(
@@ -222,6 +223,21 @@ class TradingAgentsAgent(BaseAgent):
             quote_dict = {}
         capital_list = [cf] if cf else []
 
+        taiwan_research = None
+        if stock.market.value == "TW":
+            from src.platform.marketdata.models import MarketCode, is_market_enabled
+
+            if is_market_enabled(MarketCode.TW):
+                from src.modules.research.taiwan_research import TaiwanResearchService, taiwan_research_identity
+
+                research_id = taiwan_research_identity(sym, quote_dict.get("instrument_id"))
+                taiwan_research = await _source(
+                    "taiwan_research",
+                    lambda: TaiwanResearchService().collect(research_id),
+                    None,
+                    timeout_seconds=_TAIWAN_RESEARCH_SOURCE_TIMEOUT_SECONDS,
+                )
+
         # A 股 fetch 真實財報(akshare),非 A 股留空
         financial: dict | None = None
         if stock.market.value == "CN" and stock.symbol.isdigit() and len(stock.symbol) == 6:
@@ -258,6 +274,7 @@ class TradingAgentsAgent(BaseAgent):
             "capital_flow": capital_list,
             "events": events_list,
             "financial": financial,
+            "taiwan_research": taiwan_research,
             "technical": technical,
             "fetched_at": datetime.now(timezone.utc).isoformat(),
         }

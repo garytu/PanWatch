@@ -37,7 +37,7 @@ from src.platform.marketdata.marketdata_client import (
     md_news,
     md_quote_rows,
 )
-from src.platform.marketdata.models import MARKETS, MarketCode
+from src.platform.marketdata.models import MARKETS, MarketCode, is_market_enabled
 from src.platform.marketdata.stock_list import search_stocks
 from src.platform.persistence.models import Stock
 from src.platform.runtime.config import Settings
@@ -104,6 +104,69 @@ def _market_argument(arguments: dict[str, Any]) -> MarketCode | None:
         return MarketCode(raw)
     except ValueError:
         return None
+
+
+def _taiwan_research_identity(symbol: str, venue: object = None) -> str:
+    from marketdata.symbol import Symbol
+
+    parsed = Symbol.parse(symbol, "TW")
+    if parsed.market.value != "TW":
+        raise ValueError("market must be TW")
+    requested_venue = str(venue or "").strip().upper()
+    if requested_venue:
+        if requested_venue not in {"TWSE", "TPEX"}:
+            raise ValueError("venue must be TWSE or TPEX")
+        if parsed.venue and parsed.venue != requested_venue:
+            raise ValueError("venue conflicts with the canonical instrument ID")
+        return f"{requested_venue}:{parsed.code}"
+    return symbol
+
+
+async def _fetch_taiwan_research(arguments: dict[str, Any], symbol: str) -> ToolResult:
+    raw_market = str(arguments.get("market") or "TW").strip().upper()
+    if raw_market != "TW" or not is_market_enabled(MarketCode.TW):
+        return ToolResult.failure(
+            summary="台股研究目前未啟用。", error_code="market_disabled"
+        )
+    try:
+        instrument_id = _taiwan_research_identity(symbol, arguments.get("venue"))
+    except (TypeError, ValueError):
+        return ToolResult.failure(
+            summary="台股標的或交易所無效。", error_code="instrument_invalid"
+        )
+    selectors = {
+        key: str(arguments[key]).strip()
+        for key in ("start_date", "end_date", "start_month", "end_month")
+        if arguments.get(key) is not None
+    }
+    try:
+        from src.modules.research.taiwan_research import (
+            TaiwanResearchService,
+            serialize_taiwan_research,
+        )
+
+        payload = await asyncio.to_thread(
+            lambda: TaiwanResearchService().collect(instrument_id, **selectors)
+        )
+    except ValueError:
+        return ToolResult.failure(
+            summary="台股研究的日期範圍無效或超出上游界限。",
+            error_code="research_scope_invalid",
+        )
+    except Exception:  # noqa: BLE001 - provider details stay server-side
+        return ToolResult.failure(
+            summary="台股官方研究資料暫時不可用。",
+            error_code="taiwan_research_unavailable",
+        )
+    data = serialize_taiwan_research(payload)
+    statuses = [block.get("status") for block in data.get("blocks", {}).values()]
+    available = sum(status in {"available", "partial"} for status in statuses)
+    return ToolResult.success(
+        summary=f"已查詢 {data.get('instrument_id') or instrument_id} 的官方研究資料，{available}/4 個資料區塊有資料。",
+        data=data,
+        sources=[{"name": "TWMD 官方台灣研究資料"}],
+        observed_at=datetime.now(UTC),
+    )
 
 
 def _discovery_collector() -> EastMoneyDiscoveryCollector:
@@ -563,6 +626,11 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         if parsed is None:
             return _failure_for_symbol(arguments)
         symbol, market = parsed
+        if market == MarketCode.TW:
+            if not is_market_enabled(market):
+                return ToolResult.failure(summary="台股市場目前未啟用。", error_code="market_disabled")
+            if Settings().tw_fundamentals_provider == "twmd":
+                return await _fetch_taiwan_research(arguments, symbol)
         try:
             items = await asyncio.to_thread(
                 lambda: get_market_data().fundamentals([symbol], market=market.value)
@@ -589,6 +657,11 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         if parsed is None:
             return _failure_for_symbol(arguments)
         symbol, market = parsed
+        if market == MarketCode.TW:
+            if not is_market_enabled(market):
+                return ToolResult.failure(summary="台股市場目前未啟用。", error_code="market_disabled")
+            if Settings().tw_capital_flow_provider == "twmd":
+                return await _fetch_taiwan_research(arguments, symbol)
         try:
             item = await asyncio.to_thread(
                 lambda: get_market_data().capital_flow(symbol, market=market.value)
@@ -608,6 +681,12 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             sources=[{"name": "PanWatch 資金流向"}],
             observed_at=datetime.now(UTC),
         )
+
+    async def get_taiwan_stock_research(_request: RunRequest, arguments: dict) -> ToolResult:
+        symbol = str(arguments.get("symbol") or "").strip().upper()
+        if not symbol:
+            return ToolResult.failure(summary="請提供台股程式碼。", error_code="symbol_required")
+        return await _fetch_taiwan_research(arguments, symbol)
 
     async def get_dragon_tiger(_request: RunRequest, arguments: dict) -> ToolResult:
         trade_date = str(arguments.get("date") or "").strip()
@@ -1156,7 +1235,10 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         ToolSpec(
             name="get_stock_fundamentals",
             title="查詢股票基本面",
-            description="查詢一隻股票的估值、盈利、成長和財報期等基本面摘要。",
+            description=(
+                "查詢股票基本面摘要；台股走官方研究區塊。台股完整財報尚未接入，"
+                "月營收與報價不可當成損益表、資產負債表或現金流量表。"
+            ),
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -1173,7 +1255,10 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         ToolSpec(
             name="get_capital_flow",
             title="查詢資金流向",
-            description="查詢一隻股票的主力、超大單和大單等資金流向摘要。",
+            description=(
+                "查詢股票資金流向；台股官方路徑回傳三大法人買賣股數及來源日期，"
+                "不是主力金額或固定近 5 日摘要；其他市場沿用主力、超大單和大單摘要。"
+            ),
             risk=ToolRisk.READ,
             input_schema={
                 "type": "object",
@@ -1185,6 +1270,31 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             },
         ),
         get_capital_flow,
+    )
+    registry.register(
+        ToolSpec(
+            name="get_taiwan_stock_research",
+            title="查詢台股官方研究資料",
+            description=(
+                "查詢 TWMD 官方估值、三大法人股數、公司資料和月營收。資料區塊各自帶有狀態、來源、日期、單位與 evidence。"
+                "台股財報尚未接入；月營收和報價都不能當成完整損益表、資產負債表或現金流量表。"
+            ),
+            risk=ToolRisk.READ,
+            input_schema={
+                "type": "object",
+                "required": ["symbol"],
+                "properties": {
+                    "symbol": {"type": "string", "description": "台股程式碼或 TWSE:2330／TPEX:5347"},
+                    "market": {"type": "string", "enum": ["TW"], "default": "TW"},
+                    "venue": {"type": "string", "enum": ["TWSE", "TPEX"]},
+                    "start_date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+                    "end_date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+                    "start_month": {"type": "string", "pattern": "^\\d{4}-\\d{2}$"},
+                    "end_month": {"type": "string", "pattern": "^\\d{4}-\\d{2}$"},
+                },
+            },
+        ),
+        get_taiwan_stock_research,
     )
     registry.register(
         ToolSpec(
@@ -1358,6 +1468,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         "get_board_stocks",
         "get_stock_fundamentals",
         "get_capital_flow",
+        "get_taiwan_stock_research",
         "get_dragon_tiger",
         "update_price_alert",
         "delete_price_alert",
