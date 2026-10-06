@@ -1,6 +1,6 @@
 # PW-02：官方估值與三大法人接入
 
-狀態：ready。依賴：PW-01。Owner：unassigned。
+狀態：in_progress。依賴：PW-01。Owner：pw02_valuation_flows_worker（gpt-6-luna／xhigh）。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 

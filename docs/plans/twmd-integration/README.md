@@ -6,7 +6,7 @@
 
 ## 下一項
 
-**PW-01 已完成，下一項為 PW-02。** PW-02 與 PW-03 的 PW-01 依賴已滿足，均為 ready；預設先執行 PW-02，本次不開始下一卡。
+**PW-01 已完成，PW-02 執行中。** PW-02 的 worker 為 pw02_valuation_flows_worker（gpt-6-luna／xhigh）；PW-03 的 PW-01 依賴已滿足，保持 ready。本次只執行 PW-02。
 
 PW-01 已交付契約、離線 fixtures 與驗證，尚未接入新的 research provider；其餘卡依下表等待執行。本計劃不授權採集、排程或部署。執行範例：
 
@@ -17,7 +17,7 @@ PW-01 已交付契約、離線 fixtures 與驗證，尚未接入新的 research 
 | ID | 任務 | 狀態 | 依賴 | 交付價值 |
 | --- | --- | --- | --- | --- |
 | PW-01 | [契約、能力與樣本](cards/PW-01-contracts.md) | completed | — | 確認欄位、日期、來源、單位與資料可用性 |
-| PW-02 | [官方估值與法人](cards/PW-02-valuation-flows.md) | ready | PW-01 | 現有基本面與法人介面改用明確的官方資料 |
+| PW-02 | [官方估值與法人](cards/PW-02-valuation-flows.md) | in_progress | PW-01 | 現有基本面與法人介面改用明確的官方資料 |
 | PW-03 | [公司資料與月營收](cards/PW-03-profile-revenue.md) | ready | PW-01 | 結構化公司資料及有缺口的營收時間序列 |
 | PW-04 | [個股研究與 AI](cards/PW-04-research-ai.md) | waiting | PW-02、PW-03 | 使用者能看到、詢問並追溯第一批資料 |
 | PW-05 | [更新流程與第一批驗收](cards/PW-05-freshness-acceptance.md) | waiting | PW-04 | 確認第一批功能的可用範圍與更新責任 |
