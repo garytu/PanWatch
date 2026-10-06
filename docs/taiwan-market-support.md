@@ -1,5 +1,17 @@
 # Taiwan market support
 
+## Planned data expansion
+
+The [PanWatch × twmd integration plan](plans/twmd-integration/README.md) records
+the 2026-10-06 service observations and 14 tasks for official valuations, investor
+flows, revenue, research/AI, discovery, chip data, announcements, financial
+statements, benchmarks, corporate-action annotations, historical research and
+live data. Each task includes dependencies, acceptance and validation requirements.
+Execute one selected task at a time; this plan is not a delivered-feature claim.
+The dated verification sections below remain historical evidence.
+
+## Current integration
+
 PanWatch uses twmd's native API for Taiwan quotes and price history. Listed and OTC
 instruments retain their `TWSE:` / `TPEX:` identity throughout the application. Live
 execution requires a fresh quote and a confirmed trading session. Stored closing
@@ -114,14 +126,16 @@ visually checked with an installed Chromium. `git diff --check` passed.
 
 ## Remaining service requirements and model boundaries
 
-- Complete the active TPEX catalog in twmd, preserving canonical venue, security
-  type, name and delisting state. See [the twmd handoff](twmd-taiwan-follow-up.md).
+- The 2026-10-06 catalog checks returned active TPEx equities, ETFs and warrants.
+  Filter by venue, activity and security type before search/discovery; the
+  2026-09-29 zero-active-TPEx result above remains a historical observation.
 - Validate live arrivals, quote expiry and recovery during a trading session.
   PanWatch does not silently subscribe every instrument discovered by its scanner.
   The twmd control service must be reachable with an agent token to edit subscriptions.
-- The deployed minute API serves stored historical acquisitions. Continuous live
-  minute collection still requires a twmd enhancement before a streaming chart or
-  minute-driven live strategy can be claimed.
+- The 2026-10-07 minute capability check reported live collection supported,
+  unconfigured and disabled. Configure and validate trading-session arrivals,
+  finalization and recovery before claiming a streaming chart or minute strategy;
+  stored historical bars do not prove live delivery.
 - FinMind availability, token entitlement and rate limits determine non-price
   coverage. Those datasets were checked through mocked contracts, not an exhaustive
   live fundamental/news audit.
@@ -160,3 +174,44 @@ markets are blocked while this policy is active.
 
 The regression suite explicitly enables all supported markets for existing tests;
 `tests/test_enabled_markets.py` exercises the Taiwan-only deployment separately.
+
+## twmd research contract observation (2026-10-06)
+
+PW-01 records a read-only query audit and offline contract examples in the
+[integration contract](plans/twmd-integration/contracts/README.md). These dated
+API observations define source coverage and field meaning; they do not indicate
+that PanWatch research screens or providers have started using these datasets.
+
+The local query API reported OpenAPI version `0.1.0` and readiness through the
+2026-10-06 TWSE and TPEx daily-price partitions. Its response did not expose a
+build commit, so the separately inspected tw-market-data source commit cannot
+be treated as the deployed version. The catalog query returned active
+`TWSE:2330` and `TPEX:5347` equities, `TWSE:00878` and `TPEX:006201` ETFs, and
+`TPEX:700019` as a warrant. Venue and security type must remain part of a
+Taiwan instrument's identity and eligibility.
+
+On 2026-10-06, both venue flow endpoints returned 2026-10-02 samples and
+`MISSING` coverage for 2026-10-05. TPEx valuation returned a 2026-10-02 sample
+and no retained 2026-10-05 row; the TWSE valuation query returned rows on both
+dates. Both venues' 2026-07..08 revenue responses had July missing and August
+present. The active TPEx ETF revenue query returned
+`qualification=unsupported_etf`. These outcomes distinguish dataset coverage
+from one issuer's presence and retain missing values as null rather than zero.
+
+Latest company profiles were returned for `TWSE:2330` and `TPEX:5347`, with
+`latest_snapshot_presence=present` and `qualification=qualified_issuer`. Each
+read took more than 15 seconds after two 10-second attempts timed out. This
+does not establish a latency guarantee; the current PanWatch client timeout
+defaults to 5 seconds. Profile, valuation, flow, and revenue contracts remain
+research integration prerequisites documented in PW-01, not implemented
+PanWatch features. The existing market-data HTTP helper returns parsed bodies
+only and maps exhausted request errors to `None`; it cannot currently preserve
+TPEx valuation coverage headers or distinguish those errors from empty-shaped
+results. PW-02 records this transport prerequisite.
+
+At 2026-10-07 00:10:54 Taipei, a supplemental read-only
+`/api/v1/bars/capabilities` request returned HTTP 200 in 16.522 ms with
+`live_collection_supported=true`, `live_collection_configured=false`, and
+`live_collection=false`. The sanitized capability fixture retains only these
+public flags. This updates the current service requirements while retaining
+the earlier dated observations.

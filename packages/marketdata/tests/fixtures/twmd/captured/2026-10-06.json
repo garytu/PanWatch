@@ -1,0 +1,1006 @@
+{
+  "fixture_kind": "captured_http",
+  "captured_at_taipei": "2026-10-06T23:52:17+08:00",
+  "api_base": "http://127.0.0.1:8000",
+  "request_policy": "GET only; no Authorization header; local query API only; no database access",
+  "upstream_checkout": {
+    "repository": "/Users/garytu/works/tw-market-data-main",
+    "commit": "3acd67ffd98bbcf1713f9484d8a7b77871db6ade",
+    "worktree_clean_at_inspection": true
+  },
+  "deployed_observation": {
+    "observed_at_taipei": "2026-10-06T23:53:57+08:00",
+    "openapi": {
+      "label": "served OpenAPI metadata",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/openapi.json",
+      "http_status": 200,
+      "latency_ms": 26.135,
+      "response_bytes": 138836,
+      "response_headers": {},
+      "response": {
+        "info": {
+          "title": "Taiwan Market Data Query API",
+          "description": "Local-first query service reading strictly from local storage",
+          "version": "0.1.0"
+        },
+        "paths": [
+          "/api/v1/bars",
+          "/api/v1/bars/capabilities",
+          "/api/v1/bars/coverage",
+          "/api/v1/benchmarks",
+          "/api/v1/benchmarks/{benchmark_id}/bars",
+          "/api/v1/benchmarks/{benchmark_id}/quote",
+          "/api/v1/broker-branch/coverage",
+          "/api/v1/broker-branch/quantities",
+          "/api/v1/broker-branch/queue",
+          "/api/v1/broker-branch/queue/{item_id}",
+          "/api/v1/broker-branch/queue/{item_id}/retry",
+          "/api/v1/broker-branch/worker/status",
+          "/api/v1/broker-flow/coverage",
+          "/api/v1/broker-flow/price-levels",
+          "/api/v1/broker-flow/quantities",
+          "/api/v1/capital-reduction-results",
+          "/api/v1/company-profiles",
+          "/api/v1/coverage",
+          "/api/v1/ex-right-dividend-results",
+          "/api/v1/financial-statements",
+          "/api/v1/health",
+          "/api/v1/institutional-flows",
+          "/api/v1/instruments",
+          "/api/v1/instruments/{instrument_id_or_symbol}",
+          "/api/v1/margin-short-sale",
+          "/api/v1/material-information",
+          "/api/v1/monthly-revenues",
+          "/api/v1/price-snapshots",
+          "/api/v1/prices",
+          "/api/v1/quotes",
+          "/api/v1/quotes/capabilities",
+          "/api/v1/quotes/readiness",
+          "/api/v1/readiness",
+          "/api/v1/securities-lending-originations",
+          "/api/v1/securities-repayments",
+          "/api/v1/shareholder-distribution",
+          "/api/v1/valuations",
+          "/broker-branch/dashboard",
+          "/health"
+        ]
+      }
+    },
+    "served_commit": "not exposed by the API; upstream checkout commit is not asserted to be deployed",
+    "readiness": {
+      "label": "query API readiness",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/readiness",
+      "http_status": 200,
+      "latency_ms": 9403.8,
+      "response_bytes": 1587,
+      "response_headers": {},
+      "response": {
+        "status": "ready",
+        "api_live": true,
+        "storage_readable": true,
+        "data_ready": true,
+        "checked_at": "2026-10-06T23:52:26.663709+08:00",
+        "decimal_storage": "decimal_text",
+        "datasets": [
+          {
+            "dataset": "twse_daily_price",
+            "venue": "TWSE",
+            "latest_trade_date": "2026-10-06",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-10-06",
+              "status": "AVAILABLE",
+              "record_count": 1381,
+              "acquired_at": "2026-10-06T06:30:01+00:00",
+              "checksum": null
+            },
+            "assessed_date_coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-10-06",
+              "status": "AVAILABLE",
+              "record_count": 1381,
+              "acquired_at": "2026-10-06T06:30:01+00:00",
+              "checksum": null
+            },
+            "freshness": {
+              "status": "current",
+              "reason": "covered_through_completed_date",
+              "assessed_through": "2026-10-06",
+              "evidence_start": "2025-10-06",
+              "evidence_truncated": false,
+              "calendar_days_old": 0,
+              "known_sessions_behind": 0,
+              "trading_days_behind": 0,
+              "missing_partition_count": 0
+            }
+          },
+          {
+            "dataset": "tpex_daily_price",
+            "venue": "TPEX",
+            "latest_trade_date": "2026-10-06",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-10-06",
+              "status": "AVAILABLE",
+              "record_count": 12194,
+              "acquired_at": "2026-10-06T10:30:08+00:00",
+              "checksum": null
+            },
+            "assessed_date_coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-10-06",
+              "status": "AVAILABLE",
+              "record_count": 12194,
+              "acquired_at": "2026-10-06T10:30:08+00:00",
+              "checksum": null
+            },
+            "freshness": {
+              "status": "current",
+              "reason": "covered_through_completed_date",
+              "assessed_through": "2026-10-06",
+              "evidence_start": "2025-10-06",
+              "evidence_truncated": false,
+              "calendar_days_old": 0,
+              "known_sessions_behind": 0,
+              "trading_days_behind": 0,
+              "missing_partition_count": 0
+            }
+          }
+        ],
+        "storage_error": null
+      }
+    }
+  },
+  "cases": [
+    {
+      "label": "active TWSE equity",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/instruments/TWSE:2330",
+      "http_status": 200,
+      "latency_ms": 105.736,
+      "response_bytes": 226,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TWSE:2330",
+        "symbol": "2330",
+        "name": "台積電",
+        "venue": "TWSE",
+        "security_type": "EQUITY",
+        "isin": "TW0002330008",
+        "listing_date": "1994-09-05",
+        "industry_category": "半導體業",
+        "cfi_code": "ESVUFR",
+        "is_active": true
+      }
+    },
+    {
+      "label": "active TPEX equity",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/instruments/TPEX:5347",
+      "http_status": 200,
+      "latency_ms": 3.861,
+      "response_bytes": 223,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TPEX:5347",
+        "symbol": "5347",
+        "name": "世界",
+        "venue": "TPEX",
+        "security_type": "EQUITY",
+        "isin": "TW0005347009",
+        "listing_date": "1998-03-25",
+        "industry_category": "半導體業",
+        "cfi_code": "ESVUFR",
+        "is_active": true
+      }
+    },
+    {
+      "label": "active TWSE ETF",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/instruments/TWSE:00878",
+      "http_status": 200,
+      "latency_ms": 3.387,
+      "response_bytes": 227,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TWSE:00878",
+        "symbol": "00878",
+        "name": "國泰永續高股息",
+        "venue": "TWSE",
+        "security_type": "ETF",
+        "isin": "TW0000087808",
+        "listing_date": "2020-07-20",
+        "industry_category": null,
+        "cfi_code": "CEOJEU",
+        "is_active": true
+      }
+    },
+    {
+      "label": "active TPEX warrant",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/instruments/TPEX:700019",
+      "http_status": 200,
+      "latency_ms": 6.009,
+      "response_bytes": 234,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TPEX:700019",
+        "symbol": "700019",
+        "name": "宏捷科統一5C購01",
+        "venue": "TPEX",
+        "security_type": "WARRANT",
+        "isin": "TW25Z7000198",
+        "listing_date": "2025-10-01",
+        "industry_category": null,
+        "cfi_code": "RWSCCA",
+        "is_active": true
+      }
+    },
+    {
+      "label": "TPEX:006201 revenue is unsupported for an ETF",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/monthly-revenues?instrument_id=TPEX%3A006201&start_month=2026-08&end_month=2026-08",
+      "http_status": 200,
+      "latency_ms": 14.267,
+      "response_bytes": 1336,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TPEX:006201",
+        "dataset": "tpex_monthly_revenue_latest",
+        "start_month": "2026-08-01",
+        "end_month": "2026-08-01",
+        "schema_ready": true,
+        "coverage_status": "AVAILABLE",
+        "qualification": "unsupported_etf",
+        "qualification_reason": "current_catalog_security_type_etf",
+        "current_catalog_evidence": {
+          "status": "available",
+          "name": "元大富櫃50",
+          "security_type": "ETF",
+          "is_active": true,
+          "listing_date": "2011-01-27",
+          "industry_category": null
+        },
+        "units": {
+          "revenue": "TWD thousands (inferred from TPEx issuer notes; publisher strings retained)",
+          "publisher_growth_fields": "publisher-reported percent; source lexical values",
+          "publisher_report_time": "not provided; report date is source metadata"
+        },
+        "coverage": [
+          {
+            "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+            "source": "tpex",
+            "data_month": "2026-08-01",
+            "row_count": 892,
+            "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+            "request_scope": "latest",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap05_O",
+            "acquisition_date": "2026-10-04",
+            "received_at_utc": "2026-10-04T13:09:19.479749Z",
+            "report_date": "2026-09-17",
+            "payload_sha256": "f00e3fdd7060db0db943b79dc53d732df940d038ef208a1b075363e06660bd92",
+            "selected_issuer_present": false
+          }
+        ],
+        "months": [
+          {
+            "data_month": "2026-08-01",
+            "presence": "not_in_captured_report",
+            "row": null
+          }
+        ],
+        "served_at": "2026-10-06T15:57:48.088271Z"
+      }
+    },
+    {
+      "label": "active TPEX ETF",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/instruments/TPEX:006201",
+      "http_status": 200,
+      "latency_ms": 10.069,
+      "response_bytes": 222,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TPEX:006201",
+        "symbol": "006201",
+        "name": "元大富櫃50",
+        "venue": "TPEX",
+        "security_type": "ETF",
+        "isin": "TW0000062017",
+        "listing_date": "2011-01-27",
+        "industry_category": null,
+        "cfi_code": "CEOGEU",
+        "is_active": true
+      }
+    },
+    {
+      "label": "TWSE:2330 institutional flow 2026-10-02 available",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/institutional-flows?instrument_id=TWSE%3A2330&start_date=2026-10-02&end_date=2026-10-02",
+      "http_status": 200,
+      "latency_ms": 81.901,
+      "response_bytes": 1083,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TWSE:2330",
+        "source_contract": "twse_t86_v1",
+        "native_unit": "shares",
+        "schema_ready": true,
+        "coverage": [
+          {
+            "trade_date": "2026-10-02",
+            "status": "AVAILABLE",
+            "record_count": 18610,
+            "acquired_at": "2026-10-04T13:09:26.439985Z",
+            "sha256": "92073057250b7329f67246b108f831e74185b288a3406725564daaa2fd022bd9"
+          }
+        ],
+        "data": [
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "name": "台積電",
+            "trade_date": "2026-10-02",
+            "foreign_non_dealer_buy_shares": 7044515,
+            "foreign_non_dealer_sell_shares": 12958489,
+            "foreign_non_dealer_net_shares": -5913974,
+            "foreign_dealer_buy_shares": 0,
+            "foreign_dealer_sell_shares": 0,
+            "foreign_dealer_net_shares": 0,
+            "investment_trust_buy_shares": 539805,
+            "investment_trust_sell_shares": 286127,
+            "investment_trust_net_shares": 253678,
+            "dealer_reported_net_shares": 316882,
+            "dealer_proprietary_buy_shares": 193100,
+            "dealer_proprietary_sell_shares": 47000,
+            "dealer_proprietary_net_shares": 146100,
+            "dealer_hedging_buy_shares": 197203,
+            "dealer_hedging_sell_shares": 26421,
+            "dealer_hedging_net_shares": 170782,
+            "total_institutional_net_shares": -5343414,
+            "first_observed_at": "2026-10-04T13:09:26.439985Z"
+          }
+        ]
+      }
+    },
+    {
+      "label": "TWSE:2330 institutional flow 2026-10-05 missing",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/institutional-flows?instrument_id=TWSE%3A2330&start_date=2026-10-05&end_date=2026-10-05",
+      "http_status": 200,
+      "latency_ms": 48.962,
+      "response_bytes": 224,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TWSE:2330",
+        "source_contract": "twse_t86_v1",
+        "native_unit": "shares",
+        "schema_ready": true,
+        "coverage": [
+          {
+            "trade_date": "2026-10-05",
+            "status": "MISSING",
+            "record_count": 0,
+            "acquired_at": null,
+            "sha256": null
+          }
+        ],
+        "data": []
+      }
+    },
+    {
+      "label": "TPEX:5347 institutional flow 2026-10-02 available",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/institutional-flows?instrument_id=TPEX%3A5347&start_date=2026-10-02&end_date=2026-10-02",
+      "http_status": 200,
+      "latency_ms": 150.597,
+      "response_bytes": 2029,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TPEX:5347",
+        "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+        "request_scope": "type=Daily;sect=EW",
+        "native_unit": "shares",
+        "schema_ready": true,
+        "coverage": [
+          {
+            "trade_date": "2026-10-02",
+            "status": "AVAILABLE",
+            "record_count": 910,
+            "selected_instrument_presence": "present",
+            "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+            "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+            "source_url": "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&sect=EW&date=115%2F10%2F02&response=json",
+            "request_scope": "type=Daily;sect=EW",
+            "received_at_utc": "2026-10-04T13:09:28.555661Z",
+            "payload_sha256": "dd5ec8507a75208bd64576f850462c21d4f6d33a909997cc5d0b4c0fcc50cafa"
+          }
+        ],
+        "data": [
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "company_name": "世界",
+            "trade_date": "2026-10-02",
+            "foreign_ex_dealer_buy_shares": 5922066,
+            "foreign_ex_dealer_sell_shares": 4930108,
+            "foreign_ex_dealer_net_shares": 991958,
+            "foreign_dealer_buy_shares": 0,
+            "foreign_dealer_sell_shares": 0,
+            "foreign_dealer_net_shares": 0,
+            "combined_foreign_buy_shares": 5922066,
+            "combined_foreign_sell_shares": 4930108,
+            "combined_foreign_net_shares": 991958,
+            "investment_trust_buy_shares": 321548,
+            "investment_trust_sell_shares": 11000,
+            "investment_trust_net_shares": 310548,
+            "dealer_own_buy_shares": 77000,
+            "dealer_own_sell_shares": 20060,
+            "dealer_own_net_shares": 56940,
+            "dealer_hedging_buy_shares": 124403,
+            "dealer_hedging_sell_shares": 251437,
+            "dealer_hedging_net_shares": -127034,
+            "combined_dealer_buy_shares": 201403,
+            "combined_dealer_sell_shares": 271497,
+            "combined_dealer_net_shares": -70094,
+            "total_institutional_net_shares": 1232412,
+            "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+            "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+            "source_url": "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&sect=EW&date=115%2F10%2F02&response=json",
+            "request_scope": "type=Daily;sect=EW",
+            "received_at_utc": "2026-10-04T13:09:28.555661Z",
+            "payload_sha256": "dd5ec8507a75208bd64576f850462c21d4f6d33a909997cc5d0b4c0fcc50cafa",
+            "revision": 1
+          }
+        ]
+      }
+    },
+    {
+      "label": "TPEX:5347 institutional flow 2026-10-05 missing",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/institutional-flows?instrument_id=TPEX%3A5347&start_date=2026-10-05&end_date=2026-10-05",
+      "http_status": 200,
+      "latency_ms": 59.757,
+      "response_bytes": 417,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TPEX:5347",
+        "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+        "request_scope": "type=Daily;sect=EW",
+        "native_unit": "shares",
+        "schema_ready": true,
+        "coverage": [
+          {
+            "trade_date": "2026-10-05",
+            "status": "MISSING",
+            "record_count": 0,
+            "selected_instrument_presence": "missing",
+            "capture_id": null,
+            "source_contract": null,
+            "source_url": null,
+            "request_scope": null,
+            "received_at_utc": null,
+            "payload_sha256": null
+          }
+        ],
+        "data": []
+      }
+    },
+    {
+      "label": "TWSE:2330 valuation 2026-10-02",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/valuations?instrument_id=TWSE%3A2330&start=2026-10-02&end=2026-10-02",
+      "http_status": 200,
+      "latency_ms": 53.697,
+      "response_bytes": 284,
+      "response_headers": {},
+      "response": [
+        {
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-02",
+          "company_name": "台積電",
+          "close_price": "2500.00",
+          "dividend_yield_pct": "0.88",
+          "dividend_reference_year": 114,
+          "pe_ratio": "28.98",
+          "pb_ratio": "10.08",
+          "financial_reference_year": 2026,
+          "financial_reference_quarter": 2
+        }
+      ]
+    },
+    {
+      "label": "TWSE:2330 valuation 2026-10-05 is present in this observation",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/valuations?instrument_id=TWSE%3A2330&start=2026-10-05&end=2026-10-05",
+      "http_status": 200,
+      "latency_ms": 17.279,
+      "response_bytes": 284,
+      "response_headers": {},
+      "response": [
+        {
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-05",
+          "company_name": "台積電",
+          "close_price": "2575.00",
+          "dividend_yield_pct": "0.85",
+          "dividend_reference_year": 114,
+          "pe_ratio": "29.85",
+          "pb_ratio": "10.38",
+          "financial_reference_year": 2026,
+          "financial_reference_quarter": 2
+        }
+      ]
+    },
+    {
+      "label": "TPEX:5347 valuation 2026-10-02 available",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/valuations?instrument_id=TPEX%3A5347&start=2026-10-02&end=2026-10-02",
+      "http_status": 200,
+      "latency_ms": 133.659,
+      "response_bytes": 775,
+      "response_headers": {
+        "x-twmd-schema-ready": "true",
+        "x-twmd-coverage": "available=1;missing=0;selected=present"
+      },
+      "response": [
+        {
+          "instrument_id": "TPEX:5347",
+          "symbol": "5347",
+          "trade_date": "2026-10-02",
+          "company_name": "世界",
+          "close_price": null,
+          "pe_ratio": "40.48",
+          "dividend_per_share": "4.47377334",
+          "dividend_per_share_currency": "unspecified",
+          "dividend_reference_year": 114,
+          "dividend_yield_pct": "2.39",
+          "pb_ratio": "5.58",
+          "financial_reference_year": 2026,
+          "financial_reference_quarter": 2,
+          "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+          "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+          "source_url": "https://www.tpex.org.tw/www/zh-tw/afterTrading/peQryDate?date=115%2F10%2F02&response=json",
+          "request_scope": "category=all",
+          "received_at_utc": "2026-10-04T13:09:33.499001Z",
+          "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+          "revision": 1
+        }
+      ]
+    },
+    {
+      "label": "TPEX:5347 valuation 2026-10-05 missing",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/valuations?instrument_id=TPEX%3A5347&start=2026-10-05&end=2026-10-05",
+      "http_status": 200,
+      "latency_ms": 12.474,
+      "response_bytes": 2,
+      "response_headers": {
+        "x-twmd-schema-ready": "true",
+        "x-twmd-coverage": "available=0;missing=1;selected=missing"
+      },
+      "response": []
+    },
+    {
+      "label": "TWSE:2330 monthly revenue 2026-07..08 partial coverage",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/monthly-revenues?instrument_id=TWSE%3A2330&start_month=2026-07&end_month=2026-08",
+      "http_status": 200,
+      "latency_ms": 23.508,
+      "response_bytes": 2906,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TWSE:2330",
+        "dataset": "monthly_revenue",
+        "start_month": "2026-07-01",
+        "end_month": "2026-08-01",
+        "schema_ready": true,
+        "coverage_status": "AVAILABLE",
+        "qualification": "qualified_historical_filing",
+        "qualification_reason": "retained_publisher_row_proves_historical_filing",
+        "current_catalog_evidence": {
+          "status": "available",
+          "name": "台積電",
+          "security_type": "EQUITY",
+          "is_active": true,
+          "listing_date": "1994-09-05",
+          "industry_category": "半導體業"
+        },
+        "units": {
+          "revenue": "TWD thousands (inferred from official issuer disclosure and report note)",
+          "publisher_growth_fields": "publisher-reported percent; source lexical values",
+          "publisher_report_time": "not provided; report date is source metadata"
+        },
+        "coverage": [
+          {
+            "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+            "source": "mops",
+            "data_month": "2026-08-01",
+            "row_count": 1087,
+            "source_contract": "mops_t21_sii_monthly_revenue/v1",
+            "request_scope": "2026-08",
+            "source_url": "https://mopsov.twse.com.tw/nas/t21/sii/t21sc03_115_8.csv",
+            "acquisition_date": "2026-10-04",
+            "received_at_utc": "2026-10-04T13:09:22.189587Z",
+            "report_date": "2026-10-04",
+            "payload_sha256": "779e4edca1dbbc3cf256b8ada92f39fa600625509e9bf2da067b86a4c21c3357",
+            "selected_issuer_present": true
+          },
+          {
+            "capture_id": "14013051676483a1334817837984e41031d83e6e63c309de8bae871d78fd80f0",
+            "source": "twse",
+            "data_month": "2026-08-01",
+            "row_count": 1086,
+            "source_contract": "twse_openapi_t187ap05_L/v1",
+            "request_scope": "latest-listed-company-revenue",
+            "source_url": "https://openapi.twse.com.tw/v1/opendata/t187ap05_L",
+            "acquisition_date": "2026-10-04",
+            "received_at_utc": "2026-10-04T13:09:16.019874Z",
+            "report_date": "2026-09-17",
+            "payload_sha256": "83480ff80b337e936821b45e2cef1c2a48ba92f112fb3e31027501810e8bccf5",
+            "selected_issuer_present": true
+          }
+        ],
+        "months": [
+          {
+            "data_month": "2026-07-01",
+            "presence": "missing",
+            "row": null
+          },
+          {
+            "data_month": "2026-08-01",
+            "presence": "present",
+            "row": {
+              "symbol": "2330",
+              "data_month": "2026-08-01",
+              "company_name": "台積電",
+              "industry": "半導體業",
+              "monthly_revenue": "514805337",
+              "previous_month_revenue": "467580548",
+              "year_ago_monthly_revenue": "335771691",
+              "month_over_month_pct": "10.099818994181083",
+              "year_over_year_pct": "53.320053714712955",
+              "cumulative_revenue": "3386869575",
+              "year_ago_cumulative_revenue": "2431982931",
+              "cumulative_yoy_pct": "39.26370665798065",
+              "notes": "因先進製程產品需求增加所致。",
+              "content_hash": "584e6c8b01bf69035d0807eea6dce36ebc04c4e09a7e2ff7b95c74bdad1f8dda",
+              "revision": 1,
+              "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+              "source": "mops",
+              "source_contract": "mops_t21_sii_monthly_revenue/v1",
+              "request_scope": "2026-08",
+              "source_url": "https://mopsov.twse.com.tw/nas/t21/sii/t21sc03_115_8.csv",
+              "acquisition_date": "2026-10-04",
+              "received_at_utc": "2026-10-04T13:09:22.189587Z",
+              "report_date": "2026-10-04",
+              "payload_sha256": "779e4edca1dbbc3cf256b8ada92f39fa600625509e9bf2da067b86a4c21c3357"
+            }
+          }
+        ],
+        "served_at": "2026-10-06T15:53:57.964571Z"
+      }
+    },
+    {
+      "label": "TPEX:5347 monthly revenue 2026-07..08 partial coverage",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/monthly-revenues?instrument_id=TPEX%3A5347&start_month=2026-07&end_month=2026-08",
+      "http_status": 200,
+      "latency_ms": 10.875,
+      "response_bytes": 2310,
+      "response_headers": {},
+      "response": {
+        "instrument_id": "TPEX:5347",
+        "dataset": "tpex_monthly_revenue_latest",
+        "start_month": "2026-07-01",
+        "end_month": "2026-08-01",
+        "schema_ready": true,
+        "coverage_status": "AVAILABLE",
+        "qualification": "qualified_issuer",
+        "qualification_reason": "local_tpex_catalog_equity",
+        "current_catalog_evidence": {
+          "status": "available",
+          "name": "世界",
+          "security_type": "EQUITY",
+          "is_active": true,
+          "listing_date": "1998-03-25",
+          "industry_category": "半導體業"
+        },
+        "units": {
+          "revenue": "TWD thousands (inferred from TPEx issuer notes; publisher strings retained)",
+          "publisher_growth_fields": "publisher-reported percent; source lexical values",
+          "publisher_report_time": "not provided; report date is source metadata"
+        },
+        "coverage": [
+          {
+            "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+            "source": "tpex",
+            "data_month": "2026-08-01",
+            "row_count": 892,
+            "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+            "request_scope": "latest",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap05_O",
+            "acquisition_date": "2026-10-04",
+            "received_at_utc": "2026-10-04T13:09:19.479749Z",
+            "report_date": "2026-09-17",
+            "payload_sha256": "f00e3fdd7060db0db943b79dc53d732df940d038ef208a1b075363e06660bd92",
+            "selected_issuer_present": true
+          }
+        ],
+        "months": [
+          {
+            "data_month": "2026-07-01",
+            "presence": "missing",
+            "row": null
+          },
+          {
+            "data_month": "2026-08-01",
+            "presence": "present",
+            "row": {
+              "symbol": "5347",
+              "data_month": "2026-08-01",
+              "company_name": "世界",
+              "industry": "半導體業",
+              "monthly_revenue": "5092599",
+              "previous_month_revenue": "4705722",
+              "year_ago_monthly_revenue": "3625233",
+              "month_over_month_pct": "8.22141639476365",
+              "year_over_year_pct": "40.47646040957919",
+              "cumulative_revenue": "36574795",
+              "year_ago_cumulative_revenue": "30886681",
+              "cumulative_yoy_pct": "18.416073905771878",
+              "notes": "-",
+              "content_hash": "97c9e2e67ed8e62eea6bfc9cfbc1744c04f899488e2019fd26aa681101b37e54",
+              "revision": 1,
+              "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+              "source": "tpex",
+              "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+              "request_scope": "latest",
+              "source_url": "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap05_O",
+              "acquisition_date": "2026-10-04",
+              "received_at_utc": "2026-10-04T13:09:19.479749Z",
+              "report_date": "2026-09-17",
+              "payload_sha256": "f00e3fdd7060db0db943b79dc53d732df940d038ef208a1b075363e06660bd92"
+            }
+          }
+        ],
+        "served_at": "2026-10-06T15:53:57.975812Z"
+      }
+    },
+    {
+      "label": "TWSE flow end_date equals Taipei today: HTTP 400",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/institutional-flows?instrument_id=TWSE%3A2330&start_date=2026-10-05&end_date=2026-10-06",
+      "http_status": 400,
+      "latency_ms": 1.736,
+      "response_bytes": 65,
+      "response_headers": {},
+      "response": {
+        "detail": "end date must be before the current Asia/Taipei date"
+      }
+    },
+    {
+      "label": "TPEX flow end_date equals Taipei today: HTTP 400",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/institutional-flows?instrument_id=TPEX%3A5347&start_date=2026-10-05&end_date=2026-10-06",
+      "http_status": 400,
+      "latency_ms": 1.233,
+      "response_bytes": 65,
+      "response_headers": {},
+      "response": {
+        "detail": "end date must be before the current Asia/Taipei date"
+      }
+    },
+    {
+      "label": "TPEX valuation end equals Taipei today: HTTP 400",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/valuations?instrument_id=TPEX%3A5347&start=2026-10-05&end=2026-10-06",
+      "http_status": 400,
+      "latency_ms": 1.317,
+      "response_bytes": 65,
+      "response_headers": {},
+      "response": {
+        "detail": "end date must be before the current Asia/Taipei date"
+      }
+    },
+    {
+      "label": "future revenue month: HTTP 400",
+      "method": "GET",
+      "url": "http://127.0.0.1:8000/api/v1/monthly-revenues?instrument_id=TWSE%3A2330&start_month=2026-11&end_month=2026-11",
+      "http_status": 400,
+      "latency_ms": 1.143,
+      "response_bytes": 64,
+      "response_headers": {},
+      "response": {
+        "detail": "monthly-revenue reads cannot include a future month"
+      }
+    }
+  ],
+  "company_profile_attempts": {
+    "fast_bounded_attempts": {
+      "captured_at_taipei": "2026-10-06T23:52:17+08:00",
+      "timeout_per_attempt_sec": 10,
+      "retry_policy": "one explicit retry after the initial timeout",
+      "results": [
+        {
+          "instrument_id": "TWSE:2330",
+          "method": "GET",
+          "url": "http://127.0.0.1:8000/api/v1/company-profiles?instrument_id=TWSE%3A2330",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": null,
+              "latency_ms": 10000.963,
+              "error_type": "TimeoutError",
+              "error": "timed out"
+            },
+            {
+              "attempt": 2,
+              "status": null,
+              "latency_ms": 10001.358,
+              "error_type": "TimeoutError",
+              "error": "timed out"
+            }
+          ]
+        },
+        {
+          "instrument_id": "TPEX:5347",
+          "method": "GET",
+          "url": "http://127.0.0.1:8000/api/v1/company-profiles?instrument_id=TPEX%3A5347",
+          "attempts": [
+            {
+              "attempt": 1,
+              "status": null,
+              "latency_ms": 10001.331,
+              "error_type": "TimeoutError",
+              "error": "timed out"
+            },
+            {
+              "attempt": 2,
+              "status": null,
+              "latency_ms": 10001.428,
+              "error_type": "TimeoutError",
+              "error": "timed out"
+            }
+          ]
+        }
+      ]
+    },
+    "successful_extended_reads": {
+      "captured_at_taipei": "2026-10-06T23:53:49.957720+08:00",
+      "timeout_per_request_sec": 60,
+      "results": [
+        {
+          "instrument_id": "TWSE:2330",
+          "label": "TWSE:2330 complete latest company profile",
+          "method": "GET",
+          "url": "http://127.0.0.1:8000/api/v1/company-profiles?instrument_id=TWSE:2330",
+          "http_status": 200,
+          "latency_ms": 15518.64,
+          "response_bytes": 1823,
+          "response_headers": {},
+          "response": {
+            "instrument_id": "TWSE:2330",
+            "source_contract": "twse_openapi_t187ap03_L/v1",
+            "schema_ready": true,
+            "coverage_status": "AVAILABLE",
+            "latest_snapshot_presence": "present",
+            "qualification": "qualified_issuer",
+            "qualification_reason": "local_twse_catalog_equity",
+            "units": {
+              "paid_in_capital": "TWD",
+              "issued_share_count": "shares",
+              "par_value_amount": "publisher-stated currency; null when unspecified"
+            },
+            "latest_snapshot": {
+              "capture_id": "862dded4514be003e28d472200cc8ef89966144b796961c3309ee346f16a6078",
+              "report_date": "2026-10-03",
+              "received_at_utc": "2026-10-04T13:07:03.960501Z",
+              "source_contract": "twse_openapi_t187ap03_L/v1",
+              "payload_sha256": "c9028b40687aca3e9c0b733f75c67ff19baa2785d6341977c9936a9daa20b63c",
+              "row_count": 1095,
+              "coverage_status": "AVAILABLE"
+            },
+            "profile": {
+              "instrument_id": "TWSE:2330",
+              "company_name": "台灣積體電路製造股份有限公司",
+              "industry_code": "24",
+              "established_on": "1987-02-21",
+              "listed_on": "1994-09-05",
+              "par_value_raw": "新台幣                 10.0000元",
+              "par_value_amount": "10.0000",
+              "par_value_currency": "TWD",
+              "par_value_meaning": "amount",
+              "paid_in_capital": "259323700670",
+              "issued_share_count": 25932370067,
+              "financial_report_type_code": "1",
+              "source_content_hash": "16c1abb119a6b5984fe2bd430bbb469fa5a62d2658f41a921f1497c081fe0f76",
+              "report_date": "2026-10-03",
+              "original_received_at_utc": "2026-10-04T13:07:03.960501Z",
+              "source_contract": "twse_openapi_t187ap03_L/v1",
+              "payload_sha256": "c9028b40687aca3e9c0b733f75c67ff19baa2785d6341977c9936a9daa20b63c",
+              "revision": 1,
+              "share_semantics": "ordinary_shares",
+              "qualification": "qualified_issuer",
+              "qualification_reason": "local_twse_catalog_equity",
+              "latest_snapshot_report_date": "2026-10-03",
+              "latest_snapshot_received_at_utc": "2026-10-04T13:07:03.960501Z",
+              "latest_snapshot_presence": "present",
+              "snapshot_capture_id": "862dded4514be003e28d472200cc8ef89966144b796961c3309ee346f16a6078"
+            }
+          }
+        },
+        {
+          "instrument_id": "TPEX:5347",
+          "label": "TPEX:5347 complete latest company profile",
+          "method": "GET",
+          "url": "http://127.0.0.1:8000/api/v1/company-profiles?instrument_id=TPEX:5347",
+          "http_status": 200,
+          "latency_ms": 15595.329,
+          "response_bytes": 2008,
+          "response_headers": {},
+          "response": {
+            "instrument_id": "TPEX:5347",
+            "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+            "schema_ready": true,
+            "coverage_status": "AVAILABLE",
+            "latest_snapshot_presence": "present",
+            "qualification": "qualified_issuer",
+            "qualification_reason": "local_tpex_catalog_equity",
+            "units": {
+              "paid_in_capital": "TWD",
+              "issued_share_count": "shares",
+              "par_value_amount": "publisher-stated currency; null when unspecified",
+              "private_share_count": "publisher-reported shares",
+              "preferred_share_count": "publisher-reported shares"
+            },
+            "latest_snapshot": {
+              "capture_id": "3057d4f21e79db87403faf14bc59e075f87b6704eb813648c09944afa9b5d90c",
+              "report_date": "2026-10-04",
+              "received_at_utc": "2026-10-04T13:07:07.049244Z",
+              "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+              "payload_sha256": "6e17362745ff5ee3c5f16992fa69d9495527d2c0a985b1427cd2255b4a4c8ebc",
+              "row_count": 892,
+              "coverage_status": "AVAILABLE"
+            },
+            "profile": {
+              "instrument_id": "TPEX:5347",
+              "company_name": "世界先進積體電路股份有限公司",
+              "industry_code": "24",
+              "established_on": "1994-12-05",
+              "listed_on": "1998-03-25",
+              "par_value_raw": "新台幣                 10.0000元",
+              "par_value_amount": "10.0000",
+              "par_value_currency": "TWD",
+              "par_value_meaning": "amount",
+              "paid_in_capital": "18785021920",
+              "issued_share_count": 1878502192,
+              "private_share_count": 0,
+              "preferred_share_count": 0,
+              "financial_report_type_code": "1",
+              "source_content_hash": "57cd015e13a2a6a484cdfbe68923cc1d989d9b71dafa3c22280022038e1a2c63",
+              "report_date": "2026-10-04",
+              "original_received_at_utc": "2026-10-04T13:07:07.049244Z",
+              "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+              "payload_sha256": "6e17362745ff5ee3c5f16992fa69d9495527d2c0a985b1427cd2255b4a4c8ebc",
+              "revision": 1,
+              "share_semantics": "ordinary_shares",
+              "qualification": "qualified_issuer",
+              "qualification_reason": "local_tpex_catalog_equity",
+              "latest_snapshot_report_date": "2026-10-04",
+              "latest_snapshot_received_at_utc": "2026-10-04T13:07:07.049244Z",
+              "latest_snapshot_presence": "present",
+              "snapshot_capture_id": "3057d4f21e79db87403faf14bc59e075f87b6704eb813648c09944afa9b5d90c"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "sanitization": "Responses are the selected public query API fields. No token, account, private settings, or raw upstream publisher payloads are included.",
+  "additional_capture_at_taipei": "2026-10-06T23:57:48+08:00"
+}

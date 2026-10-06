@@ -6,9 +6,9 @@
 
 ## 下一項
 
-**PW-01 執行中。** Owner：pw01_contracts_worker（gpt-6-luna／xhigh）；建立資料契約、缺值規則與可重現的唯讀樣本，完成後才開始 provider 實作。
+**PW-01 已完成，下一項為 PW-02。** PW-02 與 PW-03 的 PW-01 依賴已滿足，均為 ready；預設先執行 PW-02，本次不開始下一卡。
 
-本次僅建立計劃文件。下表沒有已交付的功能，也沒有安排採集、排程、部署或實作代理。執行範例：
+PW-01 已交付契約、離線 fixtures 與驗證，尚未接入新的 research provider；其餘卡依下表等待執行。本計劃不授權採集、排程或部署。執行範例：
 
 > 執行 docs/plans/twmd-integration 的 PW-01；完成該卡的驗收與相關檢查，更新計劃狀態，然後停下。
 
@@ -16,9 +16,9 @@
 
 | ID | 任務 | 狀態 | 依賴 | 交付價值 |
 | --- | --- | --- | --- | --- |
-| PW-01 | [契約、能力與樣本](cards/PW-01-contracts.md) | in_progress | — | 確認欄位、日期、來源、單位與資料可用性 |
-| PW-02 | [官方估值與法人](cards/PW-02-valuation-flows.md) | waiting | PW-01 | 現有基本面與法人介面改用明確的官方資料 |
-| PW-03 | [公司資料與月營收](cards/PW-03-profile-revenue.md) | waiting | PW-01 | 結構化公司資料及有缺口的營收時間序列 |
+| PW-01 | [契約、能力與樣本](cards/PW-01-contracts.md) | completed | — | 確認欄位、日期、來源、單位與資料可用性 |
+| PW-02 | [官方估值與法人](cards/PW-02-valuation-flows.md) | ready | PW-01 | 現有基本面與法人介面改用明確的官方資料 |
+| PW-03 | [公司資料與月營收](cards/PW-03-profile-revenue.md) | ready | PW-01 | 結構化公司資料及有缺口的營收時間序列 |
 | PW-04 | [個股研究與 AI](cards/PW-04-research-ai.md) | waiting | PW-02、PW-03 | 使用者能看到、詢問並追溯第一批資料 |
 | PW-05 | [更新流程與第一批驗收](cards/PW-05-freshness-acceptance.md) | waiting | PW-04 | 確認第一批功能的可用範圍與更新責任 |
 | PW-06 | [官方資料選股](cards/PW-06-discovery.md) | waiting | PW-05 | 可選擇估值、營收與法人條件並理解結果 |
