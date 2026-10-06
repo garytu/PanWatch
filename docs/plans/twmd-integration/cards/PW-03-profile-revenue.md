@@ -1,6 +1,6 @@
 # PW-03：公司資料與月營收接入
 
-狀態：ready。依賴：PW-01。Owner：unassigned。
+狀態：in_progress。依賴：PW-01。Owner：pw03_profile_revenue_worker（gpt-6-luna／xhigh）。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
