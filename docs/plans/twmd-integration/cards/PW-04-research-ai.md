@@ -1,6 +1,6 @@
 # PW-04：第一批個股研究頁與 AI
 
-狀態：ready。依賴：PW-02、PW-03。Owner：unassigned。
+狀態：in_progress。依賴：PW-02、PW-03。Owner：pw04_research_ai_worker（gpt-6-luna／xhigh）。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -44,4 +44,4 @@ src/modules/research/、src/modules/assistant/tools.py、src/modules/automation/
 
 ## 進度與交接
 
-尚未開始。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。
+Coordination checkpoint：in_progress。依賴與 ready 狀態已確認；目前 checkout 為 codex/taiwan-market-support。既有 automation 修改與未追蹤工具檔保留，worker 僅擁有 PW-04 實作範圍。主代理待交接後獨立審查、驗證及提交。

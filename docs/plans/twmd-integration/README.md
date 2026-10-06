@@ -6,7 +6,7 @@
 
 ## 下一項
 
-**PW-01、PW-02、PW-03 已完成，唯一下一項為 PW-04。** PW-04 的 PW-02／PW-03 依賴均已滿足，更新為 ready。本次只完成 PW-03，未開始下一卡。
+**PW-01、PW-02、PW-03 已完成，PW-04 執行中。** PW-04 的依賴均已滿足，已指派 pw04_research_ai_worker（gpt-6-luna／xhigh）；本次只執行 PW-04。
 
 PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值／法人 typed reads、相容介面與來源證據；PW-03 已接入公司資料／月營收 typed reads 與獨立 research blocks。完整 research 聚合、畫面與 AI 接線由 PW-04 處理，其餘卡依下表等待執行。本計劃不授權採集、排程或部署。執行範例：
 
@@ -19,7 +19,7 @@ PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值�
 | PW-01 | [契約、能力與樣本](cards/PW-01-contracts.md) | completed | — | 確認欄位、日期、來源、單位與資料可用性 |
 | PW-02 | [官方估值與法人](cards/PW-02-valuation-flows.md) | completed | PW-01 | 現有基本面與法人介面改用明確的官方資料 |
 | PW-03 | [公司資料與月營收](cards/PW-03-profile-revenue.md) | completed | PW-01 | 結構化公司資料及有缺口的營收時間序列 |
-| PW-04 | [個股研究與 AI](cards/PW-04-research-ai.md) | ready | PW-02、PW-03 | 使用者能看到、詢問並追溯第一批資料 |
+| PW-04 | [個股研究與 AI](cards/PW-04-research-ai.md) | in_progress | PW-02、PW-03 | 使用者能看到、詢問並追溯第一批資料 |
 | PW-05 | [更新流程與第一批驗收](cards/PW-05-freshness-acceptance.md) | waiting | PW-04 | 確認第一批功能的可用範圍與更新責任 |
 | PW-06 | [官方資料選股](cards/PW-06-discovery.md) | waiting | PW-05 | 可選擇估值、營收與法人條件並理解結果 |
 | PW-07 | [融資融券與集保](cards/PW-07-margin-shareholders.md) | waiting | PW-01、PW-04 | 個股籌碼變化及可解釋的持股分布 |
