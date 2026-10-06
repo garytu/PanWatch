@@ -1,6 +1,6 @@
 # PW-05：更新流程與第一批運行驗收
 
-狀態：ready。依賴：PW-04。Owner：unassigned。
+狀態：in_progress。依賴：PW-04。Owner：pw05_freshness_worker（gpt-6-luna／xhigh）。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -44,4 +44,4 @@ research service／frontend research 狀態、quotes taiwan status 既有證據�
 
 ## 進度與交接
 
-2026-10-07 協調查核：所列任務依賴已 completed；ready 僅表示可開始，尚未指派或實作。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。
+2026-10-07 Coordination checkpoint：in_progress。目前 checkout：`codex/taiwan-market-support`；依賴 PW-04 在總計劃與卡片皆 completed。Worker：pw05_freshness_worker（gpt-6-luna／xhigh）。既有 `src/modules/automation/agent_catalog.py` 修改及未追蹤檔案排除於本任務。僅授權實作與唯讀 query/control 驗證；不執行採集、排程變更、訂閱變更或部署。上游持續更新前提須明列於 runbook 與 handoff。
