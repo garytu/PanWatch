@@ -224,6 +224,150 @@ class TwmdValuationRead:
 
 
 @dataclass(frozen=True)
+class TwmdCompanyProfileSnapshot:
+    """Latest whole-market profile snapshot evidence from twmd."""
+
+    capture_id: str
+    report_date: str
+    received_at_utc: str
+    source_contract: str
+    payload_sha256: str
+    row_count: int
+    coverage_status: str
+
+
+@dataclass(frozen=True)
+class TwmdCompanyProfile:
+    """One retained latest issuer profile with publisher and catalog evidence."""
+
+    instrument_id: str
+    company_name: str
+    industry_code: str
+    established_on: str
+    listed_on: str
+    par_value_raw: str
+    par_value_amount: str | None
+    par_value_currency: str | None
+    par_value_meaning: str
+    paid_in_capital: str
+    issued_share_count: int
+    private_share_count: int | None
+    preferred_share_count: int | None
+    financial_report_type_code: str
+    source_content_hash: str
+    report_date: str
+    original_received_at_utc: str
+    source_contract: str
+    payload_sha256: str
+    revision: int
+    share_semantics: str
+    qualification: str
+    qualification_reason: str
+    latest_snapshot_report_date: str | None
+    latest_snapshot_received_at_utc: str | None
+    latest_snapshot_presence: str
+    snapshot_capture_id: str | None
+
+
+@dataclass(frozen=True)
+class TwmdCompanyProfileRead:
+    """Latest-only issuer profile result and independent snapshot coverage."""
+
+    instrument_id: str
+    endpoint: str
+    source_contract: str
+    schema_ready: bool
+    coverage_status: str
+    latest_snapshot_presence: str
+    qualification: str
+    qualification_reason: str
+    units: dict[str, str]
+    latest_snapshot: TwmdCompanyProfileSnapshot | None
+    profile: TwmdCompanyProfile | None
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class TwmdMonthlyRevenueRow:
+    """One exact publisher monthly-revenue observation and its provenance."""
+
+    symbol: str
+    data_month: str
+    company_name: str
+    industry: str
+    monthly_revenue: str | None
+    previous_month_revenue: str | None
+    year_ago_monthly_revenue: str | None
+    month_over_month_pct: str | None
+    year_over_year_pct: str | None
+    cumulative_revenue: str | None
+    year_ago_cumulative_revenue: str | None
+    cumulative_yoy_pct: str | None
+    notes: str
+    content_hash: str
+    revision: int
+    capture_id: str
+    source: str
+    source_contract: str
+    request_scope: str
+    source_url: str
+    acquisition_date: str
+    received_at_utc: str
+    report_date: str
+    payload_sha256: str
+
+
+@dataclass(frozen=True)
+class TwmdMonthlyRevenueMonth:
+    """Per-month selected-issuer presence plus any retained issuer row."""
+
+    data_month: str
+    presence: str
+    row: TwmdMonthlyRevenueRow | None
+
+
+@dataclass(frozen=True)
+class TwmdMonthlyRevenueCoverage:
+    """One source-native report entry for one actual data month."""
+
+    capture_id: str
+    source: str
+    data_month: str
+    row_count: int
+    source_contract: str
+    request_scope: str
+    source_url: str
+    acquisition_date: str
+    received_at_utc: str
+    report_date: str
+    payload_sha256: str
+    selected_issuer_present: bool
+
+
+@dataclass(frozen=True)
+class TwmdMonthlyRevenueRead:
+    """Bounded monthly-revenue series, including month-by-month evidence."""
+
+    instrument_id: str
+    endpoint: str
+    dataset: str
+    start_month: str
+    end_month: str
+    schema_ready: bool
+    coverage_status: str
+    qualification: str
+    qualification_reason: str
+    current_catalog_evidence: dict[str, object]
+    units: dict[str, str]
+    coverage: list[TwmdMonthlyRevenueCoverage]
+    months: list[TwmdMonthlyRevenueMonth]
+    served_at: str
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class InstitutionalFlowCoverage:
     """One source-native flow coverage entry for a requested calendar date."""
 

@@ -28,6 +28,8 @@ from marketdata.types import (
     Quote,
     Request,
     ShareholderItem,
+    TwmdCompanyProfileRead,
+    TwmdMonthlyRevenueRead,
 )
 from marketdata.vendors.discovery import DiscoveryVendor
 from marketdata.vendors.news import EastmoneyStockNewsVendor
@@ -276,6 +278,46 @@ class MarketData:
     def _uses_twmd(self, datatype: str, market: str) -> bool:
         sources = sorted(self.config.sources_for(datatype, market), key=lambda source: source.priority)
         return any(source.enabled and source.vendor == "twmd" for source in sources)
+
+    def _twmd_research_client(self, datatype: str):
+        """Return the explicit TWMD source configured for issuer research reads."""
+        sources = [
+            source for source in self.config.sources_for(datatype, "TW")
+            if source.enabled
+        ]
+        if len(sources) != 1 or sources[0].vendor != "twmd":
+            raise ValueError(f"{datatype} requires one explicitly configured twmd source")
+        from marketdata.vendors.twmd import TwmdClient
+        return TwmdClient(sources[0].config)
+
+    def company_profile(self, symbol: str) -> TwmdCompanyProfileRead:
+        """Read the latest official Taiwan issuer profile as a separate typed block."""
+        return self._twmd_research_client("company_profile").company_profile(symbol)
+
+    def monthly_revenues(
+        self,
+        symbol: str,
+        start_month: str,
+        end_month: str,
+        *,
+        today_taipei: date | None = None,
+    ) -> TwmdMonthlyRevenueRead:
+        """Read an inclusive official Taiwan monthly-revenue range."""
+        return self._twmd_research_client("monthly_revenue").monthly_revenues(
+            symbol, start_month, end_month, today_taipei=today_taipei
+        )
+
+    def adjacent_monthly_revenues(
+        self,
+        symbol: str,
+        month: str,
+        *,
+        today_taipei: date | None = None,
+    ) -> TwmdMonthlyRevenueRead:
+        """Read a caller-named month with exactly its preceding month."""
+        return self._twmd_research_client("monthly_revenue").adjacent_monthly_revenues(
+            symbol, month, today_taipei=today_taipei
+        )
 
     def events(self, symbols: list[str], *, market: str = "CN", since_days: int = 7) -> list[EventItem]:
         """結構化事件(東財公告)。批次 symbols。不在包內快取(cache_ttl_sec=0);宿主自行快取。"""

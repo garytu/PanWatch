@@ -27,6 +27,13 @@ from marketdata.types import (
     Request,
     Response,
     ShareholderItem,
+    TwmdCompanyProfile,
+    TwmdCompanyProfileRead,
+    TwmdCompanyProfileSnapshot,
+    TwmdMonthlyRevenueCoverage,
+    TwmdMonthlyRevenueMonth,
+    TwmdMonthlyRevenueRead,
+    TwmdMonthlyRevenueRow,
     TwmdValuationObservation,
     TwmdValuationRead,
 )
@@ -36,6 +43,9 @@ __version__ = "0.1.0"
 __all__ = [
     "MarketData", "Symbol", "Market", "Bar", "CapitalFlow", "EventItem", "FlashNews", "Fundamentals",
     "InstitutionalFlowCoverage", "InstitutionalFlowObservation", "InstitutionalFlowRead",
+    "TwmdCompanyProfile", "TwmdCompanyProfileSnapshot", "TwmdCompanyProfileRead",
+    "TwmdMonthlyRevenueRow", "TwmdMonthlyRevenueMonth", "TwmdMonthlyRevenueCoverage",
+    "TwmdMonthlyRevenueRead",
     "TwmdValuationObservation", "TwmdValuationRead",
     "HotStock", "HotBoard", "NewsArticle",
     "DragonTigerItem", "MarginItem", "ShareholderItem", "DividendItem", "NorthboundItem",

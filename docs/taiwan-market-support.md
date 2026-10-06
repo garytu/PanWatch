@@ -28,6 +28,7 @@ TW_CAPITAL_FLOW_PROVIDER=twmd
 TWMD_BASE_URL=http://127.0.0.1:8000
 TWMD_API_TOKEN=
 TWMD_TIMEOUT_SEC=5
+TWMD_PROFILE_TIMEOUT_SEC=20
 TWMD_CONTROL_BASE_URL=http://127.0.0.1:9200
 TWMD_CONTROL_AGENT_TOKEN=<agent token from twmd control service>
 PANWATCH_PORT=8001
@@ -38,7 +39,14 @@ FINMIND_API_TOKEN=
 ```
 
 Environment variables override `.env`. The PanWatch port retains its existing
-default of 8000; use 8001 when twmd already occupies 8000. For local development:
+default of 8000; use 8001 when twmd already occupies 8000.
+
+`TWMD_PROFILE_TIMEOUT_SEC` sets a separate bounded timeout for the slow latest-only
+company-profile read. Its default is 20 seconds, based on the captured 15.5-second
+responses; it makes one request and reports a timeout as an error. Other twmd reads
+continue to use `TWMD_TIMEOUT_SEC`.
+
+For local development:
 
 ```sh
 PANWATCH_PORT=8001 make dev-api
@@ -228,3 +236,27 @@ At 2026-10-07 00:10:54 Taipei, a supplemental read-only
 `live_collection=false`. The sanitized capability fixture retains only these
 public flags. This updates the current service requirements while retaining
 the earlier dated observations.
+
+
+## Profile and revenue integration (2026-10-07)
+
+PW-03 adds `MarketData.company_profile`, `monthly_revenues` and
+`adjacent_monthly_revenues`. Profiles remain latest-only. Revenue ranges are
+inclusive, start at 2024-01, contain at most 120 months, and allow the current
+Taipei month when retained. The adjacent read takes an explicit month and its
+predecessor; it does not guess a latest filing month. Queries do not acquire data.
+
+The backend research adapter returns separate data/status/reason/evidence blocks.
+It preserves profile qualification and capital/share/par semantics, month presence,
+retained rows, source percentage strings, notes, receipt, revision and unit inference.
+Monthly revenue is not quarterly financial-statement revenue. A missing month,
+omitted issuer, unsupported ETF or provider error is not a zero. Publication time
+remains unknown. The five-minute cache isolates service, credentials, venue-local
+issuer, dataset and range, returns defensive copies, and excludes failed reads.
+
+A bounded typed-client smoke at 02:38 Taipei returned both company profiles within
+the separate 20-second timeout (14.02/10.40 seconds), July missing and August present
+for both venue revenue ranges, and unsupported/no rows for TPEX:006201. All five
+GETs returned 200; this is local read-only evidence, not a deployment or future
+latency guarantee. The final backend suite passed 1151 tests with 3 skipped.
+The complete research page and AI/TradingAgents wiring remain PW-04 work.

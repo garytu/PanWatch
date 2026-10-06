@@ -19,7 +19,8 @@ def twmd_config() -> dict:
     from src.platform.runtime.config import Settings
     settings = Settings()
     return {"base_url": settings.twmd_base_url, "token": settings.twmd_api_token,
-            "timeout_sec": settings.twmd_timeout_sec}
+            "timeout_sec": settings.twmd_timeout_sec,
+            "profile_timeout_sec": settings.twmd_profile_timeout_sec}
 
 
 QUOTE_METADATA = (
@@ -80,6 +81,9 @@ class DbConfigProvider:
         if market_code == "TW":
             from src.platform.runtime.config import Settings
             settings = Settings()
+            if datatype in {"company_profile", "monthly_revenue"}:
+                return [SourceConfig(vendor="twmd", priority=0, enabled=True,
+                                     config=twmd_config(), supports_batch=False)]
             if datatype in {"fundamentals", "capital_flow"}:
                 provider = (
                     settings.tw_fundamentals_provider

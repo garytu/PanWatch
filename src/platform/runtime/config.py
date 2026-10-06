@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     twmd_base_url: str = "http://127.0.0.1:8000"
     twmd_api_token: str = ""
     twmd_timeout_sec: float = Field(default=5, gt=0)
+    # The profile projection can take over 15 seconds on the local query API.
+    # Keep its bounded read timeout independent from the normal market-data SLA.
+    twmd_profile_timeout_sec: float = Field(default=20, gt=0)
     twmd_control_base_url: str = "http://127.0.0.1:9200"
     twmd_control_agent_token: str = ""
     finmind_api_token: str = ""

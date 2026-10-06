@@ -12,6 +12,13 @@ class VendorError(MarketDataError):
 class TwmdReadError(VendorError):
     """A failed twmd query read; HTTP failures remain distinct from empty data."""
 
-    def __init__(self, message: str, *, status_code: int | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        reason_code: str | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
+        self.reason_code = reason_code

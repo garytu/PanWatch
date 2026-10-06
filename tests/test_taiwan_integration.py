@@ -33,6 +33,7 @@ def test_default_taiwan_routes_all_price_types_to_twmd(monkeypatch):
         source = cp.sources_for(kind, "TW")[0]
         assert source.vendor == "twmd" and source.config["base_url"] == "http://twmd:8000"
         assert source.config["timeout_sec"] == 12.5
+        assert source.config["profile_timeout_sec"] == 20
     assert cp.sources_for("fundamentals", "TW")[0].vendor == "twmd"
     assert cp.sources_for("capital_flow", "TW")[0].vendor == "twmd"
 
@@ -52,6 +53,20 @@ def test_taiwan_research_provider_selection_is_explicit_without_fallback(monkeyp
     assert [(source.vendor, source.config.get("base_url")) for source in flows] == [
         ("twmd", "http://127.0.0.1:8000")
     ]
+
+
+def test_profile_and_revenue_reads_have_dedicated_twmd_configuration(monkeypatch):
+    monkeypatch.setenv("TWMD_TIMEOUT_SEC", "6")
+    monkeypatch.setenv("TWMD_PROFILE_TIMEOUT_SEC", "23.5")
+    cp = mc.DbConfigProvider()
+
+    profile = cp.sources_for("company_profile", "TW")
+    revenue = cp.sources_for("monthly_revenue", "TW")
+
+    assert len(profile) == len(revenue) == 1
+    assert profile[0].vendor == revenue[0].vendor == "twmd"
+    assert profile[0].config["timeout_sec"] == revenue[0].config["timeout_sec"] == 6
+    assert profile[0].config["profile_timeout_sec"] == revenue[0].config["profile_timeout_sec"] == 23.5
 
 
 def test_default_research_window_uses_one_frozen_taipei_date(monkeypatch):
@@ -96,13 +111,14 @@ def test_default_research_window_uses_one_frozen_taipei_date(monkeypatch):
 def test_taiwan_settings_use_env_file_and_explicit_environment_override(monkeypatch, tmp_path):
     from src.platform.runtime.config import Settings
     monkeypatch.chdir(tmp_path)
-    for name in ("TWMD_BASE_URL", "TWMD_TIMEOUT_SEC", "TWMD_API_TOKEN", "TW_PAPER_LOT_SIZE",
+    for name in ("TWMD_BASE_URL", "TWMD_TIMEOUT_SEC", "TWMD_PROFILE_TIMEOUT_SEC", "TWMD_API_TOKEN", "TW_PAPER_LOT_SIZE",
                  "TW_COMMISSION_RATE", "PANWATCH_PORT"):
         monkeypatch.delenv(name, raising=False)
     (tmp_path / ".env").write_text("TWMD_BASE_URL=http://twmd:8000\nTWMD_API_TOKEN=test-token\n"
-                                   "TWMD_TIMEOUT_SEC=9\nTW_PAPER_LOT_SIZE=1\n"
+                                   "TWMD_TIMEOUT_SEC=9\nTWMD_PROFILE_TIMEOUT_SEC=27\nTW_PAPER_LOT_SIZE=1\n"
                                    "TW_COMMISSION_RATE=0.001\nPANWATCH_PORT=8001\n")
-    assert mc.twmd_config() == {"base_url": "http://twmd:8000", "token": "test-token", "timeout_sec": 9}
+    assert mc.twmd_config() == {"base_url": "http://twmd:8000", "token": "test-token",
+                                "timeout_sec": 9, "profile_timeout_sec": 27}
     assert trading_lot("TW") == 1 and cost_model_for_market("TW").cfg.commission_rate == .001
     assert Settings().panwatch_port == 8001
     monkeypatch.setenv("TWMD_BASE_URL", "http://override:8000")

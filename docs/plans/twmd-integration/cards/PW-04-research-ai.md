@@ -1,6 +1,6 @@
 # PW-04：第一批個股研究頁與 AI
 
-狀態：waiting。依賴：PW-02、PW-03。Owner：unassigned。
+狀態：ready。依賴：PW-02、PW-03。Owner：unassigned。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
