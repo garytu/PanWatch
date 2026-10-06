@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from marketdata.cache import TTLCache
 from marketdata.defaults import InMemoryMetricsSink
@@ -53,6 +54,44 @@ INDEX_TENCENT: dict[str, str] = {
     "DJI": "usDJI",         # 道瓊斯
     "INX": "usINX",         # 標普500
 }
+
+_TAIPEI = ZoneInfo("Asia/Taipei")
+
+
+def _completed_research_window(
+    start_date: date | str | None,
+    end_date: date | str | None,
+    *,
+    today_taipei: date,
+) -> tuple[str, str]:
+    if (start_date is None) != (end_date is None):
+        raise ValueError("start_date and end_date must be provided together")
+    if start_date is None:
+        end = today_taipei - timedelta(days=1)
+        start = end - timedelta(days=29)
+    else:
+        start = _research_date(start_date, "start_date")
+        end = _research_date(end_date, "end_date")  # type: ignore[arg-type]
+    if start > end:
+        raise ValueError("start_date must not be after end_date")
+    if end >= today_taipei:
+        raise ValueError("end_date must be before the current Asia/Taipei date")
+    return start.isoformat(), end.isoformat()
+
+
+def _research_date(value: date | str, label: str) -> date:
+    if isinstance(value, datetime):
+        raise TypeError(f"{label} must be a calendar date")
+    if isinstance(value, date):
+        return value
+    raw = str(value)
+    try:
+        parsed = date.fromisoformat(raw)
+    except ValueError as exc:
+        raise ValueError(f"{label} must use YYYY-MM-DD") from exc
+    if parsed.isoformat() != raw:
+        raise ValueError(f"{label} must use YYYY-MM-DD")
+    return parsed
 
 
 class MarketData:
@@ -205,12 +244,38 @@ class MarketData:
             return fetch_tencent_kline_raw(tsym, days)
         return []
 
-    def capital_flow(self, symbol: str, *, market: str = "CN") -> CapitalFlow | None:
+    def capital_flow(
+        self,
+        symbol: str,
+        *,
+        market: str = "CN",
+        start_date: date | str | None = None,
+        end_date: date | str | None = None,
+    ) -> CapitalFlow | None:
         """單隻股票資金流向。不在包內快取(cache_ttl_sec=0);宿主自行快取。"""
-        req = Request(symbols=(symbol,), market=market)
+        extras: tuple[tuple[str, str], ...] = ()
+        requested_symbol = symbol
+        if market == "TW":
+            today_taipei = datetime.now(_TAIPEI).date()
+            start, end = _completed_research_window(
+                start_date, end_date, today_taipei=today_taipei
+            )
+            requested_symbol = Symbol.parse(symbol, market).identity
+            extras = (("start_date", start), ("end_date", end),
+                      ("today_taipei", today_taipei.isoformat()))
+        elif start_date is not None or end_date is not None:
+            raise ValueError("date bounds are supported only for Taiwan research reads")
+        req = Request(symbols=(requested_symbol,), market=market, extra=extras)
         resp = self._capital_flow_engine.fetch(req, cache_ttl_sec=0)
+        if not resp.ok and market == "TW" and self._uses_twmd("capital_flow", "TW"):
+            from marketdata.errors import VendorError
+            raise VendorError(resp.error or "twmd institutional-flow read failed")
         data = resp.data or []
         return data[0] if data else None
+
+    def _uses_twmd(self, datatype: str, market: str) -> bool:
+        sources = sorted(self.config.sources_for(datatype, market), key=lambda source: source.priority)
+        return any(source.enabled and source.vendor == "twmd" for source in sources)
 
     def events(self, symbols: list[str], *, market: str = "CN", since_days: int = 7) -> list[EventItem]:
         """結構化事件(東財公告)。批次 symbols。不在包內快取(cache_ttl_sec=0);宿主自行快取。"""
@@ -313,6 +378,11 @@ class MarketData:
     def fundamentals(self, symbols: list[str | Symbol], *, market: str | None = None) -> list[Fundamentals]:
         """批次基本面/財務(按 symbol)。symbols 可跨市場:未顯式給 market 時按程式碼自動識別並分組。
         照 quotes() 範式:按市場分組、每組建 Request、逐組 engine.fetch、合併結果。"""
+        today_taipei = datetime.now(_TAIPEI).date() if market in (None, "TW") else None
+        tw_window = (
+            _completed_research_window(None, None, today_taipei=today_taipei)
+            if today_taipei is not None else None
+        )
         groups: dict[str, list[Symbol]] = {}
         for raw in symbols:
             sym = raw if isinstance(raw, Symbol) else Symbol.parse(raw, market)
@@ -320,8 +390,16 @@ class MarketData:
 
         out: list[Fundamentals] = []
         for mkt, syms in groups.items():
-            req = Request(symbols=tuple(s.code for s in syms), market=mkt)
+            request_symbols = tuple(s.identity if mkt == "TW" else s.code for s in syms)
+            extra = (
+                ("start_date", tw_window[0]), ("end_date", tw_window[1]),
+                ("today_taipei", today_taipei.isoformat()),
+            ) if mkt == "TW" and tw_window and today_taipei else ()
+            req = Request(symbols=request_symbols, market=mkt, extra=extra)
             resp = self._fundamentals_engine.fetch(req)
+            if not resp.ok and mkt == "TW" and self._uses_twmd("fundamentals", "TW"):
+                from marketdata.errors import VendorError
+                raise VendorError(resp.error or "twmd valuation read failed")
             if resp.ok and resp.data:
                 out.extend(resp.data)
         return out

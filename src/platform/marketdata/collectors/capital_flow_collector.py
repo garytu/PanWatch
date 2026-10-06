@@ -1,5 +1,6 @@
 """資金流向採集器 - 經 marketdata 包統一接入"""
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
+from typing import Any
 
 from src.platform.marketdata.collectors.market_http import TTLCache
 from src.platform.marketdata.models import MarketCode
@@ -32,6 +33,8 @@ class CapitalFlow:
     dealer_net_shares: float | None = None
     institutional_net_shares: float | None = None
     institutional_net_5d_shares: float | None = None
+    native_components: dict[str, int | None] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 def get_market_data():
@@ -49,9 +52,12 @@ class CapitalFlowCollector:
     def get_capital_flow(self, symbol: str) -> CapitalFlow | None:
         """獲取單隻股票的資金流向(經 marketdata 包統一接入 + TTL快取)。"""
         cache_key = f"{self.market.value}:{symbol}"
-        cached = _FLOW_CACHE.get(cache_key)
-        if cached is not None:
-            return cached
+        # TW reads are range/provider qualified inside MarketData. This older
+        # cache key cannot preserve either dimension, so leave that path uncached.
+        if self.market != MarketCode.TW:
+            cached = _FLOW_CACHE.get(cache_key)
+            if cached is not None:
+                return cached
 
         md_cf = get_market_data().capital_flow(symbol, market=self.market.value)
         if md_cf is None:
@@ -68,9 +74,11 @@ class CapitalFlowCollector:
             main_net_5d=md_cf.main_net_5d,
             **{key: getattr(md_cf, key, None) for key in (
                 "flow_kind", "unit", "trade_date", "foreign_net_shares", "trust_net_shares",
-                "dealer_net_shares", "institutional_net_shares", "institutional_net_5d_shares")},
+                "dealer_net_shares", "institutional_net_shares", "institutional_net_5d_shares",
+                "native_components", "evidence")},
         )
-        _FLOW_CACHE.set(cache_key, capital_flow)
+        if self.market != MarketCode.TW:
+            _FLOW_CACHE.set(cache_key, capital_flow)
         return capital_flow
 
     def get_capital_flow_summary(self, symbol: str) -> dict:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, timedelta, timezone
 
 from marketdata.http import market_get, record_error
@@ -221,25 +222,32 @@ class FinMindCapitalFlowVendor(CapitalFlowVendor):
 
         # 抓取最近 10 天三大法人數據
         lookback = (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d")
+        start_date = str(config.get("start_date") or lookback)
+        end_date = str(config.get("end_date") or "") or None
         data = _finmind_get(
             dataset="TaiwanStockInstitutionalInvestorsBuySell",
             data_id=sym.code,
-            start_date=lookback,
+            start_date=start_date,
+            end_date=end_date,
             config=config,
             log_label="FinMind三大法人",
         )
         if not data:
             return []
 
-        # 按日期歸納法人買賣
-        by_date: dict[str, dict[str, float]] = {}
+        # Keep missing categories null. The endpoint has no date-complete
+        # coverage contract, so it cannot prove an exact five-session sum.
+        by_date: dict[str, dict[str, int | None]] = {}
         for row in data:
             dt = str(row.get("date", ""))
-            buy = float(row.get("buy") or 0.0)
-            sell = float(row.get("sell") or 0.0)
-            net = buy - sell
+            if not dt:
+                continue
+            buy = _share_integer(row.get("buy"))
+            sell = _share_integer(row.get("sell"))
+            net = buy - sell if buy is not None and sell is not None else None
             name = str(row.get("name", ""))
-            by_date.setdefault(dt, {})[name] = net
+            if name:
+                by_date.setdefault(dt, {})[name] = net
 
         sorted_dates = sorted(by_date.keys())
         if not sorted_dates:
@@ -248,22 +256,25 @@ class FinMindCapitalFlowVendor(CapitalFlowVendor):
         latest_date = sorted_dates[-1]
         day_flows = by_date[latest_date]
 
-        foreign_net = day_flows.get("Foreign_Investor", 0.0)
-        trust_net = day_flows.get("Investment_Trust", 0.0)
-        dealer_net = day_flows.get("Dealer_self", 0.0) + day_flows.get("Dealer_Hedging", 0.0)
-        total_main_net = foreign_net + trust_net + dealer_net
-
-        # 計算 5 日合計
-        last_5_dates = sorted_dates[-5:]
-        main_5d = 0.0
-        for dt in last_5_dates:
-            df_net = by_date[dt]
-            main_5d += (
-                df_net.get("Foreign_Investor", 0.0)
-                + df_net.get("Investment_Trust", 0.0)
-                + df_net.get("Dealer_self", 0.0)
-                + df_net.get("Dealer_Hedging", 0.0)
-            )
+        foreign_net = day_flows.get("Foreign_Investor")
+        trust_net = day_flows.get("Investment_Trust")
+        dealer_self = day_flows.get("Dealer_self")
+        dealer_hedging = day_flows.get("Dealer_Hedging")
+        dealer_net = (
+            dealer_self + dealer_hedging
+            if dealer_self is not None and dealer_hedging is not None else None
+        )
+        total_main_net = (
+            foreign_net + trust_net + dealer_net
+            if foreign_net is not None and trust_net is not None and dealer_net is not None
+            else None
+        )
+        native_components = {
+            "foreign_net_shares": foreign_net,
+            "investment_trust_net_shares": trust_net,
+            "dealer_proprietary_net_shares": dealer_self,
+            "dealer_hedging_net_shares": dealer_hedging,
+        }
 
         return [
             CapitalFlow(
@@ -272,9 +283,34 @@ class FinMindCapitalFlowVendor(CapitalFlowVendor):
                 flow_kind="institutional_shares", unit="shares", trade_date=latest_date,
                 foreign_net_shares=foreign_net, trust_net_shares=trust_net,
                 dealer_net_shares=dealer_net, institutional_net_shares=total_main_net,
-                institutional_net_5d_shares=main_5d,
+                institutional_net_5d_shares=None,
+                native_components=native_components,
+                evidence={
+                    "provider": "finmind",
+                    "source": "finmind",
+                    "dataset": "TaiwanStockInstitutionalInvestorsBuySell",
+                    "selectors": {"data_id": sym.code, "start_date": start_date,
+                                  "end_date": end_date},
+                    "status": "available",
+                    "reason": "selected_record_present",
+                    "category_presence": {key: value is not None for key, value in native_components.items()},
+                    "rows": data,
+                    "five_day_total": "not_computed_without_complete_session_coverage",
+                },
             )
         ]
+
+
+def _share_integer(value) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        numeric = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError("FinMind share value is not numeric") from exc
+    if not numeric.is_finite() or numeric != numeric.to_integral_value():
+        raise ValueError("FinMind share value must be an integer")
+    return int(numeric)
 
 
 class FinMindMarginVendor(MarginVendor):

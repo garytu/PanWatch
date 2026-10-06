@@ -33,7 +33,64 @@ def test_default_taiwan_routes_all_price_types_to_twmd(monkeypatch):
         source = cp.sources_for(kind, "TW")[0]
         assert source.vendor == "twmd" and source.config["base_url"] == "http://twmd:8000"
         assert source.config["timeout_sec"] == 12.5
-    assert cp.sources_for("fundamentals", "TW")[0].vendor == "finmind"
+    assert cp.sources_for("fundamentals", "TW")[0].vendor == "twmd"
+    assert cp.sources_for("capital_flow", "TW")[0].vendor == "twmd"
+
+
+def test_taiwan_research_provider_selection_is_explicit_without_fallback(monkeypatch):
+    monkeypatch.setenv("TW_FUNDAMENTALS_PROVIDER", "finmind")
+    monkeypatch.setenv("TW_CAPITAL_FLOW_PROVIDER", "twmd")
+    monkeypatch.setenv("FINMIND_API_TOKEN", "test-finmind-token")
+    cp = mc.DbConfigProvider()
+
+    fundamentals = cp.sources_for("fundamentals", "TW")
+    flows = cp.sources_for("capital_flow", "TW")
+
+    assert [(source.vendor, source.config.get("token")) for source in fundamentals] == [
+        ("finmind", "test-finmind-token")
+    ]
+    assert [(source.vendor, source.config.get("base_url")) for source in flows] == [
+        ("twmd", "http://127.0.0.1:8000")
+    ]
+
+
+def test_default_research_window_uses_one_frozen_taipei_date(monkeypatch):
+    from datetime import datetime as real_datetime
+    from types import SimpleNamespace
+
+    import marketdata.client as marketdata_client
+    from marketdata import MarketData
+    from marketdata.defaults import StaticConfigProvider
+    from marketdata.engine import Engine
+
+    calls = []
+
+    class FixedDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            calls.append(tz)
+            return real_datetime(2026, 10, 7, 0, 30, tzinfo=tz)
+
+    requests = []
+
+    def fake_fetch(self, request, **kwargs):
+        requests.append(request)
+        return SimpleNamespace(ok=True, data=[])
+
+    monkeypatch.setattr(marketdata_client, "datetime", FixedDateTime)
+    monkeypatch.setattr(Engine, "fetch", fake_fetch)
+    result = MarketData(StaticConfigProvider({})).fundamentals(
+        ["TWSE:2330", "TPEX:5347"], market="TW"
+    )
+
+    assert result == []
+    assert len(calls) == 1 and calls[0].key == "Asia/Taipei"
+    assert len(requests) == 1
+    assert requests[0].symbols == ("TWSE:2330", "TPEX:5347")
+    assert dict(requests[0].extra) == {
+        "start_date": "2026-09-07", "end_date": "2026-10-06",
+        "today_taipei": "2026-10-07",
+    }
 
 
 def test_taiwan_settings_use_env_file_and_explicit_environment_override(monkeypatch, tmp_path):

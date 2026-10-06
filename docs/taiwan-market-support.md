@@ -23,6 +23,8 @@ Set these values in PanWatch's `.env` or process environment:
 
 ```dotenv
 TW_DATA_PROVIDER=twmd
+TW_FUNDAMENTALS_PROVIDER=twmd
+TW_CAPITAL_FLOW_PROVIDER=twmd
 TWMD_BASE_URL=http://127.0.0.1:8000
 TWMD_API_TOKEN=
 TWMD_TIMEOUT_SEC=5
@@ -58,6 +60,17 @@ date, currency, volume unit and adjustment mode.
 `TW_DATA_PROVIDER=external` selects the older `/quotes?symbols=...` protocol and
 FinMind daily history. Native twmd integration is the default.
 
+`TW_FUNDAMENTALS_PROVIDER` and `TW_CAPITAL_FLOW_PROVIDER` each accept `twmd`
+(default) or `finmind`, independently of the price provider. Each route selects
+one source; an official query error or missing partition does not trigger a
+FinMind fallback. Official reads default to a 30-calendar-day window ending on
+the previous Taipei date, as required by the completed-date API policy. Generic
+official PE is returned as `pe_ratio`, with `pe_ttm`/`pe_static` left null. Source
+valuation dates and exact original values remain in `valuation_evidence`;
+financial `report_date` stays separate. Flow evidence preserves each date's
+coverage, selected presence, native share categories and source receipts. Neither
+provider claims a five-trading-day sum without proven complete session coverage.
+
 ## Implemented behavior
 
 | Area | Taiwan behavior |
@@ -72,7 +85,7 @@ FinMind daily history. Native twmd integration is the default.
 | Paper trading | Taiwan allocation is configurable and defaults to 0. Entries, exits and manual closes require a confirmed session and unexpired live quote. Regular lots default to 1,000 shares; `TW_PAPER_LOT_SIZE=1` selects an odd-lot quantity assumption. |
 | Costs | Stock sell tax 0.3%; ETF sell tax 0.1%; bond ETF exemption through 2026. Commission and minimum commission are configurable broker assumptions. Taiwan has no mainland transfer fee. |
 | Calendar | Validated TWSE annual schedule cached on disk, including settlement-only closures. Unknown/out-of-year coverage stops Taiwan trading-session jobs. `TW_EXTRA_CLOSED_DATES` adds emergency closure dates. |
-| Financial and chip data | FinMind remains the optional source for fundamentals, news, dividends, institutional flows and margin. Institutional flows use shares; margin quantities use lots and leave monetary fields null. |
+| Financial and chip data | Official twmd valuation and institutional flows are the defaults; FinMind is an explicit alternate for those two routes and continues to provide news, dividends and margin. Institutional flows use integer shares, preserve native categories/evidence, and leave cash and unproven five-day totals null; margin quantities use lots. |
 | Readiness and subscriptions | `/api/quotes/taiwan/status` reports collection health, durable requested subscriptions, confirmed subscriptions, calendar status and active cash-instrument counts by venue. The watchlist can explicitly request or cancel a subscription through PanWatch's authenticated proxy to twmd control port 9200. Requested subscriptions may remain pending until the collector confirms them. |
 
 The cost assumptions follow the [TWSE securities guide](https://www.twse.com.tw/en/about/company/guide.html)

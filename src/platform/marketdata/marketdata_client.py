@@ -80,6 +80,19 @@ class DbConfigProvider:
         if market_code == "TW":
             from src.platform.runtime.config import Settings
             settings = Settings()
+            if datatype in {"fundamentals", "capital_flow"}:
+                provider = (
+                    settings.tw_fundamentals_provider
+                    if datatype == "fundamentals"
+                    else settings.tw_capital_flow_provider
+                )
+                config = (
+                    twmd_config()
+                    if provider == "twmd"
+                    else {"token": settings.finmind_api_token}
+                )
+                return [SourceConfig(vendor=provider, priority=0, enabled=True,
+                                     config=config, supports_batch=datatype == "fundamentals")]
             if datatype in {"quote", "kline", "intraday_kline"} and settings.tw_data_provider != "external":
                 return [SourceConfig(vendor="twmd", priority=0, enabled=True,
                                      config=twmd_config(), supports_batch=datatype == "quote")]

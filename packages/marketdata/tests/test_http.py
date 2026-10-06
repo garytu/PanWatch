@@ -1,4 +1,5 @@
 import httpx
+import pytest
 
 import marketdata.http as mh
 
@@ -88,3 +89,45 @@ def test_throttle_sleeps_on_second_call(monkeypatch):
     mh.throttle("t4c", 0.15)   # 首次:last_call 預設 0,wait 為負,不睡
     mh.throttle("t4c", 0.15)   # 二次:同一時刻,wait=0.15,應 sleep
     assert slept and abs(slept[-1] - 0.15) < 1e-9
+
+
+def test_response_mode_preserves_plaintext_http_errors_and_retry_backoff(monkeypatch):
+    responses = [httpx.Response(503, text="upstream unavailable", request=httpx.Request("GET", "http://x"))
+                 for _ in range(2)]
+    slept = []
+
+    class Client(_OkClient):
+        def get(self, url, params=None):
+            return responses.pop(0)
+
+    monkeypatch.setattr(mh.httpx, "Client", Client)
+    monkeypatch.setattr(mh.time, "sleep", slept.append)
+    response = mh.market_get(
+        "http://x", host_key="strict", retries=1, jitter=0,
+        parse="json", include_response=True, raise_for_status=False, raise_on_error=True,
+    )
+    assert response.status_code == 503 and response.data == "upstream unavailable"
+    assert responses == [] and slept == [0.4]
+
+
+def test_response_mode_rejects_invalid_success_json(monkeypatch):
+    class Client(_OkClient):
+        def get(self, url, params=None):
+            return httpx.Response(200, text="not JSON", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(mh.httpx, "Client", Client)
+    with pytest.raises(mh.MarketHttpError):
+        mh.market_get("http://x", host_key="strict", retries=0,
+                      parse="json", include_response=True, raise_on_error=True)
+
+
+def test_response_mode_exposes_headers_without_changing_plain_json_mode(monkeypatch):
+    class Client(_OkClient):
+        def get(self, url, params=None):
+            return httpx.Response(200, json=[], headers={"X-TWMD-Coverage": "available=0;missing=1;selected=missing"},
+                                  request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(mh.httpx, "Client", Client)
+    assert mh.market_get("http://x", host_key="strict", retries=0, parse="json") == []
+    response = mh.market_get("http://x", host_key="strict", retries=0, parse="json", include_response=True)
+    assert response.data == [] and response.headers["x-twmd-coverage"].startswith("available=0")

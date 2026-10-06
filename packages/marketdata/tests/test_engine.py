@@ -71,6 +71,51 @@ def test_cache_hit_skips_second_call():
     assert calls["n"] == 1
 
 
+def test_cache_key_changes_when_provider_changes():
+    class SwitchingConfig:
+        provider = "a"
+
+        def sources_for(self, datatype, market):
+            return [SourceConfig(vendor=self.provider, priority=0)]
+
+    config = SwitchingConfig()
+    engine = Engine(
+        datatype="quote",
+        vendors={"a": FakeVendor("a", "ok"), "b": FakeVendor("b", "ok")},
+        config=config,
+        metrics=InMemoryMetricsSink(),
+        cache=TTLCache(60),
+        default_ttl=60,
+    )
+    assert engine.fetch(_req()).data[0]["v"] == "a"
+    config.provider = "b"
+    assert engine.fetch(_req()).data[0]["v"] == "b"
+
+
+def test_cache_separates_twmd_service_and_date_range():
+    class Config:
+        base_url = "http://first"
+
+        def sources_for(self, datatype, market):
+            return [SourceConfig(vendor="twmd", config={"base_url": self.base_url})]
+
+    class Vendor:
+        supports_markets = {"TW"}
+
+        def fetch(self, symbols, config):
+            return [{"source": config["base_url"], "end": config["end_date"]}]
+
+    config = Config()
+    engine = Engine(datatype="fundamentals", vendors={"twmd": Vendor()}, config=config,
+                    metrics=InMemoryMetricsSink(), cache=TTLCache(60), default_ttl=60)
+    request = Request(symbols=("TWSE:2330",), market="TW", extra=(("end_date", "2026-10-02"),))
+    assert engine.fetch(request).data[0]["source"] == "http://first"
+    config.base_url = "http://second"
+    assert engine.fetch(request).data[0]["source"] == "http://second"
+    later = Request(symbols=("TWSE:2330",), market="TW", extra=(("end_date", "2026-10-05"),))
+    assert engine.fetch(later).data[0]["end"] == "2026-10-05"
+
+
 def test_metrics_recorded():
     m = InMemoryMetricsSink()
     _engine({"a": FakeVendor("a", "ok")}, [SourceConfig(vendor="a", priority=1)], metrics=m).fetch(_req())

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 import time
+import hashlib
+import json
 
 from marketdata.cache import TTLCache
 from marketdata.http import record_error
@@ -32,14 +34,20 @@ class Engine:
         self.default_ttl = default_ttl
 
     def fetch(self, req: Request, *, cache_ttl_sec: float | None = None, min_count: int = 1) -> Response:
-        key = req.cache_key(self.datatype)
+        market = req.market
+        sources = sorted(self.config.sources_for(self.datatype, market), key=lambda s: s.priority)
+        # A provider switch must not return a cached answer from the previous
+        # provider. The request key already carries canonical IDs and ranges.
+        provider_key = hashlib.sha256(json.dumps(
+            [(src.vendor, src.priority, src.config) for src in sources if src.enabled],
+            sort_keys=True, default=str,
+        ).encode()).hexdigest()
+        key = f"{req.cache_key(self.datatype)}|providers={provider_key}"
         cached = self.cache.get(key)
         if cached is not None:
             return cached
 
-        market = req.market
         syms = [Symbol.parse(c, market) for c in req.symbols]
-        sources = sorted(self.config.sources_for(self.datatype, market), key=lambda s: s.priority)
 
         last_err = ""
         best: Response | None = None

@@ -94,11 +94,13 @@ class CapitalFlow:
     flow_kind: str = "large_order_cash"
     unit: str = "currency"
     trade_date: str | None = None
-    foreign_net_shares: float | None = None
-    trust_net_shares: float | None = None
-    dealer_net_shares: float | None = None
-    institutional_net_shares: float | None = None
-    institutional_net_5d_shares: float | None = None
+    foreign_net_shares: int | None = None
+    trust_net_shares: int | None = None
+    dealer_net_shares: int | None = None
+    institutional_net_shares: int | None = None
+    institutional_net_5d_shares: int | None = None
+    native_components: dict[str, int | None] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -172,6 +174,111 @@ class Fundamentals:
     net_profit_yoy: float | None = None             # 淨利潤同比增長(%)
     report_date: str = ""                           # 報告期(原樣字串,不做日期解析)
     timestamp: datetime = field(default_factory=datetime.now)
+    # A provider's generic PE label is not necessarily trailing twelve months.
+    pe_ratio: float | None = None
+    valuation_trade_date: str | None = None
+    valuation_evidence: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TwmdValuationObservation:
+    """One official dated valuation row, preserving source decimal strings."""
+
+    instrument_id: str
+    symbol: str
+    trade_date: str
+    company_name: str
+    close_price: str | None
+    pe_ratio: str | None
+    pb_ratio: str | None
+    dividend_yield_pct: str | None
+    dividend_per_share: str | None
+    dividend_per_share_currency: str | None
+    dividend_reference_year: int | None
+    financial_reference_year: int | None
+    financial_reference_quarter: int | None
+    source_contract: str | None = None
+    source_url: str | None = None
+    request_scope: str | None = None
+    received_at_utc: str | None = None
+    payload_sha256: str | None = None
+    capture_id: str | None = None
+    revision: int | None = None
+
+
+@dataclass(frozen=True)
+class TwmdValuationRead:
+    """A bounded official valuation read, including endpoint coverage evidence."""
+
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    data: list[TwmdValuationObservation]
+    status: str
+    reason: str
+    schema_ready: bool | None = None
+    coverage_header: str | None = None
+    selected_instrument_presence: str = "unknown"
+    response_headers: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class InstitutionalFlowCoverage:
+    """One source-native flow coverage entry for a requested calendar date."""
+
+    trade_date: str
+    status: str
+    record_count: int
+    selected_instrument_presence: str | None = None
+    acquired_at: str | None = None
+    received_at_utc: str | None = None
+    sha256: str | None = None
+    capture_id: str | None = None
+    source_contract: str | None = None
+    source_url: str | None = None
+    request_scope: str | None = None
+    payload_sha256: str | None = None
+
+
+@dataclass(frozen=True)
+class InstitutionalFlowObservation:
+    """One official native-unit flow row with all source categories retained."""
+
+    instrument_id: str
+    symbol: str
+    name: str
+    trade_date: str
+    native_unit: str
+    native_values: dict[str, int | None]
+    source_contract: str
+    source_url: str | None = None
+    request_scope: str | None = None
+    acquired_at: str | None = None
+    first_observed_at: str | None = None
+    received_at_utc: str | None = None
+    payload_sha256: str | None = None
+    capture_id: str | None = None
+    revision: int | None = None
+
+
+@dataclass(frozen=True)
+class InstitutionalFlowRead:
+    """A bounded, typed institutional-flow response with native coverage."""
+
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    source_contract: str
+    native_unit: str
+    schema_ready: bool
+    coverage: list[InstitutionalFlowCoverage]
+    data: list[InstitutionalFlowObservation]
+    status: str
+    reason: str
+    request_scope: str | None = None
+    response_headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

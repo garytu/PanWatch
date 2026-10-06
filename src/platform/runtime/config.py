@@ -5,6 +5,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import AliasChoices, Field, model_validator
@@ -36,6 +37,8 @@ class Settings(BaseSettings):
     panwatch_port: int = Field(default=8000, ge=1, le=65535)
     playwright_chromium_executable: str = ""
     tw_data_provider: str = "twmd"
+    tw_fundamentals_provider: Literal["twmd", "finmind"] = "twmd"
+    tw_capital_flow_provider: Literal["twmd", "finmind"] = "twmd"
     twmd_base_url: str = "http://127.0.0.1:8000"
     twmd_api_token: str = ""
     twmd_timeout_sec: float = Field(default=5, gt=0)

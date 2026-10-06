@@ -12,11 +12,26 @@ import random
 import threading
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class MarketHttpResponse:
+    """Parsed response metadata available to strict typed-read clients."""
+
+    status_code: int
+    headers: dict[str, str]
+    data: Any
+
+
+class MarketHttpError(Exception):
+    """Transport failure after the shared HTTP retry policy is exhausted."""
+
 
 _FETCH_SOURCE: contextvars.ContextVar[str] = contextvars.ContextVar("fetch_source", default="")
 
@@ -95,10 +110,14 @@ def market_get(
     follow_redirects: bool = True,
     verify: bool = True,
     proxy: str | None = None,
+    include_response: bool = False,
+    raise_on_error: bool = False,
 ) -> Any | None:
     """走系統代理(env)+ 按 host 節流 + 退避重試。成功返回解析結果,失敗返回 None 並打帶來源日誌。
 
     proxy: 顯式代理,僅在給了值時傳給 httpx.Client 覆蓋 env 代理;不傳則遵循 trust_env(env)。
+    include_response: 返回包含狀態碼、headers 與解析結果的 MarketHttpResponse。
+    raise_on_error: 耗盡重試後拋出 MarketHttpError；預設仍返回 None。
     """
     effective_proxy = proxy
     last_err: Any = None
@@ -114,15 +133,34 @@ def market_get(
                 **({"proxy": effective_proxy} if effective_proxy else {}),
             ) as client:
                 resp = client.get(url, params=params)
+                if include_response and resp.status_code >= 500 and attempt < retries:
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {resp.status_code}", request=resp.request, response=resp
+                    )
                 if raise_for_status:
                     resp.raise_for_status()
                 if parse == "json":
-                    return resp.json()
-                if parse == "content":
-                    return resp.content
-                if encoding:
-                    return resp.content.decode(encoding, errors="ignore")
-                return resp.text
+                    try:
+                        result = resp.json()
+                    except ValueError:
+                        # A proxy can return an HTML error page. Preserve its
+                        # HTTP status instead of misclassifying it as bad JSON.
+                        if not include_response or 200 <= resp.status_code < 300:
+                            raise
+                        result = resp.text
+                elif parse == "content":
+                    result = resp.content
+                elif encoding:
+                    result = resp.content.decode(encoding, errors="ignore")
+                else:
+                    result = resp.text
+                if include_response:
+                    return MarketHttpResponse(
+                        status_code=resp.status_code,
+                        headers={str(k).lower(): str(v) for k, v in resp.headers.items()},
+                        data=result,
+                    )
+                return result
         except Exception as e:
             last_err = e
         if attempt < retries:
@@ -133,4 +171,6 @@ def market_get(
         sym = f" symbol={symbol}" if symbol else ""
         logger.warning(f"{label} 獲取失敗{sym}: {last_err}{source_suffix()}")
         record_error(f"{label}{sym}: {type(last_err).__name__}: {last_err}")
+        if raise_on_error:
+            raise MarketHttpError(f"{label} request failed: {type(last_err).__name__}") from last_err
     return None

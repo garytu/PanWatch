@@ -68,9 +68,11 @@ def test_finmind_capital_flow_vendor(monkeypatch):
         {"date": "2026-09-22", "name": "Foreign_Investor", "buy": 1000, "sell": 400},
         {"date": "2026-09-22", "name": "Investment_Trust", "buy": 500, "sell": 100},
         {"date": "2026-09-22", "name": "Dealer_self", "buy": 200, "sell": 100},
+        {"date": "2026-09-22", "name": "Dealer_Hedging", "buy": 0, "sell": 0},
         {"date": "2026-09-23", "name": "Foreign_Investor", "buy": 1200, "sell": 200},
         {"date": "2026-09-23", "name": "Investment_Trust", "buy": 300, "sell": 50},
         {"date": "2026-09-23", "name": "Dealer_self", "buy": 100, "sell": 200},
+        {"date": "2026-09-23", "name": "Dealer_Hedging", "buy": 0, "sell": 0},
     ]
     monkeypatch.setattr("marketdata.vendors.finmind._finmind_get", lambda dataset, **kwargs: fake_flow)
 
@@ -81,9 +83,27 @@ def test_finmind_capital_flow_vendor(monkeypatch):
     # 2026-09-23: Foreign: +1000, Trust: +250, Dealer: -100 => Total main = +1150
     assert cf.main_net_inflow is None
     assert cf.flow_kind == "institutional_shares" and cf.unit == "shares"
-    assert cf.institutional_net_shares == 1150.0
+    assert cf.institutional_net_shares == 1150
+    assert cf.institutional_net_5d_shares is None
     assert cf.super_net_inflow is None and cf.big_net_inflow is None
-    assert cf.foreign_net_shares == 1000.0 and cf.trust_net_shares == 250.0
+    assert cf.foreign_net_shares == 1000 and cf.trust_net_shares == 250
+
+
+def test_finmind_capital_flow_keeps_missing_categories_null_and_never_claims_five_days(monkeypatch):
+    monkeypatch.setattr("marketdata.vendors.finmind._finmind_get", lambda dataset, **kwargs: [
+        {"date": "2026-09-23", "name": "Foreign_Investor", "buy": 1200, "sell": 200},
+        {"date": "2026-09-23", "name": "Investment_Trust", "buy": 300, "sell": 50},
+        {"date": "2026-09-23", "name": "Dealer_self", "buy": 100, "sell": 200},
+    ])
+
+    result = FinMindCapitalFlowVendor().fetch([Symbol(Market.TW, "2330")], config={})[0]
+
+    assert result.foreign_net_shares == 1000
+    assert result.trust_net_shares == 250
+    assert result.dealer_net_shares is None
+    assert result.institutional_net_shares is None
+    assert result.institutional_net_5d_shares is None
+    assert result.evidence["category_presence"]["dealer_hedging_net_shares"] is False
 
 
 def test_finmind_margin_vendor(monkeypatch):

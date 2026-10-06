@@ -390,6 +390,54 @@ def test_market_research_tools_use_marketdata_contracts(monkeypatch):
     engine.dispose()
 
 
+def test_taiwan_market_tools_forward_official_source_dates_and_coverage(monkeypatch):
+    from marketdata.types import CapitalFlow, Fundamentals
+
+    engine, session = _session()
+
+    class _MarketData:
+        def fundamentals(self, _symbols, *, market):
+            assert market == "TW"
+            return [Fundamentals(
+                symbol="TWSE:2330", market="TW", pe_ratio=28.98,
+                valuation_trade_date="2026-10-02",
+                valuation_evidence={
+                    "provider": "twmd", "status": "available",
+                    "selectors": {"instrument_id": "TWSE:2330", "end": "2026-10-02"},
+                    "rows": [{"trade_date": "2026-10-02", "pe_ratio": "28.98"}],
+                },
+            )]
+
+        def capital_flow(self, symbol, *, market):
+            assert (symbol, market) == ("2330", "TW")
+            return CapitalFlow(
+                symbol="TWSE:2330", name="台積電", flow_kind="institutional_shares",
+                unit="shares", trade_date="2026-10-02", institutional_net_shares=-5_343_414,
+                evidence={
+                    "provider": "twmd", "status": "available",
+                    "coverage": [{"trade_date": "2026-10-02", "status": "AVAILABLE"}],
+                    "rows": [{"trade_date": "2026-10-02", "source_received_at_utc": "2026-10-03T02:00:00Z"}],
+                },
+            )
+
+    monkeypatch.setattr(assistant_tools, "get_market_data", lambda: _MarketData())
+    registry = assistant_tools.build_panwatch_tool_registry(session)
+
+    fundamentals = asyncio.run(registry.execute(
+        "get_stock_fundamentals", _request(), {"symbol": "2330", "market": "TW"}
+    ))
+    capital_flow = asyncio.run(registry.execute(
+        "get_capital_flow", _request(), {"symbol": "2330", "market": "TW"}
+    ))
+
+    assert fundamentals.data["valuation_trade_date"] == "2026-10-02"
+    assert fundamentals.data["valuation_evidence"]["rows"][0]["pe_ratio"] == "28.98"
+    assert capital_flow.data["evidence"]["coverage"][0]["trade_date"] == "2026-10-02"
+    assert capital_flow.data["evidence"]["rows"][0]["source_received_at_utc"] == "2026-10-03T02:00:00Z"
+    session.close()
+    engine.dispose()
+
+
 def test_kline_summary_tool_returns_compact_summary(monkeypatch):
     class _Collector:
         def __init__(self, _market):
