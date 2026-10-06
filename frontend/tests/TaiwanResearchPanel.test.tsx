@@ -17,7 +17,7 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
     selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10' },
     blocks: {
-      valuation: block({ instrument_id: 'TWSE:2330', observations: [{ trade_date: '2026-10-02', close_price: '1234.5000', pe_ratio: null, pb_ratio: '3.50', dividend_yield_pct: '1.20' }] }, 'partial', 'some_requested_dates_missing_or_absent', { source_contract: 'twse_daily_valuation/v1' }),
+      valuation: block({ instrument_id: 'TWSE:2330', observations: [{ trade_date: '2026-10-02', close_price: '1234.5000', pe_ratio: null, pb_ratio: '3.50', dividend_yield_pct: '0.88', dividend_reference_year: 114 }] }, 'partial', 'some_requested_dates_missing_or_absent', { source_contract: 'twse_daily_valuation/v1' }),
       institutional_flows: block({ observations: [{ trade_date: '2026-10-02', native_values: { total_institutional_net_shares: -5343414 } }] }),
       company_profile: block({ instrument_id: 'TWSE:2330', profile: { report_date: '2026-10-03', company_name: '台積電', industry_code: '24', paid_in_capital: '259323700670', issued_share_count: 25932370067 }, units: { paid_in_capital: 'TWD', issued_share_count: 'shares' } }, 'partial', 'retained_profile_snapshot_absent', { source_contract: 'twse_openapi_t187ap03_L/v1', retained_profile: { revision: 2, capture_id: 'profile-capture', received_at_utc: '2026-10-04T13:07:03Z', payload_sha256: 'profile-hash' } }),
       monthly_revenues: block({ units: { revenue: 'TWD thousands (inferred from issuer notes; publisher strings retained)' }, months: [
@@ -38,6 +38,9 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
   expect(screen.getAllByText('部分可用').length).toBe(3)
   expect(screen.getByText('資料日 2026-10-02 · TWSE 官方來源')).toBeTruthy()
   expect(screen.getByText('1234.5000')).toBeTruthy()
+  expect(screen.getByText('官方殖利率（%，股利年度 2025）')).toBeTruthy()
+  expect(screen.getByText('0.88')).toBeTruthy()
+  expect(screen.getByText('依來源股利年度採計的官方數值；與最新季度配息年化估算的口徑不同。')).toBeTruthy()
   expect(screen.getByText('實收資本額（TWD）')).toBeTruthy()
   expect(screen.getAllByText('—').length).toBeGreaterThan(0)
   expect(screen.getByText('來源期間 2026-07 至 2026-08 · TWSE 官方來源 · TWD 千元（依來源資料推定）')).toBeTruthy()
@@ -109,6 +112,8 @@ it('ignores a late response for the prior venue of the same code', async () => {
   view.rerender(<TaiwanResearchPanel symbol="TPEX:2330" market="TW" open />)
   await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
   await waitFor(() => expect(screen.getByText('TPEX:2330 · EQUITY · 區間 2026-09-08 至 2026-10-06')).toBeTruthy())
+  expect(screen.getByText('官方殖利率（%，股利年度 未提供）')).toBeTruthy()
+  expect(screen.getByText('來源未提供股利年度，無法確認採計期間；此處保留官方原值。')).toBeTruthy()
   resolveTwse({
     instrument_id: 'TWSE:2330',
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: 'TWSE 公司' },

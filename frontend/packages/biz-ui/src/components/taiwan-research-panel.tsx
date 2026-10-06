@@ -136,6 +136,10 @@ function EvidenceDetails({ block }: { block: AnyBlock }) {
 function ValuationBlock({ block }: { block: AnyBlock }) {
   const rows = [...((block.data as any)?.observations || [])].sort((a, b) => String(b.trade_date).localeCompare(String(a.trade_date)))
   const latest = rows[0]
+  const sourceYear = latest?.dividend_reference_year
+  const dividendYear = Number.isInteger(sourceYear) && sourceYear > 0
+    ? (sourceYear < 1000 ? sourceYear + 1911 : sourceYear)
+    : null
   return (
     <section className="rounded-lg border border-border/50 p-3 space-y-2">
       {blockHeader('官方估值', block)}
@@ -145,8 +149,13 @@ function ValuationBlock({ block }: { block: AnyBlock }) {
           <span>收盤價（TWD／股）</span><span className="text-right font-mono">{exactValue(latest.close_price)}</span>
           <span>本益比（倍，口徑未指定）</span><span className="text-right font-mono">{exactValue(latest.pe_ratio)}</span>
           <span>股價淨值比（倍）</span><span className="text-right font-mono">{exactValue(latest.pb_ratio)}</span>
-          <span>殖利率（%）</span><span className="text-right font-mono">{exactValue(latest.dividend_yield_pct)}</span>
+          <span>官方殖利率（%，股利年度 {dividendYear ?? '未提供'}）</span><span className="text-right font-mono">{exactValue(latest.dividend_yield_pct)}</span>
         </div>
+        <p className="text-[10px] text-muted-foreground">
+          {dividendYear
+            ? '依來源股利年度採計的官方數值；與最新季度配息年化估算的口徑不同。'
+            : '來源未提供股利年度，無法確認採計期間；此處保留官方原值。'}
+        </p>
       </> : <p className="text-xs text-muted-foreground">{missingText(block)}</p>}
       <EvidenceDetails block={block} />
     </section>

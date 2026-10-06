@@ -280,6 +280,11 @@ The research page and AI/TradingAgents wiring are now implemented by PW-04 below
 
 PW-04 connects the stock insight overview, protected research API, official
 assistant tools, TradingAgents and research context to the same four-block service.
+The valuation card labels the provider dividend reference year (ROC years are
+displayed as Gregorian years) beside the official yield. Missing years stay
+explicitly unknown. The original percentage is preserved, with an explanation
+that its reference-year basis differs from a latest-quarter annualized estimate.
+No quarterly dividend is inferred or multiplied by four.
 Latest-only profiles and retained monthly disclosures keep their own periods;
 partial data and unsupported ETF blocks do not erase available institutional data.
 Complete Taiwan financial statements remain unavailable. Named assistant tool
