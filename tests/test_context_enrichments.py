@@ -499,7 +499,7 @@ def test_taiwan_structured_research_is_injected_and_snapshotted_without_cn_reads
             name: {"data": {"period": name}, "status": "available", "reason": "", "evidence": {"provider": "twmd"}}
             for name in ("valuation", "institutional_flows", "company_profile", "monthly_revenues")
         },
-        "limitations": {"financial_statements": {"status": "not_integrated", "data": None}},
+        "limitations": {"financial_statements": {"status": "limited_scope", "message": "TWSE industry-24 retained reports."}},
     }
     calls = []
     saved = []

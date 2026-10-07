@@ -502,10 +502,11 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
             for name in (
                 "valuation", "institutional_flows", "company_profile", "monthly_revenues",
                 "margin_short_sale", "shareholder_distribution", "broker_flow",
+                "financial_statements",
             )
         },
         "limitations": {
-            "financial_statements": {"status": "not_integrated", "data": None}
+            "financial_statements": {"status": "limited_scope", "message": "TWSE industry-24 retained reports."}
         },
     }
     calls = []
@@ -534,7 +535,8 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
     ))
     research = asyncio.run(registry.execute(
         "get_taiwan_stock_research", _request(),
-        {"symbol": "TWSE:2330", "market": "TW", "start_month": "2026-07", "end_month": "2026-08"},
+        {"symbol": "TWSE:2330", "market": "TW", "start_month": "2026-07", "end_month": "2026-08",
+         "fiscal_year": 2024, "fiscal_quarter": 4, "statement": "cash_flows"},
     ))
 
     assert fundamentals.data == capital_flow.data == research.data == payload
@@ -543,11 +545,14 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
 
     descriptor = next(item for item in PANWATCH_TOOL_DESCRIPTORS if item.tool_name == "get_taiwan_stock_research")
     assert descriptor.data_freshness == ToolDataFreshness.STATIC
-    assert research.data["limitations"]["financial_statements"]["status"] == "not_integrated"
-    assert "5/7 個資料區塊有資料" in research.summary
+    assert research.data["limitations"]["financial_statements"]["status"] == "limited_scope"
+    assert "6/8 個資料區塊有資料" in research.summary
     assert research.data["blocks"]["broker_flow"]["evidence"]["endpoint"] == "/broker_flow"
     assert [instrument_id for instrument_id, _ in calls] == ["TWSE:2330"] * 3
-    assert calls[2][1] == {"start_month": "2026-07", "end_month": "2026-08"}
+    assert calls[2][1] == {
+        "start_month": "2026-07", "end_month": "2026-08",
+        "fiscal_year": 2024, "fiscal_quarter": 4, "statement": "cash_flows",
+    }
     session.close()
     engine.dispose()
 

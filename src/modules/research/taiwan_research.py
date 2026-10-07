@@ -31,6 +31,10 @@ from src.modules.research.twmd_margin_shareholders import (
 )
 from src.modules.research.twmd_broker_flow import broker_flow_block, broker_flow_unsupported_block
 from src.modules.research.twmd_material_information import material_information_block
+from src.modules.research.twmd_financial_statements import (
+    financial_statement_block,
+    financial_statement_unsupported_block,
+)
 from src.platform.marketdata.marketdata_client import twmd_config
 
 _TAIPEI = ZoneInfo("Asia/Taipei")
@@ -53,6 +57,7 @@ _CACHE_TTLS = {
     "shareholder_distribution": 300,
     "broker_flow": 300,
     "material_information": 300,
+    "financial_statements": 300,
 }
 _CACHE: OrderedDict[tuple, tuple[float, Any]] = OrderedDict()
 _CACHE_LOCK = threading.RLock()
@@ -87,6 +92,10 @@ _FRESHNESS_HINTS = {
     "broker_flow": (
         "daily",
         "日資料；分點數量依來源分界與原生單位分組，覆蓋未證明全市場完整度；來源未提供接收時間或更新期限。",
+    ),
+    "financial_statements": (
+        "quarterly",
+        "季度報表的留存原始事實；發布時間未知。各筆期間可能為年初至今或比較期，報表與最新發現的接收時間分開。",
     ),
 }
 
@@ -275,7 +284,43 @@ def _bounds(
     return start, end, month_start, month_end
 
 
-def _empty_evidence(instrument_id: str | None, endpoint: str, selectors: dict[str, str], config: dict) -> dict:
+def _quarter_end(fiscal_year: int, fiscal_quarter: int) -> date:
+    if fiscal_quarter == 4:
+        return date(fiscal_year, 12, 31)
+    return date(fiscal_year, fiscal_quarter * 3 + 1, 1) - timedelta(days=1)
+
+
+def _financial_scope(
+    today: date,
+    fiscal_year: int | None,
+    fiscal_quarter: int | None,
+    statement: str | None,
+) -> tuple[int, int, str | None]:
+    if (fiscal_year is None) != (fiscal_quarter is None):
+        raise ValueError("fiscal_year and fiscal_quarter must be provided together")
+    if fiscal_year is None:
+        year = today.year
+        quarter = (today.month - 1) // 3 + 1
+        if _quarter_end(year, quarter) >= today:
+            quarter -= 1
+        if quarter == 0:
+            year -= 1
+            quarter = 4
+        fiscal_year, fiscal_quarter = year, quarter
+    if type(fiscal_year) is not int or fiscal_year < 2024:
+        raise ValueError("financial fiscal_year must be an integer >= 2024")
+    if type(fiscal_quarter) is not int or fiscal_quarter not in (1, 2, 3, 4):
+        raise ValueError("financial fiscal_quarter must be 1 through 4")
+    if _quarter_end(fiscal_year, fiscal_quarter) >= today:
+        raise ValueError("financial quarter must be completed in Asia/Taipei")
+    if statement is not None and statement not in {
+        "balance_sheet", "comprehensive_income", "cash_flows",
+    }:
+        raise ValueError("financial statement must select one supported statement")
+    return fiscal_year, fiscal_quarter, statement
+
+
+def _empty_evidence(instrument_id: str | None, endpoint: str, selectors: dict[str, Any], config: dict) -> dict:
     return {
         "provider": "twmd",
         "instrument_id": instrument_id,
@@ -300,7 +345,7 @@ def _empty_evidence(instrument_id: str | None, endpoint: str, selectors: dict[st
 def _error_block(
     reason: str,
     endpoint: str,
-    selectors: dict[str, str],
+    selectors: dict[str, Any],
     config: dict,
     *,
     status: str = "error",
@@ -423,6 +468,8 @@ def _period_age_days(value: object, now_utc: datetime) -> int | None:
             period_end = date(year, month, calendar.monthrange(year, month)[1])
         elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
             period_end = date.fromisoformat(value)
+        elif re.fullmatch(r"\d{4}Q[1-4]", value):
+            period_end = _quarter_end(int(value[:4]), int(value[-1]))
         else:
             return None
     except (ValueError, OverflowError):
@@ -432,6 +479,16 @@ def _period_age_days(value: object, now_utc: datetime) -> int | None:
 
 
 def _freshness_observation(name: str, evidence: dict) -> dict:
+    if name == "financial_statements":
+        report = evidence.get("report_provenance") or {}
+        selectors = evidence.get("selectors") or {}
+        return {
+            "data_period": f"{selectors.get('fiscal_year')}Q{selectors.get('fiscal_quarter')}" if report else None,
+            "report_date": None,
+            "publication_time": None,
+            "source_received_at_utc": report.get("original_received_at_utc"),
+            "first_observed_at": report.get("semantic_revision_first_observed_at_utc"),
+        }
     if name == "valuation":
         rows = evidence.get("per_period_provenance") or []
         row = max(rows, key=lambda item: _period_sort_key(item.get("trade_date")), default={})
@@ -582,6 +639,19 @@ def _coverage_freshness(name: str, block: ResearchDataBlock) -> dict:
         coverage["interpretation"] = (
             "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
         )
+    elif name == "financial_statements":
+        coverage.update({
+            "total_fact_count": evidence.get("total_fact_count"),
+            "returned_fact_count": evidence.get("returned_fact_count"),
+            "truncated": evidence.get("truncated"),
+            "latest_discovery_presence": evidence.get("selected_instrument_presence"),
+            "latest_discovery_received_at_utc": evidence.get("latest_discovery_received_at_utc"),
+            "report_original_received_at_utc": evidence.get("report_original_received_at_utc"),
+            "interpretation": (
+                "Retained report authority and latest discovery coverage are separate. "
+                "Duration facts retain source YTD/comparative periods; publication time is unknown."
+            ),
+        })
     elif name in {"margin_short_sale", "shareholder_distribution", "broker_flow"}:
         entries = (
             evidence.get("per_period_coverage") or []
@@ -690,7 +760,7 @@ def _resolve(rows: list[dict], requested: str) -> tuple[str, dict]:
     return row["instrument_id"], row
 
 
-def _cache_key(config: dict, instrument_id: str, kind: str, selectors: tuple[str, ...]) -> tuple:
+def _cache_key(config: dict, instrument_id: str, kind: str, selectors: tuple[Any, ...]) -> tuple:
     return (*_scope(config), instrument_id, kind, *selectors)
 
 
@@ -746,6 +816,9 @@ class TaiwanResearchService:
         end_date: str | None = None,
         start_month: str | None = None,
         end_month: str | None = None,
+        fiscal_year: int | None = None,
+        fiscal_quarter: int | None = None,
+        statement: str | None = None,
         today_taipei: date | None = None,
         now_utc: datetime | None = None,
     ) -> dict[str, Any]:
@@ -755,6 +828,9 @@ class TaiwanResearchService:
             raise ValueError("now_utc must be timezone-aware")
         request_clock = request_clock.astimezone(timezone.utc)
         today = today_taipei or request_clock.astimezone(_TAIPEI).date()
+        fiscal_year, fiscal_quarter, statement = _financial_scope(
+            today, fiscal_year, fiscal_quarter, statement
+        )
         date_start, date_end, month_start, month_end = _bounds(
             today=today,
             start_date=start_date,
@@ -767,6 +843,9 @@ class TaiwanResearchService:
             "end_date": date_end.isoformat(),
             "start_month": month_start.strftime("%Y-%m"),
             "end_month": month_end.strftime("%Y-%m"),
+            "fiscal_year": fiscal_year,
+            "fiscal_quarter": fiscal_quarter,
+            "statement": statement,
         }
         template = {
             "valuation": ("/api/v1/valuations", {"instrument_id": instrument_id, "start": selectors["start_date"], "end": selectors["end_date"]}),
@@ -787,7 +866,41 @@ class TaiwanResearchService:
                 "coverage_end": selectors["end_date"],
                 "price_level_date": selectors["end_date"],
             }),
+            "financial_statements": ("/api/v1/financial-statements", {
+                "instrument_id": instrument_id,
+                "fiscal_year": fiscal_year,
+                "fiscal_quarter": fiscal_quarter,
+                "report_scope": "consolidated",
+                "statement": statement,
+                "limit": 1000,
+            }),
         }
+        def retained_financial(canonical: str) -> ResearchDataBlock:
+            endpoint, financial_selectors = template["financial_statements"]
+            financial_selectors = {**financial_selectors, "instrument_id": canonical}
+            key = _cache_key(self.config, canonical, "financial_statements", tuple(financial_selectors.values()))
+            cached = _cache_get(key)
+            if cached is not None:
+                return cached
+            future = None
+            try:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError()
+                future = _submit_read(self._load_block, "financial_statements", key, lambda: financial_statement_block(
+                    self.client.financial_statements(
+                        canonical, fiscal_year, fiscal_quarter, statement=statement,
+                        today_taipei=today,
+                        timeout_sec=max(0.1, min(20.0, deadline - time.monotonic())),
+                    )
+                ))
+                return future.result(timeout=max(0.0, deadline - time.monotonic()))
+            except Exception as exc:
+                if future is not None:
+                    future.cancel()
+                reason, http_status = _status_error(exc)
+                return _error_block(reason, endpoint, financial_selectors, self.config,
+                                    instrument_id=canonical, http_status=http_status)
+
         if not _REQUEST_SLOTS.acquire(blocking=False):
             blocks = {
                 name: _error_block("concurrency_limit", endpoint, block_selectors, self.config, instrument_id=instrument_id)
@@ -824,6 +937,10 @@ class TaiwanResearchService:
                                        http_status=status)
                     for name, (endpoint, block_selectors) in template.items()
                 }
+                # Retained reports use frozen admission, independent of a later
+                # omission from the current catalog.
+                if reason == "instrument_not_found" and re.fullmatch(r"TWSE:[0-9]{4,6}", instrument_id):
+                    blocks["financial_statements"] = retained_financial(instrument_id)
                 return self._result(instrument_id, None, selectors, blocks, request_clock)
 
             if time.monotonic() >= deadline:
@@ -844,6 +961,8 @@ class TaiwanResearchService:
                                        self.config, status="unsupported", instrument_id=canonical)
                     for name, (endpoint, block_selectors) in canonical_template.items()
                 }
+                if canonical.startswith("TWSE:") and instrument["security_type"] == "EQUITY":
+                    blocks["financial_statements"] = retained_financial(canonical)
                 return self._result(canonical, instrument, selectors, blocks, request_clock)
             if instrument["security_type"] not in {"EQUITY", "ETF"}:
                 reason = "unsupported_warrant" if instrument["security_type"] == "WARRANT" else "unsupported_security_type"
@@ -878,7 +997,35 @@ class TaiwanResearchService:
                     self.client, canonical, date_start, date_end,
                     today_taipei=today, deadline_monotonic=deadline,
                 ),
+                "financial_statements": lambda: financial_statement_block(
+                    self.client.financial_statements(
+                        canonical,
+                        fiscal_year,
+                        fiscal_quarter,
+                        report_scope="consolidated",
+                        statement=statement,
+                        limit=1000,
+                        today_taipei=today,
+                        timeout_sec=max(0.1, min(20.0, deadline - time.monotonic())),
+                    )
+                ),
             }
+            if canonical.startswith("TPEX:"):
+                blocks["financial_statements"] = financial_statement_unsupported_block(
+                    canonical, fiscal_year, fiscal_quarter,
+                    "financial_statements_twse_only",
+                    security_type=instrument.get("security_type"),
+                    statement=statement,
+                )
+                del builders["financial_statements"]
+            elif instrument.get("security_type") != "EQUITY":
+                blocks["financial_statements"] = financial_statement_unsupported_block(
+                    canonical, fiscal_year, fiscal_quarter,
+                    "financial_statements_security_type_not_supported",
+                    security_type=instrument.get("security_type"),
+                    statement=statement,
+                )
+                del builders["financial_statements"]
             tpex_code = canonical.split(":", 1)[1] if canonical.startswith("TPEX:") else ""
             if tpex_code and not re.fullmatch(r"\d{4}", tpex_code):
                 endpoint, block_selectors = canonical_template["valuation"]
@@ -1095,7 +1242,7 @@ class TaiwanResearchService:
     def _result(
         instrument_id: str,
         instrument: dict | None,
-        selectors: dict[str, str],
+        selectors: dict[str, Any],
         blocks: dict[str, ResearchDataBlock],
         evaluated_at_utc: datetime,
     ) -> dict[str, Any]:
@@ -1122,12 +1269,11 @@ class TaiwanResearchService:
             "blocks": serialized_blocks,
             "limitations": {
                 "financial_statements": {
-                    "status": "not_integrated",
-                    "data": None,
+                    "status": "limited_scope",
                     "message": (
-                        "Complete Taiwan financial statements are not integrated. "
-                        "Monthly revenue and quotes are not income, balance-sheet, "
-                        "or cash-flow statements."
+                        "Retained TWSE industry-24 ordinary-equity consolidated reports are supported from 2024. "
+                        "TPEX, ETFs, other industries and individual reports are unsupported; "
+                        "report publication times are unknown and duration facts may be YTD."
                     ),
                 }
             },

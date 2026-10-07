@@ -41,10 +41,12 @@ def clear_research_caches():
     clear_taiwan_research_cache()
     twmd._company_profile_cache.clear()
     twmd._monthly_revenue_cache.clear()
+    twmd._financial_statements_cache.clear()
     yield
     clear_taiwan_research_cache()
     twmd._company_profile_cache.clear()
     twmd._monthly_revenue_cache.clear()
+    twmd._financial_statements_cache.clear()
 
 
 def _catalog(instrument_id="TWSE:2330", security_type="EQUITY"):
@@ -68,6 +70,7 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
     flow = _captured("TWSE:2330 institutional flow 2026-10-02 available")
     revenue = _captured("TWSE:2330 monthly revenue 2026-07..08 partial coverage")
     profile = _profile("TWSE:2330")
+    financial = json.loads((FIXTURES / "captured/financial-statements-twse-2330-2024q4.json").read_text())
     calls = []
 
     def response(_self, path, **params):
@@ -80,6 +83,11 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
             return flow["response"], flow["response_headers"]
         if path == "company-profiles":
             return profile, {}
+        if path == "financial-statements":
+            assert params["instrument_id"] == "TWSE:2330"
+            assert params["fiscal_year"] == 2024 and params["fiscal_quarter"] == 4
+            assert params["report_scope"] == "consolidated" and params["limit"] == 1000
+            return financial, {}
         if path == "monthly-revenues":
             return revenue["response"], {}
         if path == "broker-flow/quantities":
@@ -103,15 +111,15 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
     payload = service.collect(
         "2330", start_date="2026-10-02", end_date="2026-10-02",
         start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
-        now_utc=frozen_now,
+        fiscal_year=2024, fiscal_quarter=4, now_utc=frozen_now,
     )
 
     blocks = payload["blocks"]
     assert payload["instrument_id"] == "TWSE:2330"
     assert payload["instrument"]["security_type"] == "EQUITY"
-    assert payload["limitations"]["financial_statements"]["status"] == "not_integrated"
-    assert payload["limitations"]["financial_statements"]["data"] is None
-    assert "not income" in payload["limitations"]["financial_statements"]["message"]
+    assert payload["limitations"]["financial_statements"]["status"] == "limited_scope"
+    assert "duration facts may be YTD" in payload["limitations"]["financial_statements"]["message"]
+    assert payload["selectors"]["fiscal_year"] == 2024 and payload["selectors"]["fiscal_quarter"] == 4
     assert blocks["valuation"]["data"]["observations"][0]["pe_ratio"] == "28.98"
     assert blocks["valuation"]["evidence"]["period"]["trade_dates"] == ["2026-10-02"]
     assert blocks["institutional_flows"]["data"]["observations"][0]["native_unit"] == "shares"
@@ -121,6 +129,9 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
     assert blocks["monthly_revenues"]["data"]["months"][0]["presence"] == "missing"
     assert blocks["monthly_revenues"]["data"]["months"][1]["row"]["monthly_revenue"] == "514805337"
     assert blocks["monthly_revenues"]["evidence"]["publication_time"] is None
+    assert blocks["financial_statements"]["status"] == "available"
+    assert blocks["financial_statements"]["data"]["facts"][0]["value"] == "2127627043000"
+    assert blocks["financial_statements"]["evidence"]["selectors"]["fiscal_quarter"] == 4
     assert all(
         block["evidence"]["freshness"]["evaluated_at_utc"] == "2026-10-07T00:00:00Z"
         for block in blocks.values()
@@ -142,9 +153,9 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
     later = service.collect(
         "2330", start_date="2026-10-02", end_date="2026-10-02",
         start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
-        now_utc=frozen_now + timedelta(hours=1),
+        fiscal_year=2024, fiscal_quarter=4, now_utc=frozen_now + timedelta(hours=1),
     )
-    assert len(calls) == 13
+    assert len(calls) == 14
     assert later["blocks"]["monthly_revenues"]["evidence"]["freshness"]["source_receipt_age_seconds"] == (
         revenue_freshness["source_receipt_age_seconds"] + 3600
     )
@@ -320,6 +331,17 @@ def test_known_unsupported_catalog_type_does_not_invalidate_catalog_and_not_foun
             assert path == "instruments"
             return rows, {}
 
+        def financial_statements(self, instrument_id, fiscal_year, fiscal_quarter, **_params):
+            from marketdata.financial_statements import decode_financial_statement_response
+            return decode_financial_statement_response({
+                "instrument_id": instrument_id, "fiscal_year": fiscal_year, "fiscal_quarter": fiscal_quarter,
+                "report_scope": "consolidated", "statement": None,
+                "qualification": {"status": "pending", "reason": "catalog_evidence_missing", "industry_code": None, "catalog_evidence": None, "profile_evidence": None},
+                "coverage": {"status": "MISSING", "reason": "qualification_pending", "latest_discovery_presence": "missing", "capture_id": None, "original_received_at_utc": None},
+                "report": None, "facts": [], "total_fact_count": 0, "returned_fact_count": 0, "truncated": False,
+            }, instrument_id=instrument_id, fiscal_year=fiscal_year, fiscal_quarter=fiscal_quarter,
+               report_scope="consolidated", statement=None, limit=1000)
+
     service = TaiwanResearchService(client=FakeClient(), config={"base_url": "http://fixture"})
     unsupported = service.collect(
         "TPEX:1111", start_date="2026-10-02", end_date="2026-10-02",
@@ -332,8 +354,40 @@ def test_known_unsupported_catalog_type_does_not_invalidate_catalog_and_not_foun
 
     assert all(block["status"] == "unsupported" for block in unsupported["blocks"].values())
     assert all(block["reason"] == "unsupported_security_type" for block in unsupported["blocks"].values())
-    assert all(block["status"] == "unsupported" for block in missing["blocks"].values())
-    assert all(block["reason"] == "instrument_not_found" for block in missing["blocks"].values())
+    assert all(block["reason"] == "instrument_not_found" for name, block in missing["blocks"].items() if name != "financial_statements")
+    assert missing["blocks"]["financial_statements"]["status"] == "missing"
+    assert missing["blocks"]["financial_statements"]["reason"] == "qualification_pending"
+
+
+@pytest.mark.parametrize("catalog_state", ["inactive", "omitted"])
+def test_retained_financial_report_survives_later_catalog_changes(catalog_state):
+    from marketdata.financial_statements import decode_financial_statement_response
+    response = json.loads((FIXTURES / "captured/financial-statements-twse-2330-2024q4.json").read_text())
+    response["coverage"].update(latest_discovery_presence="not_advertised", capture_id="later-discovery",
+                                original_received_at_utc="2026-10-06T00:00:00Z")
+    rows = _catalog()
+    rows[0]["is_active"] = False
+    calls = []
+
+    class Client:
+        def get_response(self, path, **_params):
+            assert path == "instruments"
+            return (rows if catalog_state == "inactive" else []), {}
+
+        def financial_statements(self, instrument_id, fiscal_year, fiscal_quarter, **params):
+            calls.append(instrument_id)
+            return decode_financial_statement_response(response, instrument_id=instrument_id,
+                fiscal_year=fiscal_year, fiscal_quarter=fiscal_quarter, report_scope="consolidated",
+                statement=params.get("statement"), limit=1000)
+
+    result = TaiwanResearchService(client=Client(), config={"base_url": f"http://{catalog_state}"}).collect(
+        "TWSE:2330", fiscal_year=2024, fiscal_quarter=4, today_taipei=date(2026, 10, 7))
+    block = result["blocks"]["financial_statements"]
+    assert block["status"] == "available" and len(block["data"]["facts"]) == 394
+    assert block["evidence"]["latest_discovery"]["latest_discovery_presence"] == "not_advertised"
+    assert block["data"]["qualification"]["catalog_evidence"]["is_active"] is True
+    assert result["blocks"]["valuation"]["status"] == "unsupported"
+    assert calls == ["TWSE:2330"]
 
 
 def test_etf_preflight_keeps_available_blocks_and_marks_profile_revenue_unsupported(monkeypatch):
@@ -382,6 +436,9 @@ def test_etf_preflight_keeps_available_blocks_and_marks_profile_revenue_unsuppor
                 served_at="2026-10-06T10:00:00Z", status="unsupported", reason="unsupported_etf",
             )
 
+        def financial_statements(self, *_args, **_kwargs):
+            pytest.fail("ETF must not invoke financial-statements API")
+
     payload = TaiwanResearchService(client=FakeClient(), config={"base_url": "http://fixture"}).collect(
         "TWSE:00878", start_date="2026-10-02", end_date="2026-10-02",
         start_month="2026-08", end_month="2026-08", today_taipei=date(2026, 10, 7),
@@ -391,6 +448,29 @@ def test_etf_preflight_keeps_available_blocks_and_marks_profile_revenue_unsuppor
     assert payload["blocks"]["valuation"]["status"] == "unknown"
     assert payload["blocks"]["company_profile"]["status"] == "unsupported"
     assert payload["blocks"]["monthly_revenues"]["reason"] == "unsupported_etf"
+    assert payload["blocks"]["financial_statements"]["status"] == "unsupported"
+    assert payload["blocks"]["financial_statements"]["reason"] == "financial_statements_security_type_not_supported"
+
+
+def test_tpex_financial_statements_are_unsupported_without_provider_read():
+    catalog = _catalog("TPEX:5347", "EQUITY")
+
+    class FakeClient:
+        def get_response(self, path, **_params):
+            return (catalog, {}) if path == "instruments" else ([], {})
+
+        def financial_statements(self, *_args, **_kwargs):
+            pytest.fail("TPEX must not invoke financial-statements API")
+
+    payload = TaiwanResearchService(
+        client=FakeClient(), config={"base_url": "http://financial-scope-test"}
+    ).collect("TPEX:5347", fiscal_year=2024, fiscal_quarter=4, today_taipei=date(2026, 10, 7))
+
+    block = payload["blocks"]["financial_statements"]
+    assert payload["selectors"]["fiscal_year"] == 2024
+    assert payload["selectors"]["fiscal_quarter"] == 4
+    assert block["status"] == "unsupported"
+    assert block["reason"] == "financial_statements_twse_only"
 
 
 def test_tpex_six_digit_etf_skips_unsupported_valuation_selector_and_keeps_flows():
@@ -587,7 +667,7 @@ def test_service_cache_isolated_by_venue_credentials_service_and_range(monkeypat
     monkeypatch.setattr(research, "_instrument_catalog", lambda *_: _catalog("TWSE:2330") + _catalog("TPEX:2330"))
     for adapter in (
         "_valuation_block", "_flow_block", "company_profile_block", "monthly_revenue_block",
-        "margin_short_sale_block", "shareholder_distribution_block",
+        "margin_short_sale_block", "shareholder_distribution_block", "financial_statement_block",
     ):
         monkeypatch.setattr(research, adapter, lambda read: ResearchDataBlock(read, "available", "selected_record_present", {"instrument_id": read["identity"]}))
     calls = []
@@ -808,6 +888,7 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
         def monthly_revenues(self, *_args, **_kwargs): return self._read("monthly_revenues")
         def margin_short_sale(self, *_args, **_kwargs): return self._read("margin_short_sale")
         def shareholder_distribution(self, *_args, **_kwargs): return self._read("shareholder_distribution")
+        def financial_statements(self, *_args, **_kwargs): return self._read("financial_statements")
 
     future = caller_pool.submit(lambda: TaiwanResearchService(
         client=Client(), config={"base_url": "http://fixture"}
@@ -819,11 +900,11 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
         payload = future.result(timeout=3)
         assert set(payload["blocks"]) == {
             "valuation", "institutional_flows", "company_profile", "monthly_revenues",
-            "margin_short_sale", "shareholder_distribution", "broker_flow",
+            "margin_short_sale", "shareholder_distribution", "broker_flow", "financial_statements",
         }
         assert set(started) == {
             "valuation", "institutional_flows", "company_profile", "monthly_revenues",
-            "margin_short_sale", "shareholder_distribution",
+            "margin_short_sale", "shareholder_distribution", "financial_statements",
         }
         assert max_active <= 4
     finally:
@@ -861,7 +942,7 @@ def test_timed_out_reads_keep_permits_and_queued_blocks_are_explicit(monkeypatch
         payload = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
             "TWSE:2330", today_taipei=date(2026, 10, 7)
         )
-        assert len(payload["blocks"]) == 7
+        assert len(payload["blocks"]) == 8
         assert {block["reason"] for block in payload["blocks"].values()} == {"timeout"}
         assert slots._value == 0
         again = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(

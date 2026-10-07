@@ -44,6 +44,9 @@ export interface TaiwanResearchPayload {
     end_date: string
     start_month: string
     end_month: string
+    fiscal_year: number
+    fiscal_quarter: number
+    statement: string | null
   }
   blocks: {
     valuation: ResearchDataBlock<{ instrument_id: string; observations: Array<Record<string, unknown>> }>
@@ -53,14 +56,87 @@ export interface TaiwanResearchPayload {
     margin_short_sale: ResearchDataBlock<Record<string, any>>
     shareholder_distribution: ResearchDataBlock<Record<string, any>>
     broker_flow: ResearchDataBlock<BrokerFlowResearchData>
+    financial_statements: ResearchDataBlock<FinancialStatementsResearchData>
   }
   limitations: {
     financial_statements: {
-      status: 'not_integrated' | string
-      data: null
+      status: 'limited_scope' | string
       message: string
     }
   }
+}
+
+export interface FinancialStatementsResearchData {
+  instrument_id: string
+  fiscal_year: number
+  fiscal_quarter: number
+  report_scope: 'consolidated'
+  statement: FinancialStatementName | null
+  qualification: {
+    status: 'qualified' | 'pending' | 'unsupported'
+    reason: string
+    industry_code: string | null
+    catalog_evidence: Record<string, unknown> | null
+    profile_evidence: Record<string, unknown> | null
+  }
+  coverage: {
+    status: 'AVAILABLE' | 'MISSING'
+    reason: string
+    latest_discovery_presence: 'present' | 'not_advertised' | 'missing'
+    capture_id: string | null
+    original_received_at_utc: string | null
+  }
+  report: FinancialStatementReport | null
+  facts: FinancialStatementFact[]
+  total_fact_count: number
+  returned_fact_count: number
+  truncated: boolean
+}
+
+export type FinancialStatementName = 'balance_sheet' | 'comprehensive_income' | 'cash_flows'
+
+export interface FinancialStatementReport {
+  document_id: string
+  capture_id: string
+  semantic_revision_id: string
+  member_filename: string
+  source_url: string
+  raw_sha256: string
+  source_contract: string
+  parser_contract: string
+  original_received_at_utc: string
+  document_first_observed_at_utc: string
+  semantic_revision_first_observed_at_utc: string
+  latest_observed_at_utc: string
+  published_at_utc: null
+  amendment_status: 'unknown'
+}
+
+export interface FinancialStatementFact {
+  statement: FinancialStatementName
+  occurrence_ordinal: number
+  concept_qname: string
+  context: {
+    source_id: string
+    entity_identifier: string
+    entity_scheme: string
+    period: {
+      kind: 'instant' | 'duration'
+      instant: string | null
+      start_date: string | null
+      end_date: string | null
+    }
+    dimensions: Array<{ axis_qname: string; member_qname: string }>
+  }
+  unit: { source_id: string; numerator: string[]; denominator: string[] }
+  value: string | null
+  is_nil: boolean
+  lexical_value: string
+  format_qname: string | null
+  scale: number | null
+  sign: string | null
+  decimals: string | null
+  precision: string | null
 }
 
 export interface BrokerFlowResearchData {
@@ -169,12 +245,15 @@ export interface TaiwanResearchParams {
   end_date?: string
   start_month?: string
   end_month?: string
+  fiscal_year?: number
+  fiscal_quarter?: number
+  statement?: FinancialStatementName
 }
 
-function withQuery(path: string, params: Record<string, string | undefined>): string {
+function withQuery(path: string, params: Record<string, string | number | undefined>): string {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
-    if (value) query.set(key, value)
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
   }
   const suffix = query.toString()
   return suffix ? `${path}?${suffix}` : path

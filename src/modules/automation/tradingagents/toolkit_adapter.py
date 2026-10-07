@@ -264,6 +264,74 @@ def _taiwan_research_snapshot(symbol: str) -> dict | None:
     return research
 
 
+def _render_taiwan_financial_statement(research: dict | None, statement: str) -> str:
+    """Render one TradingAgents three-statement tool from the shared typed block."""
+    labels = {
+        "balance_sheet": "資產負債表",
+        "comprehensive_income": "綜合損益表",
+        "cash_flows": "現金流量表",
+    }
+    if not isinstance(research, dict):
+        return "[Official Taiwan financial-statement research is unavailable; do not infer values from quotes or monthly revenue.]"
+    block = (research.get("blocks") or {}).get("financial_statements")
+    if not isinstance(block, dict):
+        return "[Taiwan financial-statement block is unavailable; do not infer values from quotes or monthly revenue.]"
+    data = block.get("data")
+    if not isinstance(data, dict):
+        return f"[{labels[statement]} unavailable: {block.get('reason') or block.get('status') or 'no data'}]"
+    status = str(block.get("status") or "unknown")
+    qualification = data.get("qualification") or {}
+    coverage = data.get("coverage") or {}
+    if status == "unsupported" or qualification.get("status") == "unsupported":
+        return f"[{labels[statement]} unsupported: {qualification.get('reason') or block.get('reason') or 'issuer qualification'}]"
+    report = data.get("report")
+    if not isinstance(report, dict):
+        discovery = coverage.get("latest_discovery_presence") or "missing"
+        return f"[{labels[statement]} has no retained report for {data.get('fiscal_year')}Q{data.get('fiscal_quarter')}; latest discovery={discovery}.]"
+    facts = [
+        fact for fact in (data.get("facts") or [])
+        if isinstance(fact, dict) and fact.get("statement") == statement
+    ]
+    if not facts:
+        return f"[{labels[statement]} has no returned source facts; status={status}, truncated={bool(data.get('truncated'))}.]"
+    year, quarter = data.get("fiscal_year"), data.get("fiscal_quarter")
+    lines = [
+        f"[{labels[statement]} | {year}Q{quarter} {data.get('report_scope')} | {status}]",
+        f"來源報表 {report.get('member_filename')} · 修訂 {report.get('semantic_revision_id')} · SHA-256 {report.get('raw_sha256')}",
+        f"報表接收 {report.get('original_received_at_utc')} · 最新發現 {coverage.get('latest_discovery_presence')} ({coverage.get('original_received_at_utc')}) · 發布時間未知",
+        "每列保留來源期別與原始事實。duration 期間照原文保留，年初至今值不是單季值；不推導比率。",
+    ]
+    for fact in facts:
+        context = fact.get("context") or {}
+        period = context.get("period") or {}
+        period_text = (
+            period.get("instant") if period.get("kind") == "instant"
+            else f"{period.get('start_date')}..{period.get('end_date')}"
+        )
+        end_date = period.get("instant") if period.get("kind") == "instant" else period.get("end_date")
+        comparative = isinstance(end_date, str) and str(year) not in end_date[:4]
+        period_kind = "比較期" if comparative else "本期"
+        if period.get("kind") == "duration":
+            period_kind += " · 累計/來源期間"
+        unit = fact.get("unit") or {}
+        numerator = ",".join(str(value).rsplit("}", 1)[-1] for value in unit.get("numerator") or [])
+        denominator = ",".join(str(value).rsplit("}", 1)[-1] for value in unit.get("denominator") or [])
+        unit_text = f"{numerator}/{denominator}" if denominator else numerator
+        value = "nil" if fact.get("is_nil") else str(fact.get("value"))
+        lexical = str(fact.get("lexical_value") or "")
+        scale = "not stated" if fact.get("scale") is None else str(fact.get("scale"))
+        sign = f" · sign={fact.get('sign')}" if fact.get("sign") else ""
+        lines.append(
+            f"{fact.get('concept_qname')} | {period_kind} {period_text} | {value} {unit_text} "
+            f"| source={lexical} ×10^{scale}{sign} | decimals={fact.get('decimals')}"
+        )
+    lines.append(
+        f"Facts shown {len(facts)}; endpoint returned {data.get('returned_fact_count')} of "
+        f"{data.get('total_fact_count')}; truncated={bool(data.get('truncated'))}."
+    )
+    return "\n".join(lines)
+
+
 def _patched_route_to_vendor(method_name: str, *args, **kwargs):
     """模組級無狀態 patch:A 股走 PanWatch(讀 _cache()),港股先試上游再兜底,其餘放行。
 
@@ -896,10 +964,7 @@ def _serve_from_panwatch(method_name: str, symbol: str, kwargs: dict, args: tupl
         return f"{header}\n\n{_quote_to_lightweight_fundamentals(symbol)}"
     if "income" in method:
         if _taiwan_identity(symbol):
-            return (
-                f"{header}\n\n[Financial statements are not available for this Taiwan issuer. "
-                "Monthly revenue is not a quarterly income statement.]"
-            )
+            return f"{header}\n\n{_render_taiwan_financial_statement(_taiwan_research_snapshot(symbol), 'comprehensive_income')}"
         if financial:
             from src.modules.automation.tradingagents.data_context import render_income_statement
             return f"{header}\n\n{render_income_statement(financial)}"
@@ -909,7 +974,7 @@ def _serve_from_panwatch(method_name: str, symbol: str, kwargs: dict, args: tupl
         )
     if "balance" in method or "sheet" in method:
         if _taiwan_identity(symbol):
-            return f"{header}\n\n[Balance sheet data is not available for this Taiwan issuer.]"
+            return f"{header}\n\n{_render_taiwan_financial_statement(_taiwan_research_snapshot(symbol), 'balance_sheet')}"
         if financial:
             from src.modules.automation.tradingagents.data_context import render_balance_sheet
             return f"{header}\n\n{render_balance_sheet(financial)}"
@@ -919,7 +984,7 @@ def _serve_from_panwatch(method_name: str, symbol: str, kwargs: dict, args: tupl
         )
     if "cashflow" in method or "cash_flow" in method:
         if _taiwan_identity(symbol):
-            return f"{header}\n\n[Cash flow statement data is not available for this Taiwan issuer.]"
+            return f"{header}\n\n{_render_taiwan_financial_statement(_taiwan_research_snapshot(symbol), 'cash_flows')}"
         if financial:
             from src.modules.automation.tradingagents.data_context import render_cashflow
             return f"{header}\n\n{render_cashflow(financial)}"

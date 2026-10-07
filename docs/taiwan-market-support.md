@@ -84,9 +84,9 @@ remain integer trading units (lots), and the TWMD route separately reads date
 coverage; it does not map those quantities into cash balances.
 
 The stock research panel and `GET /api/research/taiwan` use the shared, read-only
-TWMD research service for six independent blocks: official valuation,
+TWMD research service for eight independent blocks: official valuation,
 institutional share counts, company profile, monthly revenue, margin and short
-sale, and TDCC shareholder distribution. The dedicated
+sale, TDCC shareholder distribution, broker flow and retained financial statements. The dedicated
 `get_taiwan_stock_research` assistant tool uses this same service regardless of
 the legacy provider selectors; `get_stock_fundamentals` and `get_capital_flow`
 continue to respect their individual `TW_*_PROVIDER` setting. TradingAgents
@@ -94,9 +94,16 @@ receives the same structured research payload when Taiwan is enabled. Requests
 use canonical `TWSE:` / `TPEX:` identities, completed Taipei dates, bounded
 date/month windows, isolated block errors, a 25-second aggregate deadline,
 bounded transport attempts and server-side cache/concurrency limits. Provider
-credentials remain on the server. The current service does not integrate complete
-financial statements: monthly revenue and quotes are not income, balance-sheet,
-or cash-flow statements.
+credentials remain on the server. The financial block reads an explicit completed
+fiscal year and quarter, consolidated scope, optional statement and bounded fact
+limit. It supports retained TWSE industry-24 ordinary-equity reports from 2024;
+TPEX, ETFs, other industries and separate-company reports are unsupported. Report
+receipt and latest-discovery evidence remain independent. Exact normalized values,
+source lexical values, scale, units, QName, context period, dimensions and revision
+evidence reach research and AI. Duration facts remain source YTD/comparative values;
+the UI and three TradingAgents statement tools do not subtract quarters or invent
+ratios. A missing newer discovery does not erase a retained report, and truncation
+remains partial.
 
 ## Implemented behavior
 
@@ -112,7 +119,7 @@ or cash-flow statements.
 | Paper trading | Taiwan allocation is configurable and defaults to 0. Entries, exits and manual closes require a confirmed session and unexpired live quote. Regular lots default to 1,000 shares; `TW_PAPER_LOT_SIZE=1` selects an odd-lot quantity assumption. |
 | Costs | Stock sell tax 0.3%; ETF sell tax 0.1%; bond ETF exemption through 2026. Commission and minimum commission are configurable broker assumptions. Taiwan has no mainland transfer fee. |
 | Calendar | Validated TWSE annual schedule cached on disk, including settlement-only closures. Unknown/out-of-year coverage stops Taiwan trading-session jobs. `TW_EXTRA_CLOSED_DATES` adds emergency closure dates. |
-| Financial and chip data | Official twmd valuation, institutional flows and margin are the defaults; FinMind is an explicit alternate for those routes and continues to provide news and dividends. Institutional flows use integer shares, preserve native categories/evidence, and leave cash and unproven five-day totals null. Margin evidence retains integer trading units, coverage and the provider choice without presenting lots as currency. TDCC shareholder distribution is TWSE four-digit only; its large-holding share ratio uses levels 12–15 (>400,000 shares) over the official total row, and weekly comparison requires the exact prior report date and same variant. |
+| Financial and chip data | Official twmd valuation, institutional flows and margin are the defaults; FinMind is an explicit alternate for those routes and continues to provide news and dividends. Institutional flows use integer shares, preserve native categories/evidence, and leave cash and unproven five-day totals null. Margin evidence retains integer trading units, coverage and the provider choice without presenting lots as currency. TDCC shareholder distribution is TWSE four-digit only; its large-holding share ratio uses levels 12–15 (>400,000 shares) over the official total row, and weekly comparison requires the exact prior report date and same variant. Retained consolidated financial statements are limited to TWSE industry-24 ordinary equities; facts preserve source values, scales, units and periods, without quarter subtraction or inferred ratios. |
 | Readiness and subscriptions | `/api/quotes/taiwan/status` reports collection health, durable requested subscriptions, confirmed subscriptions, calendar status and active cash-instrument counts by venue. The watchlist can explicitly request or cancel a subscription through PanWatch's authenticated proxy to twmd control port 9200. Requested subscriptions may remain pending until the collector confirms them. |
 
 ### PW-07 margin and shareholder research
@@ -139,6 +146,35 @@ On 2026-10-07, a bounded read-only query returned three margin rows for each of
 2026-09-04 and no preceding-week report. These samples confirm the observed
 response shapes and the missing-week behavior, not complete date coverage or a
 publisher delivery guarantee. See the [saved live-contract evidence](plans/twmd-integration/evidence/PW-07-live-contract-2026-10-07.json).
+
+### PW-10 financial-statement research
+
+The stock research entry lets the user select a completed fiscal year and quarter;
+its default is the latest completed Taipei quarter. The read asks for consolidated
+facts and can optionally select one of the balance sheet, comprehensive income
+statement or cash-flow statement. Qualification, retained-report coverage and the
+latest issuer discovery remain separate. A retained report remains visible when a
+later discovery no longer advertises it; unsupported issuer types do not trigger a
+financial-statement read.
+
+The panel displays each source fact's expanded concept, current/comparative period,
+exact normalized value and unit, original lexical value, scale, sign and decimals.
+Annual or YTD duration periods retain their source dates, and EPS keeps its exact
+per-share unit. The panel and TradingAgents statement tools do not calculate a
+single quarter from accumulated facts or infer financial ratios. A truncated result
+is marked partial, with returned and total fact counts.
+
+The captured TWSE:2330 2024Q4 response returned 394 of 394 facts with frozen
+industry-24 qualification and a present latest discovery in a bounded GET observed
+at 2026-10-07 11:26:06 UTC (HTTP 200, 19.611 seconds). The report's raw SHA-256 is
+`1deba772079ed08cef1ccaf0430f40b4d36819ae5e5405073e793e6dc1932677`; its profile
+qualification evidence has a separate source hash. The [captured query response](../packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json)
+and [safe observation metadata](../packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json.metadata.json)
+retain those identities and receipts separately. This confirms one retained sample,
+not general report completeness, publication time or update cadence. A later bounded
+check through the normal shared research service returned all 394 financial facts
+in 13.55 seconds; see the [safe service observation](plans/twmd-integration/evidence/PW-10-shared-service-2026-10-07.json). An earlier 20-second request timed out, so
+these successes do not establish a latency SLA.
 
 The cost assumptions follow the [TWSE securities guide](https://www.twse.com.tw/en/about/company/guide.html)
 and [ETF trading rules](https://www.twse.com.tw/en/products/securities/etf/overview/rules.html).
@@ -317,7 +353,7 @@ that its reference-year basis differs from a latest-quarter annualized estimate.
 No quarterly dividend is inferred or multiplied by four.
 Latest-only profiles and retained monthly disclosures keep their own periods;
 partial data and unsupported ETF blocks do not erase available institutional data.
-Complete Taiwan financial statements remain unavailable. Named assistant tool
+PW-10 adds the limited financial-statement block described above. Named assistant tool
 budgets are 28 seconds, the aggregate wall deadline is 25 seconds including the
 catalog, and TradingAgents allows this source 30 seconds independently of its
 other collection sources. Underlying reads retain their concurrency permits until

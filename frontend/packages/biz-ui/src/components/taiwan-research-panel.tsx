@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import { researchApi, type ResearchDataBlock, type ResearchFreshness, type TaiwanResearchPayload } from '@panwatch/api'
 import { Button } from '@panwatch/base-ui/components/ui/button'
 import { BrokerFlowPanel } from './broker-flow-panel'
+import { FinancialStatementsPanel, defaultFiscalScope, maxCompletedQuarter, taipeiTodayParts } from './financial-statements-panel'
 
 type AnyBlock = ResearchDataBlock<Record<string, any>>
 
@@ -430,6 +431,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
   const [payload, setPayload] = useState<TaiwanResearchPayload | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [fiscalScope, setFiscalScope] = useState(defaultFiscalScope)
   const requestSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -439,7 +441,10 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     setError('')
     setPayload(null)
     try {
-      const result = await researchApi.taiwan(symbol)
+      const result = await researchApi.taiwan(symbol, {
+        fiscal_year: fiscalScope.year,
+        fiscal_quarter: fiscalScope.quarter,
+      })
       if (sequence === requestSequence.current) setPayload(result)
     } catch (cause) {
       if (sequence === requestSequence.current) {
@@ -448,7 +453,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     } finally {
       if (sequence === requestSequence.current) setLoading(false)
     }
-  }, [market, symbol])
+  }, [fiscalScope.quarter, fiscalScope.year, market, symbol])
 
   useEffect(() => {
     if (open && market === 'TW') void load()
@@ -468,13 +473,29 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">官方台股研究</h3>
-          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、融資融券、集保持股與券商分點各自標示期間、單位和來源</p>
+          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點與有限範圍財報各自保留來源期間、單位和證據</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading} aria-label="重新載入官方研究資料">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
-      <p className="text-[11px] text-muted-foreground">完整台股財報尚未接入；月營收與報價不是損益表、資產負債表或現金流量表。</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="space-y-1 text-[10px] text-muted-foreground">財報年度
+          <select aria-label="財報年度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.year} onChange={(event) => {
+            const year = Number(event.target.value)
+            const latestQuarter = maxCompletedQuarter(year)
+            setFiscalScope({ year, quarter: Math.min(fiscalScope.quarter, latestQuarter) || 1 })
+          }}>
+            {Array.from({ length: Math.max(1, taipeiTodayParts().year - 2023) }, (_, index) => 2024 + index).map((year) => <option key={year} value={year} disabled={maxCompletedQuarter(year) === 0}>{year}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1 text-[10px] text-muted-foreground">財報季度
+          <select aria-label="財報季度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.quarter} onChange={(event) => setFiscalScope((scope) => ({ ...scope, quarter: Number(event.target.value) }))}>
+            {Array.from({ length: Math.max(1, maxCompletedQuarter(fiscalScope.year)) }, (_, index) => index + 1).map((quarter) => <option key={quarter} value={quarter}>Q{quarter}</option>)}
+          </select>
+        </label>
+        <span className="pb-1 text-[10px] text-muted-foreground">只選已結束的季度；duration 期間以來源事實原樣顯示。</span>
+      </div>
       {loading && !payload ? <div className="text-xs text-muted-foreground py-3">正在載入官方研究資料…</div> : null}
       {error ? <div className="rounded border border-destructive/30 p-3 text-xs text-destructive">{error}</div> : null}
       {blocks ? <>
@@ -487,6 +508,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           <MarginBlock block={blocks.margin_short_sale as AnyBlock} />
           <ShareholderDistributionBlock block={blocks.shareholder_distribution as AnyBlock} />
           <BrokerFlowPanel block={blocks.broker_flow as AnyBlock} />
+          <FinancialStatementsPanel block={blocks.financial_statements as AnyBlock | undefined} />
         </div>
       </> : null}
       {!loading && !error && !payload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}

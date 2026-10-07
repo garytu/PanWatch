@@ -332,6 +332,109 @@ class TwmdMaterialInformationRead:
 
 
 @dataclass(frozen=True)
+class TwmdFinancialStatementDimension:
+    axis_qname: str
+    member_qname: str
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementPeriod:
+    kind: str
+    instant: str | None
+    start_date: str | None
+    end_date: str | None
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementContext:
+    source_id: str
+    entity_identifier: str
+    entity_scheme: str
+    period: TwmdFinancialStatementPeriod
+    dimensions: tuple[TwmdFinancialStatementDimension, ...]
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementUnit:
+    source_id: str
+    numerator: tuple[str, ...]
+    denominator: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementFact:
+    statement: str
+    occurrence_ordinal: int
+    concept_qname: str
+    context: TwmdFinancialStatementContext
+    unit: TwmdFinancialStatementUnit
+    value: str | None
+    is_nil: bool
+    lexical_value: str
+    format_qname: str | None
+    scale: int | None
+    sign: str | None
+    decimals: str | None
+    precision: str | None
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementQualification:
+    status: str
+    reason: str
+    industry_code: str | None
+    catalog_evidence: dict[str, object] | None
+    profile_evidence: dict[str, object] | None
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementCoverage:
+    status: str
+    reason: str
+    latest_discovery_presence: str
+    capture_id: str | None
+    original_received_at_utc: str | None
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementReport:
+    document_id: str
+    capture_id: str
+    semantic_revision_id: str
+    member_filename: str
+    source_url: str
+    raw_sha256: str
+    source_contract: str
+    parser_contract: str
+    original_received_at_utc: str
+    document_first_observed_at_utc: str
+    semantic_revision_first_observed_at_utc: str
+    latest_observed_at_utc: str
+    published_at_utc: str | None
+    amendment_status: str
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementRead:
+    instrument_id: str
+    fiscal_year: int
+    fiscal_quarter: int
+    report_scope: str
+    statement: str | None
+    limit: int
+    qualification: TwmdFinancialStatementQualification
+    coverage: TwmdFinancialStatementCoverage
+    report: TwmdFinancialStatementReport | None
+    facts: tuple[TwmdFinancialStatementFact, ...]
+    total_fact_count: int
+    returned_fact_count: int
+    truncated: bool
+    status: str
+    reason: str
+    endpoint: str = "/api/v1/financial-statements"
+
+
+@dataclass(frozen=True)
 class TwmdCompanyProfileSnapshot:
     """Latest whole-market profile snapshot evidence from twmd."""
 

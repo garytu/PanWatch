@@ -164,3 +164,34 @@ Current reads are retained snapshot observations only: native PARTIAL/MISSING, n
 TWSE:2608/2024 observed 26 history events, January EMPTY inside the complete annual bundle, and limit=1 truncation. TWSE:2330/Oct1..7 current was MISSING despite an Oct4 latest capture. TPEX:5347 and five-digit ETF TWSE:00878 raw queries returned 400; PanWatch preflights unsupported. These retained observations do not establish historical knowledge or future update guarantees.
 
 Exact publisher strings and source IDs accompany the full original text. Current provides no per-event URL; historical MOPS detail selectors reconstruct a POST request, not a navigable permalink. The UI links to the official source and expands retained original text; AI result summaries keep original text, source-local identity and capture evidence. External text is untrusted data, never a tool authorization or instruction. No notification or upstream acquisition is enabled.
+
+## PW-10 financial-statement query contract (2026-10-07)
+
+The PanWatch adapter implements the upstream financial-statements API and
+accepted contract from source checkout
+`5f79d4452b823cf3187fc019c37be909676ce3bd`. A single bounded
+`GET /api/v1/financial-statements` selects `instrument_id`, fiscal year, quarter,
+consolidated report scope, optional statement and limit. PanWatch admits retained
+TWSE industry-24 ordinary equities from 2024. PanWatch preflights TPEX and ETF
+selectors; other industries retain the upstream qualification and unsupported
+reason. Separate-company scope is rejected. Frozen admission remains authoritative
+for retained reports when a later catalog omits or inactivates an issuer.
+
+The typed fact model retains exact Decimal strings alongside source lexical form,
+transform, scale/sign/accuracy, expanded QNames, unit expression, context period
+and dimensions. Comparative periods stay attached to their facts; duration facts
+are never converted from YTD to a single quarter. Report provenance and latest
+discovery are independent, so a retained report survives a later no-report
+discovery. Fact truncation is `partial`; it does not establish a complete report.
+Publication time and amendment status remain unknown. Client cache keys isolate
+endpoint, credentials, canonical issuer, fiscal selectors, statement and limit;
+the research service keeps the read under its aggregate deadline and per-block
+failure isolation.
+
+The [captured TWSE:2330 2024Q4 response](../../../../packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json)
+is one HTTP 200 query observed 2026-10-07T11:26:06.974035Z: 394 facts, qualified
+industry 24, report retained and latest discovery present. Report raw hash
+`1deba772079ed08cef1ccaf0430f40b4d36819ae5e5405073e793e6dc1932677` is distinct
+from profile qualification evidence; [safe query metadata](../../../../packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json.metadata.json)
+records selector, latency and receipts. This sample does not establish report
+completeness for other issuers or quarters, a publication timestamp or update SLA.

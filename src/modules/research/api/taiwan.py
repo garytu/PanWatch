@@ -21,6 +21,9 @@ def get_taiwan_research(
     end_date: str | None = Query(None, min_length=10, max_length=10),
     start_month: str | None = Query(None, min_length=7, max_length=7),
     end_month: str | None = Query(None, min_length=7, max_length=7),
+    fiscal_year: int | None = Query(None, ge=2024),
+    fiscal_quarter: int | None = Query(None, ge=1, le=4),
+    statement: str | None = Query(None, pattern="^(balance_sheet|comprehensive_income|cash_flows)$"),
 ):
     if not is_market_enabled("TW"):
         raise HTTPException(status_code=404, detail="Taiwan market is disabled")
@@ -31,6 +34,9 @@ def get_taiwan_research(
             end_date=end_date,
             start_month=start_month,
             end_month=end_month,
+            fiscal_year=fiscal_year,
+            fiscal_quarter=fiscal_quarter,
+            statement=statement,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

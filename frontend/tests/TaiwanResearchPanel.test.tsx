@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TaiwanResearchPanel } from '@panwatch/biz-ui/components/taiwan-research-panel'
 import { BrokerFlowPanel } from '@panwatch/biz-ui/components/broker-flow-panel'
+import { FinancialStatementsPanel } from '@panwatch/biz-ui/components/financial-statements-panel'
 import { researchApi } from '@panwatch/api'
 
 vi.mock('@panwatch/api', () => ({ researchApi: { taiwan: vi.fn() } }))
@@ -69,7 +70,7 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
         coverage: { block_status: 'partial', requested_month_count: 2, month_presence_counts: { missing: 1, present: 1 } },
       } }),
     },
-    limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
+    limitations: { financial_statements: { status: 'limited_scope', message: 'TWSE industry-24 retained reports.' } },
   })
 
   render(<TaiwanResearchPanel symbol="2330" market="TW" open />)
@@ -101,6 +102,87 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
   expect(screen.getByText('擷取識別碼：profile-capture')).toBeTruthy()
   expect(screen.getByText('擷取識別碼：revenue-capture, row-capture')).toBeTruthy()
   expect(screen.getByText(/月營收是月度公告資料/)).toBeTruthy()
+})
+
+it('lets the stock research entry select a historical fiscal year and quarter', async () => {
+  vi.mocked(researchApi.taiwan).mockResolvedValue({
+    instrument_id: 'TWSE:2330',
+    instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
+    selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10', fiscal_year: 2026, fiscal_quarter: 3, statement: null },
+    blocks: {
+      valuation: block({ observations: [] }),
+      institutional_flows: block({ observations: [] }),
+      company_profile: block(null),
+      monthly_revenues: block({ months: [] }),
+      ...supplementalBlocks(),
+      financial_statements: block(null, 'missing', 'never_collected'),
+    },
+    limitations: { financial_statements: { status: 'limited_scope', message: '' } },
+  } as any)
+
+  render(<TaiwanResearchPanel symbol="2330" market="TW" open />)
+
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledWith('2330', { fiscal_year: expect.any(Number), fiscal_quarter: expect.any(Number) }))
+  fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2024' } })
+  fireEvent.change(screen.getByRole('combobox', { name: '財報季度' }), { target: { value: '4' } })
+
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenLastCalledWith('2330', { fiscal_year: 2024, fiscal_quarter: 4 }))
+})
+
+it('renders current and comparative source facts without deriving quarterly values or rescaling twice', () => {
+  const duration = (year: number) => ({
+    kind: 'duration', instant: null, start_date: `${year}-01-01`, end_date: `${year}-09-30`,
+  })
+  const instant = (value: string) => ({ kind: 'instant', instant: value, start_date: null, end_date: null })
+  const ordinals: Record<string, number> = {}
+  const fact = (statement: string, concept: string, value: string, lexical: string, scale: number, period: any, unit = 'TWD') => ({
+    statement, occurrence_ordinal: ordinals[statement] = (ordinals[statement] || 0) + 1, concept_qname: `{urn:ifrs}${concept}`,
+    context: { source_id: 'source-context', entity_identifier: '2330', entity_scheme: 'http://www.twse.com.tw', period, dimensions: [] },
+    unit: { source_id: unit, numerator: ['{http://www.xbrl.org/2003/iso4217}TWD'], denominator: [] },
+    value, is_nil: false, lexical_value: lexical, format_qname: null, scale, sign: null, decimals: null, precision: null,
+  })
+  const facts = [
+    fact('balance_sheet', 'Assets', '6691938000000', '6,691,938,000', 3, instant('2024-09-30')),
+    fact('balance_sheet', 'Assets', '5532371215000', '5,532,371,215', 3, instant('2023-12-31')),
+    fact('comprehensive_income', 'Revenue', '2894307699000', '2,894,307,699', 3, duration(2024)),
+    fact('comprehensive_income', 'Revenue', '2161738540000', '2,161,738,540', 3, duration(2023)),
+    { ...fact('comprehensive_income', 'BasicEarningsLossPerShare', '45.25', '45.25', 0, duration(2024), 'EarningsPerShare'), unit: { source_id: 'EarningsPerShare', numerator: ['{http://www.xbrl.org/2003/iso4217}TWD'], denominator: ['{http://www.xbrl.org/2003/instance}shares'] } },
+  ]
+  render(<FinancialStatementsPanel block={block({
+    instrument_id: 'TWSE:2330', fiscal_year: 2024, fiscal_quarter: 4, report_scope: 'consolidated',
+    qualification: { status: 'qualified', reason: 'twse_equity_industry_24' },
+    coverage: { status: 'AVAILABLE', latest_discovery_presence: 'present' },
+    report: { member_filename: 'mops-report.html', semantic_revision_id: 'revision-1', original_received_at_utc: '2026-10-04T13:00:00Z' },
+    facts, returned_fact_count: 5, total_fact_count: 5, truncated: false,
+  }) as any} />)
+
+  fireEvent.click(screen.getByText(/綜合損益表 · 3 筆回傳事實/))
+  fireEvent.click(screen.getByText(/資產負債表 · 2 筆回傳事實/))
+  expect(screen.getAllByText(/年初至今（YTD）/).length).toBeGreaterThan(0)
+  expect(screen.queryByText(/全年期間/)).toBeNull()
+  expect(screen.getByText('6691938000000')).toBeTruthy()
+  expect(screen.getByText('6,691,938,000')).toBeTruthy()
+  expect(screen.getAllByText('45.25')).toHaveLength(2)
+  expect(screen.getByText(/scale=0/)).toBeTruthy()
+  expect(screen.getByText(/沒有推導單季值或財務比率/)).toBeTruthy()
+})
+
+it('distinguishes unsupported, no-report discovery, and truncated partial statements', () => {
+  const unsupported = block({ qualification: { status: 'unsupported', reason: 'financial_statements_twse_only' }, coverage: { latest_discovery_presence: 'missing' }, report: null, facts: [] }, 'unsupported', 'financial_statements_twse_only')
+  const noReport = block({ qualification: { status: 'qualified' }, coverage: { status: 'MISSING', latest_discovery_presence: 'not_advertised', reason: 'report_not_advertised' }, report: null, facts: [] }, 'missing', 'report_not_advertised')
+  const partial = block({
+    fiscal_year: 2024, fiscal_quarter: 4, report_scope: 'consolidated',
+    qualification: { status: 'qualified' }, coverage: { status: 'AVAILABLE', latest_discovery_presence: 'present' },
+    report: { member_filename: 'report.html', semantic_revision_id: 'revision-1' }, facts: [],
+    returned_fact_count: 1, total_fact_count: 2, truncated: true,
+  }, 'partial', 'result_truncated')
+
+  const view = render(<FinancialStatementsPanel block={unsupported as any} />)
+  expect(screen.getByText(/不支援：financial_statements_twse_only/)).toBeTruthy()
+  view.rerender(<FinancialStatementsPanel block={noReport as any} />)
+  expect(screen.getByText(/最新成功發現未列出此報表/)).toBeTruthy()
+  view.rerender(<FinancialStatementsPanel block={partial as any} />)
+  expect(screen.getByText(/結果已截斷，只返回 1\/2 筆，屬部分報表/)).toBeTruthy()
 })
 
 it('shows native margin lots and TDCC denominator, and leaves a missing prior week uncomputed', async () => {
@@ -147,7 +229,7 @@ it('shows native margin lots and TDCC denominator, and leaves a missing prior we
       }),
       broker_flow: block(null, 'unknown', 'selected_presence_unreported'),
     },
-    limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
+    limitations: { financial_statements: { status: 'limited_scope', message: 'TWSE industry-24 retained reports.' } },
   } as any)
 
   render(<TaiwanResearchPanel symbol="2330" market="TW" open />)
@@ -181,7 +263,7 @@ it('explains ETF profile and revenue scope while showing the available blocks', 
         { data_month: '2026-08-01', presence: 'not_in_captured_report', row: null },
       ] }, 'unsupported', 'unsupported_etf', { source_contract: 'tpex.openapi.mopsfin_t187ap05_O/v1.0.0', selectors: { instrument_id: 'TPEX:006201', start_month: '2026-08', end_month: '2026-08' } }),
     },
-    limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
+    limitations: { financial_statements: { status: 'limited_scope', message: 'TWSE industry-24 retained reports.' } },
   })
 
   render(<TaiwanResearchPanel symbol="TPEX:006201" market="TW" open />)
@@ -263,7 +345,7 @@ it('keeps dated flow coverage visible beside a timed-out profile without treatin
       company_profile: block(null, 'error', 'timeout', { freshness: { frequency: 'latest_only_snapshot', data_period: null, report_date: null, data_period_age_days: null, source_receipt_age_seconds: null, coverage: { block_status: 'error' } } }),
       monthly_revenues: block(null, 'missing', 'coverage_missing'),
     },
-    limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
+    limitations: { financial_statements: { status: 'limited_scope', message: 'TWSE industry-24 retained reports.' } },
   })
   render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
   await waitFor(() => expect(screen.getByText('來源讀取逾時。')).toBeTruthy())
@@ -291,7 +373,7 @@ it('ignores a late response for the prior venue of the same code', async () => {
       company_profile: block(null, 'missing', 'profile_snapshot_not_retained'),
       monthly_revenues: block({ months: [], units: { revenue: 'TWD thousands' } }, 'missing', 'coverage_missing', { selectors: { start_month: '2025-11', end_month: '2026-10' } }),
     },
-    limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
+    limitations: { financial_statements: { status: 'limited_scope', message: 'TWSE industry-24 retained reports.' } },
   }
   vi.mocked(researchApi.taiwan).mockReturnValueOnce(twse).mockResolvedValueOnce(tpexPayload as any)
   const view = render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)

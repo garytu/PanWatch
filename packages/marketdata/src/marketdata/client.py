@@ -32,6 +32,7 @@ from marketdata.types import (
     ShareholderItem,
     TwmdCompanyProfileRead,
     TwmdMaterialInformationRead,
+    TwmdFinancialStatementRead,
     TwmdBrokerFlowCoverageRead,
     TwmdBrokerFlowPriceLevelsRead,
     TwmdBrokerFlowQuantityRead,
@@ -322,6 +323,25 @@ class MarketData:
         return self._twmd_research_client("material_information").material_information(
             instrument_id, start_date, end_date, source=source, limit=limit,
             today_taipei=today_taipei,
+        )
+
+    def financial_statements(
+        self,
+        instrument_id: str,
+        fiscal_year: int,
+        fiscal_quarter: int,
+        *,
+        report_scope: str = "consolidated",
+        statement: str | None = None,
+        limit: int = 1000,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdFinancialStatementRead:
+        """Read one bounded official TWSE consolidated financial report."""
+        return self._twmd_research_client("financial_statements").financial_statements(
+            instrument_id, fiscal_year, fiscal_quarter, report_scope=report_scope,
+            statement=statement, limit=limit, today_taipei=today_taipei,
+            timeout_sec=timeout_sec,
         )
 
     def monthly_revenues(

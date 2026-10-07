@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import math
 import re
@@ -15,6 +16,7 @@ import httpx
 
 from marketdata.cache import TTLCache
 from marketdata.errors import TwmdReadError
+from marketdata.financial_statements import decode_financial_statement_response
 from marketdata.http import MarketHttpError, MarketHttpResponse, market_get, record_error
 from marketdata.symbol import Symbol
 from marketdata.types import (
@@ -26,6 +28,7 @@ from marketdata.types import (
     TwmdMaterialInformationCapture,
     TwmdMaterialInformationEvent,
     TwmdMaterialInformationRead,
+    TwmdFinancialStatementRead,
     TwmdValuationObservation,
     TwmdValuationRead,
     TwmdCompanyProfile,
@@ -76,6 +79,7 @@ _MONTHLY_REVENUE_MAX_MONTHS = 120
 _RESEARCH_READ_CACHE_TTL_SEC = 300.0
 _company_profile_cache = TTLCache(default_ttl_sec=_RESEARCH_READ_CACHE_TTL_SEC)
 _monthly_revenue_cache = TTLCache(default_ttl_sec=_RESEARCH_READ_CACHE_TTL_SEC)
+_financial_statements_cache = TTLCache(default_ttl_sec=_RESEARCH_READ_CACHE_TTL_SEC)
 _PROFILE_CONTRACTS = {
     "TWSE": "twse_openapi_t187ap03_L/v1",
     "TPEX": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
@@ -1237,6 +1241,73 @@ class TwmdClient:
         if not isinstance(identity, str):
             raise TwmdReadError("twmd instruments response has an invalid instrument_id")
         return identity
+
+    def financial_statements(
+        self,
+        instrument_id: str,
+        fiscal_year: int,
+        fiscal_quarter: int,
+        *,
+        report_scope: str = "consolidated",
+        statement: str | None = None,
+        limit: int = 1000,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdFinancialStatementRead:
+        """Read one explicit retained TWSE consolidated report and its bounded facts."""
+        if not isinstance(instrument_id, str) or not re.fullmatch(r"TWSE:[0-9]{4,6}", instrument_id, re.ASCII):
+            raise ValueError("financial-statement reads require one canonical TWSE issuer")
+        if type(fiscal_year) is not int or fiscal_year < 2024:
+            raise ValueError("financial-statement fiscal_year must be an integer >= 2024")
+        if type(fiscal_quarter) is not int or fiscal_quarter not in (1, 2, 3, 4):
+            raise ValueError("financial-statement fiscal_quarter must be 1 through 4")
+        if report_scope != "consolidated":
+            raise ValueError("only consolidated financial statements are supported")
+        if statement is not None and statement not in {
+            "balance_sheet", "comprehensive_income", "cash_flows",
+        }:
+            raise ValueError("financial-statement statement selector is unsupported")
+        if type(limit) is not int or not 1 <= limit <= 5000:
+            raise ValueError("financial-statement limit must be between 1 and 5000")
+        today = today_taipei or datetime.now(_TAIPEI).date()
+        quarter_end = (
+            date(fiscal_year, 12, 31) if fiscal_quarter == 4
+            else date(fiscal_year, fiscal_quarter * 3 + 1, 1) - timedelta(days=1)
+        )
+        if quarter_end >= today:
+            raise ValueError("financial-statement quarter must be completed in Asia/Taipei")
+
+        cache_key = (
+            self.base_url.rstrip("/"),
+            hashlib.sha256(str(self.config.get("token") or "").encode()).hexdigest(),
+            instrument_id, fiscal_year, fiscal_quarter, report_scope, statement, limit,
+        )
+        cached = _financial_statements_cache.get(cache_key)
+        if cached is not None:
+            return copy.deepcopy(cached)
+        params = {
+            "instrument_id": instrument_id,
+            "fiscal_year": fiscal_year,
+            "fiscal_quarter": fiscal_quarter,
+            "report_scope": report_scope,
+            "limit": limit,
+        }
+        if statement is not None:
+            params["statement"] = statement
+        payload, _response_headers = self.get_response(
+            "financial-statements", timeout_sec=timeout_sec, retries=0, **params,
+        )
+        result = decode_financial_statement_response(
+            payload,
+            instrument_id=instrument_id,
+            fiscal_year=fiscal_year,
+            fiscal_quarter=fiscal_quarter,
+            report_scope=report_scope,
+            statement=statement,
+            limit=limit,
+        )
+        _financial_statements_cache.set(cache_key, copy.deepcopy(result))
+        return result
 
     def material_information(
         self,

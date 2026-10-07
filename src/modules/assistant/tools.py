@@ -139,6 +139,17 @@ async def _fetch_taiwan_research(arguments: dict[str, Any], symbol: str) -> Tool
         for key in ("start_date", "end_date", "start_month", "end_month")
         if arguments.get(key) is not None
     }
+    for key in ("fiscal_year", "fiscal_quarter"):
+        value = arguments.get(key)
+        if value is not None:
+            if type(value) is not int:
+                return ToolResult.failure(
+                    summary="台股財報年度與季度必須是整數。",
+                    error_code="research_scope_invalid",
+                )
+            selectors[key] = value
+    if arguments.get("statement") is not None:
+        selectors["statement"] = str(arguments["statement"])
     try:
         from src.modules.research.taiwan_research import (
             TaiwanResearchService,
@@ -1371,8 +1382,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             name="get_stock_fundamentals",
             title="查詢股票基本面",
             description=(
-                "查詢股票基本面摘要；台股走官方研究區塊。台股完整財報尚未接入，"
-                "月營收與報價不可當成損益表、資產負債表或現金流量表。"
+                "查詢股票基本面摘要；台股走官方研究區塊。財報只支援 2024 年起已留存的 "
+                "TWSE 產業 24 合併資料，且期間、累計性與來源報表必須按原文解讀。"
             ),
             risk=ToolRisk.READ,
             input_schema={
@@ -1411,11 +1422,11 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             name="get_taiwan_stock_research",
             title="查詢台股官方研究資料",
             description=(
-                "查詢 TWMD 官方估值、三大法人股數、公司資料、月營收、融資融券、集保分級持股與券商分點。資料區塊各自帶有狀態、覆蓋、資料期別、來源報表日、receipt 年齡、評估時間、單位與 evidence。"
+                "查詢 TWMD 官方估值、三大法人股數、公司資料、月營收、融資融券、集保分級持股、券商分點與有限範圍財報。財報僅支援 TWSE 產業 24 普通股留存合併報表；可選年度／季度及單一報表。資料區塊各自帶有狀態、覆蓋、來源收據、單位與 evidence。"
                 "來源發布時間或更新 SLA 未提供時，依 evidence 明確標示未知；不要把較早資料當成查詢日資料。"
                 "集保僅支援四位數 TWSE 標的；保管帳戶分級不識別實際投資人。大額比例以官方總計為分母，週變化需同變體精確前週。"
                 "分點僅支援四位數 TWSE；數量最多 31 個日曆日，覆蓋最多 366 日。Capital 張數與 TWSE 精確股數分開，集中度只用已回傳來源數量；買賣 VWAP 是來源成交均價，不是持倉成本。價格明細缺口與 revision 警示依 evidence 保留。"
-                "台股財報尚未接入；月營收和報價都不能當成完整損益表、資產負債表或現金流量表。"
+                "財報期間值可能是年初至今或比較期，不能視為單季值；原始發布時間未知。月營收和報價不能替代三表。"
             ),
             risk=ToolRisk.READ,
             input_schema={
@@ -1429,6 +1440,9 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                     "end_date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
                     "start_month": {"type": "string", "pattern": "^\\d{4}-\\d{2}$"},
                     "end_month": {"type": "string", "pattern": "^\\d{4}-\\d{2}$"},
+                    "fiscal_year": {"type": "integer", "minimum": 2024},
+                    "fiscal_quarter": {"type": "integer", "minimum": 1, "maximum": 4},
+                    "statement": {"type": "string", "enum": ["balance_sheet", "comprehensive_income", "cash_flows"]},
                 },
             },
         ),

@@ -46,6 +46,9 @@ def test_taiwan_research_api_is_protected_and_forwards_bounded_selectors(monkeyp
                 "end_date": "2026-10-06",
                 "start_month": "2026-07",
                 "end_month": "2026-08",
+                "fiscal_year": 2024,
+                "fiscal_quarter": 4,
+                "statement": "cash_flows",
             },
         )
 
@@ -56,6 +59,7 @@ def test_taiwan_research_api_is_protected_and_forwards_bounded_selectors(monkeyp
         {
             "start_date": "2026-10-02", "end_date": "2026-10-06",
             "start_month": "2026-07", "end_month": "2026-08",
+            "fiscal_year": 2024, "fiscal_quarter": 4, "statement": "cash_flows",
         },
     )]
 
