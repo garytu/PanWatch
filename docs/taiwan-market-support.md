@@ -367,5 +367,42 @@ shared-service results at 08:16 Taipei are retained in
 
 Final coordinator verification: backend 1180 passed / 3 skipped; frontend
 20 files / 51 tests passed; TypeScript, production build and whitespace check
-passed. PW-05 is completed; PW-06 is the default next ready card. This is code
+passed. PW-05 is completed; at that checkpoint PW-06 was the next ready card.
+The current PW-06 outcome is recorded below. This is code
 and bounded read-only acceptance, with no deployment or continuous-refresh claim.
+
+
+## PW-06 official-condition discovery (2026-10-07)
+
+The dashboard's Taiwan stock-discovery panel and the deferred read-only assistant
+`screen_taiwan_official_stocks` tool now share an opt-in official screen via
+`POST /api/discovery/stocks/screen`. Users can select PE/PB ceilings, a dividend
+yield floor, monthly revenue YoY and single-day institutional net shares. The
+existing hot-stock array API and price-ordering modes remain available. Taiwan
+empty results never fall back to local strategy snapshots or disabled sources.
+
+The screen selects at most 2,000 canonical active EQUITY/ETF catalog IDs in
+canonical order, ranks their current official EOD snapshots by turnover, then
+reads factors for at most 20 candidates. The response reports the sampling bias,
+price and research dates separately, inclusion/exclusion explanations, source
+lineage, logical reads, actual HTTP attempts, cache hits and incomplete scans.
+Warrants, ETNs and preferred instruments are excluded; ETF issuer revenue and
+unsupported TPEx valuation selectors are excluded before requesting them.
+Missing values remain null. Each factor uses the latest retained source row,
+without filling its null fields from older periods or claiming a shared date.
+
+Two screen requests may run concurrently, with four price-batch workers and
+four factor workers, a 30-second aggregate deadline and at most 15 seconds for
+the price stage. Running factor work retains its screen permit after timeout.
+The bounded factor cache has 512 entries and a 300-second TTL; freshness is
+re-evaluated on return. Daily factors must be within seven calendar days; monthly
+revenue must be within 90 days measured from month-end. These consumer rules do
+not establish an exchange calendar, publisher SLA or continuous refresh.
+Institutional conditions use one day only, without consecutive-buy inference.
+
+Independent coordinator verification after fixes: backend **1204 passed /
+3 skipped**, frontend **21 files / 54 tests passed**, TypeScript, production build
+and diff checks passed. PW-06 is completed in code and offline verification,
+through [PR #1](https://github.com/garytu/PanWatch/pull/1); no merge, deployment,
+upstream acquisition/schedule/subscription change or new live acceptance was
+performed. The default next task is **PW-07 ready**; PW-13 still needs PW-11/PW-12.

@@ -1,8 +1,10 @@
 import logging
 import time
+import asyncio
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy.orm import Session
 
 from src.platform.runtime.config import Settings
@@ -135,8 +137,23 @@ async def _hot_stocks_live_or_snapshot(
             return data
     except Exception as e:
         logger.warning(f"discovery stocks live failed ({mkt}/{mode}): {type(e).__name__}: {e!r}")
+    if mkt == "TW":
+        # Taiwan price discovery must stay on the configured TWMD source. A
+        # local strategy snapshot is not an eligible fallback for this route.
+        return []
     # Snapshot fallback: ensures UI is still usable when live source timeout/unavailable.
     return _latest_snapshot_stocks(db, mkt, limit=max(limit, 40))
+
+
+class TaiwanDiscoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pe_max: float | None = Field(default=None, gt=0, le=1000, strict=True)
+    pb_max: float | None = Field(default=None, gt=0, le=1000, strict=True)
+    dividend_yield_min_pct: float | None = Field(default=None, ge=0, le=1000, strict=True)
+    revenue_yoy_min_pct: float | None = Field(default=None, ge=-1000, le=100000, strict=True)
+    institutional_net_min_shares: StrictInt | None = Field(default=None, ge=-10_000_000_000, le=10_000_000_000)
+    limit: StrictInt = Field(default=20, ge=1, le=20)
 
 
 def _watchlist_symbols(db: Session, market: str) -> set[str]:
@@ -261,6 +278,27 @@ async def get_hot_stocks(
         )
     _cache_set(key, data)
     return data
+
+
+@router.post("/stocks/screen")
+async def screen_taiwan_stocks(request: TaiwanDiscoveryRequest):
+    """Opt-in official Taiwan discovery over a bounded price-ranked candidate set."""
+    conditions = request.model_dump(exclude={"limit"}, exclude_none=True)
+    if not conditions:
+        raise HTTPException(400, "至少選擇一項官方資料條件")
+    try:
+        from src.modules.research.taiwan_discovery import TaiwanDiscoveryService
+
+        return await asyncio.to_thread(
+            TaiwanDiscoveryService().collect,
+            conditions,
+            limit=request.limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Taiwan official discovery failed")
+        raise HTTPException(503, "台股官方條件選股暫時不可用") from exc
 
 
 @router.get("/boards")

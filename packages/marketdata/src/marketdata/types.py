@@ -120,6 +120,33 @@ class HotStock:
 
 
 @dataclass(frozen=True)
+class TaiwanDiscoveryPool:
+    """Bounded TW cash-instrument price pool used by official-factor discovery."""
+
+    items: list[HotStock]
+    status: str
+    catalog_count: int
+    eligible_catalog_count: int
+    scanned_instrument_count: int
+    price_snapshot_count: int
+    catalog_request_count: int
+    price_snapshot_request_count: int
+    price_universe_selected_count: int = 0
+    price_snapshot_batches_planned: int = 0
+    unattempted_price_snapshot_batches: int = 0
+    price_snapshot_batches_pending_count: int = 0
+    ranked_price_count: int = 0
+    failed_request_count: int = 0
+    cache_hits: int = 0
+    partial_scan: bool = False
+    error_reason: str | None = None
+    excluded_security_type_counts: dict[str, int] = field(default_factory=dict)
+    security_type_by_instrument_id: dict[str, str] = field(default_factory=dict)
+    price_data_dates: list[str] = field(default_factory=list)
+    provider_scope: str = ""
+
+
+@dataclass(frozen=True)
 class HotBoard:
     """熱門板塊(對齊 PanWatch src/collectors/discovery_collector.HotBoard)。"""
 

@@ -553,6 +553,63 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             observed_at=datetime.now(UTC),
         )
 
+    async def screen_taiwan_official_stocks(_request: RunRequest, arguments: dict) -> ToolResult:
+        condition_names = (
+            "pe_max", "pb_max", "dividend_yield_min_pct", "revenue_yoy_min_pct",
+            "institutional_net_min_shares",
+        )
+        conditions = {key: arguments[key] for key in condition_names if arguments.get(key) is not None}
+        if set(arguments).difference((*condition_names, "limit")):
+            return ToolResult.failure(
+                summary="不支援此篩選條件；法人目前只支援單日買賣超。",
+                error_code="discovery_condition_invalid",
+            )
+        raw_limit = arguments.get("limit", 20)
+        if isinstance(raw_limit, bool) or not isinstance(raw_limit, int) or not 1 <= raw_limit <= 20:
+            return ToolResult.failure(
+                summary="官方台股選股的結果數必須介於 1 到 20。",
+                error_code="discovery_limit_invalid",
+            )
+        try:
+            from src.modules.research.taiwan_discovery import TaiwanDiscoveryService
+
+            result = await asyncio.to_thread(
+                TaiwanDiscoveryService().collect,
+                conditions,
+                limit=raw_limit,
+            )
+        except ValueError as exc:
+            return ToolResult.failure(
+                summary=str(exc), error_code="discovery_condition_invalid"
+            )
+        except Exception:  # noqa: BLE001 - provider details stay server-side
+            return ToolResult.failure(
+                summary="台股官方條件選股暫時不可用。",
+                error_code="taiwan_discovery_unavailable",
+            )
+
+        count = len(result.get("matches") or [])
+        scope = result.get("scope") or {}
+        selectors = result.get("selectors") or {}
+        partial = "；目前為部分掃描" if scope.get("partial_scan") else ""
+        condition_summary = "、".join(
+            f"{item.get('label')} {item.get('operator')} {item.get('threshold')} {item.get('unit')}"
+            for item in (result.get("conditions") or {}).values()
+        )
+        summary = (
+            f"官方條件（{condition_summary}）符合 {count} 檔台股候選{partial}。"
+            f"估值／法人日期範圍 {selectors.get('daily_start_date')} 至 {selectors.get('daily_end_date')}；"
+            f"營收期別 {selectors.get('revenue_start_month')} 至 {selectors.get('revenue_end_month')}；"
+            f"成交額候選 {scope.get('candidates_selected', 0)} 檔，來源讀取 {((scope.get('request_counts') or {}).get('total', 0))} 次，"
+            f"HTTP {((scope.get('request_counts') or {}).get('total_http_attempts', 0))} 次。"
+        )
+        return ToolResult.success(
+            summary=summary,
+            data=result,
+            sources=[{"name": "TWMD 官方台灣市場資料"}],
+            observed_at=datetime.now(UTC),
+        )
+
     async def get_hot_boards(_request: RunRequest, arguments: dict) -> ToolResult:
         market = _market_argument(arguments)
         if market is None:
@@ -1176,6 +1233,31 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
     )
     registry.register(
         ToolSpec(
+            name="screen_taiwan_official_stocks",
+            title="依官方條件篩選台股",
+            description=(
+                "明確提供至少一項條件，在有限的 TWSE/TPEX active EQUITY／ETF 價格候選中篩選。"
+                "回傳條件、各候選的資料日期、匹配解釋、missing/stale/unsupported 原因、掃描範圍與請求／快取數。"
+                "法人條件只使用單日官方股數，不推算連買日數。"
+            ),
+            risk=ToolRisk.READ,
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "pe_max": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000, "description": "官方估值 PE 上限"},
+                    "pb_max": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000, "description": "官方估值 PB 上限"},
+                    "dividend_yield_min_pct": {"type": "number", "minimum": 0, "maximum": 1000, "description": "官方殖利率下限，百分比"},
+                    "revenue_yoy_min_pct": {"type": "number", "minimum": -1000, "maximum": 100000, "description": "最新有資料月的官方營收年增率下限，百分比"},
+                    "institutional_net_min_shares": {"type": "integer", "minimum": -10000000000, "maximum": 10000000000, "description": "單日三大法人淨買賣股數下限"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 20},
+                },
+            },
+        ),
+        screen_taiwan_official_stocks,
+    )
+    registry.register(
+        ToolSpec(
             name="get_hot_boards",
             title="查詢熱門板塊",
             description="按漲幅、成交額或熱度查詢指定市場的熱門板塊和主題。",
@@ -1465,6 +1547,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
         "find_research_candidates",
         "get_kline_summary",
         "get_hot_stocks",
+        "screen_taiwan_official_stocks",
         "get_hot_boards",
         "get_board_stocks",
         "get_stock_fundamentals",

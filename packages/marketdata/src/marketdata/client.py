@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -30,6 +32,7 @@ from marketdata.types import (
     ShareholderItem,
     TwmdCompanyProfileRead,
     TwmdMonthlyRevenueRead,
+    TaiwanDiscoveryPool,
 )
 from marketdata.vendors.discovery import DiscoveryVendor
 from marketdata.vendors.news import EastmoneyStockNewsVendor
@@ -58,6 +61,11 @@ INDEX_TENCENT: dict[str, str] = {
 }
 
 _TAIPEI = ZoneInfo("Asia/Taipei")
+_TW_DISCOVERY_PRICE_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tw-discovery-price")
+_TW_DISCOVERY_PRICE_SLOTS = threading.BoundedSemaphore(4)
+_TW_DISCOVERY_MAX_PRICE_IDS = 2_000
+_TW_DISCOVERY_PRICE_BATCH_SIZE = 100
+_TW_DISCOVERY_PRICE_SCAN_TIMEOUT_SEC = 15.0
 
 
 def _completed_research_window(
@@ -510,31 +518,282 @@ class MarketData:
     def hot_stocks(self, **kw) -> list[HotStock]:
         """熱門/異動股(東財榜單,市場級、不經 Engine)。"""
         if kw.get("market") == "TW":
-            from marketdata.vendors.twmd import TwmdClient, number
-            sources = self.config.sources_for("quote", "TW")
-            source = next((source for source in sources if source.vendor == "twmd" and source.enabled), None)
-            if source is None:
-                return []
-            client = TwmdClient(source.config)
-            ids = [row["instrument_id"] for row in client.instruments()
-                   if row.get("is_active") and row.get("security_type") in {"EQUITY", "ETF", "PREFERRED"}]
-            rows = []
-            for offset in range(0, len(ids), 100):
-                payload = client.get("price-snapshots", instrument_ids=",".join(ids[offset:offset + 100])) or {}
-                rows.extend(payload.get("snapshots", []))
-            rows = [row for row in rows if number(row.get("close")) is not None
-                    and (row.get("availability") or {}).get("status") == "available"
-                    and ((row.get("availability") or {}).get("freshness") or {}).get("status") == "current"]
-            field = "value" if kw.get("mode", "turnover") == "turnover" else "change_pct"
-            rows = [row for row in rows if number(row.get(field)) is not None]
-            rows.sort(key=lambda row: number(row[field]), reverse=True)
-            return [HotStock(symbol=row["instrument_id"], market="TW", name=row.get("name") or row["symbol"],
-                             price=number(row["close"]), change_pct=number(row.get("change_pct")),
-                             turnover=number(row.get("value")), volume=number(row.get("volume")),
-                             price_kind="eod", trade_date=row.get("trade_date"),
-                             freshness=(row.get("availability") or {}).get("freshness") or {})
-                    for row in rows[:int(kw.get("limit", 20))]]
+            pool = self.taiwan_discovery_pool(
+                mode=kw.get("mode", "turnover"),
+                limit=kw.get("limit", 20),
+                max_universe_size=None,
+            )
+            return pool.items
         return self._discovery.hot_stocks(**kw)
+
+    def taiwan_discovery_pool(
+        self,
+        *,
+        mode: str = "turnover",
+        limit: int = 20,
+        max_universe_size: int | None = _TW_DISCOVERY_MAX_PRICE_IDS,
+        deadline_monotonic: float | None = None,
+    ) -> TaiwanDiscoveryPool:
+        """Return a venue-aware, current-price ranked pool for TW research.
+
+        The bounded default examines at most 2,000 canonical catalog IDs. IDs
+        are selected in canonical order before ranking, so any truncation is
+        deterministic and must be reported by callers. The legacy hot_stocks
+        path passes ``None`` to keep its existing whole-catalog ranking scope.
+        """
+        from marketdata.vendors import twmd
+        from marketdata.vendors.twmd import TwmdClient, number
+
+        selected_limit = max(1, min(int(limit), 100))
+        if mode not in {"turnover", "gainers"}:
+            raise ValueError("Taiwan discovery mode must be turnover or gainers")
+        if max_universe_size is not None:
+            if isinstance(max_universe_size, bool) or not isinstance(max_universe_size, int):
+                raise ValueError("max_universe_size must be a positive integer or None")
+            max_universe_size = max(1, min(max_universe_size, _TW_DISCOVERY_MAX_PRICE_IDS))
+
+        sources = [source for source in self.config.sources_for("quote", "TW") if source.enabled]
+        if len(sources) != 1 or sources[0].vendor != "twmd":
+            return TaiwanDiscoveryPool(
+                items=[], status="quote_source_disabled", catalog_count=0,
+                eligible_catalog_count=0, scanned_instrument_count=0,
+                price_snapshot_count=0, catalog_request_count=0,
+                price_snapshot_request_count=0,
+            )
+
+        source = sources[0]
+        client = TwmdClient(source.config)
+        scan_deadline = time.monotonic() + _TW_DISCOVERY_PRICE_SCAN_TIMEOUT_SEC
+        if deadline_monotonic is not None:
+            scan_deadline = min(scan_deadline, deadline_monotonic)
+        catalog_key = (client.base_url, client.config.get("token"))
+        cached_catalog = twmd._catalog_cache.get(catalog_key)
+        catalog_cached = cached_catalog is not None
+        catalog_error = None
+        if cached_catalog is not None:
+            catalog = cached_catalog
+            catalog_request_count = 0
+        else:
+            remaining = scan_deadline - time.monotonic()
+            if remaining <= 0:
+                catalog, catalog_error, catalog_request_count = [], "timeout", 0
+            else:
+                catalog_request_count = 1
+                try:
+                    configured_timeout = min(float(source.config.get("timeout_sec") or 5), 5.0)
+                    catalog_payload, _headers = client.get_response(
+                        "instruments",
+                        timeout_sec=min(configured_timeout, remaining),
+                        retries=0,
+                    )
+                    if not isinstance(catalog_payload, list):
+                        raise ValueError("invalid_instruments_response")
+                    catalog = [
+                        row for row in catalog_payload
+                        if isinstance(row, dict) and row.get("venue") in {"TWSE", "TPEX"}
+                    ]
+                    if catalog:
+                        twmd._catalog_cache.set(catalog_key, catalog)
+                except Exception as exc:
+                    catalog, catalog_error = [], getattr(exc, "reason_code", None) or "catalog_error"
+        if not isinstance(catalog, list):
+            catalog = []
+
+        eligible: dict[str, dict] = {}
+        excluded_types: dict[str, int] = {}
+        for row in catalog:
+            if not isinstance(row, dict):
+                continue
+            venue, symbol = row.get("venue"), row.get("symbol")
+            instrument_id = row.get("instrument_id")
+            security_type = row.get("security_type")
+            if venue not in {"TWSE", "TPEX"} or not isinstance(symbol, str):
+                continue
+            if instrument_id != f"{venue}:{symbol}":
+                continue
+            if row.get("is_active") is True and security_type in {"EQUITY", "ETF"}:
+                eligible[instrument_id] = row
+            elif row.get("is_active") is True:
+                type_name = str(security_type or "UNKNOWN")
+                excluded_types[type_name] = excluded_types.get(type_name, 0) + 1
+
+        ids = sorted(eligible)
+        total_eligible = len(ids)
+        if max_universe_size is not None:
+            ids = ids[:max_universe_size]
+        partial_scan = len(ids) < total_eligible
+        chunks = [ids[offset:offset + _TW_DISCOVERY_PRICE_BATCH_SIZE]
+                  for offset in range(0, len(ids), _TW_DISCOVERY_PRICE_BATCH_SIZE)]
+        attempts_lock = threading.Lock()
+        request_attempts = 0
+        requested_ids_count = 0
+        pending_batch_count = 0
+        failed_request_count = 1 if catalog_error else 0
+        snapshots: list[dict] = []
+        partial_scan = partial_scan or bool(catalog_error)
+
+        try:
+            request_timeout = min(float(source.config.get("timeout_sec") or 5), 5.0)
+        except (TypeError, ValueError):
+            request_timeout = 5.0
+        if request_timeout <= 0:
+            request_timeout = 5.0
+
+        def fetch_batch(chunk: list[str]):
+            nonlocal request_attempts, requested_ids_count
+            remaining = scan_deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("discovery request deadline exceeded")
+            with attempts_lock:
+                request_attempts += 1
+                requested_ids_count += len(chunk)
+            return client.get_response(
+                "price-snapshots",
+                instrument_ids=",".join(chunk),
+                timeout_sec=min(request_timeout, remaining),
+                retries=0,
+            )
+
+        for wave_start in range(0, len(chunks), 4):
+            if time.monotonic() >= scan_deadline:
+                partial_scan = True
+                break
+            wave = chunks[wave_start:wave_start + 4]
+            futures = {}
+            for chunk in wave:
+                if not _TW_DISCOVERY_PRICE_SLOTS.acquire(blocking=False):
+                    partial_scan = True
+                    break
+
+                def make_release():
+                    lock = threading.Lock()
+                    released = False
+
+                    def release_once():
+                        nonlocal released
+                        with lock:
+                            if released:
+                                return
+                            released = True
+                        _TW_DISCOVERY_PRICE_SLOTS.release()
+
+                    return release_once
+
+                release_once = make_release()
+
+                def run_batch(selected_chunk=chunk, release=release_once):
+                    try:
+                        return fetch_batch(selected_chunk)
+                    finally:
+                        release()
+
+                try:
+                    future = _TW_DISCOVERY_PRICE_POOL.submit(run_batch)
+                except Exception:
+                    release_once()
+                    partial_scan = True
+                    failed_request_count += 1
+                    break
+                future.add_done_callback(lambda done, release=release_once: release() if done.cancelled() else None)
+                futures[future] = (chunk, release_once)
+            if not futures:
+                break
+
+            done, pending = wait(futures, timeout=max(0.0, scan_deadline - time.monotonic()))
+            pending_batch_count += len(pending)
+            for future in pending:
+                future.cancel()
+                partial_scan = True
+            for future in done:
+                chunk, release_once = futures[future]
+                try:
+                    payload, _headers = future.result()
+                except Exception:
+                    partial_scan = True
+                    failed_request_count += 1
+                    continue
+                batch_rows = payload.get("snapshots") if isinstance(payload, dict) else None
+                if not isinstance(batch_rows, list):
+                    partial_scan = True
+                    failed_request_count += 1
+                    continue
+                expected_ids = set(chunk)
+                returned_ids: set[str] = set()
+                malformed = False
+                for row in batch_rows:
+                    if not isinstance(row, dict):
+                        malformed = True
+                        continue
+                    instrument_id = row.get("instrument_id")
+                    if instrument_id not in expected_ids or instrument_id in returned_ids:
+                        malformed = True
+                        continue
+                    returned_ids.add(instrument_id)
+                    snapshots.append(row)
+                if malformed or returned_ids != expected_ids:
+                    partial_scan = True
+                    failed_request_count += 1
+            if pending:
+                break
+
+        allowed_ids = set(ids)
+        rows = [
+            row for row in snapshots
+            if row.get("instrument_id") in allowed_ids
+            and number(row.get("close")) is not None
+            and (row.get("availability") or {}).get("status") == "available"
+            and ((row.get("availability") or {}).get("freshness") or {}).get("status") == "current"
+        ]
+        field_name = "value" if mode == "turnover" else "change_pct"
+        rows = [row for row in rows if number(row.get(field_name)) is not None]
+        rows.sort(key=lambda row: (-number(row[field_name]), str(row["instrument_id"])))
+        ranked_price_count = len(rows)
+        items = [
+            HotStock(
+                symbol=row["instrument_id"], market="TW",
+                name=row.get("name") or eligible[row["instrument_id"]].get("name") or row["instrument_id"],
+                price=number(row.get("close")), change_pct=number(row.get("change_pct")),
+                turnover=number(row.get("value")), volume=number(row.get("volume")),
+                price_kind="eod", trade_date=row.get("trade_date"),
+                freshness=(row.get("availability") or {}).get("freshness") or {},
+            )
+            for row in rows[:selected_limit]
+        ]
+        unattempted_batches = max(0, len(chunks) - request_attempts)
+        if catalog_error:
+            status = "catalog_error"
+        elif unattempted_batches:
+            status = "partial_price_scan"
+        elif not catalog:
+            status = "catalog_unavailable_or_empty"
+        elif not items:
+            status = "no_current_eligible_prices"
+        else:
+            status = "partial" if partial_scan else "available"
+        data_dates = sorted({item.trade_date for item in items if item.trade_date})
+        return TaiwanDiscoveryPool(
+            items=items, status=status, catalog_count=len(catalog),
+            eligible_catalog_count=total_eligible,
+            scanned_instrument_count=requested_ids_count,
+            price_snapshot_count=len(snapshots),
+            catalog_request_count=catalog_request_count,
+            price_snapshot_request_count=request_attempts,
+            price_universe_selected_count=len(ids),
+            price_snapshot_batches_planned=len(chunks),
+            unattempted_price_snapshot_batches=unattempted_batches,
+            price_snapshot_batches_pending_count=pending_batch_count,
+            ranked_price_count=ranked_price_count,
+            failed_request_count=failed_request_count,
+            cache_hits=1 if catalog_cached else 0,
+            partial_scan=partial_scan or unattempted_batches > 0,
+            excluded_security_type_counts=excluded_types,
+            security_type_by_instrument_id={
+                item.symbol: str(eligible[item.symbol]["security_type"]) for item in items
+            },
+            price_data_dates=data_dates,
+            provider_scope="twmd",
+            error_reason=catalog_error,
+        )
 
     def hot_boards(self, **kw) -> list[HotBoard]:
         """熱門板塊(東財榜單,市場級、不經 Engine)。"""

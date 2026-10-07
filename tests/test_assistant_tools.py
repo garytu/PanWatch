@@ -45,10 +45,46 @@ def test_panwatch_registry_keeps_core_tools_direct_and_defers_specialized_tools(
         "tool_search"
     }
     assert registry.get("get_hot_stocks").spec.exposure is ToolExposure.DEFERRED
+    assert registry.get("screen_taiwan_official_stocks").spec.exposure is ToolExposure.DEFERRED
     assert registry.get("create_price_alert").spec.exposure is ToolExposure.DEFERRED
     assert registry.model_tools(
         _request(), ReadOnlyToolPolicy(), names=["get_hot_stocks"], include_deferred=True
     )[0].name == "get_hot_stocks"
+    assert registry.model_tools(
+        _request(), ReadOnlyToolPolicy(), names=["screen_taiwan_official_stocks"], include_deferred=True
+    )[0].name == "screen_taiwan_official_stocks"
+    from src.modules.assistant.tool_descriptors import PANWATCH_TOOL_DESCRIPTORS
+    assert any(item.tool_name == "screen_taiwan_official_stocks" for item in PANWATCH_TOOL_DESCRIPTORS)
+    session.close()
+    engine.dispose()
+
+
+def test_taiwan_official_screen_tool_returns_conditions_dates_scope_and_explanations(monkeypatch):
+    from src.modules.research.taiwan_discovery import TaiwanDiscoveryService
+
+    engine, session = _session()
+    monkeypatch.setattr(
+        TaiwanDiscoveryService,
+        "collect",
+        lambda self, conditions, *, limit: {
+            "market": "TW",
+            "provider": "twmd_official",
+            "conditions": {"pe_max": {"label": "本益比上限", "operator": "<=", "threshold": str(conditions["pe_max"]), "unit": "倍"}},
+            "selectors": {"daily_start_date": "2026-09-07", "daily_end_date": "2026-10-06", "revenue_start_month": "2025-10", "revenue_end_month": "2026-09"},
+            "scope": {"partial_scan": True, "candidates_selected": 20, "request_counts": {"total": 5}},
+            "matches": [],
+            "excluded": [{"instrument_id": "TWSE:2330", "explanations": ["coverage_missing"]}],
+        },
+    )
+    registry = assistant_tools.build_panwatch_tool_registry(session)
+    result = asyncio.run(registry.execute(
+        "screen_taiwan_official_stocks", _request(), {"pe_max": 20},
+    ))
+    assert result.ok is True
+    assert "本益比上限 <= 20 倍" in result.summary
+    assert "2026-10-06" in result.summary
+    assert result.data["scope"]["partial_scan"] is True
+    assert result.data["excluded"][0]["explanations"] == ["coverage_missing"]
     session.close()
     engine.dispose()
 
@@ -815,3 +851,24 @@ def test_delete_price_alert_removes_rule_and_its_hits():
     assert session.query(PriceAlertHit).count() == 0
     session.close()
     engine.dispose()
+
+
+def test_official_screen_rejects_unsupported_consecutive_day_arguments(monkeypatch):
+    from src.modules.research.taiwan_discovery import TaiwanDiscoveryService
+
+    engine, session = _session()
+    monkeypatch.setattr(
+        TaiwanDiscoveryService, 'collect',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError('unsupported filter was accepted')),
+    )
+    try:
+        registry = assistant_tools.build_panwatch_tool_registry(session)
+        result = asyncio.run(registry.execute(
+            'screen_taiwan_official_stocks', _request(),
+            {'institutional_net_min_shares': 1, 'consecutive_days': 3},
+        ))
+        assert result.ok is False
+        assert result.error_code == 'discovery_condition_invalid'
+    finally:
+        session.close()
+        engine.dispose()

@@ -142,13 +142,84 @@ def test_incomplete_minute_slots_are_not_zero_price_bars(monkeypatch):
 
 
 def test_taiwan_discovery_uses_current_eod_not_unsubscribed_live_universe(monkeypatch):
-    def get(url, **kw):
-        if url.endswith("instruments"):
-            return [instrument("TWSE:2330"), instrument("TPEX:6488"), instrument("TWSE:9999", security_type="WARRANT")]
-        return {"snapshots": [snapshot(), {**snapshot("TPEX:6488"), "value": 2000000},
-                              {**snapshot("TWSE:9999"), "availability": {"status": "available", "freshness": {"status": "stale"}}}]}
-    monkeypatch.setattr(twmd, "market_get", get)
+    from marketdata.vendors.twmd import TwmdClient
+
+    def get_response(self, path, **kw):
+        if path == "instruments":
+            return [
+                instrument("TWSE:2330"), instrument("TPEX:6488"),
+                instrument("TWSE:9999", security_type="WARRANT"),
+                instrument("TWSE:7777", is_active=False),
+                instrument("TWSE:00878", security_type="ETF"),
+                instrument("TPEX:00679B", security_type="ETN"),
+                instrument("TPEX:1234", security_type="PREFERRED"),
+            ], {}
+        requested = kw["instrument_ids"].split(",")
+        rows = [
+            snapshot(identity) if identity != "TPEX:6488" else {**snapshot(identity), "value": 2000000}
+            for identity in requested if identity in {"TWSE:2330", "TPEX:6488"}
+        ]
+        # A faulty provider cannot expand the eligible candidate set by
+        # injecting an ID outside the exact requested chunk.
+        rows.append({**snapshot("TWSE:9999"), "availability": {"status": "available", "freshness": {"status": "current"}}})
+        return {"snapshots": rows}, {}
+
+    monkeypatch.setattr(TwmdClient, "get_response", get_response)
     md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
     rows = md.hot_stocks(market="TW", mode="turnover", limit=10)
     assert [row.symbol for row in rows] == ["TPEX:6488", "TWSE:2330"]
     assert all(row.price_kind == "eod" for row in rows)
+
+    pool = md.taiwan_discovery_pool(mode="turnover", limit=10, max_universe_size=10)
+    assert [row.symbol for row in pool.items] == ["TPEX:6488", "TWSE:2330"]
+    assert pool.partial_scan is True
+    assert pool.excluded_security_type_counts == {"WARRANT": 1, "ETN": 1, "PREFERRED": 1}
+    assert pool.eligible_catalog_count == 3
+    assert pool.price_snapshot_request_count == 1
+    assert pool.scanned_instrument_count == 3
+    assert pool.provider_scope == "twmd"
+
+
+def test_taiwan_discovery_never_falls_back_when_quote_twmd_is_disabled(monkeypatch):
+    from marketdata.vendors.twmd import TwmdClient
+
+    monkeypatch.setattr(
+        TwmdClient,
+        "get_response",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("disabled TWMD was queried")),
+    )
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd", enabled=False)]}))
+    pool = md.taiwan_discovery_pool(max_universe_size=20)
+    assert pool.status == "quote_source_disabled"
+    assert pool.items == []
+    assert pool.catalog_request_count == 0
+    assert pool.price_snapshot_request_count == 0
+
+
+def test_taiwan_discovery_universe_limit_rejects_non_integer_overrides():
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
+    with pytest.raises(ValueError, match="positive integer"):
+        md.taiwan_discovery_pool(max_universe_size=1.5)
+
+
+def test_taiwan_discovery_hard_caps_custom_price_universe(monkeypatch):
+    from marketdata.vendors.twmd import TwmdClient
+
+    catalog = [instrument(f"TWSE:{10000 + index}") for index in range(2001)]
+    requested_batches = []
+
+    def get_response(self, path, **kw):
+        if path == "instruments":
+            return catalog, {}
+        identities = kw["instrument_ids"].split(",")
+        requested_batches.append(identities)
+        return {"snapshots": [snapshot(identity) for identity in identities]}, {}
+
+    monkeypatch.setattr(TwmdClient, "get_response", get_response)
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
+    pool = md.taiwan_discovery_pool(limit=1, max_universe_size=100_000)
+    assert pool.eligible_catalog_count == 2001
+    assert pool.price_universe_selected_count == 2000
+    assert pool.scanned_instrument_count == 2000
+    assert len(requested_batches) == 20
+    assert pool.partial_scan is True
