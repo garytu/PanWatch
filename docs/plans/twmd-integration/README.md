@@ -6,7 +6,7 @@
 
 ## 下一項
 
-**PW-01–PW-10、PW-12 已完成；目前沒有 ready 卡。** PW-12 由 pw12_corporate_actions_worker（gpt-6-luna／xhigh）實作，主代理獨立審查、修正、重新驗證並提交。下一項 PW-11 仍 waiting，需上游 benchmark 實際採集；本次不啟動其他卡。
+**PW-11 in_progress。** 使用者指定開始 PW-11；PW-01／PW-04 已完成，程式契約可實作。Worker：pw11_benchmarks_worker（gpt-6-luna／xhigh）；主代理負責獨立審查、修正、驗證與提交。2026-10-07 23:50 Taipei 唯讀查詢仍為兩個 benchmark 零筆，運行驗收需上游有界採集；未滿足前不標 completed。
 
 PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值／法人 typed reads、相容介面與來源證據；PW-03 已接入公司資料／月營收 typed reads 與獨立 research blocks。PW-04 已交付有界 research 聚合、既有個股入口的研究面板，以及 assistant／TradingAgents／研究 context 共用資料。PW-05 已交付各區塊 age／coverage、更新 runbook 與四個股票／ETF selectors 的唯讀運行驗收；持續更新仍有上游 manual-only 前提，未變更採集或排程。PW-06 已交付選擇性的官方條件選股、有限候選與讀取統計、逐筆資料日期／來源／排除理由，以及 UI／AI 共用入口。PW-07 已交付原生交易單位的融資融券與集保持股專用區塊，UI／AI 共用六區塊，並明示大額門檻、官方分母、variant／缺週與 TWSE 限制。PW-08 已交付來源／原生單位分組的分點買賣排行、觀察分母集中度、成交 VWAP、逐日覆蓋與已保留的單日價格明細；UI／AI 共用七區塊，筆數／修訂衝突維持部分可用，未 materialized 與空明細狀態分開。PW-09 已接入獨立的 TWSE current／MOPS history 官方事件時間線、原文查詢工具與既有 AI 公告分析；覆蓋、年度採集、修訂及原始取得時間分開，無有效採集證據不能宣稱完整或沒有事件。PW-10 已接入有限範圍的合併財報 typed reads、獨立第八研究區塊、年度／季度選擇與 TradingAgents 三表；原始值、尺度、期間、比較期、修訂及留存／最新發現證據均保留，未推導單季或比率。PW-12 已加入第九研究區塊、台股圖表標記及 raw-price 回測 metadata；除權息／減資原值与失敗狀態分開，覆蓋及公告／付款時間維持未知。其餘卡依下表等待指定。本計劃不授權採集、排程或部署。執行範例：
 
@@ -26,7 +26,7 @@ PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值�
 | PW-08 | [券商分點](cards/PW-08-broker-flow.md) | completed | PW-01、PW-04 | 分點買賣集中程度、VWAP 與覆蓋狀態 |
 | PW-09 | [官方重大訊息](cards/PW-09-material-information.md) | completed | PW-01、PW-04 | 官方事件時間線與 AI 原文分析 |
 | PW-10 | [有限範圍財報](cards/PW-10-financial-statements.md) | completed | PW-03、PW-04 | 支援範圍內的台股財務事實分析 |
-| PW-11 | [大盤基準](cards/PW-11-benchmarks.md) | waiting | PW-01、PW-04；上游採集 | 台股首頁指數與個股相對大盤表現 |
+| PW-11 | [大盤基準](cards/PW-11-benchmarks.md) | in_progress | PW-01、PW-04；上游採集 | 台股首頁指數與個股相對大盤表現 |
 | PW-12 | [除權息與減資事件](cards/PW-12-corporate-actions.md) | completed | PW-01、PW-04 | 解釋事件附近價格跳動與回測限制 |
 | PW-13 | [歷史資料與研究驗證](cards/PW-13-historical-research.md) | waiting | PW-05、PW-06、PW-11、PW-12 | 排除未來資訊、驗證新增研究條件 |
 | PW-14 | [即時指數與分鐘 K](cards/PW-14-live-data.md) | waiting | PW-11；上游交易時段驗收 | 啟用有健康證據的盤中圖表與市場背景 |

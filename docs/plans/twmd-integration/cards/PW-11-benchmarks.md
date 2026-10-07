@@ -1,6 +1,6 @@
 # PW-11：官方大盤基準與相對表現
 
-狀態：waiting。依賴：PW-01、PW-04；上游 benchmark 日線實際採集。Owner：unassigned。
+狀態：in_progress。依賴：PW-01、PW-04（已完成）；運行驗收仍需上游 benchmark 日線實際採集。Owner：pw11_benchmarks_worker（gpt-6-luna／xhigh）。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -44,4 +44,4 @@ src/modules/market/api/market.py、kline_collector.get_index_klines、MarketData
 
 ## 進度與交接
 
-尚未開始。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。
+Coordination checkpoint：in_progress。使用者已指定開始 PW-11，覆寫原 waiting 的實作啟動限制；PW-01／PW-04 已完成，契約與程式可開始。2026-10-07 23:50 Taipei 的唯讀查詢確認 TAIEX／TPEX 日線均零筆。實作 ready 與運行驗收前提分開，未取得真實資料前不能標 completed。本次先完成契約／程式／離線驗證與具體有界採集 runbook；上游 mutation 另依使用者授權執行。既有工作區修改保留，使用目前 codex/taiwan-market-support checkout，worker 不提交、不編輯狀態／owner／board。
