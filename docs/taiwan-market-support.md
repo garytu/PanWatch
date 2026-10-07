@@ -536,3 +536,31 @@ unsupported for broker flow beside its successful other research blocks.
 The source has no exposed publisher SLA, row receipt or historical as-of
 contract. Branch observations do not identify investors or holding cost.
 The next default card is **PW-09 ready**; the PR remains unmerged and undeployed.
+
+
+## PW-13 historical research checkpoint — 2026-10-08
+
+The offline research [runbook](plans/twmd-integration/runbooks/PW-13-historical-research.md)
+and CLI `scripts/research/pw13_historical_research.py` now inventory bounded retained
+evidence and evaluate separately prepared immutable snapshots for the PW-06 conditions.
+Decision-time eligibility uses version-bound observation/receipt clocks, exact source
+values, seven-calendar-day daily freshness and 90 days from revenue month end.
+Latest-only profiles cannot define a historical universe. The evaluator separates
+training/evaluation windows, purges forward outcomes crossing the split, compares
+exact matching venue benchmark dates and reports explicit raw-price cost scenarios.
+Snapshots can be exported locally without overwriting a different retained version;
+this does not enable a production collection or snapshot schedule.
+
+The checked-evidence report contains 12 fixed availability audits, 20 retained factor
+values/nulls and zero eligible forward outcome samples. It is `inventory_only`,
+`evaluation_performed=false`, `insufficient_evidence`: no condition efficacy claim
+is supported. Missing TPEx historical revenue, complete sessions/benchmark coverage,
+point-in-time universes, revisions, company actions and a complete Taiwan cost model
+remain separate evidence requirements. The FY2024Q4 report first observed in October
+2026 cannot inform a 2024 decision. No factor weights or production signals changed.
+
+Coordinator verification: 35 new research tests plus 60 backtest/factor/discovery
+regressions passed; complete backend **1428 passed, 3 skipped**, with 14 existing
+warnings. Repeated CLI output and retained evidence match byte for byte; immutable
+snapshot replay and overwrite protection passed. These are local offline results;
+PW-14 still requires upstream configuration and trading-session acceptance.
