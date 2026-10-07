@@ -23,6 +23,10 @@ import StockPriceAlertPanel from '@panwatch/biz-ui/components/stock-price-alert-
 import { TechnicalBadge } from '@panwatch/biz-ui/components/technical-badge'
 import AddPositionCalculator from '@panwatch/biz-ui/components/add-position-calculator'
 import { TaiwanResearchPanel } from './taiwan-research-panel'
+import {
+  buildMaterialInformationDisplay,
+} from '../lib/material-information-display'
+import { MaterialInformationTimeline } from './material-information-timeline'
 
 interface QuoteResponse {
   symbol: string
@@ -70,6 +74,33 @@ interface NewsItem {
   publish_time: string
   url: string
   symbols?: string[]
+  source_family?: 'current' | 'history'
+  event_identity?: string
+  fact_date?: string
+  clause?: string
+  content_hash?: string
+  revision?: number
+  latest_observed_at_utc?: string
+  first_observed_at_utc?: string
+  event_first_observed_at_utc?: string
+  capture_id?: string
+  source_reference?: {
+    label: string
+    method: 'POST'
+    url: string
+    is_navigable_permalink: false
+  } | null
+}
+
+function taipeiDateString(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now)
+}
+
+function shiftCalendarDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10)
 }
 
 interface HistoryRecord {
@@ -366,6 +397,7 @@ export default function StockInsightModal(props: {
   const [suggestions, setSuggestions] = useState<SuggestionInfo[]>([])
   const [news, setNews] = useState<NewsItem[]>([])
   const [announcements, setAnnouncements] = useState<NewsItem[]>([])
+  const [materialInfoStatuses, setMaterialInfoStatuses] = useState<Record<string, { status: string; reason: string; evidence: Record<string, any> }>>({})
   const [reports, setReports] = useState<HistoryRecord[]>([])
   const [reportTab, setReportTab] = useState<'premarket_outlook' | 'daily_report' | 'news_digest'>('premarket_outlook')
   const [deepResult, setDeepResult] = useState<DeepAnalysisResult | null>(null)
@@ -392,6 +424,7 @@ export default function StockInsightModal(props: {
   const [holdingLoadError, setHoldingLoadError] = useState(false)
   const autoTriggeredRef = useRef<Record<string, number>>({})
   const stockCacheRef = useRef<Record<string, StockItem>>({})
+  const announcementSequenceRef = useRef(0)
   const resolvedName = useMemo(() => props.stockName || quote?.name || symbol, [props.stockName, quote?.name, symbol])
 
   const loadQuote = useCallback(async () => {
@@ -532,8 +565,33 @@ export default function StockInsightModal(props: {
   }, [symbol, newsHours, resolvedName])
 
   const loadAnnouncements = useCallback(async () => {
+    const requestId = ++announcementSequenceRef.current
+    const isCurrentRequest = () => announcementSequenceRef.current === requestId
     if (!symbol) return
+    if (market === 'TW') {
+      setAnnouncements([])
+      setMaterialInfoStatuses({})
+      const endDate = taipeiDateString()
+      const days = Math.max(1, Math.ceil(Number(announcementHours || 168) / 24))
+      const startDate = shiftCalendarDate(endDate, -(days - 1))
+      const families = ['current', 'history'] as const
+      const results = await Promise.allSettled(families.map((source) =>
+        insightApi.materialInformation({
+          instrument_id: symbol,
+          start_date: startDate,
+          end_date: endDate,
+          source,
+          limit: 100,
+        })
+      ))
+      if (!isCurrentRequest()) return
+      const display = buildMaterialInformationDisplay(families, results)
+      setMaterialInfoStatuses(display.statuses)
+      setAnnouncements(display.items)
+      return
+    }
     try {
+      setMaterialInfoStatuses({})
       const runQuery = async (opts: { useName: boolean; filterRelated: boolean }) => {
         const params = new URLSearchParams()
         params.set('hours', announcementHours)
@@ -569,11 +627,11 @@ export default function StockInsightModal(props: {
           return (n.symbols || []).map(x => String(x).toUpperCase()).includes(upperSymbol)
         })
       }
-      setAnnouncements(data || [])
+      if (isCurrentRequest()) setAnnouncements(data || [])
     } catch {
-      setAnnouncements([])
+      if (isCurrentRequest()) setAnnouncements([])
     }
-  }, [symbol, announcementHours, resolvedName])
+  }, [symbol, announcementHours, resolvedName, market])
 
   const loadHoldingAgg = useCallback(async () => {
     if (!symbol) return
@@ -779,6 +837,7 @@ export default function StockInsightModal(props: {
   useEffect(() => {
     if (!props.open || !symbol) return
     loadAnnouncements().catch(() => setAnnouncements([]))
+    return () => { announcementSequenceRef.current++ }
   }, [props.open, symbol, announcementHours, loadAnnouncements])
 
   useEffect(() => {
@@ -1871,7 +1930,14 @@ export default function StockInsightModal(props: {
                     </SelectContent>
                   </Select>
                 </div>
-                {announcements.length === 0 ? (
+                {market === 'TW' ? (
+                  <MaterialInformationTimeline
+                    items={announcements}
+                    statuses={materialInfoStatuses}
+                    startDate={shiftCalendarDate(taipeiDateString(), -(Math.max(1, Math.ceil(Number(announcementHours || 168) / 24)) - 1))}
+                    endDate={taipeiDateString()}
+                  />
+                ) : announcements.length === 0 ? (
                   <div className="card p-6 text-[12px] text-muted-foreground text-center">暫無公告</div>
                 ) : (
                   announcements.map((item, idx) => (

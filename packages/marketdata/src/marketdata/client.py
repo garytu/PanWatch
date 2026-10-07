@@ -31,6 +31,7 @@ from marketdata.types import (
     Request,
     ShareholderItem,
     TwmdCompanyProfileRead,
+    TwmdMaterialInformationRead,
     TwmdBrokerFlowCoverageRead,
     TwmdBrokerFlowPriceLevelsRead,
     TwmdBrokerFlowQuantityRead,
@@ -306,6 +307,22 @@ class MarketData:
     def company_profile(self, symbol: str) -> TwmdCompanyProfileRead:
         """Read the latest official Taiwan issuer profile as a separate typed block."""
         return self._twmd_research_client("company_profile").company_profile(symbol)
+
+    def material_information(
+        self,
+        instrument_id: str,
+        start_date: str | date,
+        end_date: str | date,
+        *,
+        source: str = "current",
+        limit: int = 100,
+        today_taipei: date | None = None,
+    ) -> TwmdMaterialInformationRead:
+        """Read one bounded TWSE issuer event source without source-family merging."""
+        return self._twmd_research_client("material_information").material_information(
+            instrument_id, start_date, end_date, source=source, limit=limit,
+            today_taipei=today_taipei,
+        )
 
     def monthly_revenues(
         self,

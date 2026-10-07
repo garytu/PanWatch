@@ -251,6 +251,87 @@ class TwmdValuationRead:
 
 
 @dataclass(frozen=True)
+class TwmdMaterialInformationEvent:
+    """One source-family-local announcement, preserving publisher text verbatim."""
+
+    instrument_id: str
+    symbol: str
+    announcement_date: str
+    announced_at: str
+    company_name: str
+    subject: str
+    clause: str
+    fact_date: str
+    detail: str
+    content_hash: str
+    revision: int
+    first_observed_at_utc: str
+    event_first_observed_at_utc: str
+    latest_observed_at_utc: str
+    capture_id: str
+    acquisition_date: str
+    payload_sha256: str
+    source_event_id: str | None = None
+    provider_key: str | None = None
+    report_date: str | None = None
+    row_fingerprint: str | None = None
+    detail_subject_raw: str | None = None
+    speaker_name: str | None = None
+    speaker_title: str | None = None
+    speaker_phone: str | None = None
+    revision_count: int | None = None
+    list_payload_sha256: str | None = None
+    source_generated_at: str | None = None
+
+
+@dataclass(frozen=True)
+class TwmdMaterialInformationCapture:
+    """Original capture/acquisition evidence returned by the selected source."""
+
+    capture_id: str
+    received_at_utc: str
+    payload_sha256: str
+    byte_length: int
+    report_date: str | None = None
+    acquisition_date: str | None = None
+    row_count: int | None = None
+    instrument_id: str | None = None
+    query_year: int | None = None
+    response_class: str | None = None
+    coverage_through: str | None = None
+    source_generated_at: str | None = None
+    event_count: int | None = None
+    details_complete: bool | None = None
+
+
+@dataclass(frozen=True)
+class TwmdMaterialInformationRead:
+    """Bounded current or historical TWSE issuer-announcement read."""
+
+    instrument_id: str
+    dataset: str
+    source_contract: str
+    source_family: str
+    unsupported_reason: str | None
+    schema_ready: bool
+    coverage_status: str
+    history_complete: bool
+    history_note: str
+    partial_current_day: bool
+    start_date: str
+    end_date: str
+    limit: int
+    retained_count: int
+    returned_count: int
+    truncated: bool
+    latest_capture: TwmdMaterialInformationCapture | None
+    acquisitions: list[TwmdMaterialInformationCapture]
+    missing_dates: list[str]
+    data: list[TwmdMaterialInformationEvent]
+    response_headers: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class TwmdCompanyProfileSnapshot:
     """Latest whole-market profile snapshot evidence from twmd."""
 

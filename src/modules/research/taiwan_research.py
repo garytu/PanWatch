@@ -30,6 +30,7 @@ from src.modules.research.twmd_margin_shareholders import (
     shareholder_distribution_block,
 )
 from src.modules.research.twmd_broker_flow import broker_flow_block, broker_flow_unsupported_block
+from src.modules.research.twmd_material_information import material_information_block
 from src.platform.marketdata.marketdata_client import twmd_config
 
 _TAIPEI = ZoneInfo("Asia/Taipei")
@@ -51,6 +52,7 @@ _CACHE_TTLS = {
     "margin_short_sale": 300,
     "shareholder_distribution": 300,
     "broker_flow": 300,
+    "material_information": 300,
 }
 _CACHE: OrderedDict[tuple, tuple[float, Any]] = OrderedDict()
 _CACHE_LOCK = threading.RLock()
@@ -962,6 +964,110 @@ class TaiwanResearchService:
                         )
                 submit_available()
             return self._result(canonical, instrument, selectors, blocks, request_clock)
+        finally:
+            _REQUEST_SLOTS.release()
+
+    def material_information(
+        self,
+        instrument_id: str,
+        *,
+        start_date: str,
+        end_date: str,
+        source: str,
+        limit: int = 100,
+        today_taipei: date | None = None,
+    ) -> ResearchDataBlock:
+        """Read one explicit source family for one bounded issuer/date window."""
+        if source not in {"current", "history"}:
+            raise ValueError("source must be current or history")
+        start = _date(start_date, "start_date")
+        end = _date(end_date, "end_date")
+        today = today_taipei or datetime.now(_TAIPEI).date()
+        if start > end:
+            raise ValueError("start_date must not be after end_date")
+        if start < date(2024, 1, 1) or end > today:
+            raise ValueError("material-information dates must be between 2024-01-01 and today")
+        if (end - start).days + 1 > 366:
+            raise ValueError("material-information range is limited to 366 calendar days")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        selectors = {
+            "instrument_id": instrument_id,
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+            "source": source,
+            "limit": str(limit),
+        }
+        endpoint = "/api/v1/material-information"
+        deadline = time.monotonic() + _REQUEST_DEADLINE_SECONDS
+        if not _REQUEST_SLOTS.acquire(blocking=False):
+            return _error_block("concurrency_limit", endpoint, selectors, self.config, instrument_id=instrument_id)
+        try:
+            catalog_future = None
+            try:
+                rows = _cache_get((*_scope(self.config), "catalog", "TW"))
+                if rows is None:
+                    catalog_future = _submit_read(_instrument_catalog, self.client, self.config)
+                    rows = catalog_future.result(timeout=max(0.0, deadline - time.monotonic()))
+                canonical, instrument = _resolve(rows, instrument_id)
+            except Exception as exc:
+                if catalog_future is not None:
+                    catalog_future.cancel()
+                reason, status_code = _status_error(exc)
+                if isinstance(exc, ValueError):
+                    reason = "ambiguous_instrument" if "needs an explicit" in str(exc) else "invalid_instrument_id"
+                block_status = "unsupported" if reason == "instrument_not_found" else "error"
+                if reason == "instrument_not_found":
+                    reason = "instrument_not_found"
+                return _error_block(
+                    reason, endpoint, selectors, self.config, status=block_status,
+                    instrument_id=instrument_id, http_status=status_code,
+                )
+
+            if not instrument["is_active"]:
+                return _error_block("instrument_inactive", endpoint, selectors, self.config,
+                                    status="unsupported", instrument_id=canonical)
+            if not canonical.startswith("TWSE:") or not re.fullmatch(r"TWSE:[0-9]{4}", canonical):
+                return _error_block("twse_four_digit_only", endpoint, selectors, self.config,
+                                    status="unsupported", instrument_id=canonical)
+            if instrument["security_type"] != "EQUITY":
+                reason = "unsupported_etf" if instrument["security_type"] == "ETF" else "issuer_events_only"
+                return _error_block(reason, endpoint, selectors, self.config,
+                                    status="unsupported", instrument_id=canonical)
+
+            canonical_selectors = {**selectors, "instrument_id": canonical}
+            key = _cache_key(self.config, canonical, "material_information", tuple(canonical_selectors.values()))
+            cached = _cache_get(key)
+            if cached is not None:
+                return cached
+            if time.monotonic() >= deadline:
+                return _error_block("timeout", endpoint, canonical_selectors, self.config, instrument_id=canonical)
+            try:
+                timeout = max(0.1, min(20.0, deadline - time.monotonic()))
+                future = _submit_read(lambda: self.client.material_information(
+                    canonical,
+                    start,
+                    end,
+                    source=source,
+                    limit=limit,
+                    today_taipei=today,
+                    timeout_sec=timeout,
+                ))
+            except RuntimeError:
+                return _error_block("concurrency_limit", endpoint, canonical_selectors, self.config, instrument_id=canonical)
+            try:
+                read = future.result(timeout=max(0.0, deadline - time.monotonic()))
+                block = material_information_block(read)
+                if block.status != "error":
+                    _cache_set(key, block, _CACHE_TTLS["material_information"])
+                return block
+            except Exception as exc:
+                future.cancel()
+                reason, status_code = _status_error(exc)
+                return _error_block(
+                    reason, endpoint, canonical_selectors, self.config,
+                    instrument_id=canonical, http_status=status_code,
+                )
         finally:
             _REQUEST_SLOTS.release()
 

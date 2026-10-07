@@ -23,6 +23,9 @@ from marketdata.types import (
     InstitutionalFlowObservation,
     InstitutionalFlowRead,
     Quote,
+    TwmdMaterialInformationCapture,
+    TwmdMaterialInformationEvent,
+    TwmdMaterialInformationRead,
     TwmdValuationObservation,
     TwmdValuationRead,
     TwmdCompanyProfile,
@@ -65,6 +68,7 @@ _SHAREHOLDER_DISTRIBUTION_ENDPOINT = "/api/v1/shareholder-distribution"
 _BROKER_FLOW_QUANTITIES_ENDPOINT = "/api/v1/broker-flow/quantities"
 _BROKER_FLOW_COVERAGE_ENDPOINT = "/api/v1/broker-flow/coverage"
 _BROKER_FLOW_PRICE_LEVELS_ENDPOINT = "/api/v1/broker-flow/price-levels"
+_MATERIAL_INFORMATION_ENDPOINT = "material-information"
 _BROKER_FLOW_CUTOVER = date(2026, 7, 24)
 _COVERAGE_ENDPOINT = "/api/v1/coverage"
 _MONTHLY_REVENUE_FLOOR = date(2024, 1, 1)
@@ -755,6 +759,231 @@ def _validate_source_date(value, field_name: str) -> str:
     return raw
 
 
+def _material_information_event(
+    row: object, source: str, instrument_id: str
+) -> TwmdMaterialInformationEvent:
+    if not isinstance(row, dict):
+        raise ValueError("material-information rows must be objects")
+    required = {
+        "source_event_id", "instrument_id", "symbol", "announcement_date",
+        "announced_at", "company_name", "subject", "clause", "fact_date",
+        "detail", "content_hash", "revision", "first_observed_at_utc",
+        "event_first_observed_at_utc", "latest_observed_at_utc", "capture_id",
+        "acquisition_date", "payload_sha256",
+    }
+    if source == "history":
+        required |= {
+            "provider_key", "row_fingerprint", "detail_subject_raw", "speaker_name",
+            "speaker_title", "speaker_phone", "revision_count", "list_payload_sha256",
+            "source_generated_at",
+        }
+    missing = required.difference(row)
+    if missing:
+        raise ValueError(f"material-information row is missing {sorted(missing)[0]}")
+    if row.get("instrument_id") != instrument_id:
+        raise ValueError("material-information row instrument_id does not match request")
+    raw_strings = (
+        "symbol", "company_name", "subject", "clause", "detail", "content_hash",
+        "capture_id", "payload_sha256",
+    )
+    values: dict[str, str | None] = {}
+    for name in raw_strings:
+        value = row.get(name)
+        if not isinstance(value, str):
+            raise ValueError(f"material-information {name} must be a string")
+        values[name] = value
+    if values["symbol"] != instrument_id.split(":", 1)[1]:
+        raise ValueError("material-information row symbol does not match request")
+    for name in ("announcement_date", "fact_date", "acquisition_date"):
+        _validate_source_date(row.get(name), name)
+    announced_at = _source_datetime(row.get("announced_at"), "announced_at", required=True)
+    announced_datetime = datetime.fromisoformat((announced_at or "").replace("Z", "+00:00"))
+    if announced_datetime.utcoffset() != timedelta(hours=8):
+        raise ValueError("material-information announced_at must use Asia/Taipei offset")
+    if announced_datetime.date().isoformat() != row["announcement_date"]:
+        raise ValueError("material-information announcement date disagrees with announced_at")
+    first_observed = _source_datetime(row.get("first_observed_at_utc"), "first_observed_at_utc", required=True)
+    event_first_observed = _source_datetime(row.get("event_first_observed_at_utc"), "event_first_observed_at_utc", required=True)
+    latest_observed = _source_datetime(row.get("latest_observed_at_utc"), "latest_observed_at_utc", required=True)
+    revision = _source_int(row.get("revision"), "revision")
+    if revision is None or revision < 1:
+        raise ValueError("material-information revision must be a positive integer")
+
+    optional_strings = (
+        "source_event_id", "provider_key", "report_date", "row_fingerprint",
+        "detail_subject_raw", "speaker_name", "speaker_title", "speaker_phone",
+        "list_payload_sha256",
+    )
+    for name in optional_strings:
+        if name in row:
+            values[name] = _source_string(row.get(name), name)
+    if source == "current":
+        _validate_source_date(row.get("report_date"), "report_date")
+        if not values.get("source_event_id"):
+            raise ValueError("current material-information row has no source_event_id")
+    else:
+        provider_key = values.get("provider_key")
+        if not provider_key or not re.fullmatch(r"sii:[0-9]{4}:[0-9]{7}:[0-9]+", provider_key):
+            raise ValueError("history material-information provider_key is invalid")
+        _company_id, roc_date, _serial = provider_key.split(":")[1:]
+        if _company_id != instrument_id.split(":", 1)[1]:
+            raise ValueError("history provider_key issuer does not match request")
+        event_date = date.fromisoformat(row["announcement_date"])
+        provider_date = date(
+            int(roc_date[:3]) + 1911, int(roc_date[3:5]), int(roc_date[5:7])
+        )
+        if provider_date != event_date:
+            raise ValueError("history provider_key date does not match announcement_date")
+        _source_datetime(row.get("source_generated_at"), "source_generated_at", required=True)
+        revision_count = _source_int(row.get("revision_count"), "revision_count")
+        if revision_count is None or revision_count < 1:
+            raise ValueError("history material-information revision_count is invalid")
+    return TwmdMaterialInformationEvent(
+        instrument_id=instrument_id,
+        symbol=values["symbol"] or "",
+        announcement_date=row["announcement_date"],
+        announced_at=announced_at or "",
+        company_name=values["company_name"] or "",
+        subject=values["subject"] or "",
+        clause=values["clause"] or "",
+        fact_date=row["fact_date"],
+        detail=values["detail"] or "",
+        content_hash=values["content_hash"] or "",
+        revision=revision,
+        first_observed_at_utc=first_observed or "",
+        event_first_observed_at_utc=event_first_observed or "",
+        latest_observed_at_utc=latest_observed or "",
+        capture_id=values["capture_id"] or "",
+        acquisition_date=row["acquisition_date"],
+        payload_sha256=values["payload_sha256"] or "",
+        source_event_id=values.get("source_event_id"),
+        provider_key=values.get("provider_key"),
+        report_date=values.get("report_date"),
+        row_fingerprint=values.get("row_fingerprint"),
+        detail_subject_raw=values.get("detail_subject_raw"),
+        speaker_name=values.get("speaker_name"),
+        speaker_title=values.get("speaker_title"),
+        speaker_phone=values.get("speaker_phone"),
+        revision_count=_source_int(row.get("revision_count"), "revision_count"),
+        list_payload_sha256=values.get("list_payload_sha256"),
+        source_generated_at=row.get("source_generated_at"),
+    )
+
+
+def _material_information_capture(
+    value: object, source: str
+) -> TwmdMaterialInformationCapture | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("material-information capture must be an object or null")
+    common = {"capture_id", "received_at_utc", "payload_sha256", "byte_length"}
+    source_fields = {"report_date", "acquisition_date", "row_count"} if source == "current" else {
+        "instrument_id", "query_year", "response_class", "coverage_through",
+        "source_generated_at", "event_count", "details_complete",
+    }
+    missing = (common | source_fields).difference(value)
+    if missing:
+        raise ValueError(f"material-information capture is missing {sorted(missing)[0]}")
+    capture_id = _source_string(value.get("capture_id"), "capture.capture_id", required=True) or ""
+    received_at = _source_datetime(value.get("received_at_utc"), "capture.received_at_utc", required=True) or ""
+    payload_hash = _source_string(value.get("payload_sha256"), "capture.payload_sha256", required=True) or ""
+    byte_length = _source_int(value.get("byte_length"), "capture.byte_length")
+    if byte_length is None or byte_length < 0:
+        raise ValueError("material-information capture byte_length is invalid")
+    optional: dict[str, str | int | bool | None] = {}
+    for name in ("report_date", "acquisition_date", "coverage_through", "source_generated_at"):
+        if name in value:
+            raw = value.get(name)
+            if name in {"report_date", "acquisition_date"} and raw is not None:
+                raw = _validate_source_date(raw, f"capture.{name}")
+            elif name in {"coverage_through", "source_generated_at"} and raw is not None:
+                raw = _source_datetime(raw, f"capture.{name}")
+            else:
+                raw = _source_string(raw, f"capture.{name}")
+            optional[name] = raw
+    for name in ("row_count", "query_year", "event_count"):
+        if name in value:
+            optional[name] = _source_int(value.get(name), f"capture.{name}")
+    if source == "history":
+        if value.get("response_class") not in {"positive", "unverified_no_data"}:
+            raise ValueError("history capture response_class is invalid")
+        if not isinstance(value.get("details_complete"), bool):
+            raise ValueError("history capture details_complete must be boolean")
+        optional["response_class"] = value["response_class"]
+        optional["details_complete"] = value["details_complete"]
+        instrument_id = _source_string(value.get("instrument_id"), "capture.instrument_id", required=True)
+        if instrument_id is None or not re.fullmatch(r"TWSE:[0-9]{4}", instrument_id):
+            raise ValueError("history capture instrument_id is invalid")
+        optional["instrument_id"] = instrument_id
+        year = optional.get("query_year")
+        if isinstance(year, bool) or not isinstance(year, int) or year < 2024:
+            raise ValueError("history capture query_year is invalid")
+        event_count = optional.get("event_count")
+        if not isinstance(event_count, int) or event_count < 0:
+            raise ValueError("history capture event_count is invalid")
+        if optional.get("source_generated_at") is None:
+            raise ValueError("history capture has no source generation clock")
+        if value["response_class"] == "positive":
+            if not value["details_complete"] or event_count == 0 or optional.get("coverage_through") is None:
+                raise ValueError("positive history capture requires a complete nonempty bundle")
+        elif event_count or optional.get("coverage_through") is not None:
+            raise ValueError("unverified no-data capture cannot establish coverage")
+    else:
+        if value.get("report_date") is not None:
+            _validate_source_date(value["report_date"], "capture.report_date")
+        if value.get("acquisition_date") is not None:
+            _validate_source_date(value["acquisition_date"], "capture.acquisition_date")
+    return TwmdMaterialInformationCapture(
+        capture_id=capture_id,
+        received_at_utc=received_at,
+        payload_sha256=payload_hash,
+        byte_length=byte_length,
+        report_date=optional.get("report_date"),
+        acquisition_date=optional.get("acquisition_date"),
+        row_count=optional.get("row_count"),
+        instrument_id=optional.get("instrument_id"),
+        query_year=optional.get("query_year"),
+        response_class=optional.get("response_class"),
+        coverage_through=optional.get("coverage_through"),
+        source_generated_at=optional.get("source_generated_at"),
+        event_count=optional.get("event_count"),
+        details_complete=optional.get("details_complete"),
+    )
+
+
+def _material_information_history_missing_dates(acquisitions, start: date, end: date) -> list[str]:
+    """Verify complete dates using the original positive annual bundle clocks."""
+    positive = {}
+    for capture in acquisitions:
+        year = capture.query_year
+        if not start.year <= year <= end.year:
+            raise ValueError("history acquisition year is outside the query scope")
+        if capture.response_class != "positive":
+            continue
+        received = datetime.fromisoformat(capture.received_at_utc.replace("Z", "+00:00"))
+        generated = datetime.fromisoformat(capture.source_generated_at.replace("Z", "+00:00"))
+        cutoff = min(received, generated).astimezone(_TAIPEI)
+        if year > cutoff.year:
+            raise ValueError("history acquisition year is after its original clocks")
+        through = datetime.fromisoformat(capture.coverage_through.replace("Z", "+00:00"))
+        year_end = datetime(year, 12, 31, 23, 59, 59, tzinfo=_TAIPEI)
+        if through != min(year_end, cutoff):
+            raise ValueError("history coverage-through disagrees with acquisition clocks")
+        previous = positive.get(year)
+        order = (received, capture.capture_id)
+        if previous is None or order > previous[0]:
+            complete_end = date(year, 12, 31) if year < cutoff.year else cutoff.date() - timedelta(days=1)
+            positive[year] = (order, complete_end)
+    missing = []
+    for offset in range((end - start).days + 1):
+        day = start + timedelta(days=offset)
+        proof = positive.get(day.year)
+        if proof is None or day > proof[1]:
+            missing.append(day.isoformat())
+    return missing
+
+
 def _valuation_observation(row, instrument_id: str) -> TwmdValuationObservation:
     if not isinstance(row, dict):
         raise ValueError("valuation rows must be objects")
@@ -1008,6 +1237,180 @@ class TwmdClient:
         if not isinstance(identity, str):
             raise TwmdReadError("twmd instruments response has an invalid instrument_id")
         return identity
+
+    def material_information(
+        self,
+        instrument_id: str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        source: str = "current",
+        limit: int = 100,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdMaterialInformationRead:
+        """Read one bounded TWSE current/history source without merging identities."""
+        if not isinstance(instrument_id, str) or not re.fullmatch(r"TWSE:[0-9]{4}", instrument_id):
+            raise ValueError("material-information reads require TWSE:<four-digit symbol>")
+        if source not in {"current", "history"}:
+            raise ValueError("material-information source must be current or history")
+        start = _date_value(start_date, "start_date")
+        end = _date_value(end_date, "end_date")
+        today = today_taipei or datetime.now(_TAIPEI).date()
+        if start > end:
+            raise ValueError("start_date must not be after end_date")
+        if start < date(2024, 1, 1) or end > today:
+            raise ValueError("material-information bounds must be between 2024-01-01 and today")
+        if (end - start).days + 1 > 366:
+            raise ValueError("material-information reads are limited to 366 calendar days")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("material-information limit must be between 1 and 1000")
+
+        payload, response_headers = self.get_response(
+            _MATERIAL_INFORMATION_ENDPOINT,
+            instrument_id=instrument_id,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            source=source,
+            limit=limit,
+            timeout_sec=timeout_sec,
+            retries=0,
+        )
+        if not isinstance(payload, dict):
+            raise TwmdReadError(
+                "twmd material-information response must be an object",
+                reason_code="invalid_response",
+            )
+        try:
+            required = {
+                "instrument_id", "dataset", "source_contract", "source_family",
+                "unsupported_reason", "schema_ready", "coverage_status",
+                "history_complete", "history_note", "partial_current_day",
+                "start_date", "end_date", "limit", "retained_count",
+                "returned_count", "truncated", "latest_capture", "data",
+            }
+            if source == "history":
+                required |= {"acquisitions", "missing_dates"}
+            if required.difference(payload):
+                raise ValueError(f"response is missing {sorted(required.difference(payload))[0]}")
+            if payload["instrument_id"] != instrument_id or payload["source_family"] != source:
+                raise ValueError("material-information response identity does not match request")
+            if payload["dataset"] not in {"twse_material_information", "mops_material_information_history"}:
+                raise ValueError("material-information dataset is invalid")
+            if source == "current" and payload["dataset"] != "twse_material_information":
+                raise ValueError("current material-information dataset is invalid")
+            if source == "history" and payload["dataset"] != "mops_material_information_history":
+                raise ValueError("historical material-information dataset is invalid")
+            if payload["start_date"] != start.isoformat() or payload["end_date"] != end.isoformat():
+                raise ValueError("material-information response range does not match request")
+            if isinstance(payload["limit"], bool) or not isinstance(payload["limit"], int) or payload["limit"] != limit:
+                raise ValueError("material-information response limit does not match request")
+            schema_ready = payload["schema_ready"]
+            history_complete = payload["history_complete"]
+            partial_current_day = payload["partial_current_day"]
+            truncated = payload["truncated"]
+            if any(not isinstance(value, bool) for value in (schema_ready, history_complete, partial_current_day, truncated)):
+                raise ValueError("material-information flags must be boolean")
+            if source == "current" and history_complete:
+                raise ValueError("current material-information cannot claim complete history")
+            coverage_status = payload["coverage_status"]
+            valid_coverage = {"PARTIAL", "MISSING"} if source == "current" else {"AVAILABLE", "EMPTY", "PARTIAL", "MISSING"}
+            if coverage_status not in valid_coverage:
+                raise ValueError("material-information coverage status is invalid")
+            counts = (payload["retained_count"], payload["returned_count"])
+            if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts):
+                raise ValueError("material-information counts must be non-negative integers")
+            if payload["retained_count"] < payload["returned_count"]:
+                raise ValueError("material-information counts are inconsistent")
+            if truncated != (payload["retained_count"] > payload["returned_count"]):
+                raise ValueError("material-information truncation flag is inconsistent")
+            raw_rows = payload["data"]
+            if not isinstance(raw_rows, list) or len(raw_rows) != payload["returned_count"] or len(raw_rows) > limit:
+                raise ValueError("material-information data count is inconsistent")
+            rows = [_material_information_event(row, source, instrument_id) for row in raw_rows]
+            if any(not start.isoformat() <= row.announcement_date <= end.isoformat() for row in rows):
+                raise ValueError("material-information row is outside the requested date window")
+            keys = [row.source_event_id if source == "current" else row.provider_key for row in rows]
+            if any(not key for key in keys) or len(keys) != len(set(keys)):
+                raise ValueError("material-information rows have missing or duplicate source identities")
+            latest_capture = _material_information_capture(payload["latest_capture"], source)
+            acquisitions_raw = payload.get("acquisitions", [])
+            if not isinstance(acquisitions_raw, list):
+                raise ValueError("material-information acquisitions must be a list")
+            acquisitions = [_material_information_capture(item, source) for item in acquisitions_raw]
+            if any(item is None for item in acquisitions):
+                raise ValueError("material-information acquisition cannot be null")
+            if source == "history":
+                all_captures = [item for item in [latest_capture, *acquisitions] if item is not None]
+                if any(item.instrument_id != instrument_id for item in all_captures):
+                    raise ValueError("history acquisition issuer does not match request")
+            missing_dates = payload.get("missing_dates", [])
+            if not isinstance(missing_dates, list):
+                raise ValueError("material-information missing_dates must be a list")
+            parsed_missing = [_validate_source_date(item, "missing_dates[]") for item in missing_dates]
+            if len(parsed_missing) != len(set(parsed_missing)) or any(
+                item < start.isoformat() or item > end.isoformat() for item in parsed_missing
+            ):
+                raise ValueError("material-information missing_dates are outside the requested window")
+            if source == "history":
+                expected_missing = _material_information_history_missing_dates(acquisitions, start, end)
+                if sorted(parsed_missing) != expected_missing or history_complete != (not expected_missing):
+                    raise ValueError("history completeness requires matching original acquisition evidence")
+                if len({item.capture_id for item in acquisitions}) != len(acquisitions):
+                    raise ValueError("duplicate history acquisition identities")
+                if acquisitions and latest_capture is None:
+                    raise ValueError("history acquisitions require a latest capture")
+                if latest_capture is not None and latest_capture not in acquisitions:
+                    raise ValueError("latest history capture is absent from acquisition evidence")
+                if history_complete and parsed_missing:
+                    raise ValueError("complete history cannot have missing dates")
+                if history_complete and coverage_status != ("AVAILABLE" if payload["retained_count"] else "EMPTY"):
+                    raise ValueError("complete history coverage status is inconsistent")
+                if not history_complete and coverage_status not in {"PARTIAL", "MISSING"}:
+                    raise ValueError("incomplete history coverage status is inconsistent")
+                if coverage_status == "AVAILABLE" and payload["retained_count"] == 0:
+                    raise ValueError("available history requires retained events")
+                if coverage_status == "EMPTY" and payload["retained_count"] != 0:
+                    raise ValueError("empty history cannot have retained events")
+                if coverage_status == "MISSING" and payload["retained_count"] != 0:
+                    raise ValueError("missing history cannot have retained events")
+            elif coverage_status != ("PARTIAL" if payload["retained_count"] else "MISSING"):
+                raise ValueError("current snapshot coverage status is inconsistent")
+            source_contract = _source_string(payload.get("source_contract"), "source_contract", required=True) or ""
+            unsupported_reason = _source_string(payload.get("unsupported_reason"), "unsupported_reason")
+            history_note = _source_string(payload.get("history_note"), "history_note", required=True) or ""
+        except (TypeError, ValueError, KeyError) as exc:
+            raise TwmdReadError(
+                "twmd material-information response violated its contract",
+                reason_code="invalid_response",
+            ) from exc
+
+        return TwmdMaterialInformationRead(
+            instrument_id=instrument_id,
+            dataset=payload["dataset"],
+            source_contract=source_contract,
+            source_family=source,
+            unsupported_reason=unsupported_reason,
+            schema_ready=schema_ready,
+            coverage_status=coverage_status,
+            history_complete=history_complete,
+            history_note=history_note,
+            partial_current_day=partial_current_day,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            limit=limit,
+            retained_count=payload["retained_count"],
+            returned_count=payload["returned_count"],
+            truncated=truncated,
+            latest_capture=latest_capture,
+            acquisitions=[item for item in acquisitions if item is not None],
+            missing_dates=parsed_missing,
+            data=rows,
+            response_headers={
+                key.lower(): value for key, value in response_headers.items()
+                if key.lower() in {"x-twmd-schema-ready", "x-twmd-coverage"}
+            },
+        )
 
     def valuation_history(
         self,
