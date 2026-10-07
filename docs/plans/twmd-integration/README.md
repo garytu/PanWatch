@@ -6,7 +6,7 @@
 
 ## 下一項
 
-**PW-01–PW-08 已完成；預設下一項為 PW-09（ready）。** PW-08 由 pw08_broker_flow_worker（gpt-6-luna／xhigh）實作，主代理獨立審查、修正並完成驗證。本次到 PW-08 為止。
+**PW-01–PW-08 已完成；PW-09 由 pw09_material_information_worker（gpt-6-luna／xhigh）實作中。** PW-08 由 pw08_broker_flow_worker（gpt-6-luna／xhigh）實作，主代理獨立審查、修正並完成驗證。本次到 PW-08 為止。
 
 PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值／法人 typed reads、相容介面與來源證據；PW-03 已接入公司資料／月營收 typed reads 與獨立 research blocks。PW-04 已交付有界 research 聚合、既有個股入口的研究面板，以及 assistant／TradingAgents／研究 context 共用資料。PW-05 已交付各區塊 age／coverage、更新 runbook 與四個股票／ETF selectors 的唯讀運行驗收；持續更新仍有上游 manual-only 前提，未變更採集或排程。PW-06 已交付選擇性的官方條件選股、有限候選與讀取統計、逐筆資料日期／來源／排除理由，以及 UI／AI 共用入口。PW-07 已交付原生交易單位的融資融券與集保持股專用區塊，UI／AI 共用六區塊，並明示大額門檻、官方分母、variant／缺週與 TWSE 限制。PW-08 已交付來源／原生單位分組的分點買賣排行、觀察分母集中度、成交 VWAP、逐日覆蓋與已保留的單日價格明細；UI／AI 共用七區塊，筆數／修訂衝突維持部分可用，未 materialized 與空明細狀態分開。其餘卡依下表等待指定。本計劃不授權採集、排程或部署。執行範例：
 
@@ -24,14 +24,14 @@ PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值�
 | PW-06 | [官方資料選股](cards/PW-06-discovery.md) | completed | PW-05 | 可選擇估值、營收與法人條件並理解結果 |
 | PW-07 | [融資融券與集保](cards/PW-07-margin-shareholders.md) | completed | PW-01、PW-04 | 個股籌碼變化及可解釋的持股分布 |
 | PW-08 | [券商分點](cards/PW-08-broker-flow.md) | completed | PW-01、PW-04 | 分點買賣集中程度、VWAP 與覆蓋狀態 |
-| PW-09 | [官方重大訊息](cards/PW-09-material-information.md) | ready | PW-01、PW-04 | 官方事件時間線與 AI 原文分析 |
+| PW-09 | [官方重大訊息](cards/PW-09-material-information.md) | in_progress | PW-01、PW-04 | 官方事件時間線與 AI 原文分析 |
 | PW-10 | [有限範圍財報](cards/PW-10-financial-statements.md) | ready | PW-03、PW-04 | 支援範圍內的台股財務事實分析 |
 | PW-11 | [大盤基準](cards/PW-11-benchmarks.md) | waiting | PW-01、PW-04；上游採集 | 台股首頁指數與個股相對大盤表現 |
 | PW-12 | [除權息與減資事件](cards/PW-12-corporate-actions.md) | ready | PW-01、PW-04 | 解釋事件附近價格跳動與回測限制 |
 | PW-13 | [歷史資料與研究驗證](cards/PW-13-historical-research.md) | waiting | PW-05、PW-06、PW-11、PW-12 | 排除未來資訊、驗證新增研究條件 |
 | PW-14 | [即時指數與分鐘 K](cards/PW-14-live-data.md) | waiting | PW-11；上游交易時段驗收 | 啟用有健康證據的盤中圖表與市場背景 |
 
-PW-09 是唯一預設下一項；PW-09／PW-10／PW-12 的卡片依賴已滿足而標為 ready，尚未開始。PW-11 仍等待上游 benchmark 實際採集；不以第一批完成代替該前提。PW-13 已滿足 PW-05／PW-06，仍等待 PW-11／PW-12；保持 waiting。
+PW-09 是目前唯一執行項，Owner：pw09_material_information_worker（gpt-6-luna／xhigh）；PW-10／PW-12 的卡片依賴已滿足而標為 ready，尚未開始。PW-11 仍等待上游 benchmark 實際採集；不以第一批完成代替該前提。PW-13 已滿足 PW-05／PW-06，仍等待 PW-11／PW-12；保持 waiting。
 
 預設按表格順序逐項執行。使用者可指定已滿足依賴的其他卡；不自動延伸到下一張。PW-01–PW-05 為第一批交付，PW-06–PW-10 為研究擴充，PW-11–PW-14 涉及額外採集或歷史／即時驗證。
 
