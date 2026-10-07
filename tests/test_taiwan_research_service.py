@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import time
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -85,9 +85,12 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
         raise AssertionError(path)
 
     monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
-    payload = TaiwanResearchService(config={"base_url": "http://fixture", "timeout_sec": 5}).collect(
+    service = TaiwanResearchService(config={"base_url": "http://fixture", "timeout_sec": 5})
+    frozen_now = datetime(2026, 10, 7, 0, 0, tzinfo=timezone.utc)
+    payload = service.collect(
         "2330", start_date="2026-10-02", end_date="2026-10-02",
         start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
+        now_utc=frozen_now,
     )
 
     blocks = payload["blocks"]
@@ -105,7 +108,137 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
     assert blocks["monthly_revenues"]["data"]["months"][0]["presence"] == "missing"
     assert blocks["monthly_revenues"]["data"]["months"][1]["row"]["monthly_revenue"] == "514805337"
     assert blocks["monthly_revenues"]["evidence"]["publication_time"] is None
+    assert all(
+        block["evidence"]["freshness"]["evaluated_at_utc"] == "2026-10-07T00:00:00Z"
+        for block in blocks.values()
+    )
+    profile_freshness = blocks["company_profile"]["evidence"]["freshness"]
+    assert profile_freshness["data_period"] == "2026-10-03"
+    assert profile_freshness["source_received_at_utc"] == "2026-10-04T13:07:03.960501Z"
+    assert profile_freshness["latest_snapshot"]["report_date"] == "2026-10-03"
+    assert profile_freshness["latest_snapshot"]["source_received_at_utc"] == "2026-10-04T13:07:03.960501Z"
+    revenue_freshness = blocks["monthly_revenues"]["evidence"]["freshness"]
+    assert revenue_freshness["data_period"] == "2026-08"
+    assert revenue_freshness["report_date"] == "2026-10-04"
+    assert revenue_freshness["data_period_age_days"] == 37
+    assert revenue_freshness["source_received_at_utc"] == "2026-10-04T13:09:22.189587Z"
+    assert revenue_freshness["source_served_at"] == "2026-10-06T15:53:57.964571Z"
+    assert blocks["monthly_revenues"]["evidence"]["served_at"] == "2026-10-06T15:53:57.964571Z"
+    assert revenue_freshness["coverage"]["month_presence_counts"] == {"missing": 1, "present": 1}
+
+    later = service.collect(
+        "2330", start_date="2026-10-02", end_date="2026-10-02",
+        start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
+        now_utc=frozen_now + timedelta(hours=1),
+    )
     assert len(calls) == 5
+    assert later["blocks"]["monthly_revenues"]["evidence"]["freshness"]["source_receipt_age_seconds"] == (
+        revenue_freshness["source_receipt_age_seconds"] + 3600
+    )
+    assert later["blocks"]["monthly_revenues"]["evidence"]["freshness"]["evaluated_at_utc"] == "2026-10-07T01:00:00Z"
+    assert later["blocks"]["monthly_revenues"]["evidence"]["served_at"] == "2026-10-06T15:53:57.964571Z"
+
+
+def test_freshness_selects_latest_daily_row_and_keeps_oct_05_flow_gap():
+    from src.modules.research.taiwan_research import _freshness_metadata
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+
+    frozen_now = datetime(2026, 10, 7, 0, 0, tzinfo=timezone.utc)
+    valuation = ResearchDataBlock(
+        data={"observations": []}, status="partial", reason="some_requested_dates_missing",
+        evidence={
+            "selectors": {"start": "2026-10-02", "end": "2026-10-05"},
+            "dataset_coverage": "available=2;missing=0;selected=available",
+            "per_period_provenance": [
+                {"trade_date": "2026-10-02", "received_at_utc": "2026-10-03T01:00:00Z"},
+                {"trade_date": "2026-10-05", "received_at_utc": "2026-10-06T01:00:00Z"},
+            ],
+        },
+    )
+    flow = ResearchDataBlock(
+        data={"observations": []}, status="partial", reason="some_requested_dates_missing",
+        evidence={
+            "selectors": {"start_date": "2026-10-02", "end_date": "2026-10-05"},
+            "per_period_provenance": [
+                {"trade_date": "2026-10-02", "acquired_at": "2026-10-03T02:00:00Z"},
+            ],
+            "per_period_coverage": [
+                {"trade_date": "2026-10-02", "status": "AVAILABLE", "selected_instrument_presence": "present"},
+                {"trade_date": "2026-10-05", "status": "MISSING", "selected_instrument_presence": "missing"},
+            ],
+        },
+    )
+
+    valuation_freshness = _freshness_metadata("valuation", valuation, frozen_now)
+    flow_freshness = _freshness_metadata("institutional_flows", flow, frozen_now)
+
+    assert valuation_freshness["data_period"] == "2026-10-05"
+    assert valuation_freshness["source_received_at_utc"] == "2026-10-06T01:00:00Z"
+    assert valuation_freshness["data_period_age_days"] == 2
+    assert valuation_freshness["source_receipt_age_seconds"] == 82_800
+    assert flow_freshness["data_period"] == "2026-10-02"
+    assert flow_freshness["source_received_at_utc"] == "2026-10-03T02:00:00Z"
+    assert flow_freshness["coverage"]["reported_status_counts"] == {"AVAILABLE": 1, "MISSING": 1}
+    assert flow_freshness["coverage"]["interpretation"].find("no exchange-calendar inference") >= 0
+
+
+def test_retained_profile_freshness_does_not_use_newer_absent_snapshot_receipt():
+    from src.modules.research.taiwan_research import _freshness_metadata
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+
+    block = ResearchDataBlock(
+        data=None, status="partial", reason="retained_profile_snapshot_absent",
+        evidence={
+            "selectors": {"instrument_id": "TWSE:2330"},
+            "dataset_coverage": "AVAILABLE",
+            "selected_instrument_presence": "absent",
+            "retained_profile": {
+                "report_date": "2026-10-02",
+                "received_at_utc": "2026-10-05T00:00:00Z",
+            },
+            "latest_snapshot": {
+                "report_date": "2026-10-06",
+                "received_at_utc": "2026-10-06T23:00:00Z",
+            },
+        },
+    )
+
+    freshness = _freshness_metadata(
+        "company_profile", block, datetime(2026, 10, 7, 0, 0, tzinfo=timezone.utc)
+    )
+
+    assert freshness["data_period"] == "2026-10-02"
+    assert freshness["source_received_at_utc"] == "2026-10-05T00:00:00Z"
+    assert freshness["source_receipt_age_seconds"] == 172_800
+    assert freshness["latest_snapshot"]["source_received_at_utc"] == "2026-10-06T23:00:00Z"
+    assert freshness["latest_snapshot"]["source_receipt_age_seconds"] == 3600
+
+
+def test_request_clock_uses_taipei_date_across_utc_midnight():
+    from marketdata.errors import TwmdReadError
+
+    class FailingReads:
+        def get_response(self, path, **_params):
+            assert path == "instruments"
+            return _catalog(), {}
+
+        def valuation_history(self, *_args, **_kwargs):
+            raise TwmdReadError("offline", status_code=503, reason_code="http_503")
+
+        institutional_flows = company_profile = monthly_revenues = valuation_history
+
+    payload = TaiwanResearchService(
+        client=FailingReads(), config={"base_url": "http://fixture"}
+    ).collect(
+        "TWSE:2330", now_utc=datetime(2026, 10, 6, 16, 30, tzinfo=timezone.utc)
+    )
+
+    assert payload["selectors"]["end_date"] == "2026-10-06"
+    assert payload["selectors"]["end_month"] == "2026-09"
+    assert all(
+        block["evidence"]["freshness"]["evaluated_at_utc"] == "2026-10-06T16:30:00Z"
+        for block in payload["blocks"].values()
+    )
 
 
 def test_one_provider_failure_does_not_erase_other_blocks(monkeypatch):
@@ -131,6 +264,8 @@ def test_one_provider_failure_does_not_erase_other_blocks(monkeypatch):
 
     assert payload["blocks"]["institutional_flows"]["status"] == "error"
     assert payload["blocks"]["institutional_flows"]["reason"] == "http_503"
+    assert payload["blocks"]["institutional_flows"]["evidence"]["freshness"]["age_status"] == "age_unknown"
+    assert payload["blocks"]["valuation"]["evidence"]["freshness"]["age_status"] == "age_unknown"
     assert "private URL" not in json.dumps(payload)
     assert payload["blocks"]["valuation"]["data"] is not None
     assert payload["blocks"]["company_profile"]["data"] is not None
@@ -375,13 +510,21 @@ def test_catalog_deadline_keeps_actual_read_permits_until_workers_finish(monkeyp
     monkeypatch.setattr(research, "_READ_POOL", pool)
     monkeypatch.setattr(research, "_READ_SLOTS", threading.BoundedSemaphore(4))
     monkeypatch.setattr(research, "_REQUEST_DEADLINE_SECONDS", 0.02)
+    frozen_now = datetime(2026, 10, 7, 0, 0, tzinfo=timezone.utc)
     try:
         service = TaiwanResearchService(client=StalledCatalog(), config={"base_url": "http://fixture"})
         began = time.monotonic()
-        results = [service.collect("TWSE:2330", today_taipei=date(2026, 10, 7)) for _ in range(5)]
+        results = [service.collect(
+            "TWSE:2330", today_taipei=date(2026, 10, 7), now_utc=frozen_now
+        ) for _ in range(5)]
         assert time.monotonic() - began < 0.5
         assert len(calls) == 4
         assert all(block["reason"] == "timeout" for result in results[:4] for block in result["blocks"].values())
+        assert all(
+            block["evidence"]["freshness"]["evaluated_at_utc"] == "2026-10-07T00:00:00Z"
+            and block["evidence"]["freshness"]["age_status"] == "age_unknown"
+            for result in results[:4] for block in result["blocks"].values()
+        )
         assert all(block["reason"] == "concurrency_limit" for block in results[4]["blocks"].values())
     finally:
         released.set()

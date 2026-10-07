@@ -79,19 +79,11 @@ def company_profile_block(read: TwmdCompanyProfileRead) -> ResearchDataBlock:
                 "profile_report_date": profile.report_date if profile else None,
                 "latest_snapshot_report_date": snapshot.report_date if snapshot else None,
             },
-            "source_report_date": _uniform([
-                value for value in (
-                    profile.report_date if profile else None,
-                    snapshot.report_date if snapshot else None,
-                ) if value is not None
-            ]),
+            "source_report_date": profile.report_date if profile else None,
             "publication_time": None,
-            "source_received_at_utc": _uniform([
-                value for value in (
-                    profile.original_received_at_utc if profile else None,
-                    snapshot.received_at_utc if snapshot else None,
-                ) if value is not None
-            ]),
+            "source_received_at_utc": profile.original_received_at_utc if profile else None,
+            "profile_received_at_utc": profile.original_received_at_utc if profile else None,
+            "latest_snapshot_received_at_utc": snapshot.received_at_utc if snapshot else None,
             "retained_profile": {
                 "report_date": profile.report_date,
                 "received_at_utc": profile.original_received_at_utc,

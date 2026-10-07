@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { researchApi, type ResearchDataBlock, type TaiwanResearchPayload } from '@panwatch/api'
+import { researchApi, type ResearchDataBlock, type ResearchFreshness, type TaiwanResearchPayload } from '@panwatch/api'
 import { Button } from '@panwatch/base-ui/components/ui/button'
 
 type AnyBlock = ResearchDataBlock<Record<string, any>>
@@ -59,8 +59,8 @@ function missingText(block: AnyBlock, securityType?: string): string {
     issuer_absent_from_latest_snapshot_retained_profile: '來源保留了公司資料，但最新快照未列入此標的。',
     issuer_absent_from_captured_reports: '來源報告沒有列入此標的。',
     selected_presence_unreported: '來源未回報此標的是否列於報告。',
-    some_requested_dates_missing_or_absent: '部分交易日沒有資料或未列入來源報告。',
-    some_requested_dates_missing: '部分交易日沒有來源資料。',
+    some_requested_dates_missing_or_absent: '部分所選日期沒有資料或未列入來源報告；尚未核對交易日曆。',
+    some_requested_dates_missing: '部分所選日期沒有來源資料；尚未核對交易日曆。',
     some_requested_months_missing: '部分月份沒有來源資料。',
     some_requested_months_absent: '部分月份未列於來源報告。',
     some_requested_months_missing_or_absent: '部分月份缺少來源資料或未列入報告。',
@@ -90,12 +90,74 @@ function blockHeader(title: string, block: AnyBlock) {
   )
 }
 
+function ageLabel(seconds: unknown): string {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) return '未知'
+  if (seconds < 60) return `${Math.floor(seconds)} 秒`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分鐘`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小時`
+  return `${(seconds / 86400).toFixed(1)} 日`
+}
+
+function coverageSummary(freshness: ResearchFreshness): string {
+  const coverage = freshness?.coverage || {}
+  if (coverage.month_presence_counts) {
+    const labels: Record<string, string> = {
+      present: '有列示',
+      missing: '未取得覆蓋',
+      not_in_captured_report: '報告未列此標的',
+    }
+    const counts = Object.entries(coverage.month_presence_counts as Record<string, number>)
+      .map(([key, count]) => `${labels[key] || key} ${count} 月`)
+    return `${coverage.requested_month_count ?? '所選'} 個月：${counts.join('、') || '未回報月份狀態'}`
+  }
+  if (coverage.reported_status_counts) {
+    const labels: Record<string, string> = { AVAILABLE: '已取得', EMPTY: '來源回報無資料', MISSING: '未取得覆蓋' }
+    const presenceLabels: Record<string, string> = { present: '有列示', absent: '未列示', missing: '覆蓋未知', empty: '來源回報無資料', unknown: '狀態未知' }
+    const counts = Object.entries(coverage.reported_status_counts as Record<string, number>)
+      .map(([key, count]) => `${labels[key] || statusLabel(key)} ${count} 日`)
+    const presence = Object.entries(coverage.selected_presence_counts || {})
+      .map(([key, count]) => `標的${presenceLabels[key] || statusLabel(key)} ${count} 日`)
+    return [...counts, ...presence].join(' · ') || '來源未回報每日覆蓋'
+  }
+  if (coverage.latest_snapshot_presence || coverage.snapshot_coverage_status) {
+    const snapshotLabels: Record<string, string> = { AVAILABLE: '已取得', MISSING: '未取得覆蓋' }
+    const presenceLabels: Record<string, string> = { present: '有列示', absent: '未列示' }
+    return `最新快照 ${snapshotLabels[String(coverage.snapshot_coverage_status)] || '未知'} · 標的${presenceLabels[String(coverage.latest_snapshot_presence)] || '狀態未知'}`
+  }
+  if (coverage.source_coverage_header) {
+    const labels: Record<string, string> = { available: '已取得', empty: '來源回報無資料', missing: '未取得覆蓋' }
+    const counts = String(coverage.source_coverage_header).split(';').flatMap((part) => {
+      const match = /^(available|empty|missing)=(\d+)$/.exec(part.trim())
+      return match ? [`${labels[match[1]]} ${match[2]} 日`] : []
+    })
+    if (counts.length) return counts.join(' · ')
+  }
+  return `區塊${statusLabel(String(coverage.block_status || 'unknown'))} · 來源未回報覆蓋細節`
+}
+
+function FreshnessSummary({ block }: { block: AnyBlock }) {
+  const freshness = block.evidence?.freshness as ResearchFreshness | undefined
+  if (!freshness) return null
+  const age = typeof freshness.data_period_age_days === 'number' && Number.isFinite(freshness.data_period_age_days)
+    ? `${freshness.data_period_age_days} 個日曆日` : '未知'
+  const ageBasis = freshness.frequency === 'monthly' ? '月份結束距今' : '期別距今'
+  return (
+    <div className="rounded bg-muted/30 px-2 py-1.5 text-[10px] text-muted-foreground space-y-0.5">
+      <div>所選資料中最新期別 {freshness.data_period || '未提供'} · 報表日 {freshness.report_date || '未提供'} · {ageBasis} {age}</div>
+      <div>來源接收後 {ageLabel(freshness.source_receipt_age_seconds)} · 覆蓋：{coverageSummary(freshness)}</div>
+      {freshness.latest_snapshot ? <div>最新快照報表日 {freshness.latest_snapshot.report_date || '未提供'} · 快照接收後 {ageLabel(freshness.latest_snapshot.source_receipt_age_seconds)}</div> : null}
+      <div>{freshness.frequency_hint}</div>
+    </div>
+  )
+}
+
 function exactValue(value: unknown): string {
   return value === null || value === undefined || value === '' ? '—' : String(value)
 }
 
 function EvidenceDetails({ block }: { block: AnyBlock }) {
   const evidence: any = block.evidence || {}
+  const freshness: any = evidence.freshness || {}
   const provenance = [
     ...(evidence.per_period_provenance || []),
     ...(evidence.per_month_coverage || []),
@@ -122,6 +184,13 @@ function EvidenceDetails({ block }: { block: AnyBlock }) {
       <summary className="cursor-pointer">來源證據</summary>
       <div className="mt-1 space-y-1 break-all">
         <div>狀態原因：{block.reason || '未提供'}</div>
+        <div>資料期別：{String(freshness.data_period || '未提供')}</div>
+        <div>來源報表日：{String(freshness.report_date || '未提供')}</div>
+        <div>來源發布時間：{String(freshness.publication_time || '未提供')}</div>
+        <div>來源接收時間年齡：{ageLabel(freshness.source_receipt_age_seconds)}</div>
+        <div>上游回應時間：{String(evidence.served_at || '未提供')}</div>
+        <div>新鮮度評估時間：{String(freshness.evaluated_at_utc || '未提供')}</div>
+        {freshness.latest_snapshot ? <div>最新整體快照接收時間：{String(freshness.latest_snapshot.source_received_at_utc || '未提供')}</div> : null}
         <div>來源契約：{Array.isArray(evidence.source_contract) ? evidence.source_contract.join(', ') : String(evidence.source_contract || '未提供')}</div>
         <div>端點：{String(evidence.endpoint || '未提供')}</div>
         <div>來源接收時間：{received.length ? received.join(', ') : '未提供'}</div>
@@ -157,6 +226,7 @@ function ValuationBlock({ block }: { block: AnyBlock }) {
             : '來源未提供股利年度，無法確認採計期間；此處保留官方原值。'}
         </p>
       </> : <p className="text-xs text-muted-foreground">{missingText(block)}</p>}
+      <FreshnessSummary block={block} />
       <EvidenceDetails block={block} />
     </section>
   )
@@ -184,6 +254,7 @@ function FlowBlock({ block }: { block: AnyBlock }) {
           {entries.map(([key, label]) => <div key={key} className="contents"><span>{label}</span><span className="text-right font-mono">{exactValue(values[key])}</span></div>)}
         </div>
       </> : <p className="text-xs text-muted-foreground">{missingText(block)}</p>}
+      <FreshnessSummary block={block} />
       <EvidenceDetails block={block} />
     </section>
   )
@@ -204,6 +275,7 @@ function ProfileBlock({ block, securityType }: { block: AnyBlock; securityType?:
           <span>已發行股數（股）</span><span className="text-right font-mono">{exactValue(profile.issued_share_count)}</span>
         </div>
       </> : <p className="text-xs text-muted-foreground">{missingText(block, securityType)}</p>}
+      <FreshnessSummary block={block} />
       <EvidenceDetails block={block} />
     </section>
   )
@@ -244,6 +316,7 @@ function RevenueBlock({ block, securityType }: { block: AnyBlock; securityType?:
       {securityType === 'ETF' && block.status === 'unsupported'
         ? <p className="text-xs text-muted-foreground">ETF 不發布這類發行公司月營收資料。</p>
         : null}
+      <FreshnessSummary block={block} />
       <EvidenceDetails block={block} />
       <p className="text-[10px] text-muted-foreground">月營收是月度公告資料，不是季度財報或完整損益表。</p>
     </section>

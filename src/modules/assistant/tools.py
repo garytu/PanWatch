@@ -1276,7 +1276,8 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             name="get_taiwan_stock_research",
             title="查詢台股官方研究資料",
             description=(
-                "查詢 TWMD 官方估值、三大法人股數、公司資料和月營收。資料區塊各自帶有狀態、來源、日期、單位與 evidence。"
+                "查詢 TWMD 官方估值、三大法人股數、公司資料和月營收。資料區塊各自帶有狀態、覆蓋、資料期別、來源報表日、receipt 年齡、評估時間、單位與 evidence。"
+                "來源發布時間或更新 SLA 未提供時，依 evidence 明確標示未知；不要把較早資料當成查詢日資料。"
                 "台股財報尚未接入；月營收和報價都不能當成完整損益表、資產負債表或現金流量表。"
             ),
             risk=ToolRisk.READ,

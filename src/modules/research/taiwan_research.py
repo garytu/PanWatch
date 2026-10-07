@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import calendar
 import copy
 import hashlib
 import re
 import threading
 import time
-from urllib.parse import urlsplit
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import asdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from marketdata.errors import TwmdReadError
@@ -48,6 +49,24 @@ _CACHE_LOCK = threading.RLock()
 _REQUEST_SLOTS = threading.BoundedSemaphore(4)
 _READ_SLOTS = threading.BoundedSemaphore(4)
 _READ_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tw-research")
+_FRESHNESS_HINTS = {
+    "valuation": (
+        "daily",
+        "日資料；距今按日曆日計算。尚未核對交易日曆或來源更新期限；未取得覆蓋不代表休市或零值。",
+    ),
+    "institutional_flows": (
+        "daily",
+        "日資料；距今按日曆日計算。尚未核對交易日曆或來源更新期限；未取得覆蓋不代表休市或零值。",
+    ),
+    "company_profile": (
+        "latest_only_snapshot",
+        "公司資料只提供最新快照；保留公司列與整體快照的接收時間分開。來源未提供更新期限，不能查詢歷史快照。",
+    ),
+    "monthly_revenues": (
+        "monthly",
+        "月資料；期別距今從該月月底計算。來源未提供發布時間或申報期限；未取得覆蓋不代表零營收或未申報。",
+    ),
+}
 
 
 def _scope(config: dict) -> tuple[str, str]:
@@ -349,6 +368,204 @@ def _flow_block(read) -> ResearchDataBlock:
     )
 
 
+def _period_sort_key(value: object) -> date:
+    if not isinstance(value, str):
+        return date.min
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}", value):
+            return date.fromisoformat(f"{value}-01")
+        return date.fromisoformat(value)
+    except ValueError:
+        return date.min
+
+
+def _timestamp_age_seconds(value: object, now_utc: datetime) -> float | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    age = (now_utc - parsed.astimezone(timezone.utc)).total_seconds()
+    return round(age, 3) if age >= 0 else None
+
+
+def _period_age_days(value: object, now_utc: datetime) -> int | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}", value):
+            year, month = (int(part) for part in value.split("-"))
+            period_end = date(year, month, calendar.monthrange(year, month)[1])
+        elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            period_end = date.fromisoformat(value)
+        else:
+            return None
+    except (ValueError, OverflowError):
+        return None
+    age = (now_utc.astimezone(_TAIPEI).date() - period_end).days
+    return age if age >= 0 else None
+
+
+def _freshness_observation(name: str, evidence: dict) -> dict:
+    if name == "valuation":
+        rows = evidence.get("per_period_provenance") or []
+        row = max(rows, key=lambda item: _period_sort_key(item.get("trade_date")), default={})
+        return {
+            "data_period": row.get("trade_date"),
+            "report_date": row.get("report_date"),
+            "publication_time": row.get("publication_time", evidence.get("publication_time")),
+            "source_received_at_utc": row.get("received_at_utc"),
+            "first_observed_at": row.get("first_observed_at"),
+        }
+    if name == "institutional_flows":
+        rows = evidence.get("per_period_provenance") or []
+        row = max(rows, key=lambda item: _period_sort_key(item.get("trade_date")), default={})
+        coverage = next(
+            (item for item in evidence.get("per_period_coverage") or []
+             if item.get("trade_date") == row.get("trade_date")),
+            {},
+        )
+        return {
+            "data_period": row.get("trade_date"),
+            "report_date": row.get("report_date"),
+            "publication_time": row.get("publication_time", evidence.get("publication_time")),
+            "source_received_at_utc": (
+                row.get("received_at_utc") or row.get("acquired_at")
+                or coverage.get("received_at_utc") or coverage.get("acquired_at")
+            ),
+            "first_observed_at": row.get("first_observed_at"),
+        }
+    if name == "company_profile":
+        retained = evidence.get("retained_profile") or {}
+        snapshot = evidence.get("latest_snapshot") or {}
+        return {
+            "data_period": retained.get("report_date"),
+            "report_date": retained.get("report_date"),
+            "publication_time": evidence.get("publication_time"),
+            "source_received_at_utc": retained.get("received_at_utc"),
+            "first_observed_at": None,
+            "latest_snapshot": {
+                "report_date": snapshot.get("report_date"),
+                "source_received_at_utc": snapshot.get("received_at_utc"),
+            } if snapshot else None,
+        }
+    if name == "monthly_revenues":
+        rows = [
+            item for item in evidence.get("per_month_presence_and_provenance") or []
+            if item.get("retained_row")
+        ]
+        item = max(rows, key=lambda entry: _period_sort_key(entry.get("data_month")), default={})
+        row = item.get("retained_row") or {}
+        data_month = item.get("data_month") or row.get("data_month")
+        return {
+            "data_period": data_month[:7] if isinstance(data_month, str) else None,
+            "report_date": row.get("report_date"),
+            "publication_time": evidence.get("publication_time"),
+            "source_received_at_utc": row.get("received_at_utc"),
+            "first_observed_at": None,
+        }
+    return {
+        "data_period": None,
+        "report_date": None,
+        "publication_time": evidence.get("publication_time"),
+        "source_received_at_utc": None,
+        "first_observed_at": None,
+    }
+
+
+def _coverage_freshness(name: str, block: ResearchDataBlock) -> dict:
+    evidence = block.evidence
+    coverage = {
+        "block_status": block.status,
+        "dataset_coverage": evidence.get("dataset_coverage"),
+        "selected_instrument_presence": evidence.get("selected_instrument_presence"),
+        "requested_scope": dict(evidence.get("selectors") or {}),
+        "calendar_assessed": False,
+    }
+    if name == "valuation":
+        rows = evidence.get("per_period_provenance") or []
+        coverage["observed_row_count"] = len(rows)
+        coverage["source_coverage_header"] = evidence.get("dataset_coverage")
+        coverage["interpretation"] = (
+            "Selector dates are calendar bounds; this response does not establish which dates were trading sessions."
+        )
+    elif name == "institutional_flows":
+        periods = evidence.get("per_period_coverage") or []
+        coverage["reported_period_count"] = len(periods)
+        coverage["reported_status_counts"] = {
+            status: sum(1 for item in periods if item.get("status") == status)
+            for status in sorted({item.get("status") for item in periods if item.get("status")})
+        }
+        presences = [item.get("selected_instrument_presence") for item in periods]
+        coverage["selected_presence_counts"] = {
+            presence: presences.count(presence)
+            for presence in sorted({item for item in presences if item})
+        }
+        coverage["interpretation"] = (
+            "Coverage follows source-reported dates; no exchange-calendar inference is applied, and selected-issuer absence is not zero flow."
+        )
+    elif name == "company_profile":
+        coverage["snapshot_coverage_status"] = evidence.get("dataset_coverage")
+        coverage["latest_snapshot_presence"] = evidence.get("selected_instrument_presence")
+        coverage["interpretation"] = (
+            "Latest whole-market snapshot coverage and retained issuer profile are separate observations."
+        )
+    elif name == "monthly_revenues":
+        periods = evidence.get("per_month_presence_and_provenance") or []
+        coverage["requested_month_count"] = len(periods)
+        coverage["month_presence_counts"] = {
+            presence: sum(1 for item in periods if item.get("presence") == presence)
+            for presence in sorted({item.get("presence") for item in periods if item.get("presence")})
+        }
+        coverage["retained_row_count"] = sum(1 for item in periods if item.get("retained_row"))
+        coverage["interpretation"] = (
+            "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
+        )
+    return coverage
+
+
+def _freshness_metadata(
+    name: str,
+    block: ResearchDataBlock,
+    evaluated_at_utc: datetime,
+) -> dict:
+    frequency, hint = _FRESHNESS_HINTS[name]
+    observation = _freshness_observation(name, block.evidence)
+    receipt = observation.get("source_received_at_utc")
+    receipt_age = _timestamp_age_seconds(receipt, evaluated_at_utc)
+    period_age = _period_age_days(observation.get("data_period"), evaluated_at_utc)
+    metadata = {
+        "frequency": frequency,
+        "data_period": observation.get("data_period"),
+        "report_date": observation.get("report_date"),
+        "publication_time": observation.get("publication_time"),
+        "source_received_at_utc": receipt,
+        "source_receipt_age_seconds": receipt_age,
+        "data_period_age_days": period_age,
+        "first_observed_at": observation.get("first_observed_at"),
+        "source_served_at": block.evidence.get("served_at"),
+        "evaluated_at_utc": evaluated_at_utc.isoformat().replace("+00:00", "Z"),
+        "publisher_sla": None,
+        "age_status": "age_known_sla_unknown" if receipt_age is not None else "age_unknown",
+        "frequency_hint": hint,
+        "coverage": _coverage_freshness(name, block),
+    }
+    snapshot = observation.get("latest_snapshot")
+    if snapshot is not None:
+        snapshot_receipt_age = _timestamp_age_seconds(
+            snapshot.get("source_received_at_utc"), evaluated_at_utc
+        )
+        metadata["latest_snapshot"] = {
+            **snapshot,
+            "source_receipt_age_seconds": snapshot_receipt_age,
+            "data_period_age_days": _period_age_days(snapshot.get("report_date"), evaluated_at_utc),
+        }
+    return metadata
+
+
 def _instrument_catalog(client: TwmdClient, config: dict) -> list[dict]:
     key = (*_scope(config), "catalog", "TW")
     cached = _cache_get(key)
@@ -454,9 +671,14 @@ class TaiwanResearchService:
         start_month: str | None = None,
         end_month: str | None = None,
         today_taipei: date | None = None,
+        now_utc: datetime | None = None,
     ) -> dict[str, Any]:
         deadline = time.monotonic() + _REQUEST_DEADLINE_SECONDS
-        today = today_taipei or datetime.now(_TAIPEI).date()
+        request_clock = now_utc or datetime.now(timezone.utc)
+        if request_clock.tzinfo is None or request_clock.utcoffset() is None:
+            raise ValueError("now_utc must be timezone-aware")
+        request_clock = request_clock.astimezone(timezone.utc)
+        today = today_taipei or request_clock.astimezone(_TAIPEI).date()
         date_start, date_end, month_start, month_end = _bounds(
             today=today,
             start_date=start_date,
@@ -481,7 +703,7 @@ class TaiwanResearchService:
                 name: _error_block("concurrency_limit", endpoint, block_selectors, self.config, instrument_id=instrument_id)
                 for name, (endpoint, block_selectors) in template.items()
             }
-            return self._result(instrument_id, None, selectors, blocks)
+            return self._result(instrument_id, None, selectors, blocks, request_clock)
 
         try:
             catalog_future = None
@@ -512,7 +734,7 @@ class TaiwanResearchService:
                                        http_status=status)
                     for name, (endpoint, block_selectors) in template.items()
                 }
-                return self._result(instrument_id, None, selectors, blocks)
+                return self._result(instrument_id, None, selectors, blocks, request_clock)
 
             if time.monotonic() >= deadline:
                 blocks = {
@@ -520,7 +742,7 @@ class TaiwanResearchService:
                                        instrument_id=canonical)
                     for name, (endpoint, block_selectors) in template.items()
                 }
-                return self._result(canonical, instrument, selectors, blocks)
+                return self._result(canonical, instrument, selectors, blocks, request_clock)
 
             canonical_template = {
                 name: (endpoint, {**block_selectors, "instrument_id": canonical})
@@ -532,7 +754,7 @@ class TaiwanResearchService:
                                        self.config, status="unsupported", instrument_id=canonical)
                     for name, (endpoint, block_selectors) in canonical_template.items()
                 }
-                return self._result(canonical, instrument, selectors, blocks)
+                return self._result(canonical, instrument, selectors, blocks, request_clock)
             if instrument["security_type"] not in {"EQUITY", "ETF"}:
                 reason = "unsupported_warrant" if instrument["security_type"] == "WARRANT" else "unsupported_security_type"
                 blocks = {
@@ -540,7 +762,7 @@ class TaiwanResearchService:
                                        status="unsupported", instrument_id=canonical)
                     for name, (endpoint, block_selectors) in canonical_template.items()
                 }
-                return self._result(canonical, instrument, selectors, blocks)
+                return self._result(canonical, instrument, selectors, blocks, request_clock)
 
             blocks: dict[str, ResearchDataBlock] = {}
             builders = {
@@ -602,7 +824,7 @@ class TaiwanResearchService:
                         reason, endpoint, block_selectors, self.config,
                         instrument_id=canonical, http_status=status,
                     )
-            return self._result(canonical, instrument, selectors, blocks)
+            return self._result(canonical, instrument, selectors, blocks, request_clock)
         finally:
             _REQUEST_SLOTS.release()
 
@@ -623,7 +845,23 @@ class TaiwanResearchService:
         return block
 
     @staticmethod
-    def _result(instrument_id: str, instrument: dict | None, selectors: dict[str, str], blocks: dict[str, ResearchDataBlock]) -> dict[str, Any]:
+    def _result(
+        instrument_id: str,
+        instrument: dict | None,
+        selectors: dict[str, str],
+        blocks: dict[str, ResearchDataBlock],
+        evaluated_at_utc: datetime,
+    ) -> dict[str, Any]:
+        serialized_blocks = {}
+        for name, block in blocks.items():
+            evidence = copy.deepcopy(block.evidence)
+            evidence["freshness"] = _freshness_metadata(name, block, evaluated_at_utc)
+            serialized_blocks[name] = asdict(ResearchDataBlock(
+                data=block.data,
+                status=block.status,
+                reason=block.reason,
+                evidence=evidence,
+            ))
         return {
             "instrument_id": instrument_id,
             "instrument": ({
@@ -634,7 +872,7 @@ class TaiwanResearchService:
                 "name": instrument.get("name"),
             } if instrument else None),
             "selectors": dict(selectors),
-            "blocks": {name: asdict(block) for name, block in blocks.items()},
+            "blocks": serialized_blocks,
             "limitations": {
                 "financial_statements": {
                     "status": "not_integrated",

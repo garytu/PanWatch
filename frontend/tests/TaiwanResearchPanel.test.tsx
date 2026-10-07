@@ -17,9 +17,31 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
     selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10' },
     blocks: {
-      valuation: block({ instrument_id: 'TWSE:2330', observations: [{ trade_date: '2026-10-02', close_price: '1234.5000', pe_ratio: null, pb_ratio: '3.50', dividend_yield_pct: '0.88', dividend_reference_year: 114 }] }, 'partial', 'some_requested_dates_missing_or_absent', { source_contract: 'twse_daily_valuation/v1' }),
+      valuation: block({ instrument_id: 'TWSE:2330', observations: [{ trade_date: '2026-10-02', close_price: '1234.5000', pe_ratio: null, pb_ratio: '3.50', dividend_yield_pct: '0.88', dividend_reference_year: 114 }] }, 'partial', 'some_requested_dates_missing_or_absent', {
+        source_contract: 'twse_daily_valuation/v1',
+        freshness: {
+          frequency: 'daily', data_period: '2026-10-02', report_date: null,
+          publication_time: null, source_received_at_utc: '2026-10-03T00:00:00Z',
+          source_receipt_age_seconds: 3600, data_period_age_days: 5,
+          source_served_at: null, evaluated_at_utc: '2026-10-07T00:00:00Z',
+          publisher_sla: null, age_status: 'age_known_sla_unknown',
+          frequency_hint: '日資料；未驗證交易日曆或發布 SLA。',
+          coverage: { block_status: 'partial', source_coverage_header: 'available=1;missing=1' },
+        },
+      }),
       institutional_flows: block({ observations: [{ trade_date: '2026-10-02', native_values: { total_institutional_net_shares: -5343414 } }] }),
-      company_profile: block({ instrument_id: 'TWSE:2330', profile: { report_date: '2026-10-03', company_name: '台積電', industry_code: '24', paid_in_capital: '259323700670', issued_share_count: 25932370067 }, units: { paid_in_capital: 'TWD', issued_share_count: 'shares' } }, 'partial', 'retained_profile_snapshot_absent', { source_contract: 'twse_openapi_t187ap03_L/v1', retained_profile: { revision: 2, capture_id: 'profile-capture', received_at_utc: '2026-10-04T13:07:03Z', payload_sha256: 'profile-hash' } }),
+      company_profile: block({ instrument_id: 'TWSE:2330', profile: { report_date: '2026-10-03', company_name: '台積電', industry_code: '24', paid_in_capital: '259323700670', issued_share_count: 25932370067 }, units: { paid_in_capital: 'TWD', issued_share_count: 'shares' } }, 'partial', 'retained_profile_snapshot_absent', {
+        source_contract: 'twse_openapi_t187ap03_L/v1', retained_profile: { revision: 2, capture_id: 'profile-capture', received_at_utc: '2026-10-04T13:07:03Z', payload_sha256: 'profile-hash' },
+        freshness: {
+          frequency: 'latest_only_snapshot', data_period: '2026-10-03', report_date: '2026-10-03',
+          publication_time: null, source_received_at_utc: '2026-10-04T13:07:03Z',
+          source_receipt_age_seconds: 80000, data_period_age_days: 4,
+          source_served_at: null, evaluated_at_utc: '2026-10-07T00:00:00Z',
+          publisher_sla: null, age_status: 'age_known_sla_unknown', frequency_hint: '最新快照型資料；沒有 publisher SLA。',
+          coverage: { block_status: 'partial', snapshot_coverage_status: 'AVAILABLE', latest_snapshot_presence: 'absent' },
+          latest_snapshot: { report_date: '2026-10-03', source_received_at_utc: '2026-10-04T13:07:03Z', source_receipt_age_seconds: 80000, data_period_age_days: 4 },
+        },
+      }),
       monthly_revenues: block({ units: { revenue: 'TWD thousands (inferred from issuer notes; publisher strings retained)' }, months: [
         { data_month: '2026-07-01', presence: 'missing', row: null },
         { data_month: '2026-08-01', presence: 'present', row: { monthly_revenue: '514805337', month_over_month_pct: '3.21', year_over_year_pct: null, cumulative_revenue: '1133811744', cumulative_yoy_pct: '-0.61' } },
@@ -27,7 +49,15 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
         { data_month: '2026-08-01', source_contract: 'mops_t21_sii_monthly_revenue/v1', report_date: '2026-09-10', received_at_utc: '2026-09-11T01:00:00Z', capture_id: 'revenue-capture', payload_sha256: 'revenue-hash' },
       ], per_month_presence_and_provenance: [
         { data_month: '2026-08-01', retained_row: { revision: 3, capture_id: 'row-capture', received_at_utc: '2026-09-11T01:00:00Z', payload_sha256: 'row-hash' } },
-      ] }),
+      ], freshness: {
+        frequency: 'monthly', data_period: '2026-08', report_date: '2026-09-10',
+        publication_time: null, source_received_at_utc: '2026-09-11T01:00:00Z',
+        source_receipt_age_seconds: 2246400, data_period_age_days: 37,
+        source_served_at: '2026-10-06T15:53:57Z', evaluated_at_utc: '2026-10-07T00:00:00Z',
+        publisher_sla: null, age_status: 'age_known_sla_unknown',
+        frequency_hint: '月資料；沒有推定發布時間或申報 SLA。',
+        coverage: { block_status: 'partial', requested_month_count: 2, month_presence_counts: { missing: 1, present: 1 } },
+      } }),
     },
     limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
   })
@@ -48,6 +78,11 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
   expect(screen.getByText('3.21')).toBeTruthy()
   expect(screen.getAllByText('累計年增率（%）').length).toBe(2)
   expect(screen.getByText('來源沒有此月份覆蓋')).toBeTruthy()
+  expect(screen.getByText('所選資料中最新期別 2026-10-02 · 報表日 未提供 · 期別距今 5 個日曆日')).toBeTruthy()
+  expect(screen.getByText(/來源接收後 1 小時 · 覆蓋：已取得 1 日 · 未取得覆蓋 1 日/)).toBeTruthy()
+  expect(screen.getByText(/2 個月：未取得覆蓋 1 月、有列示 1 月/)).toBeTruthy()
+  expect(screen.getByText(/月份結束距今 37 個日曆日/)).toBeTruthy()
+  expect(screen.getAllByText('來源發布時間：未提供').length).toBe(4)
   expect(screen.getByText('來源 TWSE 官方來源 · 報表日 2026-09-10')).toBeTruthy()
   expect(screen.getByText('來源契約：mops_t21_sii_monthly_revenue/v1')).toBeTruthy()
   expect(screen.getByText('來源接收時間：2026-09-11T01:00:00Z')).toBeTruthy()
@@ -89,6 +124,34 @@ it('shows a provider error without inventing zero data', async () => {
   render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
   await waitFor(() => expect(screen.getByText('研究服務逾時')).toBeTruthy())
   expect(screen.queryByText('0')).toBeNull()
+})
+
+it('keeps dated flow coverage visible beside a timed-out profile without treating missing calendar dates as closures', async () => {
+  vi.mocked(researchApi.taiwan).mockResolvedValue({
+    instrument_id: 'TWSE:2330',
+    instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
+    selectors: { start_date: '2026-10-02', end_date: '2026-10-05', start_month: '2026-07', end_month: '2026-08' },
+    blocks: {
+      valuation: block({ observations: [{ trade_date: '2026-10-05', close_price: '1234.50' }] }),
+      institutional_flows: block({ observations: [{ trade_date: '2026-10-02', native_values: { total_institutional_net_shares: -123 } }] }, 'partial', 'some_requested_dates_missing', {
+        freshness: { frequency: 'daily', data_period: '2026-10-02', report_date: null, data_period_age_days: 5, source_receipt_age_seconds: null,
+          coverage: { reported_status_counts: { AVAILABLE: 1, MISSING: 3 }, selected_presence_counts: { present: 1, missing: 3 } },
+          frequency_hint: '日資料；距今按日曆日計算。尚未核對交易日曆或來源更新期限；未取得覆蓋不代表休市或零值。' },
+      }),
+      company_profile: block(null, 'error', 'timeout', { freshness: { frequency: 'latest_only_snapshot', data_period: null, report_date: null, data_period_age_days: null, source_receipt_age_seconds: null, coverage: { block_status: 'error' } } }),
+      monthly_revenues: block(null, 'missing', 'coverage_missing'),
+    },
+    limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
+  })
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await waitFor(() => expect(screen.getByText('來源讀取逾時。')).toBeTruthy())
+  expect(screen.getByText('1234.50')).toBeTruthy()
+  expect(screen.getByText('-123')).toBeTruthy()
+  expect(screen.getByText(/所選資料中最新期別 2026-10-02.*期別距今 5 個日曆日/)).toBeTruthy()
+  expect(screen.getByText(/覆蓋：已取得 1 日 · 未取得覆蓋 3 日/)).toBeTruthy()
+  expect(screen.getByText(/未取得覆蓋不代表休市或零值/)).toBeTruthy()
+  expect(screen.getByText(/區塊讀取失敗 · 來源未回報覆蓋細節/)).toBeTruthy()
+  expect(screen.queryByText(/undefined 日/)).toBeNull()
 })
 
 it('ignores a late response for the prior venue of the same code', async () => {

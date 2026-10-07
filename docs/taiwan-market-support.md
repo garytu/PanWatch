@@ -313,3 +313,59 @@ working and staged whitespace checks passed. The next default task is PW-05 for
 update responsibility, age/coverage hints and first-batch operational acceptance.
 No collection, schedules, deployment, control mutations or paid LLM run were
 executed for PW-04.
+
+## Research freshness and read-only acceptance (2026-10-07)
+
+PW-05 adds per-block freshness and coverage to valuation, flow, company-profile,
+and monthly-revenue research. It keeps the selected data period, publisher
+report date, publication time only when supplied, matching source receipt,
+upstream API `served_at`, and PanWatch's request evaluation clock separate. A
+single UTC request clock drives default bounds and age evaluation; cached
+results are re-aged on every return. Monthly period age is measured from the
+last day of the data month. Frequency hints describe daily, latest-snapshot, or
+monthly data without asserting a publisher release deadline. No publication
+time, publisher SLA, or exchange-calendar result is inferred. Missing source
+rows remain missing and are never converted to zero.
+
+The 2026-10-07 shared research smoke used 2026-10-02..05 and revenue months
+2026-07..08:
+
+| Instrument | Valuation | Institutional flows | Profile | Revenue |
+| --- | --- | --- | --- | --- |
+| `TWSE:2330` | Available through 2026-10-05 | Partial; 2026-10-02 row, later selected dates missing | Available; report 2026-10-03 | Partial; August present, July missing |
+| `TPEX:5347` | Partial; 2026-10-02 row, 2026-10-05 missing | Partial; 2026-10-02 row, later selected dates missing | Available; report 2026-10-04 | Partial; August present, July missing |
+| `TWSE:00878` | No selected rows; selection coverage unknown | Partial | Unsupported issuer type | Unsupported issuer type |
+| `TPEX:006201` | Unsupported valuation selector | Partial | Unsupported issuer type | Unsupported issuer type |
+
+Date-complete flow responses also reported `MISSING` for 2026-10-03 and
+2026-10-04. This does not establish that either date was an exchange session.
+The 2026-10-02 flow row is not shown as 2026-10-05 data. For ETF revenue,
+July was `missing` and August was `not_in_captured_report`; these are distinct
+states. Shared research requests took about 10.6–11.7 seconds overall;
+the direct profile endpoint reads took about 13.4–13.6 seconds, so the separate
+20-second profile timeout remains bounded and necessary. These measurements do
+not establish a latency guarantee.
+
+The query API reported OpenAPI 0.1.0, health OK, and ready daily-price
+partitions through 2026-10-06 for both venues. Its readiness response concerns
+daily prices, not research products. Authenticated read-only control GETs
+reported 24 job definitions and 11 schedules, eight enabled. Only the existing
+TWSE valuation schedule covered the requested research datasets; flows,
+profiles, latest-revenue feeds, the MOPS archive, and TPEx valuation had no
+recurring schedule. The manual-only adapters and precise publisher bounds are
+in the [PW-05 refresh and recovery runbook](plans/twmd-integration/runbooks/PW-05-refresh.md).
+Sanitized endpoint evidence is linked from that runbook. Continuous refresh
+requires upstream adapter and schedule review; adding a schedule alone cannot
+make all manual-only adapters accept scheduled runs.
+
+The assistant's research discovery metadata classifies these retained reads as
+static, with period-specific evidence; it does not promise near-real-time source
+updates. The UI separates calendar-day age from monthly age measured at month-end,
+and identifies the latest row within the selected scope. The coordinator's actual
+shared-service results at 08:16 Taipei are retained in
+[the aggregate evidence](plans/twmd-integration/evidence/PW-05-shared-service-2026-10-07.json).
+
+Final coordinator verification: backend 1180 passed / 3 skipped; frontend
+20 files / 51 tests passed; TypeScript, production build and whitespace check
+passed. PW-05 is completed; PW-06 is the default next ready card. This is code
+and bounded read-only acceptance, with no deployment or continuous-refresh claim.

@@ -454,7 +454,14 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
                 "data": {"marker": name},
                 "status": "available",
                 "reason": "",
-                "evidence": {"provider": "twmd", "endpoint": f"/{name}"},
+                "evidence": {
+                    "provider": "twmd", "endpoint": f"/{name}",
+                    "freshness": {
+                        "data_period": "2026-10-02", "publisher_sla": None,
+                        "evaluated_at_utc": "2026-10-07T00:00:00Z",
+                        "source_receipt_age_seconds": 3600,
+                    },
+                },
             }
             for name in (
                 "valuation", "institutional_flows", "company_profile", "monthly_revenues"
@@ -494,6 +501,11 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
     ))
 
     assert fundamentals.data == capital_flow.data == research.data == payload
+    from pan_agent_tool_research import ToolDataFreshness
+    from src.modules.assistant.tool_descriptors import PANWATCH_TOOL_DESCRIPTORS
+
+    descriptor = next(item for item in PANWATCH_TOOL_DESCRIPTORS if item.tool_name == "get_taiwan_stock_research")
+    assert descriptor.data_freshness == ToolDataFreshness.STATIC
     assert research.data["limitations"]["financial_statements"]["status"] == "not_integrated"
     assert [instrument_id for instrument_id, _ in calls] == ["TWSE:2330"] * 3
     assert calls[2][1] == {"start_month": "2026-07", "end_month": "2026-08"}

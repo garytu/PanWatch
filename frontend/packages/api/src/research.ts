@@ -7,6 +7,29 @@ export interface ResearchDataBlock<T = Record<string, unknown>> {
   evidence: Record<string, unknown>
 }
 
+export interface ResearchFreshness {
+  frequency: string
+  data_period: string | null
+  report_date: string | null
+  publication_time: string | null
+  source_received_at_utc: string | null
+  source_receipt_age_seconds: number | null
+  data_period_age_days: number | null
+  first_observed_at: string | null
+  source_served_at: string | null
+  evaluated_at_utc: string
+  publisher_sla: null | string
+  age_status: string
+  frequency_hint: string
+  coverage: Record<string, unknown>
+  latest_snapshot?: {
+    report_date: string | null
+    source_received_at_utc: string | null
+    source_receipt_age_seconds: number | null
+    data_period_age_days: number | null
+  }
+}
+
 export interface TaiwanResearchPayload {
   instrument_id: string
   instrument: {
