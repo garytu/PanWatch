@@ -1,6 +1,6 @@
 # PW-07：融資融券與集保持股分布
 
-狀態：ready。依賴：PW-01、PW-04。Owner：unassigned。
+狀態：in_progress。依賴：PW-01、PW-04。Owner：pw07_margin_shareholders_worker（gpt-6-luna／xhigh）。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -44,3 +44,5 @@ upstream domain/models/{margin_short_sale.py,shareholder_distribution.py}、quer
 ## 進度與交接
 
 2026-10-07 協調查核：所列任務依賴已 completed；ready 僅表示可開始，尚未指派或實作。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。
+
+Coordination checkpoint：2026-10-07，in_progress；依賴 PW-01／PW-04 已 completed。於目前 `codex/taiwan-market-support` checkout 指派 worker；保留既有 automation 修改及所有無關未追蹤檔。模型與 effort 依本計劃指定為 gpt-6-luna／xhigh。
