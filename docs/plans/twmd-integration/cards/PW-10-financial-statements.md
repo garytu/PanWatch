@@ -1,6 +1,6 @@
 # PW-10：有限範圍台股財報
 
-狀態：ready。依賴：PW-03、PW-04。Owner：unassigned。
+狀態：in_progress。依賴：PW-03、PW-04。Owner：pw10_financial_statements_worker（gpt-6-luna／xhigh）。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -45,3 +45,6 @@ upstream docs/financial-statements-api.md；TradingAgents data_context.py、tool
 ## 進度與交接
 
 2026-10-07 協調查核：所列任務依賴已 completed；ready 僅表示可開始，尚未指派或實作。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。
+
+
+Coordination checkpoint：in_progress，2026-10-07 Asia/Taipei。依賴與上游 financial-statements API／accepted contract 已查核；目前 checkout codex/taiwan-market-support。既有 agent_catalog.py 與未追蹤工具檔保留並排除本卡。Worker 實作，主代理獨立審查／驗證／提交；未授權採集、排程或部署。
