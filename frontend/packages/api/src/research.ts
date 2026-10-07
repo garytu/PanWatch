@@ -57,12 +57,76 @@ export interface TaiwanResearchPayload {
     shareholder_distribution: ResearchDataBlock<Record<string, any>>
     broker_flow: ResearchDataBlock<BrokerFlowResearchData>
     financial_statements: ResearchDataBlock<FinancialStatementsResearchData>
+    corporate_actions: ResearchDataBlock<CorporateActionsResearchData>
   }
   limitations: {
     financial_statements: {
       status: 'limited_scope' | string
       message: string
     }
+  }
+}
+
+export interface CorporateActionResearchResult {
+  instrument_id: string
+  block: ResearchDataBlock<CorporateActionsResearchData>
+}
+
+export interface CorporateActionResearchPart<T> {
+  status: string
+  reason: string
+  http_status: number | null
+  data: T[]
+  endpoint: string
+  selectors: Record<string, string>
+  dataset_coverage: 'unknown'
+  product_history_floor: string
+}
+
+export interface ExRightDividendResult {
+  effective_date: string
+  instrument_id: string
+  symbol: string
+  observed_name: string
+  action_kind: 'ex_right' | 'ex_dividend' | 'ex_right_dividend'
+  prior_close: string
+  reference_price: string
+  rights_dividend_value: string
+  limit_up_price: string
+  limit_down_price: string
+  opening_auction_basis: string
+  dividend_adjusted_reference_price: string
+  provider: string
+  currency: string
+}
+
+export interface CapitalReductionResult {
+  recovery_date: string
+  instrument_id: string
+  symbol: string
+  observed_name: string
+  reduction_reason: 'loss_offset' | 'return_of_capital'
+  pre_suspension_close: string
+  recovery_reference_price: string
+  limit_up_price: string
+  limit_down_price: string
+  opening_auction_basis: string
+  ex_right_reference_price: string | null
+  provider: string
+  currency: string
+}
+
+export interface CorporateActionsResearchData {
+  instrument_id: string
+  ex_right_dividend: CorporateActionResearchPart<ExRightDividendResult>
+  capital_reduction: CorporateActionResearchPart<CapitalReductionResult>
+  known_event_dates: Array<{ date: string; kind: string; dataset: 'TWT49U' | 'TWTAUU' }>
+  price_interpretation: {
+    prior_close_and_reference_price_are_not_cash_dividend_amounts: true
+    rights_dividend_value_is_combined_adjustment_not_cash_dividend: true
+    announcement_time: null
+    payment_time: null
+    raw_daily_bars_are_not_adjusted_by_these_annotations: true
   }
 }
 
@@ -263,6 +327,15 @@ export const researchApi = {
   taiwan: (instrumentId: string, params: TaiwanResearchParams = {}) =>
     fetchAPI<TaiwanResearchPayload>(
       withQuery('/research/taiwan', { instrument_id: instrumentId, ...params }),
+      { timeoutMs: 30_000 },
+    ),
+  corporateActions: (instrumentId: string, startDate: string, endDate: string) =>
+    fetchAPI<CorporateActionResearchResult>(
+      withQuery('/research/taiwan/corporate-actions', {
+        instrument_id: instrumentId,
+        start_date: startDate,
+        end_date: endDate,
+      }),
       { timeoutMs: 30_000 },
     ),
 }

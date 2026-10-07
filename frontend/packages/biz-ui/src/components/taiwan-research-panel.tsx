@@ -79,6 +79,7 @@ function missingText(block: AnyBlock, securityType?: string): string {
     concurrency_limit: '目前查詢量較高，請稍後重試。',
     http_503: '來源服務暫時不可用。',
     provider_error: '來源讀取失敗。',
+    twse_only: '除權息與減資結果來源目前只涵蓋 TWSE。',
   }
   return reasons[block.reason] || '目前沒有可顯示的資料；可展開來源證據查看狀態。'
 }
@@ -327,6 +328,46 @@ function RevenueBlock({ block, securityType }: { block: AnyBlock; securityType?:
   )
 }
 
+function CorporateActionsBlock({ block = { data: null, status: 'unknown', reason: 'coverage_not_returned', evidence: {} } }: { block?: AnyBlock }) {
+  const data = (block.data || {}) as any
+  const exRight = data.ex_right_dividend || {}
+  const reductions = data.capital_reduction || {}
+  const exRows: any[] = exRight.data || []
+  const reductionRows: any[] = reductions.data || []
+  const events = [
+    ...exRows.map((row) => ({ ...row, dataset: 'TWT49U', eventDate: row.effective_date, kind: row.action_kind })),
+    ...reductionRows.map((row) => ({ ...row, dataset: 'TWTAUU', eventDate: row.recovery_date, kind: row.reduction_reason })),
+  ].sort((left, right) => left.eventDate.localeCompare(right.eventDate) || left.dataset.localeCompare(right.dataset) || left.kind.localeCompare(right.kind))
+  const labels: Record<string, string> = {
+    ex_right: '除權', ex_dividend: '除息', ex_right_dividend: '除權息',
+    loss_offset: '減資彌補虧損', return_of_capital: '減資退還股款',
+  }
+  return (
+    <section className="rounded-lg border border-border/50 p-3 space-y-2">
+      {blockHeader('除權息與減資結果', block)}
+      <p className="text-[11px] text-muted-foreground">TWSE 已實現計算結果 · 價格單位 TWD／股 · 覆蓋未知。</p>
+      <p className="text-[11px] text-muted-foreground">除權息：{statusLabel(exRight.status)} · 減資：{statusLabel(reductions.status)}</p>
+      {[exRight, reductions].filter((part) => part.status === 'error').map((part, index) => <p key={index} className="text-[11px] text-destructive">{missingText(part)}</p>)}
+      {events.length ? <div className="space-y-1">
+        {events.map((row: any, index: number) => <div key={`${row.dataset}:${row.eventDate}:${row.kind}:${index}`} className="rounded border border-border/30 p-2 text-xs">
+          <div className="flex justify-between gap-2"><span>{row.eventDate} · {labels[row.kind] || row.kind}</span><span className="text-muted-foreground">{row.dataset} · {row.instrument_id}</span></div>
+          {row.dataset === 'TWT49U' ? <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+            <span>原收盤</span><span className="text-right font-mono break-all">{exactValue(row.prior_close)}</span>
+            <span>參考價</span><span className="text-right font-mono break-all">{exactValue(row.reference_price)}</span>
+            <span>權息合併調整值</span><span className="text-right font-mono break-all">{exactValue(row.rights_dividend_value)}</span>
+          </div> : <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+            <span>停牌前收盤</span><span className="text-right font-mono break-all">{exactValue(row.pre_suspension_close)}</span>
+            <span>恢復參考價</span><span className="text-right font-mono break-all">{exactValue(row.recovery_reference_price)}</span>
+            <span>除權參考價</span><span className="text-right font-mono break-all">{exactValue(row.ex_right_reference_price)}</span>
+          </div>}
+        </div>)}
+      </div> : <p className="text-xs text-muted-foreground">{block.status === 'unsupported' ? missingText(block) : '目前沒有回傳已知事件列；來源覆蓋未知，不能據此判定沒有公司行動。'}</p>}
+      <p className="text-[10px] text-muted-foreground">參考價與原收盤是價格欄位，權息合併調整值不是現金股利。列表不提供完整覆蓋、接收時間或修訂證據；公告與付款時間未知，原始日線未作回溯調整。</p>
+      <EvidenceDetails block={block} />
+    </section>
+  )
+}
+
 function MarginBlock({ block }: { block: AnyBlock }) {
   const data = (block.data || {}) as any
   const latest = data.latest
@@ -473,7 +514,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">官方台股研究</h3>
-          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點與有限範圍財報各自保留來源期間、單位和證據</p>
+          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點、公司行動與有限範圍財報各自保留來源期間、單位和證據</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading} aria-label="重新載入官方研究資料">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -509,6 +550,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           <ShareholderDistributionBlock block={blocks.shareholder_distribution as AnyBlock} />
           <BrokerFlowPanel block={blocks.broker_flow as AnyBlock} />
           <FinancialStatementsPanel block={blocks.financial_statements as AnyBlock | undefined} />
+          <CorporateActionsBlock block={blocks.corporate_actions as AnyBlock} />
         </div>
       </> : null}
       {!loading && !error && !payload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}

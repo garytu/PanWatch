@@ -73,3 +73,26 @@ def get_taiwan_material_information(
         "source_family": source,
         "block": asdict(block),
     })
+
+
+@router.get("/taiwan/corporate-actions")
+def get_taiwan_corporate_actions(
+    instrument_id: str = Query(..., min_length=1, max_length=32),
+    start_date: str = Query(..., min_length=10, max_length=10),
+    end_date: str = Query(..., min_length=10, max_length=10),
+):
+    """Read the realized TWSE action annotations for one bounded completed-date range."""
+    if not is_market_enabled("TW"):
+        raise HTTPException(status_code=404, detail="Taiwan market is disabled")
+    try:
+        block = get_taiwan_research_service().corporate_actions(
+            instrument_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Taiwan corporate actions are temporarily unavailable") from exc
+    canonical_id = block.evidence.get("instrument_id") or instrument_id
+    return serialize_taiwan_research({"instrument_id": canonical_id, "block": asdict(block)})

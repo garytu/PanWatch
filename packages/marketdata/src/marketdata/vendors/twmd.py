@@ -28,6 +28,10 @@ from marketdata.types import (
     TwmdMaterialInformationCapture,
     TwmdMaterialInformationEvent,
     TwmdMaterialInformationRead,
+    TwmdExRightDividendObservation,
+    TwmdExRightDividendRead,
+    TwmdCapitalReductionObservation,
+    TwmdCapitalReductionRead,
     TwmdFinancialStatementRead,
     TwmdValuationObservation,
     TwmdValuationRead,
@@ -72,6 +76,11 @@ _BROKER_FLOW_QUANTITIES_ENDPOINT = "/api/v1/broker-flow/quantities"
 _BROKER_FLOW_COVERAGE_ENDPOINT = "/api/v1/broker-flow/coverage"
 _BROKER_FLOW_PRICE_LEVELS_ENDPOINT = "/api/v1/broker-flow/price-levels"
 _MATERIAL_INFORMATION_ENDPOINT = "material-information"
+_EX_RIGHT_DIVIDEND_RESULTS_ENDPOINT = "ex-right-dividend-results"
+_CAPITAL_REDUCTION_RESULTS_ENDPOINT = "capital-reduction-results"
+_EX_RIGHT_DIVIDEND_FLOOR = date(2003, 5, 5)
+_CAPITAL_REDUCTION_FLOOR = date(2011, 1, 1)
+_CORPORATE_ACTION_MAX_DAYS = 366
 _BROKER_FLOW_CUTOVER = date(2026, 7, 24)
 _COVERAGE_ENDPOINT = "/api/v1/coverage"
 _MONTHLY_REVENUE_FLOOR = date(2024, 1, 1)
@@ -199,6 +208,145 @@ def _source_decimal_string(value, field_name: str, *, required: bool = False) ->
     if not number.is_finite():
         raise ValueError(f"{field_name} must be finite")
     return raw
+
+
+def _action_decimal_string(value, field_name: str, *, required: bool = True, signed: bool = False, positive: bool = False) -> str | None:
+    """Preserve the decimal token returned by the JSON API without float conversion."""
+    if value is None:
+        if required:
+            raise ValueError(f"{field_name} is required")
+        return None
+    if isinstance(value, Decimal):
+        number = value
+        raw = str(value)
+    elif isinstance(value, str):
+        raw = value
+        try:
+            number = Decimal(raw)
+        except InvalidOperation as exc:
+            raise ValueError(f"{field_name} must be a decimal or null") from exc
+    else:
+        # In particular, reject float: its JSON decoder may already have rounded
+        # the official decimal token before this boundary sees it.
+        raise ValueError(f"{field_name} must be a decimal token or null")
+    if not number.is_finite():
+        raise ValueError(f"{field_name} must be finite")
+    if not signed and number < 0:
+        raise ValueError(f"{field_name} must not be negative")
+    if positive and number <= 0:
+        raise ValueError(f"{field_name} must be positive")
+    return raw
+
+
+_TWSE_CORPORATE_ACTION_ID = re.compile(r"^TWSE:([0-9][0-9A-Z]{3,5})$")
+
+
+def _corporate_action_bounds(
+    instrument_id: str,
+    start_date: date | str,
+    end_date: date | str,
+    *,
+    floor: date,
+    label: str,
+    today_taipei: date | None,
+) -> tuple[str, date, date]:
+    if not isinstance(instrument_id, str) or not _TWSE_CORPORATE_ACTION_ID.fullmatch(instrument_id):
+        raise ValueError("corporate-action reads require TWSE:<valid symbol>")
+    start = _date_value(start_date, "start")
+    end = _date_value(end_date, "end")
+    today = today_taipei or datetime.now(_TAIPEI).date()
+    if start < floor:
+        raise ValueError(f"{label} history begins on {floor.isoformat()}")
+    if start > end:
+        raise ValueError("start must not be after end")
+    if end >= today:
+        raise ValueError("end must be before the current Asia/Taipei date")
+    if (end - start).days + 1 > _CORPORATE_ACTION_MAX_DAYS:
+        raise ValueError("corporate-action reads are limited to 366 calendar days")
+    return instrument_id.split(":", 1)[1], start, end
+
+
+def _ex_right_dividend_observation(value: object, instrument_id: str, start: date, end: date) -> TwmdExRightDividendObservation:
+    if not isinstance(value, dict):
+        raise ValueError("ex-right/dividend result must be an object")
+    symbol = instrument_id.split(":", 1)[1]
+    if value.get("instrument_id") != instrument_id or value.get("symbol") != symbol:
+        raise ValueError("ex-right/dividend result identity does not match request")
+    effective_date = _validate_source_date(value.get("effective_date"), "effective_date")
+    if not start.isoformat() <= effective_date <= end.isoformat():
+        raise ValueError("ex-right/dividend result is outside the requested range")
+    kind = _source_string(value.get("action_kind"), "action_kind", required=True) or ""
+    if kind not in {"ex_right", "ex_dividend", "ex_right_dividend"}:
+        raise ValueError("ex-right/dividend action_kind is invalid")
+    provider = _source_string(value.get("provider"), "provider", required=True) or ""
+    currency = _source_string(value.get("currency"), "currency", required=True) or ""
+    if provider != "twse_twt49u" or currency != "TWD":
+        raise ValueError("ex-right/dividend source identity is invalid")
+    return TwmdExRightDividendObservation(
+        effective_date=effective_date,
+        instrument_id=instrument_id,
+        symbol=symbol,
+        observed_name=_source_string(value.get("observed_name"), "observed_name", required=True) or "",
+        action_kind=kind,
+        prior_close=_action_decimal_string(value.get("prior_close"), "prior_close") or "",
+        reference_price=_action_decimal_string(value.get("reference_price"), "reference_price") or "",
+        rights_dividend_value=_action_decimal_string(value.get("rights_dividend_value"), "rights_dividend_value", signed=True) or "",
+        limit_up_price=_action_decimal_string(value.get("limit_up_price"), "limit_up_price") or "",
+        limit_down_price=_action_decimal_string(value.get("limit_down_price"), "limit_down_price") or "",
+        opening_auction_basis=_action_decimal_string(value.get("opening_auction_basis"), "opening_auction_basis") or "",
+        dividend_adjusted_reference_price=_action_decimal_string(value.get("dividend_adjusted_reference_price"), "dividend_adjusted_reference_price") or "",
+        provider=provider,
+        currency=currency,
+    )
+
+
+def _capital_reduction_observation(value: object, instrument_id: str, start: date, end: date) -> TwmdCapitalReductionObservation:
+    if not isinstance(value, dict):
+        raise ValueError("capital-reduction result must be an object")
+    symbol = instrument_id.split(":", 1)[1]
+    if value.get("instrument_id") != instrument_id or value.get("symbol") != symbol:
+        raise ValueError("capital-reduction result identity does not match request")
+    recovery_date = _validate_source_date(value.get("recovery_date"), "recovery_date")
+    if not start.isoformat() <= recovery_date <= end.isoformat():
+        raise ValueError("capital-reduction result is outside the requested range")
+    reason = _source_string(value.get("reduction_reason"), "reduction_reason", required=True) or ""
+    if reason not in {"loss_offset", "return_of_capital"}:
+        raise ValueError("capital-reduction reduction_reason is invalid")
+    provider = _source_string(value.get("provider"), "provider", required=True) or ""
+    currency = _source_string(value.get("currency"), "currency", required=True) or ""
+    if provider != "twse_twtauu" or currency != "TWD":
+        raise ValueError("capital-reduction source identity is invalid")
+    if "ex_right_reference_price" not in value:
+        raise ValueError("capital-reduction result is missing ex_right_reference_price")
+    return TwmdCapitalReductionObservation(
+        recovery_date=recovery_date,
+        instrument_id=instrument_id,
+        symbol=symbol,
+        observed_name=_source_string(value.get("observed_name"), "observed_name", required=True) or "",
+        reduction_reason=reason,
+        pre_suspension_close=_action_decimal_string(value.get("pre_suspension_close"), "pre_suspension_close", positive=True) or "",
+        recovery_reference_price=_action_decimal_string(value.get("recovery_reference_price"), "recovery_reference_price", positive=True) or "",
+        limit_up_price=_action_decimal_string(value.get("limit_up_price"), "limit_up_price") or "",
+        limit_down_price=_action_decimal_string(value.get("limit_down_price"), "limit_down_price") or "",
+        opening_auction_basis=_action_decimal_string(value.get("opening_auction_basis"), "opening_auction_basis") or "",
+        ex_right_reference_price=_action_decimal_string(value.get("ex_right_reference_price"), "ex_right_reference_price", required=False),
+        provider=provider,
+        currency=currency,
+    )
+
+
+def _corporate_action_read_data(payload: object, mapper, instrument_id: str, start: date, end: date):
+    if not isinstance(payload, list):
+        raise ValueError("corporate-action response must be a list")
+    rows = [mapper(row, instrument_id, start, end) for row in payload]
+    keys = [
+        (getattr(row, "effective_date", None) or getattr(row, "recovery_date"),
+         getattr(row, "action_kind", None) or getattr(row, "reduction_reason", None))
+        for row in rows
+    ]
+    if len(keys) != len(set(keys)):
+        raise ValueError("corporate-action response contains duplicate date/kind rows")
+    return rows
 
 
 def _source_decimal(value, field_name: str) -> Decimal | None:
@@ -1481,6 +1629,94 @@ class TwmdClient:
                 key.lower(): value for key, value in response_headers.items()
                 if key.lower() in {"x-twmd-schema-ready", "x-twmd-coverage"}
             },
+        )
+
+    def ex_right_dividend_results(
+        self,
+        instrument_id: str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdExRightDividendRead:
+        """Read bounded TWSE TWT49U realized results, without inferring coverage."""
+        symbol, start, end = _corporate_action_bounds(
+            instrument_id, start_date, end_date,
+            floor=_EX_RIGHT_DIVIDEND_FLOOR, label="TWT49U",
+            today_taipei=today_taipei,
+        )
+        payload, _headers = self.get_response(
+            _EX_RIGHT_DIVIDEND_RESULTS_ENDPOINT,
+            parse="json_decimal",
+            timeout_sec=timeout_sec,
+            retries=0,
+            instrument_id=instrument_id,
+            start=start.isoformat(),
+            end=end.isoformat(),
+        )
+        try:
+            rows = _corporate_action_read_data(
+                payload, _ex_right_dividend_observation, instrument_id, start, end
+            )
+        except (TypeError, ValueError) as exc:
+            raise TwmdReadError(
+                "twmd ex-right/dividend response violated its contract",
+                reason_code="invalid_response",
+            ) from exc
+        return TwmdExRightDividendRead(
+            instrument_id=instrument_id,
+            endpoint=f"/api/v1/{_EX_RIGHT_DIVIDEND_RESULTS_ENDPOINT}",
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            data=rows,
+            status="available" if rows else "unknown",
+            reason="realized_events_returned" if rows else "coverage_not_returned",
+            dataset_coverage="unknown",
+        )
+
+    def capital_reduction_results(
+        self,
+        instrument_id: str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdCapitalReductionRead:
+        """Read bounded TWSE TWTAUU recovery results, without inferring coverage."""
+        symbol, start, end = _corporate_action_bounds(
+            instrument_id, start_date, end_date,
+            floor=_CAPITAL_REDUCTION_FLOOR, label="TWTAUU",
+            today_taipei=today_taipei,
+        )
+        payload, _headers = self.get_response(
+            _CAPITAL_REDUCTION_RESULTS_ENDPOINT,
+            parse="json_decimal",
+            timeout_sec=timeout_sec,
+            retries=0,
+            instrument_id=instrument_id,
+            start=start.isoformat(),
+            end=end.isoformat(),
+        )
+        try:
+            rows = _corporate_action_read_data(
+                payload, _capital_reduction_observation, instrument_id, start, end
+            )
+        except (TypeError, ValueError) as exc:
+            raise TwmdReadError(
+                "twmd capital-reduction response violated its contract",
+                reason_code="invalid_response",
+            ) from exc
+        return TwmdCapitalReductionRead(
+            instrument_id=instrument_id,
+            endpoint=f"/api/v1/{_CAPITAL_REDUCTION_RESULTS_ENDPOINT}",
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            data=rows,
+            status="available" if rows else "unknown",
+            reason="realized_events_returned" if rows else "coverage_not_returned",
+            dataset_coverage="unknown",
         )
 
     def valuation_history(

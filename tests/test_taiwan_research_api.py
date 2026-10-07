@@ -89,3 +89,37 @@ def test_taiwan_research_api_rejects_bad_bounds_and_disabled_market(monkeypatch)
     assert invalid.status_code == 422
     assert len(calls) == 1
     assert disabled.status_code == 404
+
+
+def test_corporate_action_route_protects_reads_and_retains_unknown_coverage(monkeypatch):
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+    calls = []
+    mode = {"value": "success"}
+    class Service:
+        def corporate_actions(self, instrument_id, **selectors):
+            calls.append((instrument_id, selectors))
+            if mode["value"] == "bad_bounds":
+                raise ValueError("invalid range")
+            if mode["value"] == "error":
+                raise RuntimeError("private credentials must never be returned")
+            return ResearchDataBlock({"instrument_id": instrument_id, "known_event_dates": []}, "unknown", "coverage_not_returned", {"instrument_id": instrument_id, "dataset_coverage": "unknown"})
+    monkeypatch.setattr(taiwan, "get_taiwan_research_service", Service)
+    enabled = {"value": True}
+    monkeypatch.setattr(taiwan, "is_market_enabled", lambda _market: enabled["value"])
+    app = _app()
+    params = {"instrument_id": "TWSE:123A", "start_date": "2024-06-25", "end_date": "2024-07-01"}
+    with TestClient(app) as client:
+        assert client.get("/api/research/taiwan/corporate-actions", params=params).status_code == 401
+        assert not calls
+        app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+        response = client.get("/api/research/taiwan/corporate-actions", params=params)
+        assert response.status_code == 200
+        assert response.json()["block"]["evidence"]["dataset_coverage"] == "unknown"
+        assert calls == [("TWSE:123A", {"start_date": "2024-06-25", "end_date": "2024-07-01"})]
+        mode["value"] = "bad_bounds"
+        assert client.get("/api/research/taiwan/corporate-actions", params=params).status_code == 422
+        mode["value"] = "error"
+        error = client.get("/api/research/taiwan/corporate-actions", params=params)
+        assert error.status_code == 503 and "private credentials" not in error.text
+        enabled["value"] = False
+        assert client.get("/api/research/taiwan/corporate-actions", params=params).status_code == 404

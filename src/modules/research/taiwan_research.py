@@ -31,6 +31,7 @@ from src.modules.research.twmd_margin_shareholders import (
 )
 from src.modules.research.twmd_broker_flow import broker_flow_block, broker_flow_unsupported_block
 from src.modules.research.twmd_material_information import material_information_block
+from src.modules.research.twmd_corporate_actions import corporate_actions_block
 from src.modules.research.twmd_financial_statements import (
     financial_statement_block,
     financial_statement_unsupported_block,
@@ -58,6 +59,7 @@ _CACHE_TTLS = {
     "broker_flow": 300,
     "material_information": 300,
     "financial_statements": 300,
+    "corporate_actions": 300,
 }
 _CACHE: OrderedDict[tuple, tuple[float, Any]] = OrderedDict()
 _CACHE_LOCK = threading.RLock()
@@ -96,6 +98,10 @@ _FRESHNESS_HINTS = {
     "financial_statements": (
         "quarterly",
         "季度報表的留存原始事實；發布時間未知。各筆期間可能為年初至今或比較期，報表與最新發現的接收時間分開。",
+    ),
+    "corporate_actions": (
+        "event_driven",
+        "TWSE 實際除權息／減資結果；端點沒有覆蓋、接收時間或修訂欄位，空清單不能證明沒有事件。",
     ),
 }
 
@@ -582,6 +588,19 @@ def _freshness_observation(name: str, evidence: dict) -> dict:
             "source_received_at_utc": None,
             "first_observed_at": None,
         }
+    if name == "corporate_actions":
+        dates = [
+            item.get("date")
+            for item in (evidence.get("period") or {}).get("known_event_dates", [])
+            if isinstance(item.get("date"), str)
+        ]
+        return {
+            "data_period": max(dates) if dates else None,
+            "report_date": None,
+            "publication_time": None,
+            "source_received_at_utc": None,
+            "first_observed_at": None,
+        }
     return {
         "data_period": None,
         "report_date": None,
@@ -670,6 +689,16 @@ def _coverage_freshness(name: str, block: ResearchDataBlock) -> dict:
                 "Canonical broker-flow coverage is date-complete in the query response, but it does not establish an exchange calendar or all-market branch completeness. "
                 "Concentration denominators use only the returned branch rows within one provider-native unit group."
             )
+    elif name == "corporate_actions":
+        coverage["component_statuses"] = {
+            component: evidence.get(component, {}).get("status")
+            for component in ("ex_right_dividend", "capital_reduction")
+        }
+        coverage["known_event_count"] = len((block.data or {}).get("known_event_dates", []))
+        coverage["interpretation"] = (
+            "Each endpoint returns a bounded list without coverage, receipt or revision evidence. "
+            "Returned events are known observations; an empty list means unknown coverage, not no events."
+        )
     return coverage
 
 
@@ -739,6 +768,11 @@ def _instrument_catalog(client: TwmdClient, config: dict) -> list[dict]:
 
 
 def _resolve(rows: list[dict], requested: str) -> tuple[str, dict]:
+    if re.fullmatch(r"TWSE:[0-9][0-9A-Z]{3,5}", requested):
+        matches = [row for row in rows if row.get("instrument_id") == requested]
+        if not matches:
+            raise LookupError("instrument_not_found")
+        return requested, matches[0]
     try:
         parsed = Symbol.parse(requested, "TW")
     except (TypeError, ValueError) as exc:
@@ -799,6 +833,56 @@ def _safe_block_error_reason(reason: str, http_status: object) -> str:
         if 100 <= code <= 599:
             return reason
     return f"http_{status}" if status else "provider_error"
+
+
+def _corporate_actions_for_client(
+    client: TwmdClient,
+    instrument_id: str,
+    start: date,
+    end: date,
+    today: date,
+    deadline_monotonic: float,
+) -> ResearchDataBlock:
+    """Read each realized action endpoint separately and preserve independent outcomes."""
+    ex_read = capital_read = None
+    ex_error = capital_error = None
+    timeout = getattr(client, "config", {}).get("timeout_sec") or 5.0
+
+    def call(method, product_start: date):
+        remaining = deadline_monotonic - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("research deadline elapsed")
+        try:
+            bounded_timeout = min(float(timeout), remaining, 20.0)
+        except (TypeError, ValueError):
+            bounded_timeout = min(5.0, remaining)
+        return method(
+            instrument_id,
+            max(start, product_start),
+            end,
+            today_taipei=today,
+            timeout_sec=max(0.1, bounded_timeout),
+        )
+
+    if max(start, date(2003, 5, 5)) <= end:
+        try:
+            ex_read = call(client.ex_right_dividend_results, date(2003, 5, 5))
+        except Exception as exc:
+            ex_error = exc
+    if max(start, date(2011, 1, 1)) <= end:
+        try:
+            capital_read = call(client.capital_reduction_results, date(2011, 1, 1))
+        except Exception as exc:
+            capital_error = exc
+    return corporate_actions_block(
+        instrument_id,
+        start.isoformat(),
+        end.isoformat(),
+        ex_right=ex_read,
+        ex_right_error=ex_error,
+        capital_reduction=capital_read,
+        capital_reduction_error=capital_error,
+    )
 
 
 class TaiwanResearchService:
@@ -873,6 +957,11 @@ class TaiwanResearchService:
                 "report_scope": "consolidated",
                 "statement": statement,
                 "limit": 1000,
+            }),
+            "corporate_actions": ("/api/v1/ex-right-dividend-results, /api/v1/capital-reduction-results", {
+                "instrument_id": instrument_id,
+                "start_date": selectors["start_date"],
+                "end_date": selectors["end_date"],
             }),
         }
         def retained_financial(canonical: str) -> ResearchDataBlock:
@@ -1009,6 +1098,9 @@ class TaiwanResearchService:
                         timeout_sec=max(0.1, min(20.0, deadline - time.monotonic())),
                     )
                 ),
+                "corporate_actions": lambda: _corporate_actions_for_client(
+                    self.client, canonical, date_start, date_end, today, deadline,
+                ),
             }
             if canonical.startswith("TPEX:"):
                 blocks["financial_statements"] = financial_statement_unsupported_block(
@@ -1018,6 +1110,12 @@ class TaiwanResearchService:
                     statement=statement,
                 )
                 del builders["financial_statements"]
+                blocks["corporate_actions"] = _error_block(
+                    "twse_only", canonical_template["corporate_actions"][0],
+                    canonical_template["corporate_actions"][1], self.config,
+                    status="unsupported", instrument_id=canonical,
+                )
+                del builders["corporate_actions"]
             elif instrument.get("security_type") != "EQUITY":
                 blocks["financial_statements"] = financial_statement_unsupported_block(
                     canonical, fiscal_year, fiscal_quarter,
@@ -1218,6 +1316,67 @@ class TaiwanResearchService:
         finally:
             _REQUEST_SLOTS.release()
 
+    def corporate_actions(
+        self,
+        instrument_id: str,
+        *,
+        start_date: str,
+        end_date: str,
+        today_taipei: date | None = None,
+    ) -> ResearchDataBlock:
+        """Read both realized TWSE action lists independently over one completed range."""
+        if not isinstance(instrument_id, str) or not re.fullmatch(r"TWSE:[0-9][0-9A-Z]{3,5}", instrument_id):
+            raise ValueError("corporate-action research requires TWSE:<valid symbol>")
+        start = _date(start_date, "start_date")
+        end = _date(end_date, "end_date")
+        today = today_taipei or datetime.now(_TAIPEI).date()
+        if start < date(2003, 5, 5):
+            raise ValueError("corporate-action range begins on 2003-05-05")
+        if start > end:
+            raise ValueError("start_date must not be after end_date")
+        if end >= today:
+            raise ValueError("end_date must be before the current Asia/Taipei date")
+        if (end - start).days + 1 > _MAX_DAYS:
+            raise ValueError("corporate-action range is limited to 366 calendar days")
+        selectors = (start.isoformat(), end.isoformat())
+        endpoint = "/api/v1/ex-right-dividend-results, /api/v1/capital-reduction-results"
+        if not _REQUEST_SLOTS.acquire(blocking=False):
+            return _error_block("concurrency_limit", endpoint, {
+                "instrument_id": instrument_id, "start_date": selectors[0], "end_date": selectors[1],
+            }, self.config, instrument_id=instrument_id)
+        deadline = time.monotonic() + _REQUEST_DEADLINE_SECONDS
+        try:
+            key = _cache_key(self.config, instrument_id, "corporate_actions", selectors)
+            cached = _cache_get(key)
+            if cached is not None:
+                return cached
+            if time.monotonic() >= deadline:
+                return _error_block("timeout", endpoint, {
+                    "instrument_id": instrument_id, "start_date": selectors[0], "end_date": selectors[1],
+                }, self.config, instrument_id=instrument_id)
+            try:
+                future = _submit_read(
+                    _corporate_actions_for_client,
+                    self.client, instrument_id, start, end, today, deadline,
+                )
+            except RuntimeError:
+                return _error_block("concurrency_limit", endpoint, {
+                    "instrument_id": instrument_id, "start_date": selectors[0], "end_date": selectors[1],
+                }, self.config, instrument_id=instrument_id)
+            try:
+                block = future.result(timeout=max(0.0, deadline - time.monotonic()))
+            except Exception as exc:
+                future.cancel()
+                reason, http_status = _status_error(exc)
+                return _error_block(reason, endpoint, {
+                    "instrument_id": instrument_id, "start_date": selectors[0], "end_date": selectors[1],
+                }, self.config, instrument_id=instrument_id, http_status=http_status)
+            if block.status in {"available", "unknown"}:
+                _cache_set(key, block, _CACHE_TTLS["corporate_actions"])
+            return block
+        finally:
+            _REQUEST_SLOTS.release()
+
     def _load_block(self, name: str, key: tuple, builder) -> ResearchDataBlock:
         block = builder()
         if block.status == "error":
@@ -1234,7 +1393,11 @@ class TaiwanResearchService:
             (block.data or {}).get(component, {}).get("status") == "error"
             for component in ("quantity_range", "coverage_range", "price_levels")
         )
-        if not broker_component_error and block.status in {"available", "partial", "missing", "absent", "empty", "unsupported", "unknown", "closed"}:
+        action_component_error = name == "corporate_actions" and any(
+            (block.data or {}).get(component, {}).get("status") == "error"
+            for component in ("ex_right_dividend", "capital_reduction")
+        )
+        if not (broker_component_error or action_component_error) and block.status in {"available", "partial", "missing", "absent", "empty", "unsupported", "unknown", "closed"}:
             _cache_set(key, block, _CACHE_TTLS[name])
         return block
 

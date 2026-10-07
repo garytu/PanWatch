@@ -3,10 +3,13 @@ import logging
 import os
 import tempfile
 import asyncio
+import re
+import textwrap
 from html import escape
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Awaitable, Callable
 
 from src.platform.marketdata.cn_symbol import get_cn_prefix
 
@@ -33,14 +36,40 @@ class ChartScreenshot:
     filepath: str
     period: str = "daily"  # daily/weekly/monthly
     timestamp: datetime = field(default_factory=datetime.now)
+    corporate_actions: dict | None = None
 
     @property
     def exists(self) -> bool:
         return os.path.exists(self.filepath)
 
 
-def taiwan_chart_html(symbol: str, name: str, bars: list, period: str = "daily") -> str:
-    """Render stored OHLCV locally, preserving the provenance on the exported chart."""
+def _taiwan_chart_identity(symbol: str, quote_identity: str | None) -> str | None:
+    """A hint may qualify a matching bare code, never override an explicit venue."""
+    raw = symbol.strip().upper()
+    pattern = r"(?:TWSE|TPEX):[0-9][0-9A-Z]{3,5}"
+    if re.fullmatch(pattern, raw):
+        return raw
+    if raw.startswith(("TWSE:", "TPEX:")):
+        return None
+    if raw.endswith(".TW") or raw.endswith(".TWO"):
+        venue, code = ("TPEX", raw[:-4]) if raw.endswith(".TWO") else ("TWSE", raw[:-3])
+        identity = f"{venue}:{code}"
+        return identity if re.fullmatch(pattern, identity) else None
+    if isinstance(quote_identity, str) and re.fullmatch(pattern, quote_identity) and quote_identity.split(":", 1)[1] == raw:
+        return quote_identity
+    return None
+
+
+def taiwan_chart_html(
+    symbol: str,
+    name: str,
+    bars: list,
+    period: str = "daily",
+    *,
+    instrument_id: str | None = None,
+    corporate_actions: dict | None = None,
+) -> str:
+    """Render local raw OHLCV and annotate known realized TWSE action results."""
     from .kline_collector import KlineData
     if period not in {"daily", "weekly", "monthly"}:
         raise ValueError(f"Unsupported chart period: {period}")
@@ -60,6 +89,29 @@ def taiwan_chart_html(symbol: str, name: str, bars: list, period: str = "daily")
     max_volume = max(bar.volume for bar in candles) or 1
     width = 1050 / len(candles)
     elements = []
+    keys = list(buckets)
+    group_index = {key: index for index, key in enumerate(keys)}
+    event_groups: dict[int, list[dict]] = {}
+    action_data = (corporate_actions or {}).get("data") or {}
+    if not instrument_id or action_data.get("instrument_id") != instrument_id:
+        action_data = {}
+    action_parts = (
+        ((action_data.get("ex_right_dividend") or {}).get("data") or [], "TWT49U", "effective_date"),
+        ((action_data.get("capital_reduction") or {}).get("data") or [], "TWTAUU", "recovery_date"),
+    )
+    for rows, dataset, date_field in action_parts:
+        for row in rows:
+            if not isinstance(row, dict) or row.get("instrument_id") != instrument_id:
+                continue
+            try:
+                event_day = datetime.strptime(row[date_field], "%Y-%m-%d").date()
+                key = event_day if period == "daily" else event_day.isocalendar()[:2] if period == "weekly" else (event_day.year, event_day.month)
+                index = group_index.get(key)
+                if index is not None:
+                    kind = row.get("action_kind") or row.get("reduction_reason") or ""
+                    event_groups.setdefault(index, []).append({"date": row[date_field], "kind": kind, "dataset": dataset, "row": row})
+            except (KeyError, TypeError, ValueError):
+                continue
     for index, bar in enumerate(candles):
         x = 100 + width * (index + .5)
         color = "#dc2626" if bar.close >= bar.open else "#059669"
@@ -69,15 +121,63 @@ def taiwan_chart_html(symbol: str, name: str, bars: list, period: str = "daily")
         elements.append(f'<rect x="{x-width*.3}" y="{top}" width="{width*.6}" height="{height}" fill="{color}"/>')
         volume_height = bar.volume / max_volume * 100
         elements.append(f'<rect x="{x-width*.3}" y="{620-volume_height}" width="{width*.6}" height="{volume_height}" fill="{color}"/>')
+        event_rows = event_groups.get(index, [])
+        if event_rows:
+            labels = []
+            for event in event_rows:
+                label = ({"ex_right": "除權", "ex_dividend": "除息", "ex_right_dividend": "權息"}.get(event["kind"], "減資"))
+                labels.append(label)
+            marker_text = "、".join(dict.fromkeys(labels))
+            marker_color = "#7c3aed" if any(item["dataset"] == "TWTAUU" for item in event_rows) else "#d97706"
+            elements.append(f'<line x1="{x}" x2="{x}" y1="126" y2="510" stroke="{marker_color}" stroke-dasharray="4 4" opacity="0.6"/>')
+            elements.append(f'<circle cx="{x}" cy="126" r="5" fill="{marker_color}"/>')
+            elements.append(f'<text x="{x}" y="116" text-anchor="middle" font-size="12" fill="{marker_color}">{escape(marker_text)}</text>')
     mode = getattr(bars[-1], "adjustment_mode", None) or "unknown"
     label = f"{escape(name)} ({escape(symbol)}) · {period} · TWD / shares · adjustment: {escape(mode)}"
+    canonical_label = escape(instrument_id or "標的身分未知")
+    action_status = (corporate_actions or {}).get("status", "unknown")
+    events = [item for group in event_groups.values() for item in group]
+    if events:
+        summaries = []
+        for event in sorted(events, key=lambda item: (item["date"], item["dataset"], item["kind"]))[:5]:
+            row = event["row"]
+            comparison = (
+                f"前收 {row.get('prior_close')} → 參考價 {row.get('reference_price')}"
+                if event["dataset"] == "TWT49U"
+                else f"停牌前收 {row.get('pre_suspension_close')} → 恢復參考價 {row.get('recovery_reference_price')}"
+            )
+            summaries.append(f"{event['date']} {event['kind']}: {comparison}")
+        coverage_line = " · ".join(summaries) if summaries else "已知事件不在目前圖表期間"
+        if len(events) > 5:
+            coverage_line += f" · 另有 {len(events) - 5} 筆標記"
+        coverage_line = "已知事件；覆蓋未知 · " + coverage_line
+        if action_status == "partial":
+            coverage_line += " · 部分來源讀取失敗"
+    elif action_status == "unsupported":
+        coverage_line = "TWSE-only company-action source · this venue is unsupported"
+    elif action_status == "partial":
+        coverage_line = "部分公司行動來源失敗；覆蓋未知，空結果不代表沒有事件"
+    else:
+        coverage_line = "公司行動覆蓋未知；空清單不代表沒有事件"
+    legend_lines = textwrap.wrap(coverage_line, width=130) or [coverage_line]
+    legend = "".join(
+        f'<text x="50" y="{704 + index * 24}" font-size="13">{escape(line)}</text>'
+        for index, line in enumerate(legend_lines)
+    )
+    explanation_y = 704 + len(legend_lines) * 24 + 6
+    explanation = (
+        "參考價反映交易所事件日價格基準；權息合併調整值不是現金股利。公告／付款時間未知，原始日 K 未作回溯調整。"
+    )
     return (f'<!doctype html><html><body style="margin:0;background:#fff;color:#111827;font:20px sans-serif">'
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" role="img">'
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="{max(800, explanation_y + 40)}" role="img">'
             f'<text x="50" y="40">{label}</text><text x="50" y="72" font-size="16">'
             f'Stored historical bars through {escape(candles[-1].date)}; not a live quote</text>'
+            f'<text x="100" y="92" font-size="13">Event identity: {canonical_label}</text>'
             f'<text x="20" y="110">{upper:.2f}</text><text x="20" y="490">{lower:.2f}</text>'
             f'{"".join(elements)}<text x="100" y="660">{escape(candles[0].date)}</text>'
-            f'<text x="1000" y="660">{escape(candles[-1].date)}</text></svg></body></html>')
+            f'<text x="1000" y="660">{escape(candles[-1].date)}</text>'
+            f'{legend}'
+            f'<text x="50" y="{explanation_y}" font-size="12">{escape(explanation)}</text></svg></body></html>')
 
 
 class ScreenshotCollector:
@@ -90,7 +190,8 @@ class ScreenshotCollector:
     - 港股: https://quote.eastmoney.com/hk/{symbol}.html
     """
 
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: dict | None = None, *, corporate_action_loader: Callable[[str, str, str], Awaitable[dict]] | None = None):
+        self._corporate_action_loader = corporate_action_loader
         self.config = {**DEFAULT_CONFIG, **(config or {})}
         self._browser = None
         self._playwright = None
@@ -163,6 +264,7 @@ class ScreenshotCollector:
         market: str = "CN",
         period: str = "daily",
         provider: str = "xueqiu",
+        instrument_id: str | None = None,
     ) -> ChartScreenshot | None:
         """
         擷取單隻股票的 K 線圖
@@ -179,7 +281,7 @@ class ScreenshotCollector:
         """
         await self._ensure_browser()
         if market.upper() == "TW":
-            return await self._capture_twmd(symbol, name, period)
+            return await self._capture_twmd(symbol, name, period, instrument_id=instrument_id)
 
         url = self._get_url(symbol, market, provider)
         filepath = str(SCREENSHOT_DIR / f"{symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
@@ -453,21 +555,46 @@ class ScreenshotCollector:
             except Exception:
                 continue
 
-    async def _capture_twmd(self, symbol: str, name: str, period: str) -> ChartScreenshot | None:
+    async def _capture_twmd(
+        self, symbol: str, name: str, period: str, *, instrument_id: str | None = None,
+    ) -> ChartScreenshot | None:
         from .kline_collector import KlineCollector
         from src.platform.marketdata.models import MarketCode
         context = None
         try:
-            bars = await asyncio.to_thread(KlineCollector(MarketCode.TW).get_klines, symbol, days=120)
-            content = taiwan_chart_html(symbol, name, bars, period)
-            context = await self._browser.new_context(viewport={"width": 1280, "height": 720})
+            canonical = _taiwan_chart_identity(symbol, instrument_id)
+            resolved_id = canonical if canonical and canonical.startswith("TWSE:") else None
+            bars_symbol = canonical or symbol
+            bars = await asyncio.to_thread(KlineCollector(MarketCode.TW).get_klines, bars_symbol, days=120)
+            corporate_actions = None
+            if resolved_id and bars and self._corporate_action_loader:
+                try:
+                    from zoneinfo import ZoneInfo
+                    first = max(min(bar.date for bar in bars), "2003-05-05")
+                    last_completed = (datetime.now(ZoneInfo("Asia/Taipei")).date() - timedelta(days=1)).isoformat()
+                    last = min(max(bar.date for bar in bars), last_completed)
+                    if first <= last:
+                        corporate_actions = await self._corporate_action_loader(resolved_id, first, last)
+                except Exception as exc:
+                    logger.debug("TWSE corporate-action chart annotations unavailable for %s: %s", resolved_id, exc)
+            elif canonical and canonical.startswith("TPEX:"):
+                corporate_actions = {"status": "unsupported", "reason": "twse_only"}
+            content = taiwan_chart_html(
+                symbol, name, bars, period,
+                instrument_id=canonical,
+                corporate_actions=corporate_actions,
+            )
+            context = await self._browser.new_context(viewport={"width": 1280, "height": 820})
             page = await context.new_page()
             await page.set_content(content)
             await page.evaluate("document.fonts.ready")
             safe_symbol = symbol.replace(":", "_").replace("/", "_")
             filepath = str(SCREENSHOT_DIR / f"{safe_symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
-            await page.screenshot(path=filepath)
-            return ChartScreenshot(symbol=symbol, name=name, market="TW", filepath=filepath, period=period)
+            await page.screenshot(path=filepath, full_page=True)
+            return ChartScreenshot(
+                symbol=symbol, name=name, market="TW", filepath=filepath,
+                period=period, corporate_actions=corporate_actions,
+            )
         except Exception as exc:
             logger.warning("twmd chart capture failed for %s: %s", symbol, exc)
             return None
@@ -500,6 +627,7 @@ class ScreenshotCollector:
                 market=stock.get("market", "CN"),
                 period=period,
                 provider=provider,
+                instrument_id=stock.get("instrument_id"),
             )
             if screenshot:
                 results.append(screenshot)

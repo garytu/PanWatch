@@ -101,7 +101,7 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
         if path == "broker-flow/price-levels":
             assert params["date"] == "2026-10-02"
             return [], {}
-        if path in {"margin-short-sale", "shareholder-distribution", "coverage"}:
+        if path in {"margin-short-sale", "shareholder-distribution", "coverage", "ex-right-dividend-results", "capital-reduction-results"}:
             return [], {}
         raise AssertionError(path)
 
@@ -155,7 +155,7 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
         start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
         fiscal_year=2024, fiscal_quarter=4, now_utc=frozen_now + timedelta(hours=1),
     )
-    assert len(calls) == 14
+    assert len(calls) == 16
     assert later["blocks"]["monthly_revenues"]["evidence"]["freshness"]["source_receipt_age_seconds"] == (
         revenue_freshness["source_receipt_age_seconds"] + 3600
     )
@@ -285,7 +285,7 @@ def test_one_provider_failure_does_not_erase_other_blocks(monkeypatch):
             "revision_id": None, "failure_reason": None,
         }], {}
         if path == "broker-flow/price-levels": return [], {}
-        if path in {"margin-short-sale", "shareholder-distribution", "coverage"}: return [], {}
+        if path in {"margin-short-sale", "shareholder-distribution", "coverage", "ex-right-dividend-results", "capital-reduction-results"}: return [], {}
         raise AssertionError(path)
 
     monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
@@ -860,6 +860,7 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
         "margin_short_sale_block", "shareholder_distribution_block",
     ):
         monkeypatch.setattr(research, adapter, identity_adapter)
+    monkeypatch.setattr(research, "_corporate_actions_for_client", lambda client, *_args: identity_adapter(client._read("corporate_actions")))
     monkeypatch.setattr(research, "_READ_POOL", pool)
     monkeypatch.setattr(research, "_READ_SLOTS", slots)
 
@@ -900,11 +901,11 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
         payload = future.result(timeout=3)
         assert set(payload["blocks"]) == {
             "valuation", "institutional_flows", "company_profile", "monthly_revenues",
-            "margin_short_sale", "shareholder_distribution", "broker_flow", "financial_statements",
+            "margin_short_sale", "shareholder_distribution", "broker_flow", "financial_statements", "corporate_actions",
         }
         assert set(started) == {
             "valuation", "institutional_flows", "company_profile", "monthly_revenues",
-            "margin_short_sale", "shareholder_distribution", "financial_statements",
+            "margin_short_sale", "shareholder_distribution", "financial_statements", "corporate_actions",
         }
         assert max_active <= 4
     finally:
@@ -942,7 +943,7 @@ def test_timed_out_reads_keep_permits_and_queued_blocks_are_explicit(monkeypatch
         payload = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
             "TWSE:2330", today_taipei=date(2026, 10, 7)
         )
-        assert len(payload["blocks"]) == 8
+        assert len(payload["blocks"]) == 9
         assert {block["reason"] for block in payload["blocks"].values()} == {"timeout"}
         assert slots._value == 0
         again = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(

@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import copy
+import re
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Callable
 
@@ -66,6 +68,7 @@ class BacktestResult:
     metrics: dict
     initial_capital: float
     skipped: int = 0
+    metadata: dict = field(default_factory=dict)
 
 
 PositionSizer = Callable[[float], int]  # price -> qty
@@ -178,7 +181,11 @@ class Backtester:
         )
 
     def run(
-        self, signals: list[Signal], bars_by_symbol: dict
+        self,
+        signals: list[Signal],
+        bars_by_symbol: dict,
+        *,
+        corporate_actions_by_instrument: dict[str, dict] | None = None,
     ) -> BacktestResult:
         """批量回測,聚合淨值曲線與績效指標。
 
@@ -214,7 +221,87 @@ class Backtester:
             metrics=M.summarize(curve, pnls),
             initial_capital=self.initial_capital,
             skipped=skipped,
+            metadata=_corporate_action_metadata(
+                signals,
+                bars_by_symbol,
+                corporate_actions_by_instrument or {},
+            ),
         )
+
+
+def _corporate_action_metadata(
+    signals: list[Signal],
+    bars_by_symbol: dict,
+    corporate_actions_by_instrument: dict[str, dict],
+) -> dict:
+    """Attach read-only event context; this function never changes fills or equity."""
+    instruments: dict[str, dict] = {}
+    for signal in signals:
+        market = getattr(signal.market, "value", signal.market)
+        if str(market).upper() != "TW":
+            continue
+        raw_symbol = str(signal.symbol)
+        canonical = raw_symbol if raw_symbol.startswith(("TWSE:", "TPEX:")) else None
+        identity = canonical or f"TW:{raw_symbol}"
+        bars = bars_by_symbol.get((signal.symbol, signal.market)) or bars_by_symbol.get(signal.symbol) or []
+        dates = sorted({str(bar.date)[:10] for bar in bars if getattr(bar, "date", None)})
+        start_date, end_date = (dates[0], dates[-1]) if dates else (None, None)
+        annotation = corporate_actions_by_instrument.get(canonical, {}) if canonical else {}
+        annotation = annotation if isinstance(annotation, dict) else {}
+        identity_matches = annotation.get("instrument_id", canonical) == canonical
+        if isinstance(annotation.get("block"), dict):
+            annotation = annotation["block"]
+        data = annotation.get("data")
+        data = data if isinstance(data, dict) else {}
+        evidence = annotation.get("evidence")
+        evidence = evidence if isinstance(evidence, dict) else {}
+        identity_matches = identity_matches and (
+            data.get("instrument_id", canonical) == canonical
+            and evidence.get("instrument_id", canonical) == canonical
+        )
+        known = data.get("known_event_dates")
+        known = known if isinstance(known, list) else []
+        valid_kinds = {"TWT49U": {"ex_right", "ex_dividend", "ex_right_dividend"}, "TWTAUU": {"loss_offset", "return_of_capital"}}
+        if identity_matches and canonical and canonical.startswith("TWSE:") and start_date and end_date:
+            known = [
+                copy.deepcopy(item) for item in known
+                if isinstance(item, dict) and isinstance(item.get("date"), str)
+                and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", item["date"])
+                and _parse_day(item["date"]) is not None
+                and start_date <= item["date"] <= end_date
+                and item.get("instrument_id", canonical) == canonical
+                and isinstance(item.get("dataset"), str) and isinstance(item.get("kind"), str)
+                and item["kind"] in valid_kinds.get(item["dataset"], set())
+            ]
+        else:
+            known = []
+        known = sorted(known, key=lambda item: (item["date"], item["dataset"], item["kind"]))
+        query_ranges = {}
+        component_statuses = {}
+        for component in ("ex_right_dividend", "capital_reduction"):
+            part = data.get(component)
+            if not isinstance(part, dict):
+                continue
+            component_statuses[component] = part.get("status", "unknown")
+            query_ranges[component] = copy.deepcopy(part.get("selectors") or {})
+        instruments[identity] = {
+            "instrument_id": canonical,
+            "bar_range": {"start_date": start_date, "end_date": end_date},
+            "known_event_dates": known,
+            "dataset_coverage": "unknown",
+            "annotation_status": annotation.get("status", "unknown") if identity_matches else "invalid_annotation_identity",
+            "annotation_reason": annotation.get("reason"),
+            "query_range": copy.deepcopy(evidence.get("selectors") or {}),
+            "component_query_ranges": query_ranges,
+            "component_statuses": component_statuses,
+            "coverage_reason": "event list endpoints provide no coverage metadata; missing and empty reads do not establish no events",
+            "raw_daily_bar_limitation": (
+                "Backtest uses the supplied daily OHLC values as-is; it does not back-adjust prices, "
+                "reinvest cash dividends, or model capital-reduction entitlements."
+            ),
+            "numerical_results_adjusted": False,
+        }
+    return {"corporate_actions": instruments}
 
 
 def horizon_return(signal: Signal, bars: list[PriceBar], horizon_days: int) -> float | None:

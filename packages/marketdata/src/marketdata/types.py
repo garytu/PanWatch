@@ -332,6 +332,73 @@ class TwmdMaterialInformationRead:
 
 
 @dataclass(frozen=True)
+class TwmdExRightDividendObservation:
+    """One TWSE realized TWT49U result; decimals retain response lexical form."""
+
+    effective_date: str
+    instrument_id: str
+    symbol: str
+    observed_name: str
+    action_kind: str
+    prior_close: str
+    reference_price: str
+    rights_dividend_value: str
+    limit_up_price: str
+    limit_down_price: str
+    opening_auction_basis: str
+    dividend_adjusted_reference_price: str
+    provider: str
+    currency: str
+
+
+@dataclass(frozen=True)
+class TwmdExRightDividendRead:
+    """Bounded TWT49U read. Empty data has unknown, not empty, coverage."""
+
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    data: list[TwmdExRightDividendObservation]
+    status: str
+    reason: str
+    dataset_coverage: str = "unknown"
+
+
+@dataclass(frozen=True)
+class TwmdCapitalReductionObservation:
+    """One TWSE realized TWTAUU recovery result with exact decimal strings."""
+
+    recovery_date: str
+    instrument_id: str
+    symbol: str
+    observed_name: str
+    reduction_reason: str
+    pre_suspension_close: str
+    recovery_reference_price: str
+    limit_up_price: str
+    limit_down_price: str
+    opening_auction_basis: str
+    ex_right_reference_price: str | None
+    provider: str
+    currency: str
+
+
+@dataclass(frozen=True)
+class TwmdCapitalReductionRead:
+    """Bounded TWTAUU read. Empty data has unknown, not empty, coverage."""
+
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    data: list[TwmdCapitalReductionObservation]
+    status: str
+    reason: str
+    dataset_coverage: str = "unknown"
+
+
+@dataclass(frozen=True)
 class TwmdFinancialStatementDimension:
     axis_qname: str
     member_qname: str

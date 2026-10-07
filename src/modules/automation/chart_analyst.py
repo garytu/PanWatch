@@ -1,6 +1,8 @@
 """技術分析 Agent - 多模態 K 線圖分析"""
 
 import logging
+import asyncio
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
@@ -9,6 +11,16 @@ from src.platform.marketdata.collectors.screenshot_collector import ScreenshotCo
 from src.modules.research.signals import SignalPackBuilder
 
 logger = logging.getLogger(__name__)
+
+async def _load_chart_actions(instrument_id: str, start_date: str, end_date: str) -> dict:
+    from src.modules.research.taiwan_research import TaiwanResearchService
+
+    block = await asyncio.to_thread(
+        TaiwanResearchService().corporate_actions,
+        instrument_id, start_date=start_date, end_date=end_date,
+    )
+    return asdict(block)
+
 
 PROMPT_PATH = Path(__file__).parent.parent.parent.parent / "prompts" / "chart_analyst.txt"
 
@@ -39,40 +51,42 @@ class ChartAnalystAgent(BaseAgent):
             logger.warning("自選股列表為空，跳過截圖採集")
             return {"screenshots": [], "watchlist": []}
 
+        # Resolve the canonical quote identity before collecting the chart so
+        # event annotations cannot inherit identity from an OHLC bar.
+        packs = {}
+        try:
+            builder = SignalPackBuilder()
+            sym_list = [(s.symbol, s.market, s.name) for s in context.watchlist]
+            packs = await builder.build_for_symbols(
+                symbols=sym_list,
+                include_news=False,
+                news_hours=12,
+                portfolio=context.portfolio,
+                include_technical=True,
+                include_capital_flow=False,
+                include_events=True,
+                events_days=3,
+            )
+        except Exception as e:
+            logger.warning(f"SignalPack 獲取失敗（chart_analyst 繼續執行）：{e}")
+
         # 準備股票列表
         stocks = [
             {
                 "symbol": stock.symbol,
                 "name": stock.name,
                 "market": stock.market.value,
+                "instrument_id": getattr(getattr(packs.get(stock.symbol), "quote", None), "instrument_id", None),
             }
             for stock in context.watchlist
         ]
 
         # 截圖
-        self._collector = ScreenshotCollector()
+        self._collector = ScreenshotCollector(corporate_action_loader=_load_chart_actions)
         try:
             screenshots = await self._collector.capture_batch(
                 stocks, period=self.period
             )
-
-            # 結構化訊號（行情/技術/持倉），用於提示詞增強（失敗不影響截圖）
-            packs = {}
-            try:
-                builder = SignalPackBuilder()
-                sym_list = [(s.symbol, s.market, s.name) for s in context.watchlist]
-                packs = await builder.build_for_symbols(
-                    symbols=sym_list,
-                    include_news=False,
-                    news_hours=12,
-                    portfolio=context.portfolio,
-                    include_technical=True,
-                    include_capital_flow=False,
-                    include_events=True,
-                    events_days=3,
-                )
-            except Exception as e:
-                logger.warning(f"SignalPack 獲取失敗（chart_analyst 繼續執行）：{e}")
 
             # 清理舊截圖
             self._collector.cleanup_old_screenshots(max_age_hours=24)
@@ -148,6 +162,17 @@ class ChartAnalystAgent(BaseAgent):
                             pass
                 if brief_parts:
                     lines.append(f"   - 訊號：{'；'.join(brief_parts)}")
+                if shot.market.upper() == "TW":
+                    action_block = (shot.corporate_actions or {})
+                    action_data = action_block.get("data") or {}
+                    event_rows = action_data.get("known_event_dates") or []
+                    event_text = "、".join(
+                        f"{item.get('date')} {item.get('kind')}" for item in event_rows
+                    ) or "目前未取得已知事件列"
+                    lines.append(
+                        f"   - 公司行動：{event_text}；覆蓋狀態未知，空清單不能證明沒有事件。"
+                        "前收、參考價及權息合併調整不是現金股利；公告／付款時間未知，日 K 未作回溯調整。"
+                    )
         else:
             lines.append("- 無截圖")
 

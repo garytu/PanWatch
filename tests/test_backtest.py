@@ -102,3 +102,72 @@ def test_backtest_run_aggregates():
     res = Backtester().run(sigs, {("X", "CN"): bars})
     assert len(res.trades) == 1 and res.metrics["trades"] == 1
     assert len(res.equity_curve) == 2
+
+
+def test_taiwan_corporate_action_metadata_warns_without_changing_backtest_math():
+    bars = [
+        _bar("2026-06-01", 100, 101, 99, 100),
+        _bar("2026-06-02", 99, 100, 98, 99),
+        _bar("2026-06-03", 99, 102, 99, 101),
+    ]
+    signal = Signal("TWSE:123A", "TW", "2026-06-01", holding_days=1)
+    inputs = {("TWSE:123A", "TW"): bars}
+    baseline = Backtester().run([signal], inputs)
+    annotated = Backtester().run(
+        [signal],
+        inputs,
+        corporate_actions_by_instrument={
+            "TWSE:123A": {
+                "status": "available",
+                "data": {"known_event_dates": [
+                    {"date": "2026-06-02", "kind": "ex_dividend", "dataset": "TWT49U"},
+                    {"date": "2026-05-31", "kind": "ex_right", "dataset": "TWT49U"},
+                ]},
+            }
+        },
+    )
+
+    assert annotated.trades == baseline.trades
+    assert annotated.equity_curve == baseline.equity_curve
+    assert annotated.equity_dates == baseline.equity_dates
+    assert annotated.metrics == baseline.metrics
+    assert annotated.metadata["corporate_actions"]["TWSE:123A"]["bar_range"] == {
+        "start_date": "2026-06-01", "end_date": "2026-06-03",
+    }
+    assert annotated.metadata["corporate_actions"]["TWSE:123A"]["known_event_dates"] == [
+        {"date": "2026-06-02", "kind": "ex_dividend", "dataset": "TWT49U"},
+    ]
+    assert annotated.metadata["corporate_actions"]["TWSE:123A"]["dataset_coverage"] == "unknown"
+    assert annotated.metadata["corporate_actions"]["TWSE:123A"]["numerical_results_adjusted"] is False
+    assert "does not back-adjust prices" in baseline.metadata["corporate_actions"]["TWSE:123A"]["raw_daily_bar_limitation"]
+
+
+
+def test_backtest_annotation_identity_errors_never_alter_math_or_claim_wrong_events():
+    bars = [_bar("2026-06-01", 100, 101, 99, 100), _bar("2026-06-02", 99, 100, 98, 99)]
+    sigs = [Signal("TWSE:1234", "TW", "2026-06-01", holding_days=1), Signal("TPEX:1234", "TW", "2026-06-01", holding_days=1)]
+    inputs = {(s.symbol, "TW"): bars for s in sigs}
+    baseline = Backtester().run(sigs, inputs)
+    bad = {"instrument_id": "TPEX:1234", "known_event_dates": [{"date": "2026-06-02", "dataset": "TWT49U", "kind": "ex_dividend"}]}
+    result = Backtester().run(sigs, inputs, corporate_actions_by_instrument={"TWSE:1234": {"data": bad}, "TPEX:1234": None})
+    assert result.trades == baseline.trades and result.metrics == baseline.metrics
+    assert result.equity_curve == baseline.equity_curve
+    assert result.metadata["corporate_actions"]["TWSE:1234"]["known_event_dates"] == []
+    assert result.metadata["corporate_actions"]["TWSE:1234"]["annotation_status"] == "invalid_annotation_identity"
+    assert result.metadata["corporate_actions"]["TPEX:1234"]["known_event_dates"] == []
+
+
+def test_backtest_preserves_selected_action_range_errors_and_does_not_alias_inputs():
+    annotation = {"instrument_id": "TWSE:1234", "block": {"status": "partial", "evidence": {"selectors": {"start_date": "2026-01-01", "end_date": "2026-06-02"}}, "data": {
+        "instrument_id": "TWSE:1234", "ex_right_dividend": {"status": "available", "selectors": {"start": "2026-01-01", "end": "2026-06-02"}},
+        "capital_reduction": {"status": "error", "selectors": {"start": "2026-01-01", "end": "2026-06-02"}},
+        "known_event_dates": [{"date": "2026-06-02", "kind": "ex_dividend", "dataset": "TWT49U"}],
+    }}}
+    bars = [_bar("2026-06-01", 100, 101, 99, 100), _bar("2026-06-02", 99, 100, 98, 99)]
+    result = Backtester().run([Signal("TWSE:1234", "TW", "2026-06-01", holding_days=1)], {"TWSE:1234": bars}, corporate_actions_by_instrument={"TWSE:1234": annotation})
+    metadata = result.metadata["corporate_actions"]["TWSE:1234"]
+    assert metadata["annotation_status"] == "partial"
+    assert metadata["query_range"]["start_date"] == "2026-01-01"
+    assert metadata["component_statuses"]["capital_reduction"] == "error"
+    metadata["known_event_dates"][0]["kind"] = "changed"
+    assert annotation["block"]["data"]["known_event_dates"][0]["kind"] == "ex_dividend"

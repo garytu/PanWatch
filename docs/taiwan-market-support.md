@@ -276,6 +276,30 @@ markets are blocked while this policy is active.
 The regression suite explicitly enables all supported markets for existing tests;
 `tests/test_enabled_markets.py` exercises the Taiwan-only deployment separately.
 
+## PW-12 corporate-action research (2026-10-07)
+
+PW-12 passed independent review and verification on the current PR branch. It adds typed, bounded
+TWSE TWT49U ex-right/dividend and TWTAUU capital-reduction reads; shared research
+evidence; daily, weekly and monthly screenshot annotations; and raw-price
+backtest metadata. Decimal source tokens and venue-local IDs remain explicit.
+The result endpoints do not provide coverage, acquisition receipt, revision,
+announcement time or payment time. Empty responses stay unknown, and a populated
+response confirms only its returned realized rows. Reference prices and the
+combined rights/dividend adjustment are not cash dividend amounts.
+
+On 2026-10-07 the coordinator ran four bounded query-only checks: TWSE:2330 and
+TWSE:00878 ex-right/dividend results for 2026-01-01..2026-10-06, TWSE:1418
+capital-reduction results for 2024-01-01..2024-12-31, and TWSE:2330
+capital-reduction results for 2026-01-01..2026-10-06. All returned HTTP 200 with
+empty lists in 6–12 ms. These observations establish neither event absence nor
+complete coverage; see the [sanitized query evidence](plans/twmd-integration/evidence/PW-12-live-contract-2026-10-07.json).
+Synthetic offline fixtures provide positive examples of each source schema. The final shared service observed the TWSE:2330 Oct 2 event lists as unknown in an 11.44-second aggregate, while other research blocks remained available or partial; see the [shared-service evidence](plans/twmd-integration/evidence/PW-12-shared-service-2026-10-07.json). Final checks passed 1344 backend tests (3 skipped), 42 runtime tests, 68 frontend tests, TypeScript and production build. Screenshot charts use an injected application-layer reader, preserve canonical venue identity, and retain partial-source annotations. This is reviewed PR work, not a deployment or a full action/adjustment guarantee.
+
+Input price bars remain unadjusted. Backtest annotations report the supplied
+bar range, selected action query ranges, per-source failures and only known returned event dates; they do not alter fills, cash,
+holdings, costs, equity or metrics. Full adjustment and total-return backtests
+need the additional data contract in the [integration contract](plans/twmd-integration/contracts/README.md#contract-still-required-for-adjusted-price-or-total-return-backtests).
+
 ## twmd research contract observation (2026-10-06)
 
 PW-01 records a read-only query audit and offline contract examples in the

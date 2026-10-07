@@ -195,3 +195,57 @@ industry 24, report retained and latest discovery present. Report raw hash
 from profile qualification evidence; [safe query metadata](../../../../packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json.metadata.json)
 records selector, latency and receipts. This sample does not establish report
 completeness for other issuers or quarters, a publication timestamp or update SLA.
+
+## PW-12 corporate-action results (2026-10-07)
+
+The TWMD source checkout reviewed for PW-12 is `78e6e5b103886456434b6ee3032cdd31ce16943b`;
+the deployed service does not expose a source commit. `GET
+/api/v1/ex-right-dividend-results` exposes retained TWSE TWT49U results from
+2003-05-05. `GET /api/v1/capital-reduction-results` exposes retained TWTAUU
+recovery results from 2011-01-01. Both accept a canonical TWSE identity and
+paired inclusive date bounds of at most 366 calendar days; `end` must be a
+completed Taipei date. TWSE symbols use the upstream 4–6 character identity
+shape, beginning with a digit and allowing letters.
+
+TWT49U keeps effective date, normalized action kind, observed issuer name,
+prior close, reference price, signed combined rights/dividend value, price
+limits, opening-auction basis, dividend-adjusted reference price, provider and
+currency. TWTAUU keeps recovery date, normalized reduction reason, pre-suspension
+close, recovery reference, price limits, opening-auction basis, nullable
+ex-right reference, provider and currency. PanWatch preserves every monetary
+value as the exact JSON decimal token text. Each product remains a distinct
+identity space and event kind, so a same-day ex-right result and recovery result
+remain separate events.
+
+These endpoint lists have no coverage, revision, acquisition receipt, publisher
+publication time, announcement time or payment time. A populated list confirms
+only the returned realized rows; an empty list has `unknown` coverage and does
+not mean no action. TWT49U's prior close, reference price and combined
+rights/dividend adjustment are price calculations, not cash dividend amounts.
+Neither product is a complete dividend calendar or corporate-action stream.
+
+The shared research block gives UI, assistant and TradingAgents the same event
+rows and caveats. Taiwan screenshot charts draw event markers in daily, weekly
+and monthly buckets, and state when a reference-price comparison can explain a
+visible price gap. Price bars remain as supplied. Backtest results add per-ID
+known event dates, bar range, unknown coverage and an explicit raw-input
+limitation as metadata; trades, costs, holdings, cash and equity calculations
+are unchanged. An unqualified or bare code never supplies a canonical event
+identity to a backtest annotation.
+
+### Contract still required for adjusted-price or total-return backtests
+
+The current realized result lists are insufficient for adjusted or total-return
+history. A future contract must define: (1) a complete, date-partitioned action
+universe including splits, reverse splits, cash/stock dividends, rights issues,
+capital reductions and delistings; (2) exact ratio, amount, currency, ex-date,
+effective date and payment/settlement terms needed by each action; (3) point-in-
+time announcements, first availability, source receipts and revision history so
+an as-of backtest cannot see later corrections; (4) a documented price and
+volume adjustment formula, rounding rules and consistency with exchange limits;
+(5) cash-dividend treatment, reinvestment price/date, rights subscription or
+lapse, returned capital and optional tax/fee policy for total return; and (6)
+tests for same-day actions, missing partitions, corrected records, suspensions,
+delisted instruments and bar/action identity. Until that contract is accepted,
+results may annotate known retained events but must use the input price series
+as-is.

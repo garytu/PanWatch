@@ -18,6 +18,16 @@ function supplementalBlocks() {
     margin_short_sale: block({ instrument_id: 'TWSE:2330', native_unit: 'trading_units', latest: null }, 'unknown', 'selected_presence_unreported'),
     shareholder_distribution: block({ instrument_id: 'TWSE:2330', native_unit: 'shares', latest: null }, 'unknown', 'selected_presence_unreported'),
     broker_flow: block(null, 'unknown', 'selected_presence_unreported'),
+    corporate_actions: block({
+      instrument_id: 'TWSE:2330', ex_right_dividend: { data: [] }, capital_reduction: { data: [] },
+      known_event_dates: [],
+      price_interpretation: {
+        prior_close_and_reference_price_are_not_cash_dividend_amounts: true,
+        rights_dividend_value_is_combined_adjustment_not_cash_dividend: true,
+        announcement_time: null, payment_time: null,
+        raw_daily_bars_are_not_adjusted_by_these_annotations: true,
+      },
+    }, 'unknown', 'coverage_not_returned', { source_contract: 'TWSE TWT49U and TWTAUU realized results' }),
   }
 }
 
@@ -93,7 +103,7 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
   expect(screen.getByText(/來源接收後 1 小時 · 覆蓋：已取得 1 日 · 未取得覆蓋 1 日/)).toBeTruthy()
   expect(screen.getByText(/2 個月：未取得覆蓋 1 月、有列示 1 月/)).toBeTruthy()
   expect(screen.getByText(/月份結束距今 37 個日曆日/)).toBeTruthy()
-  expect(screen.getAllByText('來源發布時間：未提供').length).toBe(6)
+  expect(screen.getAllByText('來源發布時間：未提供').length).toBe(7)
   expect(screen.getByText('來源 TWSE 官方來源 · 報表日 2026-09-10')).toBeTruthy()
   expect(screen.getByText('來源契約：mops_t21_sii_monthly_revenue/v1')).toBeTruthy()
   expect(screen.getByText('來源接收時間：2026-09-11T01:00:00Z')).toBeTruthy()
@@ -191,6 +201,7 @@ it('shows native margin lots and TDCC denominator, and leaves a missing prior we
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
     selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10' },
     blocks: {
+      ...supplementalBlocks(),
       valuation: block({ observations: [] }, 'unknown', 'selected_presence_unreported'),
       institutional_flows: block({ observations: [] }, 'unknown', 'selected_presence_unreported'),
       company_profile: block(null, 'unknown', 'selected_presence_unreported'),
@@ -406,4 +417,30 @@ it('shows producer failure, ambiguous empty detail and revision limits beside in
   expect(screen.getByText(/來源失敗：archive parse failed/)).toBeTruthy()
   expect(screen.getByText('來源沒有回傳成交價格列，目前無法確認是無成交明細（EMPTY）或處理失敗（FAILED）。')).toBeTruthy()
   expect(screen.getByText(/分點數量、覆蓋或明細的筆數／修訂不一致/)).toBeTruthy()
+})
+
+it('keeps same-day corporate action kinds, exact values, partial source errors, and unknown coverage visible', async () => {
+  const empty = block(null, 'unknown', 'coverage_not_returned')
+  vi.mocked(researchApi.taiwan).mockResolvedValue({
+    instrument_id: 'TWSE:2330', instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: 'Fixture' },
+    selectors: { start_date: '2026-06-01', end_date: '2026-06-30' },
+    blocks: {
+      ...supplementalBlocks(), valuation: empty, institutional_flows: empty, company_profile: empty, monthly_revenues: empty,
+      corporate_actions: block({ instrument_id: 'TWSE:2330',
+        ex_right_dividend: { status: 'available', data: [
+          { instrument_id: 'TWSE:2330', effective_date: '2026-06-02', action_kind: 'ex_right', prior_close: '100.00', reference_price: '98.765', rights_dividend_value: '-1.235' },
+          { instrument_id: 'TWSE:2330', effective_date: '2026-06-02', action_kind: 'ex_dividend', prior_close: '100.00', reference_price: '99.125', rights_dividend_value: '0.875' },
+        ] }, capital_reduction: { status: 'error', reason: 'timeout', data: [] },
+      }, 'partial', 'one_corporate_action_source_failed'),
+    },
+  } as any)
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText('2026-06-02 · 除權')
+  expect(screen.getByText('2026-06-02 · 除息')).toBeTruthy()
+  expect(screen.getByText('98.765')).toBeTruthy()
+  expect(screen.getByText('-1.235')).toBeTruthy()
+  expect(screen.getByText(/除權息：可用 · 減資：讀取失敗/)).toBeTruthy()
+  expect(screen.getByText('來源讀取逾時。')).toBeTruthy()
+  expect(screen.getByText(/TWD／股 · 覆蓋未知/)).toBeTruthy()
+  expect(screen.getByText(/權息合併調整值不是現金股利/)).toBeTruthy()
 })
