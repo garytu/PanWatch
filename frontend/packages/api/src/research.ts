@@ -58,12 +58,87 @@ export interface TaiwanResearchPayload {
     broker_flow: ResearchDataBlock<BrokerFlowResearchData>
     financial_statements: ResearchDataBlock<FinancialStatementsResearchData>
     corporate_actions: ResearchDataBlock<CorporateActionsResearchData>
+    benchmark_comparison: ResearchDataBlock<BenchmarkComparisonResearchData>
   }
   limitations: {
     financial_statements: {
       status: 'limited_scope' | string
       message: string
     }
+  }
+}
+
+export interface BenchmarkComparisonResearchData {
+  instrument_id: string
+  benchmark_id: 'TAIEX' | 'TPEX'
+  venue: 'TWSE' | 'TPEX'
+  requested_range: { start_date: string; end_date: string; inclusive: true }
+  price_basis: 'raw_price'
+  stock_series: {
+    instrument_id: string
+    provider: string | null
+    timeframe: string
+    price_kind: string
+    adjustment_mode: string
+    unit: 'TWD/share'
+    returned_count: number | null
+    partial: boolean | null
+    selection: string
+  }
+  benchmark_series: {
+    benchmark_id: 'TAIEX' | 'TPEX'
+    venue: 'TWSE' | 'TPEX'
+    provider: string | null
+    source_alias: string | null
+    source_contract: string | null
+    source_url: string | null
+    timeframe: 'day'
+    price_kind: 'benchmark_index'
+    adjustment_mode: 'raw_price_index'
+    unit: 'index_points'
+    returned_count: number | null
+    partial: boolean | null
+    truncated: boolean | null
+    coverage_window: Record<string, unknown> | null
+  }
+  common_observation_dates: string[]
+  observations: Array<{
+    trade_date: string
+    stock_close: string
+    stock_unit: 'TWD/share'
+    stock_price_kind: 'eod'
+    stock_adjustment_mode: 'raw'
+    stock_coverage?: {
+      dataset: string | null
+      partition_key: string
+      status: string
+      record_count: number | null
+      acquired_at: string | null
+      checksum: string | null
+    }
+    benchmark_close: string
+    benchmark_unit: 'index_points'
+    benchmark_basis: 'raw_price_index'
+    benchmark_revision: number
+    benchmark_capture_id: string
+    benchmark_captured_at: string
+    benchmark_source_contract: string
+    benchmark_source_alias: string
+    benchmark_source_url?: string
+    benchmark_request_scope: string
+    benchmark_payload_sha256: string
+  }>
+  comparison: null | {
+    requested_start_date: string
+    requested_end_date: string
+    calculation_start_date: string
+    calculation_end_date: string
+    observation_count: number
+    basis: 'raw_price_return'
+    stock_return_pct: string
+    benchmark_return_pct: string
+    relative_return_percentage_points: string
+    relative_return_definition: string
   }
 }
 

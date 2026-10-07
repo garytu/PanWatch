@@ -103,7 +103,7 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
   expect(screen.getByText(/來源接收後 1 小時 · 覆蓋：已取得 1 日 · 未取得覆蓋 1 日/)).toBeTruthy()
   expect(screen.getByText(/2 個月：未取得覆蓋 1 月、有列示 1 月/)).toBeTruthy()
   expect(screen.getByText(/月份結束距今 37 個日曆日/)).toBeTruthy()
-  expect(screen.getAllByText('來源發布時間：未提供').length).toBe(7)
+  expect(screen.getAllByText('來源發布時間：未提供').length).toBe(8)
   expect(screen.getByText('來源 TWSE 官方來源 · 報表日 2026-09-10')).toBeTruthy()
   expect(screen.getByText('來源契約：mops_t21_sii_monthly_revenue/v1')).toBeTruthy()
   expect(screen.getByText('來源接收時間：2026-09-11T01:00:00Z')).toBeTruthy()
@@ -443,4 +443,49 @@ it('keeps same-day corporate action kinds, exact values, partial source errors, 
   expect(screen.getByText('來源讀取逾時。')).toBeTruthy()
   expect(screen.getByText(/TWD／股 · 覆蓋未知/)).toBeTruthy()
   expect(screen.getByText(/權息合併調整值不是現金股利/)).toBeTruthy()
+})
+
+it('shows venue-matched raw-price comparison and partial source evidence', async () => {
+  const empty = block(null, 'unknown', 'coverage_not_returned')
+  vi.mocked(researchApi.taiwan).mockResolvedValue({
+    instrument_id: 'TWSE:2330',
+    instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
+    selectors: { start_date: '2026-09-01', end_date: '2026-10-06' },
+    blocks: {
+      ...supplementalBlocks(), valuation: empty, institutional_flows: empty,
+      company_profile: empty, monthly_revenues: empty,
+      benchmark_comparison: block({
+        instrument_id: 'TWSE:2330', benchmark_id: 'TAIEX', venue: 'TWSE',
+        common_observation_dates: ['2026-09-01', '2026-10-06'],
+        observations: [{ trade_date: '2026-10-06', stock_close: '1938.75', benchmark_close: '45631.2',
+          stock_coverage: { dataset: 'twse_daily_price', status: 'AVAILABLE', record_count: 1050, acquired_at: '2026-10-07T08:00:00Z', checksum: 'stock-checksum' },
+          benchmark_captured_at: '2026-10-07T09:00:00Z', benchmark_revision: 1, benchmark_capture_id: 'captured-receipt',
+          benchmark_source_url: 'https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20261001&response=json',
+          benchmark_source_contract: 'TWSE daily OHLC', benchmark_request_scope: '2026-10', benchmark_payload_sha256: 'benchmark-checksum' }],
+        comparison: {
+          calculation_start_date: '2026-09-01', calculation_end_date: '2026-10-06', observation_count: 24,
+          stock_return_pct: '5.9426229508', benchmark_return_pct: '6.1212105463',
+          relative_return_percentage_points: '-0.1785875955', basis: 'raw_price_return',
+        },
+      }, 'available', 'raw_price_returns_on_common_observation_dates', {
+        stock_source: { provider: 'TWSE', returned_count: 669, partial: true, requested_period_returned_count: 24 },
+        benchmark_source: { provider: 'TWSE', returned_count: 24, partial: true, truncated: false,
+          bar_receipts: [{ trade_date: '2026-10-06', revision: 1, capture_id: 'captured-receipt' }] },
+        freshness: { frequency: 'daily', data_period: '2026-10-06', data_period_age_days: 2, coverage: { calendar_assessed: false } },
+      }),
+    },
+    limitations: { financial_statements: { status: 'limited_scope', message: 'TWSE industry-24 retained reports.' } },
+  } as any)
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText('個股相對大盤')
+  expect(screen.getByText('比較個股與 TAIEX 的原始價格報酬 · 不含股利 · 非即時行情')).toBeTruthy()
+  expect(screen.getByText('個股原始價格報酬')).toBeTruthy()
+  expect(screen.getByText('-0.18 個百分點')).toBeTruthy()
+  expect(screen.getByText(/擷取識別碼：captured-receipt/)).toBeTruthy()
+  expect(screen.getByText('2026-10-06 逐日來源證據')).toBeTruthy()
+  expect(screen.getByText(/個股採集時間：2026-10-07T08:00:00Z/)).toBeTruthy()
+  expect(screen.getByText(/指數來源：https:\/\/www.twse.com.tw/)).toBeTruthy()
+  expect(screen.getByText('採集與擷取時間不代表來源發布時間。')).toBeTruthy()
+  expect(screen.getAllByText(/來源回傳部分資料/).length).toBeGreaterThan(0)
+  expect(screen.getByText(/只比較兩邊都有資料的共同觀察日/)).toBeTruthy()
 })

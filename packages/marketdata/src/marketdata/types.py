@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 
@@ -396,6 +397,135 @@ class TwmdCapitalReductionRead:
     status: str
     reason: str
     dataset_coverage: str = "unknown"
+
+
+@dataclass(frozen=True)
+class TwmdBenchmarkDefinition:
+    """One official index benchmark identity, separate from stock instruments."""
+
+    benchmark_id: str
+    venue: str
+    name: str
+    name_zh: str
+    provider: str
+    source_alias: str
+    source_contract: str
+    source_url: str
+    price_kind: str = "benchmark_index"
+    unit: str = "index_points"
+    basis: str = "raw_price_index"
+    stock_venue_default: str = ""
+
+
+@dataclass(frozen=True)
+class TwmdBenchmarkBar:
+    """One official publisher-dated benchmark bar with its winning capture."""
+
+    benchmark_id: str
+    trade_date: str
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    unit: str
+    basis: str
+    revision: int
+    capture_id: str
+    captured_at: str
+    source_contract: str
+    source_alias: str
+    source_url: str
+    request_scope: str
+    payload_sha256: str
+
+
+@dataclass(frozen=True)
+class TwmdBenchmarkProvenance:
+    """One bounded capture receipt in a benchmark query response."""
+
+    capture_id: str
+    benchmark_id: str
+    captured_at: str
+    acquisition_date: str
+    source_contract: str
+    source_alias: str
+    source_url: str
+    request_scope: str
+    publication_start: str | None
+    publication_end: str | None
+    payload_sha256: str
+    record_count: int
+
+
+@dataclass(frozen=True)
+class TwmdBenchmarkCoverageDay:
+    trade_date: str
+    status: str
+
+
+@dataclass(frozen=True)
+class TwmdBenchmarkBarsRead:
+    """A validated, bounded official benchmark bar read and source evidence."""
+
+    benchmark_id: str
+    venue: str
+    provider: str
+    source_alias: str
+    source_contract: str
+    source_url: str
+    timeframe: str
+    price_kind: str
+    adjustment_mode: str
+    unit: str
+    basis: str
+    limit: int
+    returned_count: int
+    total_count: int
+    partial: bool
+    truncated: bool
+    requested_start_date: str | None
+    requested_end_date: str | None
+    coverage_window: dict[str, object]
+    coverage: tuple[TwmdBenchmarkCoverageDay, ...]
+    gaps: tuple[str, ...]
+    bars: tuple[TwmdBenchmarkBar, ...]
+    provenance: tuple[TwmdBenchmarkProvenance, ...]
+    provenance_total_count: int
+    provenance_truncated: bool
+    served_at: str
+
+
+@dataclass(frozen=True)
+class TwmdDailyPriceBar:
+    """A raw TWSE/TPEx daily close from the upstream latest-only bars API."""
+
+    trade_date: str
+    close: Decimal | None
+    observation_status: str
+    coverage_status: str
+    coverage_dataset: str | None = None
+    coverage_record_count: int | None = None
+    coverage_acquired_at: str | None = None
+    coverage_checksum: str | None = None
+
+
+@dataclass(frozen=True)
+class TwmdDailyBarsRead:
+    """Bounded latest-N raw stock bars, before any requested-range filtering."""
+
+    instrument_id: str
+    symbol: str
+    venue: str
+    name: str
+    timeframe: str
+    price_kind: str
+    adjustment_mode: str
+    provider: str
+    limit: int
+    returned_count: int
+    partial: bool
+    bars: tuple[TwmdDailyPriceBar, ...]
+    latest_dataset_trade_date: str | None
 
 
 @dataclass(frozen=True)

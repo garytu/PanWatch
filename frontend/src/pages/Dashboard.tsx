@@ -29,6 +29,7 @@ import { Onboarding } from '@panwatch/biz-ui/components/onboarding'
 import StockInsightModal from '@panwatch/biz-ui/components/stock-insight-modal'
 import DiscoveryPanel from '@/components/DiscoveryPanel'
 import Sparkline from '@/components/Sparkline'
+import MarketIndexCards from '@/components/MarketIndexCards'
 import BenchChart from '@/components/BenchChart'
 import BenchmarkShareCard from '@/components/BenchmarkShareCard'
 import DiagnosticsShareCard from '@/components/DiagnosticsShareCard'
@@ -394,28 +395,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 指數走勢 pills */}
-      <div className="mb-3 grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-5">
-        {indices.slice(0, 5).map((ix) => (
-          <div key={`${ix.market}:${ix.symbol}`} className="card-subtle relative p-2.5">
-            <div className="flex items-start justify-between gap-1">
-              <div className="min-w-0">
-                <div className="truncate text-[11px] text-muted-foreground">{ix.name}</div>
-                <div className="font-mono text-[15px] text-foreground">
-                  {ix.current_price != null ? ix.current_price.toFixed(2) : '--'}
-                </div>
-              </div>
-              <span className={`shrink-0 rounded px-1 py-0.5 font-mono text-[10px] ${pctChipCls(ix.change_pct)}`}>
-                {ix.change_pct != null ? pct(ix.change_pct) : '--'}
-              </span>
-            </div>
-            {ix.spark && ix.spark.length >= 2 && (
-              <div className="mt-1.5">
-                <Sparkline data={ix.spark} height={26} className={moveColor(ix.change_pct)} />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      <MarketIndexCards indices={indices} />
 
       {/* 主體:要緊事(7) | 體檢(5);機會(5) | 簡報(7) */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">

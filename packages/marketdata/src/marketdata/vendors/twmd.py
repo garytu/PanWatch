@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from marketdata.cache import TTLCache
+from marketdata.benchmarks import decode_benchmark_bars, decode_benchmark_definitions, decode_daily_bars
 from marketdata.errors import TwmdReadError
 from marketdata.financial_statements import decode_financial_statement_response
 from marketdata.http import MarketHttpError, MarketHttpResponse, market_get, record_error
@@ -35,6 +36,9 @@ from marketdata.types import (
     TwmdFinancialStatementRead,
     TwmdValuationObservation,
     TwmdValuationRead,
+    TwmdBenchmarkBarsRead,
+    TwmdBenchmarkDefinition,
+    TwmdDailyBarsRead,
     TwmdCompanyProfile,
     TwmdCompanyProfileRead,
     TwmdCompanyProfileSnapshot,
@@ -1352,6 +1356,76 @@ class TwmdClient:
                 reason_code=f"http_{response.status_code}",
             )
         return response.data, response.headers
+
+    def benchmark_definitions(self, *, timeout_sec: float | None = None) -> tuple[TwmdBenchmarkDefinition, ...]:
+        """Read and validate the fixed official index identities."""
+        payload, _headers = self.get_response(
+            "benchmarks", timeout_sec=timeout_sec, retries=0,
+        )
+        return decode_benchmark_definitions(payload)
+
+    def benchmark_bars(
+        self,
+        benchmark_id: str,
+        *,
+        start_date: date | str | None = None,
+        end_date: date | str | None = None,
+        limit: int = 120,
+        timeout_sec: float | None = None,
+    ) -> TwmdBenchmarkBarsRead:
+        """Read one bounded official daily index series without stock conversion."""
+        if benchmark_id not in {"TAIEX", "TPEX"}:
+            raise ValueError("benchmark_id must be TAIEX or TPEX")
+        if (start_date is None) != (end_date is None):
+            raise ValueError("start_date and end_date must be provided together")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("benchmark limit must be between 1 and 1000")
+        start = _date_value(start_date, "start_date").isoformat() if start_date is not None else None
+        end = _date_value(end_date, "end_date").isoformat() if end_date is not None else None
+        if start is not None and end is not None:
+            if start > end:
+                raise ValueError("start_date must not be after end_date")
+            if (date.fromisoformat(end) - date.fromisoformat(start)).days + 1 > 366:
+                raise ValueError("benchmark reads are limited to 366 calendar days")
+        params = {"limit": limit}
+        if start is not None and end is not None:
+            params.update(start_date=start, end_date=end)
+        payload, _headers = self.get_response(
+            f"benchmarks/{benchmark_id}/bars",
+            timeout_sec=timeout_sec,
+            retries=0,
+            **params,
+        )
+        return decode_benchmark_bars(
+            payload,
+            benchmark_id=benchmark_id,
+            requested_start=start,
+            requested_end=end,
+            limit=limit,
+        )
+
+    def daily_bars(
+        self,
+        instrument_id: str,
+        *,
+        limit: int = 1000,
+        timeout_sec: float | None = None,
+    ) -> TwmdDailyBarsRead:
+        """Read latest-N source daily bars; upstream does not accept date filters."""
+        if not isinstance(instrument_id, str) or not re.fullmatch(r"(?:TWSE|TPEX):[0-9][0-9A-Z]{3,5}", instrument_id):
+            raise ValueError("daily bars require a canonical TWSE:/TPEX: instrument ID")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("daily-bar limit must be between 1 and 1000")
+        payload, _headers = self.get_response(
+            "bars",
+            timeout_sec=timeout_sec,
+            retries=0,
+            parse="json_decimal",
+            instrument_id=instrument_id,
+            timeframe="day",
+            limit=limit,
+        )
+        return decode_daily_bars(payload, instrument_id=instrument_id, limit=limit)
 
     @staticmethod
     def _timeout(value) -> float:

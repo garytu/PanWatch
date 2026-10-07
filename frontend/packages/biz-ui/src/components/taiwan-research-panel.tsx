@@ -17,6 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
   stale: '資料較舊',
   error: '讀取失敗',
   unknown: '狀態未知',
+  unavailable: '目前不可比較',
 }
 
 function statusLabel(status?: string): string {
@@ -171,10 +172,11 @@ function EvidenceDetails({ block }: { block: AnyBlock }) {
       .filter(Boolean),
     ...(evidence.retained_profile ? [evidence.retained_profile] : []),
     ...(evidence.latest_snapshot ? [evidence.latest_snapshot] : []),
+    ...(evidence.benchmark_source?.bar_receipts || []),
   ] as any[]
   const received = [...new Set([
     evidence.source_received_at_utc,
-    ...provenance.map((row) => row.received_at_utc || row.source_received_at_utc),
+    ...provenance.map((row) => row.received_at_utc || row.source_received_at_utc || row.captured_at),
   ].filter(Boolean).map(String))].sort()
   const revisions = [...new Set([
     evidence.revision,
@@ -202,6 +204,18 @@ function EvidenceDetails({ block }: { block: AnyBlock }) {
         <div>修訂版本：{revisions.length ? revisions.join(', ') : '未提供'}</div>
         <div>擷取識別碼：{captures.length ? captures.join(', ') : '未提供'}</div>
         <div>內容雜湊：{String(evidence.payload_sha256 || '未提供')}</div>
+        {(block.data as any)?.observations?.filter((row: any) => row.stock_coverage).map((row: any) => (
+          <details key={row.trade_date} className="border-t border-border/40 pt-1">
+            <summary className="cursor-pointer">{row.trade_date} 逐日來源證據</summary>
+            <div>個股原始收盤：{row.stock_close} TWD／股 · 指數：{row.benchmark_close} 點</div>
+            <div>個股覆蓋：{row.stock_coverage.dataset || '未提供'} · {row.stock_coverage.status} · 筆數 {row.stock_coverage.record_count ?? '未提供'}</div>
+            <div>個股採集時間：{row.stock_coverage.acquired_at || '未提供'} · 雜湊：{row.stock_coverage.checksum || '未提供'}</div>
+            <div>指數擷取時間：{row.benchmark_captured_at} · 修訂 {row.benchmark_revision} · 識別碼 {row.benchmark_capture_id}</div>
+            <div>指數來源：{row.benchmark_source_url || '未提供'} · {row.benchmark_source_contract} · {row.benchmark_request_scope}</div>
+            <div>指數內容雜湊：{row.benchmark_payload_sha256}</div>
+            <div>採集與擷取時間不代表來源發布時間。</div>
+          </details>
+        ))}
       </div>
     </details>
   )
@@ -368,6 +382,46 @@ function CorporateActionsBlock({ block = { data: null, status: 'unknown', reason
   )
 }
 
+function BenchmarkComparisonBlock({ block = { data: null, status: 'unknown', reason: 'coverage_not_returned', evidence: {} } }: { block?: AnyBlock }) {
+  const data = (block.data || {}) as any
+  const comparison = data.comparison
+  const stockSource = block.evidence?.stock_source || {}
+  const benchmarkSource = block.evidence?.benchmark_source || {}
+  const percent = (value: unknown) => {
+    const numeric = Number(value)
+    return value == null || !Number.isFinite(numeric) ? '—' : `${numeric > 0 ? '+' : ''}${numeric.toFixed(2)}%`
+  }
+  const points = (value: unknown) => {
+    const numeric = Number(value)
+    return value == null || !Number.isFinite(numeric) ? '—' : `${numeric > 0 ? '+' : ''}${numeric.toFixed(2)} 個百分點`
+  }
+  const sourceReadLabel = (source: any) => {
+    const partial = source?.partial === true || source?.truncated === true ? '來源回傳部分資料' : '來源未標記部分資料'
+    return `${source?.provider || '來源未知'} · ${source?.returned_count ?? '—'} 筆 · ${partial}`
+  }
+  return (
+    <section className="rounded-lg border border-border/50 p-3 space-y-2">
+      {blockHeader('個股相對大盤', block)}
+      <p className="text-[11px] text-muted-foreground">比較個股與 {data.benchmark_id || '所屬市場基準'} 的原始價格報酬 · 不含股利 · 非即時行情</p>
+      {comparison ? <>
+        <div className="text-[11px] text-muted-foreground">共同觀察日 {comparison.calculation_start_date} 至 {comparison.calculation_end_date} · {comparison.observation_count} 日</div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <span>個股原始價格報酬</span><span className="text-right font-mono">{percent(comparison.stock_return_pct)}</span>
+          <span>{data.benchmark_id} 指數報酬</span><span className="text-right font-mono">{percent(comparison.benchmark_return_pct)}</span>
+          <span>個股相對報酬</span><span className="text-right font-mono">{points(comparison.relative_return_percentage_points)}</span>
+        </div>
+      </> : <p className="text-xs text-muted-foreground">{block.reason === 'benchmark_no_bars' ? '所選大盤沒有已留存指數日線；不會建立假點或報酬。' : block.reason === 'insufficient_common_observation_dates' ? '共同觀察日期不足兩日，暫不計算報酬。' : block.reason === 'stock_no_observed_closes_in_range' ? '所選期間沒有可用的個股原始收盤。' : '目前無法計算相對表現；個股其他研究資料仍可使用。'}</p>}
+      <div className="space-y-1 text-[10px] text-muted-foreground">
+        <div>個股日線：{sourceReadLabel(stockSource)} · 依所選日期篩選近期回傳資料</div>
+        <div>大盤日線：{sourceReadLabel(benchmarkSource)}</div>
+        <div>只比較兩邊都有資料的共同觀察日；缺少日期不代表休市或採集失敗。</div>
+      </div>
+      <FreshnessSummary block={block} />
+      <EvidenceDetails block={block} />
+    </section>
+  )
+}
+
 function MarginBlock({ block }: { block: AnyBlock }) {
   const data = (block.data || {}) as any
   const latest = data.latest
@@ -425,7 +479,7 @@ function ShareholderDistributionBlock({ block }: { block: AnyBlock }) {
           <span>集保總股數（官方總計）</span><span className="text-right font-mono">{exactValue(latest.total_share_count)}</span>
           <span>保管帳戶總數</span><span className="text-right font-mono">{exactValue(latest.total_holder_accounts)}</span>
           <span>大額分級股數（&gt;400,000 股）</span><span className="text-right font-mono">{exactValue(large?.share_count)}</span>
-          <span>占官方總股數（%）</span><span className="text-right font-mono">{exactValue(large?.percentage_of_official_total)}</span>
+          <span>占官方總股數（%）</span><span className="text-right font-mono break-all">{exactValue(large?.percentage_of_official_total)}</span>
         </div>
         <div className="space-y-1 rounded border border-border/30 p-2 text-[11px]">
           <div className="font-medium">門檻分級（來源級別 12–15）</div>
@@ -514,7 +568,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">官方台股研究</h3>
-          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點、公司行動與有限範圍財報各自保留來源期間、單位和證據</p>
+          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點、財報、公司行動與 raw 大盤比較各自保留來源期間、單位和證據</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading} aria-label="重新載入官方研究資料">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -551,6 +605,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           <BrokerFlowPanel block={blocks.broker_flow as AnyBlock} />
           <FinancialStatementsPanel block={blocks.financial_statements as AnyBlock | undefined} />
           <CorporateActionsBlock block={blocks.corporate_actions as AnyBlock} />
+          <BenchmarkComparisonBlock block={blocks.benchmark_comparison as AnyBlock} />
         </div>
       </> : null}
       {!loading && !error && !payload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}

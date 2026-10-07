@@ -1,6 +1,6 @@
 # PW-13：歷史資料與新增研究條件驗證
 
-狀態：waiting。依賴：PW-05、PW-06、PW-11、PW-12。Owner：unassigned。
+狀態：ready。依賴：PW-05、PW-06、PW-11、PW-12。Owner：unassigned。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -44,4 +44,4 @@ src/modules/strategy/backtest/、factor_eval.py、factor_calibration.py；resear
 
 ## 進度與交接
 
-尚未開始。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。
+2026-10-08：PW-05／PW-06／PW-11／PW-12 均 completed，依賴已滿足；本卡 ready、Owner unassigned，尚未開始，等待使用者另行指定。樣本不足仍須如實交付不足證據結論。執行時更新：目前狀態、修改檔案、已通過／未通過的驗收、實際測試、外部限制、提交／PR 和可恢復步驟。未完成的上游或運行驗收必須明列。

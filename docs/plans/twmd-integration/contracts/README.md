@@ -129,7 +129,7 @@ transport behavior is already fixed.
 | PW-08 broker flow | Establish branch coverage, price/quantity availability, and provenance separately; daily institutional flow is not branch trading identity. |
 | PW-09 material information | Keep current and historical announcement sources and publication/receipt times separate. |
 | PW-10 financial statements | Honor the source's supported issuer, consolidated scope, fiscal period, and statement coverage; do not infer completeness from profile or revenue coverage. |
-| PW-11 benchmarks | Verify each benchmark's own source, units, daily coverage, and selected series before using market-wide context. The plan baseline had missing TAIEX/TPEX bars and unconfigured TAIEX live quotes; acquisition and independent acceptance remain prerequisites. |
+| PW-11 benchmarks | Verify each benchmark's own source, units, daily coverage, and selected series before using market-wide context. The plan baseline had missing TAIEX/TPEX bars and unconfigured TAIEX live quotes; bounded acquisition and independent daily-bar acceptance were completed on 2026-10-08 (see PW-11 below). Live quote/session acceptance remains PW-14. |
 | PW-12 corporate actions | Treat realized ex-right results as event annotations, not a complete dividend calendar or adjustment stream. |
 | PW-13 historical research | Preserve as-of versus currently retained evidence. Receipt, publication and report dates must not be substituted for one another. |
 | PW-14 live data | Establish trading-session arrival, age and recovery evidence separately; historical EOD samples do not prove live delivery. The supplemental capability sample reports support but unconfigured/disabled collection; enablement and trading-session acceptance remain separate upstream work. |
@@ -249,3 +249,41 @@ tests for same-day actions, missing partitions, corrected records, suspensions,
 delisted instruments and bar/action identity. Until that contract is accepted,
 results may annotate known retained events but must use the input price series
 as-is.
+
+
+## PW-11 official benchmark and raw stock comparison (2026-10-08)
+
+The reviewed TWMD checkout remains `78e6e5b103886456434b6ee3032cdd31ce16943b`;
+the deployed source commit is unknown. `/api/v1/benchmarks` fixes TAIEX to
+TWSE `MI_5MINS_HIST` and TPEX to TPEx `tpex_index`. Their identity space is
+separate from stock IDs. Daily OHLC values are exact decimal strings in
+`index_points`, with `raw_price_index` basis; volume and turnover are absent.
+
+Benchmark bar reads accept paired inclusive bounds of at most 366 calendar days
+or latest-N (limit 1..1000). Latest reads retain a separate calendar coverage
+window: available_count describes the window, not just selected bars; unbounded
+total_count can include older observations. Bounded total_count equals available
+coverage; completeness requires ready schema and no calendar gaps. Partial,
+truncated and evidence_truncated retain their source meanings. Calendar MISSING
+does not establish a holiday or failed acquisition. Each bar retains revision,
+capture ID/time, payload hash, scope and actual publisher URL, including monthly
+TAIEX query selectors; untruncated capture receipts must match selected bars.
+
+Raw stock `/api/v1/bars?timeframe=day` accepts latest-N only, with canonical
+`(?:TWSE|TPEX):[0-9][0-9A-Z]{3,5}`, raw EOD/TWD/share basis. It has no date-range
+selector. PanWatch filters the latest 1000 returned observations by the requested
+completed date range, preserves null/untraded closes, and uses actual common
+dates only. Per-date coverage dataset, partition, status, count, acquisition
+time and nullable checksum remain available; acquisition time is not publication
+time. Relative return is stock raw-price return minus same-date raw-price-index
+return in percentage points, excluding dividends and company-action adjustment.
+
+After explicit user authorization, exactly two existing control jobs succeeded:
+TAIEX Sep1..Oct6 retained 24 bars and TPEx latest retained 5 bars through Oct7.
+Existing benchmark schedules remained disabled; all 11 schedules and four stock
+subscriptions were unchanged. Formal shared-service reads verified 24 common
+dates for TWSE:2330 and four for TPEX:5347 against an independent raw-price
+oracle. This is useful retained evidence, not full TPEx historical coverage,
+publisher timing/SLA, point-in-time knowledge, live-session or deployed PanWatch
+acceptance. See [runbook](../runbooks/PW-11-benchmarks.md) and
+[shared-service evidence](../evidence/PW-11-shared-service-2026-10-08.json).

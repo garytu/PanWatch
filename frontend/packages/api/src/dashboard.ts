@@ -23,7 +23,20 @@ export interface DashboardMarketIndex {
   change_pct: number | null
   change_amount: number | null
   prev_close: number | null
-  /** 近20日收盤價,用於首頁指數走勢 sparkline;取數失敗/無對映(如美股指數)則為空陣列 */
+  /** Official Taiwan index cards use persisted daily bars rather than live quotes. */
+  price_kind?: 'eod' | string
+  trade_date?: string | null
+  change_start_date?: string | null
+  change_end_date?: string | null
+  provider?: string | null
+  source_alias?: string | null
+  unit?: string | null
+  basis?: string | null
+  source_partial?: boolean | null
+  source_truncated?: boolean | null
+  availability?: string
+  spark_dates?: string[]
+  /** Recent observed daily closes; missing dates are not filled with synthetic points. */
   spark?: number[]
 }
 

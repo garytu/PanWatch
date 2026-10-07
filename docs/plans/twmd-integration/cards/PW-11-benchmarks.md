@@ -1,6 +1,6 @@
 # PW-11：官方大盤基準與相對表現
 
-狀態：in_progress。依賴：PW-01、PW-04（已完成）；運行驗收仍需上游 benchmark 日線實際採集。Owner：pw11_benchmarks_worker（gpt-6-luna／xhigh）。
+狀態：completed。依賴：PW-01、PW-04（已完成）；授權有界採集及實際運行驗收已完成。Owner：pw11_benchmarks_worker（gpt-6-luna／xhigh），主代理完成獨立審查／修正／驗證。
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
@@ -44,4 +44,19 @@ src/modules/market/api/market.py、kline_collector.get_index_klines、MarketData
 
 ## 進度與交接
 
-Coordination checkpoint：in_progress。使用者已指定開始 PW-11，覆寫原 waiting 的實作啟動限制；PW-01／PW-04 已完成，契約與程式可開始。2026-10-07 23:50 Taipei 的唯讀查詢確認 TAIEX／TPEX 日線均零筆。實作 ready 與運行驗收前提分開，未取得真實資料前不能標 completed。本次先完成契約／程式／離線驗證與具體有界採集 runbook；上游 mutation 另依使用者授權執行。既有工作區修改保留，使用目前 codex/taiwan-market-support checkout，worker 不提交、不編輯狀態／owner／board。
+Coordination checkpoint：in_progress。使用者已指定開始 PW-11，覆寫原 waiting 的實作啟動限制；PW-01／PW-04 已完成。2026-10-07 23:50 Taipei 的初始唯讀查詢確認 TAIEX／TPEX 日線均零筆；授權的有界上游採集後，coordinator 已以實際 TWSE／TPEx 資料完成獨立 shared-service positive acceptance。Worker 完成本卡實作、離線驗證與採集 runbook，交由 parent 獨立 review／最終 QA；使用目前 codex/taiwan-market-support checkout，不提交、不編輯狀態／owner／board。
+
+Worker handoff 2026-10-08：加入獨立 benchmark identity、Decimal index-point bars／raw TWSE-TPEX stock daily reads、官方首頁日期型日線與 spark、TW venue routing，以及研究面板以實際共同日期計算不含股利的原始價格報酬和百分點差。有效 partial/truncated 讀取保留來源旗標並可依 provider/credential/identity/period 快取；錯誤讀取不快取，返回資料採 defensive copy。TAIEX 選取 limit 小於 coverage available count 的情況有回歸測試；TWSE 月度來源 query URL 的 `date=...` receipt 保留並依固定 HTTPS publisher path 驗證。操作邊界記於[基準採集 runbook](../runbooks/PW-11-benchmarks.md)：TAIEX 有界 inclusive 月範圍、TPEx latest-only 累積、未啟用 schedule，且不補造 TPEx 歷史。上游正向 shared-service acceptance 由 coordinator 留存在 [`PW-11-shared-service-2026-10-08.json`](../evidence/PW-11-shared-service-2026-10-08.json)；此證據由 coordinator 管理。
+
+Worker verification：`.venv/bin/python -m pytest -q tests packages/marketdata/tests`（1376 passed、3 skipped）；`frontend/node_modules/.bin/vitest run`（25 files、70 passed）；`frontend/node_modules/.bin/tsc -b && frontend/node_modules/.bin/vite build`（passed）；`git diff --check`（passed）。`pnpm test -- --run`／`pnpm build` 因 pnpm 嘗試寫入 workspace 外的 global lockfile、遇到 `ERR_PNPM_LOCKFILE_WRITE_FILE`，改以相同已安裝的 Vitest／TypeScript／Vite 執行檔完成驗證。等待 parent 獨立 contract review 與最後 UI QA；worker 不提交，未執行額外上游操作。
+
+
+Coordinator final acceptance 2026-10-08：主代理獨立審查並修正 stock canonical ID（首碼數字、4–6 碼）、coverage 與 total／complete／partial／evidence_truncated 的一致性，補 malformed／零筆來源及 identity 預檢回歸。逐日共同觀察保留 stock dataset／partition／status／record_count／acquired_at／checksum 與 benchmark 實際月 URL／revision／capture／captured_at／hash；UI 可展開逐日來源，採集與發布時間不混用。正式研究面板手機查核發現 TDCC 精確百分比和財報 revision 長字串溢出，補換行而不截短原值。
+
+- 使用者明確授權兩次手動採集：TAIEX 2026-09-01..10-06（`run_71260d6aeb9b464b`）及 TPEX 空 scope 最新一次（`run_ba60ae238ae749fc`），均 SUCCEEDED。留存 TAIEX 24 日、TPEX 5 日至 10-07；11 個既有 schedules 和 4 個股票 subscriptions 前後一致，兩個 benchmark schedules 保持 disabled。未部署、未新增／啟用排程，沒有進一步採集。
+- 正式 TaiwanResearchService：TWSE:2330 13,829.423 ms，共同 24 日（09-01..10-06），相對報酬 -0.1785875955 百分點；TPEX:5347 12,520.527 ms，共同 4 日（10-01..06），+0.6482919039 百分點。與獨立原始收盤 oracle 的共同日期／起訖／兩側報酬／百分點差全部相符。首頁 TAIEX 20 點、TPEX 5 點與實際日期一致，partial／truncated 原旗標保留。
+- `.venv/bin/python -m pytest -q tests packages/marketdata/tests`：1393 passed、3 skipped、14 既有 warnings（18.38 s）。frontend `node node_modules/vitest/vitest.mjs run`：25 files／70 tests；補逐日 DOM assertions 後 `node node_modules/vitest/vitest.mjs run tests/TaiwanResearchPanel.test.tsx`：13 passed。`node node_modules/typescript/bin/tsc -b`／`node node_modules/vite/bin/vite.js build` 通過。正式元件＋實際 payload 在桌面 1280×900／手機 390×844、TWSE／TPEX 共四組查核均無 page errors／頁面橫向溢出，逐日 receipt 可展開且實際時間與官方 URL 可見。`.venv/bin/python -m pytest -q packages/pan-agent-runtime/tests`：42 passed。`git diff --check`／staged diff 檢查通過。正式驗收後已清除臨時 preview 並停止本機 server。
+- 安全證據：[初始零筆](../evidence/PW-11-live-baseline-2026-10-07.json)、[採集](../evidence/PW-11-acquisition-2026-10-07.json)、[取得資料](../evidence/PW-11-live-acquired-2026-10-07.json)、[正式共用服務](../evidence/PW-11-shared-service-2026-10-08.json)、[畫面查核](../evidence/PW-11-ui-qa-2026-10-08.json)。
+- 限制：TPEx latest-only 不代表完整歷史；日曆 gaps 不推斷休市／採集故障；raw price 不含股利或公司行動調整，無 point-in-time／發布時刻／更新 SLA 保證。上游 source checkout 已知，deployed commit 未公開。正式研究及首頁在本機驗收，尚未合併／部署。
+
+PW-11 completed，PW-13 的 PW-05／PW-06／PW-11／PW-12 依賴均已完成，標記 ready，未開始實作；PW-14 仍等待獨立上游配置與交易時段驗收。最終任務提交與交付 PR 以 Git history／[PR #1](https://github.com/garytu/PanWatch/pull/1) 為準。

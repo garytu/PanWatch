@@ -95,7 +95,7 @@ export function FinancialStatementsPanel({ block }: { block?: AnyBlock }) {
     <section className="rounded-lg border border-border/50 p-3 space-y-2 lg:col-span-2">
       {blockHeading(block)}
       {report ? <>
-        <div className="text-[11px] text-muted-foreground">{data.fiscal_year}Q{data.fiscal_quarter} · 合併 · {report.member_filename} · 修訂 {report.semantic_revision_id}</div>
+        <div className="break-all text-[11px] text-muted-foreground">{data.fiscal_year}Q{data.fiscal_quarter} · 合併 · {report.member_filename} · 修訂 {report.semantic_revision_id}</div>
         <div className="text-[11px] text-muted-foreground">報表接收 {report.original_received_at_utc || '未知'} · 最新發現 {coverage?.latest_discovery_presence || '未知'}{coverage?.original_received_at_utc ? `（${coverage.original_received_at_utc}）` : ''} · 發布時間未知</div>
         <div className="text-[11px] text-muted-foreground">
           精確值已依來源 scale 保留；來源字串與 scale 另列。期間照來源日期顯示，沒有推導單季值或財務比率。

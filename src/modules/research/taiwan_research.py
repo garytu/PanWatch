@@ -32,6 +32,7 @@ from src.modules.research.twmd_margin_shareholders import (
 from src.modules.research.twmd_broker_flow import broker_flow_block, broker_flow_unsupported_block
 from src.modules.research.twmd_material_information import material_information_block
 from src.modules.research.twmd_corporate_actions import corporate_actions_block
+from src.modules.research.twmd_benchmarks import benchmark_comparison_block
 from src.modules.research.twmd_financial_statements import (
     financial_statement_block,
     financial_statement_unsupported_block,
@@ -60,6 +61,7 @@ _CACHE_TTLS = {
     "material_information": 300,
     "financial_statements": 300,
     "corporate_actions": 300,
+    "benchmark_comparison": 300,
 }
 _CACHE: OrderedDict[tuple, tuple[float, Any]] = OrderedDict()
 _CACHE_LOCK = threading.RLock()
@@ -102,6 +104,10 @@ _FRESHNESS_HINTS = {
     "corporate_actions": (
         "event_driven",
         "TWSE 實際除權息／減資結果；端點沒有覆蓋、接收時間或修訂欄位，空清單不能證明沒有事件。",
+    ),
+    "benchmark_comparison": (
+        "daily",
+        "只比較共同實際觀察日期的官方原始日線收盤；來源沒有發布期限，日曆缺日不代表交易日缺漏。",
     ),
 }
 
@@ -601,6 +607,15 @@ def _freshness_observation(name: str, evidence: dict) -> dict:
             "source_received_at_utc": None,
             "first_observed_at": None,
         }
+    if name == "benchmark_comparison":
+        dates = (evidence.get("period") or {}).get("common_observation_dates") or []
+        return {
+            "data_period": max(dates) if dates else None,
+            "report_date": None,
+            "publication_time": None,
+            "source_received_at_utc": None,
+            "first_observed_at": None,
+        }
     return {
         "data_period": None,
         "report_date": None,
@@ -699,6 +714,16 @@ def _coverage_freshness(name: str, block: ResearchDataBlock) -> dict:
             "Each endpoint returns a bounded list without coverage, receipt or revision evidence. "
             "Returned events are known observations; an empty list means unknown coverage, not no events."
         )
+    elif name == "benchmark_comparison":
+        coverage.update({
+            "common_observation_count": len((block.data or {}).get("common_observation_dates", [])),
+            "stock_source": evidence.get("stock_source"),
+            "benchmark_source": evidence.get("benchmark_source"),
+            "calendar_assessed": False,
+            "interpretation": (
+                "Only actual same-date raw daily closes are compared. Calendar MISSING entries do not infer holidays or acquisition failure."
+            ),
+        })
     return coverage
 
 
@@ -963,6 +988,12 @@ class TaiwanResearchService:
                 "start_date": selectors["start_date"],
                 "end_date": selectors["end_date"],
             }),
+            "benchmark_comparison": ("/api/v1/bars; /api/v1/benchmarks/{benchmark_id}/bars", {
+                "instrument_id": instrument_id,
+                "start_date": selectors["start_date"],
+                "end_date": selectors["end_date"],
+                "benchmark_id": None,
+            }),
         }
         def retained_financial(canonical: str) -> ResearchDataBlock:
             endpoint, financial_selectors = template["financial_statements"]
@@ -1044,6 +1075,12 @@ class TaiwanResearchService:
                 name: (endpoint, {**block_selectors, "instrument_id": canonical})
                 for name, (endpoint, block_selectors) in template.items()
             }
+            benchmark_id = "TAIEX" if canonical.startswith("TWSE:") else "TPEX"
+            endpoint, block_selectors = canonical_template["benchmark_comparison"]
+            canonical_template["benchmark_comparison"] = (
+                endpoint,
+                {**block_selectors, "benchmark_id": benchmark_id},
+            )
             if not instrument["is_active"]:
                 blocks = {
                     name: _error_block("instrument_inactive", endpoint, block_selectors,
@@ -1100,6 +1137,11 @@ class TaiwanResearchService:
                 ),
                 "corporate_actions": lambda: _corporate_actions_for_client(
                     self.client, canonical, date_start, date_end, today, deadline,
+                ),
+                "benchmark_comparison": lambda: benchmark_comparison_block(
+                    self.client, canonical, date_start, date_end,
+                    today_taipei=today,
+                    deadline_monotonic=deadline,
                 ),
             }
             if canonical.startswith("TPEX:"):
@@ -1397,7 +1439,9 @@ class TaiwanResearchService:
             (block.data or {}).get(component, {}).get("status") == "error"
             for component in ("ex_right_dividend", "capital_reduction")
         )
-        if not (broker_component_error or action_component_error) and block.status in {"available", "partial", "missing", "absent", "empty", "unsupported", "unknown", "closed"}:
+        if (not (broker_component_error or action_component_error)
+                and block.evidence.get("cacheable") is not False
+                and block.status in {"available", "partial", "missing", "absent", "empty", "unsupported", "unknown", "closed"}):
             _cache_set(key, block, _CACHE_TTLS[name])
         return block
 

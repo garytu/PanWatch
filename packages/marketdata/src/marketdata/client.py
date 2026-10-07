@@ -31,6 +31,9 @@ from marketdata.types import (
     Request,
     ShareholderItem,
     TwmdCompanyProfileRead,
+    TwmdBenchmarkBarsRead,
+    TwmdBenchmarkDefinition,
+    TwmdDailyBarsRead,
     TwmdMaterialInformationRead,
     TwmdFinancialStatementRead,
     TwmdBrokerFlowCoverageRead,
@@ -304,6 +307,42 @@ class MarketData:
             raise ValueError(f"{datatype} requires one explicitly configured twmd source")
         from marketdata.vendors.twmd import TwmdClient
         return TwmdClient(sources[0].config)
+
+    def benchmark_definitions(self) -> tuple[TwmdBenchmarkDefinition, ...]:
+        """Read official TWSE/TPEx index identities through the explicit source."""
+        return self._twmd_research_client("benchmark").benchmark_definitions()
+
+    def benchmark_bars(
+        self,
+        benchmark_id: str,
+        *,
+        start_date: str | date | None = None,
+        end_date: str | date | None = None,
+        limit: int = 120,
+        timeout_sec: float | None = None,
+    ) -> TwmdBenchmarkBarsRead:
+        """Read official benchmark points and provenance without stock identity."""
+        return self._twmd_research_client("benchmark").benchmark_bars(
+            benchmark_id,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            timeout_sec=timeout_sec,
+        )
+
+    def raw_daily_bars(
+        self,
+        instrument_id: str,
+        *,
+        limit: int = 1000,
+        timeout_sec: float | None = None,
+    ) -> TwmdDailyBarsRead:
+        """Read latest-N raw daily issuer bars from the official TW source."""
+        return self._twmd_research_client("benchmark").daily_bars(
+            instrument_id,
+            limit=limit,
+            timeout_sec=timeout_sec,
+        )
 
     def company_profile(self, symbol: str) -> TwmdCompanyProfileRead:
         """Read the latest official Taiwan issuer profile as a separate typed block."""

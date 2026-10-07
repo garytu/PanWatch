@@ -155,7 +155,9 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
         start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
         fiscal_year=2024, fiscal_quarter=4, now_utc=frozen_now + timedelta(hours=1),
     )
-    assert len(calls) == 16
+    # The tenth block independently probes the new benchmark service; failed
+    # benchmark reads are not cached even while the other research blocks hit.
+    assert len(calls) == 20
     assert later["blocks"]["monthly_revenues"]["evidence"]["freshness"]["source_receipt_age_seconds"] == (
         revenue_freshness["source_receipt_age_seconds"] + 3600
     )
@@ -902,6 +904,7 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
         assert set(payload["blocks"]) == {
             "valuation", "institutional_flows", "company_profile", "monthly_revenues",
             "margin_short_sale", "shareholder_distribution", "broker_flow", "financial_statements", "corporate_actions",
+            "benchmark_comparison",
         }
         assert set(started) == {
             "valuation", "institutional_flows", "company_profile", "monthly_revenues",
@@ -943,7 +946,7 @@ def test_timed_out_reads_keep_permits_and_queued_blocks_are_explicit(monkeypatch
         payload = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
             "TWSE:2330", today_taipei=date(2026, 10, 7)
         )
-        assert len(payload["blocks"]) == 9
+        assert len(payload["blocks"]) == 10
         assert {block["reason"] for block in payload["blocks"].values()} == {"timeout"}
         assert slots._value == 0
         again = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(

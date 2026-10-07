@@ -30,10 +30,15 @@ def test_quotes_do_not_contact_disabled_providers(monkeypatch):
 
 def test_indices_do_not_contact_other_markets(monkeypatch):
     from src.modules.market.api import market
+    from src.platform.marketdata import marketdata_client
     provider = Mock()
-    monkeypatch.setattr(market, 'get_market_data', provider)
-    assert asyncio.run(market.get_market_indices()) == []
-    provider.assert_not_called()
+    market.clear_indices_cache()
+    monkeypatch.setattr(market, 'get_market_data', lambda: provider)
+    monkeypatch.setattr(marketdata_client, 'twmd_config', lambda: {'base_url': 'http://fixture', 'token': 'test'})
+    rows = asyncio.run(market.get_market_indices())
+    assert [item['symbol'] for item in rows] == ['TAIEX', 'TPEX']
+    provider.index_quotes.assert_not_called()
+    assert [call.args[0] for call in provider.benchmark_bars.call_args_list] == ['TAIEX', 'TPEX']
 
 
 def test_paper_allocation_is_masked_without_moving_or_mutating_money():

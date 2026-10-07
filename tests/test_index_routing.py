@@ -51,9 +51,10 @@ def test_get_market_indices_uses_marketdata(monkeypatch):
 
     out = asyncio.run(mkt.get_market_indices())
 
-    assert captured["symbols"] == [idx["tencent_symbol"] for idx in mkt.MARKET_INDICES]
+    assert captured["symbols"] == [idx["tencent_symbol"] for idx in mkt.MARKET_INDICES if not idx.get("benchmark_id")]
     sh = next(i for i in out if i["symbol"] == "000001")
     assert sh["current_price"] == 3200.0 and sh["change_pct"] == 0.63
     # 未命中行情的指數仍返回基本資訊佔位(current_price=None),匹配邏輯不變
     hsi = next(i for i in out if i["symbol"] == "HSI")
     assert hsi["current_price"] is None
+    assert next(i for i in out if i["symbol"] == "TAIEX")["price_kind"] == "eod"

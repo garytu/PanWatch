@@ -6,9 +6,9 @@
 
 ## 下一項
 
-**PW-11 in_progress。** 使用者指定開始 PW-11；PW-01／PW-04 已完成，程式契約可實作。Worker：pw11_benchmarks_worker（gpt-6-luna／xhigh）；主代理負責獨立審查、修正、驗證與提交。2026-10-07 23:50 Taipei 唯讀查詢仍為兩個 benchmark 零筆，運行驗收需上游有界採集；未滿足前不標 completed。
+**PW-13 ready。** PW-11 已完成官方大盤首頁與原始價格相對比較，兩次明確授權的有界採集及實際共用服務／畫面驗收均成功。PW-13 的 PW-05／PW-06／PW-11／PW-12 依賴已全部完成，Owner unassigned，等待使用者另行指定；不自動開始。PW-14 仍等待上游即時配置及交易時段驗收。
 
-PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值／法人 typed reads、相容介面與來源證據；PW-03 已接入公司資料／月營收 typed reads 與獨立 research blocks。PW-04 已交付有界 research 聚合、既有個股入口的研究面板，以及 assistant／TradingAgents／研究 context 共用資料。PW-05 已交付各區塊 age／coverage、更新 runbook 與四個股票／ETF selectors 的唯讀運行驗收；持續更新仍有上游 manual-only 前提，未變更採集或排程。PW-06 已交付選擇性的官方條件選股、有限候選與讀取統計、逐筆資料日期／來源／排除理由，以及 UI／AI 共用入口。PW-07 已交付原生交易單位的融資融券與集保持股專用區塊，UI／AI 共用六區塊，並明示大額門檻、官方分母、variant／缺週與 TWSE 限制。PW-08 已交付來源／原生單位分組的分點買賣排行、觀察分母集中度、成交 VWAP、逐日覆蓋與已保留的單日價格明細；UI／AI 共用七區塊，筆數／修訂衝突維持部分可用，未 materialized 與空明細狀態分開。PW-09 已接入獨立的 TWSE current／MOPS history 官方事件時間線、原文查詢工具與既有 AI 公告分析；覆蓋、年度採集、修訂及原始取得時間分開，無有效採集證據不能宣稱完整或沒有事件。PW-10 已接入有限範圍的合併財報 typed reads、獨立第八研究區塊、年度／季度選擇與 TradingAgents 三表；原始值、尺度、期間、比較期、修訂及留存／最新發現證據均保留，未推導單季或比率。PW-12 已加入第九研究區塊、台股圖表標記及 raw-price 回測 metadata；除權息／減資原值与失敗狀態分開，覆蓋及公告／付款時間維持未知。其餘卡依下表等待指定。本計劃不授權採集、排程或部署。執行範例：
+PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值／法人 typed reads、相容介面與來源證據；PW-03 已接入公司資料／月營收 typed reads 與獨立 research blocks。PW-04 已交付有界 research 聚合、既有個股入口的研究面板，以及 assistant／TradingAgents／研究 context 共用資料。PW-05 已交付各區塊 age／coverage、更新 runbook 與四個股票／ETF selectors 的唯讀運行驗收；持續更新仍有上游 manual-only 前提，未變更採集或排程。PW-06 已交付選擇性的官方條件選股、有限候選與讀取統計、逐筆資料日期／來源／排除理由，以及 UI／AI 共用入口。PW-07 已交付原生交易單位的融資融券與集保持股專用區塊，UI／AI 共用六區塊，並明示大額門檻、官方分母、variant／缺週與 TWSE 限制。PW-08 已交付來源／原生單位分組的分點買賣排行、觀察分母集中度、成交 VWAP、逐日覆蓋與已保留的單日價格明細；UI／AI 共用七區塊，筆數／修訂衝突維持部分可用，未 materialized 與空明細狀態分開。PW-09 已接入獨立的 TWSE current／MOPS history 官方事件時間線、原文查詢工具與既有 AI 公告分析；覆蓋、年度採集、修訂及原始取得時間分開，無有效採集證據不能宣稱完整或沒有事件。PW-10 已接入有限範圍的合併財報 typed reads、獨立第八研究區塊、年度／季度選擇與 TradingAgents 三表；原始值、尺度、期間、比較期、修訂及留存／最新發現證據均保留，未推導單季或比率。PW-12 已加入第九研究區塊、台股圖表標記及 raw-price 回測 metadata；除權息／減資原值与失敗狀態分開，覆蓋及公告／付款時間維持未知。PW-11 已交付第十研究區塊、官方加權／櫃買首頁與日線 spark，依共同觀察日計算不含股利原始價格報酬及百分點差，逐日採集／修訂證據可核對。其餘卡依下表等待指定。本計劃不授權採集、排程或部署。執行範例：
 
 > 執行 docs/plans/twmd-integration 的 PW-01；完成該卡的驗收與相關檢查，更新計劃狀態，然後停下。
 
@@ -26,12 +26,12 @@ PW-01 已交付契約、離線 fixtures 與驗證；PW-02 已接入官方估值�
 | PW-08 | [券商分點](cards/PW-08-broker-flow.md) | completed | PW-01、PW-04 | 分點買賣集中程度、VWAP 與覆蓋狀態 |
 | PW-09 | [官方重大訊息](cards/PW-09-material-information.md) | completed | PW-01、PW-04 | 官方事件時間線與 AI 原文分析 |
 | PW-10 | [有限範圍財報](cards/PW-10-financial-statements.md) | completed | PW-03、PW-04 | 支援範圍內的台股財務事實分析 |
-| PW-11 | [大盤基準](cards/PW-11-benchmarks.md) | in_progress | PW-01、PW-04；上游採集 | 台股首頁指數與個股相對大盤表現 |
+| PW-11 | [大盤基準](cards/PW-11-benchmarks.md) | completed | PW-01、PW-04；授權採集已驗收 | 台股首頁指數與個股相對大盤表現 |
 | PW-12 | [除權息與減資事件](cards/PW-12-corporate-actions.md) | completed | PW-01、PW-04 | 解釋事件附近價格跳動與回測限制 |
-| PW-13 | [歷史資料與研究驗證](cards/PW-13-historical-research.md) | waiting | PW-05、PW-06、PW-11、PW-12 | 排除未來資訊、驗證新增研究條件 |
+| PW-13 | [歷史資料與研究驗證](cards/PW-13-historical-research.md) | ready | PW-05、PW-06、PW-11、PW-12 | 排除未來資訊、驗證新增研究條件 |
 | PW-14 | [即時指數與分鐘 K](cards/PW-14-live-data.md) | waiting | PW-11；上游交易時段驗收 | 啟用有健康證據的盤中圖表與市場背景 |
 
-PW-12 完成：後端 1344 passed／3 skipped、runtime 42 passed、前端 24 files／68 tests，TypeScript／build／diff 檢查通過；日／週／月匯出圖與正式研究元件的離線事件畫面查核通過。固定共用服務唯讀樣本 11.44 秒，兩個事件端點均空清單，維持 coverage unknown，不宣稱沒有事件。PW-11 仍等待上游 benchmark 實際採集；PW-13 已滿足 PW-05／PW-06／PW-12，仍等待 PW-11；PW-14 仍等待 PW-11 及交易時段驗收。沒有符合全部前提的 ready 卡。
+PW-12 完成：後端 1344 passed／3 skipped、runtime 42 passed、前端 24 files／68 tests，TypeScript／build／diff 檢查通過；日／週／月匯出圖與正式研究元件的離線事件畫面查核通過。固定共用服務唯讀樣本 11.44 秒，兩個事件端點均空清單，維持 coverage unknown，不宣稱沒有事件。此為 PW-12 當時 checkpoint。PW-11 隨後於 2026-10-08 完成：後端 1393 passed／3 skipped、前端 25 files／70 tests，TypeScript／build／diff 檢查及四組正式元件畫面查核通過。TAIEX 24／TPEX 5 日資料經授權取得；TWSE:2330 與 TPEX:5347 正式服務共同日期比較與獨立 oracle 相符。唯一 ready 卡為 PW-13；PW-14 仍等待即時配置與交易時段驗收。
 
 預設按表格順序逐項執行。使用者可指定已滿足依賴的其他卡；不自動延伸到下一張。PW-01–PW-05 為第一批交付，PW-06–PW-10 為研究擴充，PW-11–PW-14 涉及額外採集或歷史／即時驗證。
 
