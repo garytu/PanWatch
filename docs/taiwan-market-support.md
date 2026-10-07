@@ -448,3 +448,31 @@ seconds, with TPEX TDCC explicitly unsupported and TWSE TDCC still dated
 2026-09-04 without a prior-week delta. PW-07 is completed in code and bounded
 read-only verification; the current default next task is **PW-08 ready**.
 The PR remains unmerged and the change is not deployed.
+
+
+## 2026-10-07: PW-08 broker-flow research
+
+PW-08 is completed in code and bounded query verification. The Taiwan research
+service now supplies seven shared UI/AI blocks, including source-local broker
+flow quantities, top-five buy/sell rankings, observed-side concentration,
+source transaction VWAP and retained single-date execution prices. Capital lots
+before 2026-07-24 remain separate from later TWSE exact shares and branch keys.
+Typed reads enforce the 2024 floor and current Taipei day, 31-day quantities,
+366-day coverage and single-date price detail; shared research retains its
+completed-date selectors without silently shortening oversized quantity ranges.
+
+Coverage counts and revisions are checked against actual returned branches;
+conflicts remain partial and visible. EMPTY, FAILED, CLOSED, MISSING and absent
+materialization remain explicit. A successful empty detail response cannot
+distinguish EMPTY from FAILED projection closure; its outcome remains unknown.
+Broker flow currently requires four-digit TWSE IDs. No watchlist, queue,
+producer, collection, scheduling, subscription, strategy or deployment changed.
+
+[Fixed query evidence](plans/twmd-integration/evidence/PW-08-live-contract-2026-10-07.json)
+and [shared-service evidence](plans/twmd-integration/evidence/PW-08-shared-service-2026-10-07.json)
+show TWSE:4164 available with 98 quantity and 185 price-detail rows,
+TWSE:2330 partial due to missing detail materialization, and TPEX:5347 explicitly
+unsupported for broker flow beside its successful other research blocks.
+The source has no exposed publisher SLA, row receipt or historical as-of
+contract. Branch observations do not identify investors or holding cost.
+The next default card is **PW-09 ready**; the PR remains unmerged and undeployed.

@@ -29,6 +29,7 @@ from src.modules.research.twmd_margin_shareholders import (
     margin_short_sale_block,
     shareholder_distribution_block,
 )
+from src.modules.research.twmd_broker_flow import broker_flow_block, broker_flow_unsupported_block
 from src.platform.marketdata.marketdata_client import twmd_config
 
 _TAIPEI = ZoneInfo("Asia/Taipei")
@@ -49,6 +50,7 @@ _CACHE_TTLS = {
     "monthly_revenues": 1_800,
     "margin_short_sale": 300,
     "shareholder_distribution": 300,
+    "broker_flow": 300,
 }
 _CACHE: OrderedDict[tuple, tuple[float, Any]] = OrderedDict()
 _CACHE_LOCK = threading.RLock()
@@ -79,6 +81,10 @@ _FRESHNESS_HINTS = {
     "shareholder_distribution": (
         "weekly",
         "週資料；保管帳戶分級不是實際投資人身分。來源未提供逐列接收時間或更新期限。",
+    ),
+    "broker_flow": (
+        "daily",
+        "日資料；分點數量依來源分界與原生單位分組，覆蓋未證明全市場完整度；來源未提供接收時間或更新期限。",
     ),
 }
 
@@ -501,6 +507,22 @@ def _freshness_observation(name: str, evidence: dict) -> dict:
             "source_received_at_utc": None,
             "first_observed_at": None,
         }
+    if name == "broker_flow":
+        rows = evidence.get("per_period_provenance") or []
+        row = max(rows, key=lambda item: _period_sort_key(item.get("trade_date")), default={})
+        if not row:
+            available_coverage = [
+                item for item in evidence.get("per_period_coverage") or []
+                if item.get("status") == "AVAILABLE"
+            ]
+            row = max(available_coverage, key=lambda item: _period_sort_key(item.get("trade_date")), default={})
+        return {
+            "data_period": row.get("trade_date"),
+            "report_date": None,
+            "publication_time": None,
+            "source_received_at_utc": None,
+            "first_observed_at": None,
+        }
     return {
         "data_period": None,
         "report_date": None,
@@ -558,8 +580,11 @@ def _coverage_freshness(name: str, block: ResearchDataBlock) -> dict:
         coverage["interpretation"] = (
             "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
         )
-    elif name in {"margin_short_sale", "shareholder_distribution"}:
-        entries = evidence.get("dataset_coverage") or []
+    elif name in {"margin_short_sale", "shareholder_distribution", "broker_flow"}:
+        entries = (
+            evidence.get("per_period_coverage") or []
+            if name == "broker_flow" else evidence.get("dataset_coverage") or []
+        )
         coverage["reported_partition_count"] = len(entries)
         coverage["reported_status_counts"] = {
             status: sum(1 for item in entries if item.get("status") == status)
@@ -568,6 +593,11 @@ def _coverage_freshness(name: str, block: ResearchDataBlock) -> dict:
         coverage["interpretation"] = (
             "Coverage describes source partitions only; it does not establish a trading calendar or selected-issuer absence."
         )
+        if name == "broker_flow":
+            coverage["interpretation"] = (
+                "Canonical broker-flow coverage is date-complete in the query response, but it does not establish an exchange calendar or all-market branch completeness. "
+                "Concentration denominators use only the returned branch rows within one provider-native unit group."
+            )
     return coverage
 
 
@@ -700,7 +730,7 @@ def _safe_block_error_reason(reason: str, http_status: object) -> str:
 
 
 class TaiwanResearchService:
-    """Merge six independent official TWMD reads with bounded scope and fan-out."""
+    """Merge independent official TWMD reads with bounded scope and fan-out."""
 
     def __init__(self, *, client: TwmdClient | None = None, config: dict | None = None):
         self.config = dict(config if config is not None else twmd_config())
@@ -746,6 +776,14 @@ class TaiwanResearchService:
                 "instrument_id": instrument_id,
                 "start": (today - timedelta(days=90)).isoformat(),
                 "end": (today - timedelta(days=1)).isoformat(),
+            }),
+            "broker_flow": ("/api/v1/broker-flow/quantities, /api/v1/broker-flow/coverage, /api/v1/broker-flow/price-levels", {
+                "instrument_id": instrument_id,
+                "quantity_start": selectors["start_date"],
+                "quantity_end": selectors["end_date"],
+                "coverage_start": selectors["start_date"],
+                "coverage_end": selectors["end_date"],
+                "price_level_date": selectors["end_date"],
             }),
         }
         if not _REQUEST_SLOTS.acquire(blocking=False):
@@ -834,6 +872,10 @@ class TaiwanResearchService:
                     today - timedelta(days=90),
                     today - timedelta(days=1),
                 )),
+                "broker_flow": lambda: broker_flow_block(
+                    self.client, canonical, date_start, date_end,
+                    today_taipei=today, deadline_monotonic=deadline,
+                ),
             }
             tpex_code = canonical.split(":", 1)[1] if canonical.startswith("TPEX:") else ""
             if tpex_code and not re.fullmatch(r"\d{4}", tpex_code):
@@ -850,6 +892,11 @@ class TaiwanResearchService:
                     self.config, status="unsupported", instrument_id=canonical,
                 )
                 del builders["shareholder_distribution"]
+            if not re.fullmatch(r"TWSE:[0-9]{4}", canonical):
+                blocks["broker_flow"] = broker_flow_unsupported_block(
+                    canonical, "twse_four_digit_only"
+                )
+                del builders["broker_flow"]
             names = list(builders)
             futures = {}
             queued = iter(names)
@@ -930,7 +977,11 @@ class TaiwanResearchService:
                 reason=_safe_block_error_reason(block.reason, status),
                 evidence=evidence,
             )
-        if block.status in {"available", "partial", "missing", "absent", "empty", "unsupported", "unknown"}:
+        broker_component_error = name == "broker_flow" and any(
+            (block.data or {}).get(component, {}).get("status") == "error"
+            for component in ("quantity_range", "coverage_range", "price_levels")
+        )
+        if not broker_component_error and block.status in {"available", "partial", "missing", "absent", "empty", "unsupported", "unknown", "closed"}:
             _cache_set(key, block, _CACHE_TTLS[name])
         return block
 

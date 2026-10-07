@@ -535,6 +535,94 @@ class TwmdShareholderDistributionRead:
     coverage_error_reasons: dict[str, str] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class TwmdBrokerFlowQuantityObservation:
+    """One source-preserving Capital-lot or TWSE-share branch observation."""
+
+    provider: str
+    dataset: str
+    instrument_id: str
+    symbol: str
+    trade_date: str
+    source_branch_key: str
+    branch_code: str
+    branch_name: str
+    native_unit: str
+    precision_shares: int
+    buy_native: int
+    sell_native: int
+    net_native: int
+    buy_vwap: Decimal | None = None
+    sell_vwap: Decimal | None = None
+    revision_id: str | None = None
+
+
+@dataclass(frozen=True)
+class TwmdBrokerFlowCoverageObservation:
+    """One canonical daily coverage outcome; statuses remain source-native."""
+
+    provider: str
+    dataset: str
+    instrument_id: str
+    trade_date: str
+    status: str
+    record_count: int
+    revision_id: str | None = None
+    failure_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class TwmdBrokerFlowPriceLevelObservation:
+    """One exact TWSE execution-price row for a materialized detail date."""
+
+    provider: str
+    dataset: str
+    instrument_id: str
+    symbol: str
+    trade_date: str
+    source_branch_key: str
+    branch_code: str
+    branch_name: str
+    price: Decimal
+    buy_native: int
+    sell_native: int
+    native_unit: str
+    precision_shares: int
+    revision_id: str
+
+
+@dataclass(frozen=True)
+class TwmdBrokerFlowQuantityRead:
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    data: list[TwmdBrokerFlowQuantityObservation]
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class TwmdBrokerFlowCoverageRead:
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    data: list[TwmdBrokerFlowCoverageObservation]
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class TwmdBrokerFlowPriceLevelsRead:
+    instrument_id: str
+    endpoint: str
+    trade_date: str
+    data: list[TwmdBrokerFlowPriceLevelObservation]
+    status: str
+    reason: str
+
+
 @dataclass
 class DragonTigerItem:
     """龍虎榜(東財每日龍虎榜明細,市場級,按 date 過濾)。欄位待實抓校準。"""

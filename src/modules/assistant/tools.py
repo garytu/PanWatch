@@ -1358,9 +1358,10 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             name="get_taiwan_stock_research",
             title="查詢台股官方研究資料",
             description=(
-                "查詢 TWMD 官方估值、三大法人股數、公司資料、月營收、融資融券和集保分級持股。資料區塊各自帶有狀態、覆蓋、資料期別、來源報表日、receipt 年齡、評估時間、單位與 evidence。"
+                "查詢 TWMD 官方估值、三大法人股數、公司資料、月營收、融資融券、集保分級持股與券商分點。資料區塊各自帶有狀態、覆蓋、資料期別、來源報表日、receipt 年齡、評估時間、單位與 evidence。"
                 "來源發布時間或更新 SLA 未提供時，依 evidence 明確標示未知；不要把較早資料當成查詢日資料。"
                 "集保僅支援四位數 TWSE 標的；保管帳戶分級不識別實際投資人。大額比例以官方總計為分母，週變化需同變體精確前週。"
+                "分點僅支援四位數 TWSE；數量最多 31 個日曆日，覆蓋最多 366 日。Capital 張數與 TWSE 精確股數分開，集中度只用已回傳來源數量；買賣 VWAP 是來源成交均價，不是持倉成本。價格明細缺口與 revision 警示依 evidence 保留。"
                 "台股財報尚未接入；月營收和報價都不能當成完整損益表、資產負債表或現金流量表。"
             ),
             risk=ToolRisk.READ,

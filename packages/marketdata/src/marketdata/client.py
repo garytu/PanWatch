@@ -31,6 +31,9 @@ from marketdata.types import (
     Request,
     ShareholderItem,
     TwmdCompanyProfileRead,
+    TwmdBrokerFlowCoverageRead,
+    TwmdBrokerFlowPriceLevelsRead,
+    TwmdBrokerFlowQuantityRead,
     TwmdMonthlyRevenueRead,
     TwmdMarginShortSaleRead,
     TwmdShareholderDistributionRead,
@@ -353,6 +356,47 @@ class MarketData:
         """Read dedicated TDCC holder-distribution rows for one canonical issuer."""
         return self._twmd_research_client("shareholder_distribution").shareholder_distribution(
             symbol, start_date, end_date, report_variant=report_variant
+        )
+
+    def broker_flow_quantities(
+        self,
+        symbol: str,
+        start_date: str | date,
+        end_date: str | date,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdBrokerFlowQuantityRead:
+        """Read canonical broker quantities from the explicitly configured TWMD source."""
+        return self._twmd_research_client("broker_flow").broker_flow_quantities(
+            symbol, start_date, end_date, today_taipei=today_taipei, timeout_sec=timeout_sec
+        )
+
+    def broker_flow_coverage(
+        self,
+        symbol: str,
+        start_date: str | date,
+        end_date: str | date,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdBrokerFlowCoverageRead:
+        """Read date-complete canonical broker-flow coverage."""
+        return self._twmd_research_client("broker_flow").broker_flow_coverage(
+            symbol, start_date, end_date, today_taipei=today_taipei, timeout_sec=timeout_sec
+        )
+
+    def broker_flow_price_levels(
+        self,
+        symbol: str,
+        trade_date: str | date,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdBrokerFlowPriceLevelsRead:
+        """Read one already-materialized TWSE broker execution-price date."""
+        return self._twmd_research_client("broker_flow").broker_flow_price_levels(
+            symbol, trade_date, today_taipei=today_taipei, timeout_sec=timeout_sec
         )
 
     def events(self, symbols: list[str], *, market: str = "CN", since_days: int = 7) -> list[EventItem]:

@@ -2,6 +2,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TaiwanResearchPanel } from '@panwatch/biz-ui/components/taiwan-research-panel'
+import { BrokerFlowPanel } from '@panwatch/biz-ui/components/broker-flow-panel'
 import { researchApi } from '@panwatch/api'
 
 vi.mock('@panwatch/api', () => ({ researchApi: { taiwan: vi.fn() } }))
@@ -15,6 +16,7 @@ function supplementalBlocks() {
   return {
     margin_short_sale: block({ instrument_id: 'TWSE:2330', native_unit: 'trading_units', latest: null }, 'unknown', 'selected_presence_unreported'),
     shareholder_distribution: block({ instrument_id: 'TWSE:2330', native_unit: 'shares', latest: null }, 'unknown', 'selected_presence_unreported'),
+    broker_flow: block(null, 'unknown', 'selected_presence_unreported'),
   }
 }
 
@@ -143,6 +145,7 @@ it('shows native margin lots and TDCC denominator, and leaves a missing prior we
         freshness: { frequency: 'weekly', data_period: '2026-10-02', report_date: '2026-10-02', data_period_age_days: 5,
           coverage: { reported_status_counts: { AVAILABLE: 1 } }, frequency_hint: '週資料；來源未提供發布 SLA。' },
       }),
+      broker_flow: block(null, 'unknown', 'selected_presence_unreported'),
     },
     limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
   } as any)
@@ -170,6 +173,7 @@ it('explains ETF profile and revenue scope while showing the available blocks', 
     blocks: {
       ...supplementalBlocks(),
       shareholder_distribution: block(null, 'unsupported', 'tdcc_contract_is_twse_four_digit_only'),
+      broker_flow: block(null, 'unsupported', 'twse_four_digit_only'),
       valuation: block({ instrument_id: 'TPEX:006201', observations: [] }, 'unsupported', 'unsupported_valuation_selector', { source_contract: 'tpex_daily_valuation/v1' }),
       institutional_flows: block({ observations: [{ trade_date: '2026-10-02', native_values: { total_institutional_net_shares: 1000 } }] }),
       company_profile: block(null, 'unsupported', 'unsupported_etf'),
@@ -188,6 +192,7 @@ it('explains ETF profile and revenue scope while showing the available blocks', 
   expect(screen.getByText('ETF 不發布這類發行公司月營收資料。')).toBeTruthy()
   expect(screen.getByText('ETF 不發布這類發行公司月營收或公司 profile 資料。')).toBeTruthy()
   expect(screen.getByText('集保持股分布目前只支援四位數上市標的。')).toBeTruthy()
+  expect(screen.getByText('券商分點目前只支援四位數上市標的；上櫃標的尚不支援。')).toBeTruthy()
   expect(screen.getByText(/月營收是月度公告資料/)).toBeTruthy()
 })
 
@@ -196,6 +201,50 @@ it('shows a provider error without inventing zero data', async () => {
   render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
   await waitFor(() => expect(screen.getByText('研究服務逾時')).toBeTruthy())
   expect(screen.queryByText('0')).toBeNull()
+})
+
+it('keeps Capital lots and TWSE shares separate and explains bounded concentration and detail gaps', () => {
+  render(<BrokerFlowPanel block={block({
+    quantity_range: { start_date: '2026-07-23', end_date: '2026-07-24', status: 'available', reason: 'selected_records_present' },
+    quantity_groups: [
+      {
+        provider: 'capital', native_unit: 'lots', precision_shares: 1000,
+        top_buy: [{ source_branch_key: 'capital:4:12340001', branch_code: '0001', branch_name: 'Capital 台北', buy_native: 9, sell_native: 1, net_native: 8, share_of_observed_group_pct: '100.0000', revisions: ['cap-r1'] }],
+        top_sell: [{ source_branch_key: 'capital:4:12340001', branch_code: '0001', branch_name: 'Capital 台北', buy_native: 9, sell_native: 1, net_native: 8, share_of_observed_group_pct: '100.0000', revisions: ['cap-r1'] }],
+        top_n_buy_concentration_pct: '100.0000', top_n_sell_concentration_pct: '100.0000',
+        observed_buy_denominator_native: 9, observed_sell_denominator_native: 1,
+        coverage_complete_for_source_dates: false, coverage_status_counts: { MISSING: 1, AVAILABLE: 1 },
+        coverage_missing_dates: ['2026-07-23'], revision_ids: ['cap-r1'],
+        denominator_definition: 'Observed Capital rows only; no all-market denominator.',
+      },
+      {
+        provider: 'twse', native_unit: 'shares', precision_shares: 1,
+        top_buy: [{ source_branch_key: 'twse:0001', branch_code: '0001', branch_name: 'TWSE 台北', buy_native: 100000, sell_native: 50000, net_native: 50000, share_of_observed_group_pct: '100.0000', revisions: ['twse-r1'] }],
+        top_sell: [{ source_branch_key: 'twse:0001', branch_code: '0001', branch_name: 'TWSE 台北', buy_native: 100000, sell_native: 50000, net_native: 50000, share_of_observed_group_pct: '100.0000', revisions: ['twse-r1'] }],
+        top_n_buy_concentration_pct: '100.0000', top_n_sell_concentration_pct: '100.0000',
+        observed_buy_denominator_native: 100000, observed_sell_denominator_native: 50000,
+        coverage_complete_for_source_dates: true, coverage_status_counts: { AVAILABLE: 1 },
+        coverage_missing_dates: [], revision_ids: ['twse-r1'],
+        denominator_definition: 'Observed TWSE rows only; no all-market denominator.',
+      },
+    ],
+    quantity_observations: [{ provider: 'twse', trade_date: '2026-07-24', source_branch_key: 'twse:0001', branch_code: '0001', branch_name: 'TWSE 台北', buy_vwap: '100.123456', sell_vwap: null }],
+    coverage_range: { start_date: '2026-07-23', end_date: '2026-07-24', status: 'partial', reason: 'some_requested_dates_missing_or_failed' },
+    coverage_status_counts_by_provider: { capital: { MISSING: 1 }, twse: { AVAILABLE: 1 } },
+    coverage_observations: [],
+    price_levels: { trade_date: '2026-07-24', status: 'not_materialized', reason: 'detail_projection_not_materialized', observations: [], revision_consistency_with_same_date_quantities: 'unknown', no_rows_interpretation: null },
+    revision_consistency_warnings: [],
+  }, 'partial', 'broker_flow_source_scope_limited', { vwap_meaning: 'Source transaction VWAP; not position cost basis.' }) as any} />)
+
+  expect(screen.getByText('Capital · 張（原生單位）')).toBeTruthy()
+  expect(screen.getByText('TWSE BSR · 股（精確股數）')).toBeTruthy()
+  expect(screen.getAllByText('Capital 台北（0001）').length).toBe(2)
+  expect(screen.getAllByText('TWSE 台北（0001）').length).toBe(2)
+  expect(screen.getAllByText(/分母為此來源在所選期間已回傳分點/).length).toBe(2)
+  expect(screen.getByText('來源買賣成交均價（VWAP）')).toBeTruthy()
+  expect(screen.getByText(/100\.123456/)).toBeTruthy()
+  expect(screen.getByText('買賣 VWAP 是來源成交均價（TWD），不是分點持倉成本。')).toBeTruthy()
+  expect(screen.getByText('來源尚未保留此標的在該日的成交價格明細。')).toBeTruthy()
 })
 
 it('keeps dated flow coverage visible beside a timed-out profile without treating missing calendar dates as closures', async () => {
@@ -261,4 +310,18 @@ it('ignores a late response for the prior venue of the same code', async () => {
   await Promise.resolve()
   expect(screen.getByText('TPEX:2330 · EQUITY · 區間 2026-09-08 至 2026-10-06')).toBeTruthy()
   expect(screen.queryByText('TWSE:2330 · EQUITY · 區間 2026-09-08 至 2026-10-06')).toBeNull()
+})
+
+it('shows producer failure, ambiguous empty detail and revision limits beside independent component states', () => {
+  render(<BrokerFlowPanel block={block({
+    quantity_range: { status: 'available' }, quantity_groups: [], quantity_observations: [],
+    coverage_range: { status: 'partial' }, coverage_status_counts_by_provider: { twse: { FAILED: 1 } },
+    coverage_observations: [{ provider: 'twse', trade_date: '2026-10-02', status: 'FAILED', failure_reason: 'archive parse failed' }],
+    price_levels: { trade_date: '2026-10-02', status: 'unknown', reason: 'materialized_no_rows_status_unknown', observations: [] },
+    revision_consistency_warnings: ['twse:2026-10-02 quantity count or revision conflicts with coverage'],
+  }, 'partial') as any} />)
+  expect(screen.getByText(/TWSE BSR：來源處理失敗 1 日/)).toBeTruthy()
+  expect(screen.getByText(/來源失敗：archive parse failed/)).toBeTruthy()
+  expect(screen.getByText('來源沒有回傳成交價格列，目前無法確認是無成交明細（EMPTY）或處理失敗（FAILED）。')).toBeTruthy()
+  expect(screen.getByText(/分點數量、覆蓋或明細的筆數／修訂不一致/)).toBeTruthy()
 })

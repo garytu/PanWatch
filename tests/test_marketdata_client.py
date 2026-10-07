@@ -117,3 +117,15 @@ def test_tw_quote_timeout_reaches_http_request(monkeypatch, primary, legacy, exp
     source = mc.DbConfigProvider().sources_for("quote", "TW")[0]
     ExternalQuoteVendor().fetch([Symbol(Market.TW, "2330")], source.config)
     assert calls == [expected]
+
+
+def test_broker_research_routes_to_explicit_twmd_source_without_host_database(monkeypatch):
+    from marketdata import MarketData
+    from marketdata.vendors.twmd import TwmdClient
+    monkeypatch.setattr(mc, 'twmd_config', lambda: {'base_url': 'http://broker-fixture'})
+    config = mc.DbConfigProvider()
+    monkeypatch.setattr(config, '_query_rows', lambda *_: pytest.fail('broker-flow must not fall back to host DB'))
+    calls = []
+    monkeypatch.setattr(TwmdClient, 'broker_flow_quantities', lambda self, symbol, *args, **kwargs: calls.append((self.base_url, symbol)) or 'typed-result')
+    assert MarketData(config).broker_flow_quantities('TWSE:2330', '2026-10-02', '2026-10-02') == 'typed-result'
+    assert calls == [('http://broker-fixture', 'TWSE:2330')]

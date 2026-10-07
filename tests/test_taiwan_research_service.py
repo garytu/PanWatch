@@ -82,6 +82,17 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
             return profile, {}
         if path == "monthly-revenues":
             return revenue["response"], {}
+        if path == "broker-flow/quantities":
+            return [], {}
+        if path == "broker-flow/coverage":
+            return [{
+                "provider": "twse", "dataset": "broker_flow", "instrument_id": "TWSE:2330",
+                "trade_date": params["start"], "status": "MISSING", "record_count": 0,
+                "revision_id": None, "failure_reason": None,
+            }], {}
+        if path == "broker-flow/price-levels":
+            assert params["date"] == "2026-10-02"
+            return [], {}
         if path in {"margin-short-sale", "shareholder-distribution", "coverage"}:
             return [], {}
         raise AssertionError(path)
@@ -133,7 +144,7 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
         start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
         now_utc=frozen_now + timedelta(hours=1),
     )
-    assert len(calls) == 10
+    assert len(calls) == 13
     assert later["blocks"]["monthly_revenues"]["evidence"]["freshness"]["source_receipt_age_seconds"] == (
         revenue_freshness["source_receipt_age_seconds"] + 3600
     )
@@ -256,6 +267,13 @@ def test_one_provider_failure_does_not_erase_other_blocks(monkeypatch):
         if path == "institutional-flows": raise TwmdReadError("private URL/token details", status_code=503, reason_code="http_503")
         if path == "company-profiles": return profile, {}
         if path == "monthly-revenues": return revenue["response"], {}
+        if path == "broker-flow/quantities": return [], {}
+        if path == "broker-flow/coverage": return [{
+            "provider": "twse", "dataset": "broker_flow", "instrument_id": "TWSE:2330",
+            "trade_date": params["start"], "status": "MISSING", "record_count": 0,
+            "revision_id": None, "failure_reason": None,
+        }], {}
+        if path == "broker-flow/price-levels": return [], {}
         if path in {"margin-short-sale", "shareholder-distribution", "coverage"}: return [], {}
         raise AssertionError(path)
 
@@ -801,9 +819,12 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
         payload = future.result(timeout=3)
         assert set(payload["blocks"]) == {
             "valuation", "institutional_flows", "company_profile", "monthly_revenues",
+            "margin_short_sale", "shareholder_distribution", "broker_flow",
+        }
+        assert set(started) == {
+            "valuation", "institutional_flows", "company_profile", "monthly_revenues",
             "margin_short_sale", "shareholder_distribution",
         }
-        assert set(started) == set(payload["blocks"])
         assert max_active <= 4
     finally:
         release_initial.set()
@@ -840,7 +861,7 @@ def test_timed_out_reads_keep_permits_and_queued_blocks_are_explicit(monkeypatch
         payload = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
             "TWSE:2330", today_taipei=date(2026, 10, 7)
         )
-        assert len(payload["blocks"]) == 6
+        assert len(payload["blocks"]) == 7
         assert {block["reason"] for block in payload["blocks"].values()} == {"timeout"}
         assert slots._value == 0
         again = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(

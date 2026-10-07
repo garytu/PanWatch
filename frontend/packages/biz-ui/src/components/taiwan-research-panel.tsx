@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { researchApi, type ResearchDataBlock, type ResearchFreshness, type TaiwanResearchPayload } from '@panwatch/api'
 import { Button } from '@panwatch/base-ui/components/ui/button'
+import { BrokerFlowPanel } from './broker-flow-panel'
 
 type AnyBlock = ResearchDataBlock<Record<string, any>>
 
@@ -467,7 +468,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">官方台股研究</h3>
-          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、融資融券與集保持股各自標示期間、單位和來源</p>
+          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、融資融券、集保持股與券商分點各自標示期間、單位和來源</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading} aria-label="重新載入官方研究資料">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -485,6 +486,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           <RevenueBlock block={blocks.monthly_revenues as AnyBlock} securityType={payload?.instrument?.security_type} />
           <MarginBlock block={blocks.margin_short_sale as AnyBlock} />
           <ShareholderDistributionBlock block={blocks.shareholder_distribution as AnyBlock} />
+          <BrokerFlowPanel block={blocks.broker_flow as AnyBlock} />
         </div>
       </> : null}
       {!loading && !error && !payload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}

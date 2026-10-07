@@ -37,6 +37,12 @@ from marketdata.types import (
     TwmdMarginShortSaleRead,
     TwmdShareholderDistributionObservation,
     TwmdShareholderDistributionRead,
+    TwmdBrokerFlowCoverageObservation,
+    TwmdBrokerFlowCoverageRead,
+    TwmdBrokerFlowPriceLevelObservation,
+    TwmdBrokerFlowPriceLevelsRead,
+    TwmdBrokerFlowQuantityObservation,
+    TwmdBrokerFlowQuantityRead,
     MarginItem,
 )
 from marketdata.vendors.base import (
@@ -56,6 +62,10 @@ _COMPANY_PROFILE_ENDPOINT = "/api/v1/company-profiles"
 _MONTHLY_REVENUE_ENDPOINT = "/api/v1/monthly-revenues"
 _MARGIN_SHORT_SALE_ENDPOINT = "/api/v1/margin-short-sale"
 _SHAREHOLDER_DISTRIBUTION_ENDPOINT = "/api/v1/shareholder-distribution"
+_BROKER_FLOW_QUANTITIES_ENDPOINT = "/api/v1/broker-flow/quantities"
+_BROKER_FLOW_COVERAGE_ENDPOINT = "/api/v1/broker-flow/coverage"
+_BROKER_FLOW_PRICE_LEVELS_ENDPOINT = "/api/v1/broker-flow/price-levels"
+_BROKER_FLOW_CUTOVER = date(2026, 7, 24)
 _COVERAGE_ENDPOINT = "/api/v1/coverage"
 _MONTHLY_REVENUE_FLOOR = date(2024, 1, 1)
 _MONTHLY_REVENUE_MAX_MONTHS = 120
@@ -308,6 +318,164 @@ def _shareholder_observation(value, instrument_id: str) -> TwmdShareholderDistri
         share_percentage_points=percentage,
         provider=provider,
         native_unit="shares",
+    )
+
+
+_BROKER_FLOW_COVERAGE_STATUSES = {"AVAILABLE", "EMPTY", "FAILED", "CLOSED", "MISSING"}
+
+
+def _broker_flow_branch_key(provider: str, branch_code: str, key: str) -> bool:
+    if provider == "twse":
+        return bool(re.fullmatch(r"twse:[A-Za-z0-9]{4}", key)) and key == f"twse:{branch_code}"
+    if provider != "capital":
+        return False
+    match = re.fullmatch(r"capital:(\d+):([A-Za-z0-9]+)", key)
+    if match is None:
+        return False
+    broker_length = int(match.group(1))
+    encoded_ids = match.group(2)
+    return (
+        broker_length > 0
+        and broker_length < len(encoded_ids)
+        and encoded_ids[broker_length:] == branch_code
+    )
+
+
+def _broker_flow_quantity(value, instrument_id: str) -> TwmdBrokerFlowQuantityObservation:
+    if not isinstance(value, dict):
+        raise ValueError("broker-flow quantity must be an object")
+    if value.get("dataset") != "broker_flow" or value.get("instrument_id") != instrument_id:
+        raise ValueError("broker-flow quantity dataset or instrument does not match request")
+    symbol = _source_string(value.get("symbol"), "symbol", required=True) or ""
+    if instrument_id != f"TWSE:{symbol}":
+        raise ValueError("broker-flow symbol does not match canonical identity")
+    provider = _source_string(value.get("provider"), "provider", required=True) or ""
+    branch_code = _source_string(value.get("branch_code"), "branch_code", required=True) or ""
+    source_branch_key = _source_string(value.get("source_branch_key"), "source_branch_key", required=True) or ""
+    if not _broker_flow_branch_key(provider, branch_code, source_branch_key):
+        raise ValueError("broker-flow branch identity does not match its provider")
+    trade_date = _validate_source_date(value.get("trade_date"), "trade_date")
+    if (provider == "capital" and trade_date >= _BROKER_FLOW_CUTOVER.isoformat()) or (
+        provider == "twse" and trade_date < _BROKER_FLOW_CUTOVER.isoformat()
+    ):
+        raise ValueError("broker-flow provider does not match the source cutover")
+    native_unit = _source_string(value.get("native_unit"), "native_unit", required=True) or ""
+    precision = _source_int(value.get("precision_shares"), "precision_shares")
+    expected_unit, expected_precision = ("lots", 1000) if provider == "capital" else ("shares", 1)
+    if native_unit != expected_unit or precision != expected_precision:
+        raise ValueError("broker-flow native unit does not match provider")
+    buy = _source_int(value.get("buy_native"), "buy_native")
+    sell = _source_int(value.get("sell_native"), "sell_native")
+    net = _source_int(value.get("net_native"), "net_native")
+    if buy is None or sell is None or net is None or min(buy, sell) < 0 or net != buy - sell:
+        raise ValueError("broker-flow quantities must be non-negative integers with consistent net")
+    buy_vwap = _source_decimal(value.get("buy_vwap"), "buy_vwap")
+    sell_vwap = _source_decimal(value.get("sell_vwap"), "sell_vwap")
+    if any(value is not None and value < 0 for value in (buy_vwap, sell_vwap)):
+        raise ValueError("broker-flow VWAP must be non-negative")
+    if provider == "capital" and (buy_vwap is not None or sell_vwap is not None):
+        raise ValueError("Capital quantities do not provide VWAP")
+    branch_name = _source_string(value.get("branch_name"), "branch_name", required=True) or ""
+    if not branch_name.strip():
+        raise ValueError("broker-flow branch_name must not be blank")
+    return TwmdBrokerFlowQuantityObservation(
+        provider=provider,
+        dataset="broker_flow",
+        instrument_id=instrument_id,
+        symbol=symbol,
+        trade_date=trade_date,
+        source_branch_key=source_branch_key,
+        branch_code=branch_code,
+        branch_name=branch_name,
+        native_unit=native_unit,
+        precision_shares=precision,  # type: ignore[arg-type]
+        buy_native=buy,  # type: ignore[arg-type]
+        sell_native=sell,  # type: ignore[arg-type]
+        net_native=net,
+        buy_vwap=buy_vwap,
+        sell_vwap=sell_vwap,
+        revision_id=_source_string(value.get("revision_id"), "revision_id"),
+    )
+
+
+def _broker_flow_coverage(value, instrument_id: str) -> TwmdBrokerFlowCoverageObservation:
+    if not isinstance(value, dict):
+        raise ValueError("broker-flow coverage must be an object")
+    if value.get("dataset") != "broker_flow" or value.get("instrument_id") != instrument_id:
+        raise ValueError("broker-flow coverage dataset or instrument does not match request")
+    provider = _source_string(value.get("provider"), "provider", required=True) or ""
+    trade_date = _validate_source_date(value.get("trade_date"), "trade_date")
+    expected_provider = "capital" if trade_date < _BROKER_FLOW_CUTOVER.isoformat() else "twse"
+    if provider != expected_provider:
+        raise ValueError("broker-flow coverage provider does not match the source cutover")
+    status = _source_string(value.get("status"), "status", required=True) or ""
+    count = _source_int(value.get("record_count"), "record_count")
+    if status not in _BROKER_FLOW_COVERAGE_STATUSES or count is None or count < 0:
+        raise ValueError("broker-flow coverage has invalid status or record_count")
+    if (status == "AVAILABLE") != (count > 0):
+        raise ValueError("AVAILABLE coverage requires records and other statuses require zero")
+    failure_reason = _source_string(value.get("failure_reason"), "failure_reason")
+    if status == "FAILED" and not failure_reason:
+        raise ValueError("FAILED broker-flow coverage requires failure_reason")
+    return TwmdBrokerFlowCoverageObservation(
+        provider=provider,
+        dataset="broker_flow",
+        instrument_id=instrument_id,
+        trade_date=trade_date,
+        status=status,
+        record_count=count,
+        revision_id=_source_string(value.get("revision_id"), "revision_id"),
+        failure_reason=failure_reason,
+    )
+
+
+def _broker_flow_price_level(value, instrument_id: str) -> TwmdBrokerFlowPriceLevelObservation:
+    if not isinstance(value, dict):
+        raise ValueError("broker-flow price level must be an object")
+    if value.get("provider") != "twse" or value.get("dataset") != "broker_flow":
+        raise ValueError("broker-flow price levels require the TWSE source")
+    if value.get("instrument_id") != instrument_id:
+        raise ValueError("broker-flow price-level instrument does not match request")
+    symbol = _source_string(value.get("symbol"), "symbol", required=True) or ""
+    if instrument_id != f"TWSE:{symbol}":
+        raise ValueError("broker-flow price-level symbol does not match canonical identity")
+    trade_date = _validate_source_date(value.get("trade_date"), "trade_date")
+    if trade_date < _BROKER_FLOW_CUTOVER.isoformat():
+        raise ValueError("broker-flow price levels predate the TWSE cutover")
+    branch_code = _source_string(value.get("branch_code"), "branch_code", required=True) or ""
+    source_branch_key = _source_string(value.get("source_branch_key"), "source_branch_key", required=True) or ""
+    if not _broker_flow_branch_key("twse", branch_code, source_branch_key):
+        raise ValueError("broker-flow price-level branch identity is invalid")
+    price = _source_decimal(value.get("price"), "price")
+    if price is None or price <= 0:
+        raise ValueError("broker-flow price must be positive")
+    buy = _source_int(value.get("buy_native"), "buy_native")
+    sell = _source_int(value.get("sell_native"), "sell_native")
+    if buy is None or sell is None or min(buy, sell) < 0:
+        raise ValueError("broker-flow price-level quantities must be non-negative integers")
+    if value.get("native_unit") != "shares" or _source_int(value.get("precision_shares"), "precision_shares") != 1:
+        raise ValueError("broker-flow price levels require exact-share units")
+    revision = _source_string(value.get("revision_id"), "revision_id", required=True) or ""
+    if not revision:
+        raise ValueError("broker-flow price level revision_id must not be blank")
+    branch_name = _source_string(value.get("branch_name"), "branch_name", required=True) or ""
+    if not branch_name.strip():
+        raise ValueError("broker-flow branch_name must not be blank")
+    return TwmdBrokerFlowPriceLevelObservation(
+        provider="twse",
+        dataset="broker_flow",
+        instrument_id=instrument_id,
+        symbol=symbol,
+        trade_date=trade_date,
+        source_branch_key=source_branch_key,
+        branch_code=branch_code,
+        branch_name=branch_name,
+        price=price,
+        buy_native=buy,  # type: ignore[arg-type]
+        sell_native=sell,  # type: ignore[arg-type]
+        native_unit="shares",
+        precision_shares=1,
+        revision_id=revision,
     )
 
 
@@ -1573,6 +1741,230 @@ class TwmdClient:
             status=status,
             reason=reason,
             coverage_error_reasons=coverage_errors,
+        )
+
+    def _broker_flow_bounds(
+        self,
+        symbol: Symbol | str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        max_days: int,
+        subject: str,
+        today_taipei: date | None,
+    ) -> tuple[str, date, date]:
+        start = _date_value(start_date, "start_date")
+        end = _date_value(end_date, "end_date")
+        today = today_taipei or datetime.now(_TAIPEI).date()
+        if not date(2024, 1, 1) <= start <= end <= today:
+            raise ValueError("broker-flow dates must be between 2024-01-01 and the current Asia/Taipei date")
+        if (end - start).days + 1 > max_days:
+            raise ValueError(f"broker-flow {subject} reads are limited to {max_days} calendar days")
+        instrument_id = self._canonical_id(symbol)
+        if instrument_id.startswith("TPEX:"):
+            if re.fullmatch(r"TPEX:[0-9A-Z]{3,6}", instrument_id) is None:
+                raise ValueError("broker-flow reads require a canonical instrument ID")
+        elif re.fullmatch(r"TWSE:[0-9]{4}", instrument_id) is None:
+            raise ValueError("broker-flow TWSE reads require a four-digit canonical instrument ID")
+        return instrument_id, start, end
+
+    @staticmethod
+    def _broker_flow_unsupported_quantity(instrument_id: str, start: date, end: date) -> TwmdBrokerFlowQuantityRead:
+        return TwmdBrokerFlowQuantityRead(
+            instrument_id=instrument_id,
+            endpoint=_BROKER_FLOW_QUANTITIES_ENDPOINT,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            data=[],
+            status="unsupported",
+            reason="twse_four_digit_only",
+        )
+
+    @staticmethod
+    def _broker_flow_unsupported_coverage(instrument_id: str, start: date, end: date) -> TwmdBrokerFlowCoverageRead:
+        return TwmdBrokerFlowCoverageRead(
+            instrument_id=instrument_id,
+            endpoint=_BROKER_FLOW_COVERAGE_ENDPOINT,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            data=[],
+            status="unsupported",
+            reason="twse_four_digit_only",
+        )
+
+    def broker_flow_quantities(
+        self,
+        symbol: Symbol | str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdBrokerFlowQuantityRead:
+        """Read source-local branch quantities without converting native lots."""
+        instrument_id, start, end = self._broker_flow_bounds(
+            symbol, start_date, end_date, max_days=31, subject="quantity", today_taipei=today_taipei
+        )
+        if not instrument_id.startswith("TWSE:"):
+            return self._broker_flow_unsupported_quantity(instrument_id, start, end)
+        payload, _headers = self.get_response(
+            "broker-flow/quantities",
+            instrument_id=instrument_id,
+            start=start.isoformat(),
+            end=end.isoformat(),
+            parse="json_decimal",
+            timeout_sec=timeout_sec,
+        )
+        if not isinstance(payload, list):
+            raise TwmdReadError("twmd broker-flow quantities response must be a list", reason_code="invalid_response")
+        try:
+            rows = [_broker_flow_quantity(row, instrument_id) for row in payload]
+            keys = [(row.trade_date, row.source_branch_key) for row in rows]
+            if len(keys) != len(set(keys)):
+                raise ValueError("broker-flow quantities repeat a source branch/date")
+            if any(not start.isoformat() <= row.trade_date <= end.isoformat() for row in rows):
+                raise ValueError("broker-flow quantity is outside the requested range")
+        except (TypeError, ValueError) as exc:
+            raise TwmdReadError(f"invalid twmd broker-flow quantities response: {exc}", reason_code="invalid_response") from exc
+        rows.sort(key=lambda row: (row.trade_date, row.provider, row.source_branch_key))
+        return TwmdBrokerFlowQuantityRead(
+            instrument_id=instrument_id,
+            endpoint=_BROKER_FLOW_QUANTITIES_ENDPOINT,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            data=rows,
+            status="available" if rows else "unknown",
+            reason="selected_records_present" if rows else "quantity_rows_not_returned",
+        )
+
+    def broker_flow_coverage(
+        self,
+        symbol: Symbol | str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdBrokerFlowCoverageRead:
+        """Read inclusive, date-complete broker-flow coverage (maximum 366 days)."""
+        instrument_id, start, end = self._broker_flow_bounds(
+            symbol, start_date, end_date, max_days=366, subject="coverage", today_taipei=today_taipei
+        )
+        if not instrument_id.startswith("TWSE:"):
+            return self._broker_flow_unsupported_coverage(instrument_id, start, end)
+        payload, _headers = self.get_response(
+            "broker-flow/coverage",
+            instrument_id=instrument_id,
+            start=start.isoformat(),
+            end=end.isoformat(),
+            timeout_sec=timeout_sec,
+        )
+        if not isinstance(payload, list):
+            raise TwmdReadError("twmd broker-flow coverage response must be a list", reason_code="invalid_response")
+        expected_dates = [(start + timedelta(days=offset)).isoformat() for offset in range((end - start).days + 1)]
+        try:
+            rows = [_broker_flow_coverage(row, instrument_id) for row in payload]
+            actual_dates = [row.trade_date for row in rows]
+            if len(actual_dates) != len(set(actual_dates)) or set(actual_dates) != set(expected_dates):
+                raise ValueError("broker-flow coverage must include exactly one row for every requested date")
+        except (TypeError, ValueError) as exc:
+            raise TwmdReadError(f"invalid twmd broker-flow coverage response: {exc}", reason_code="invalid_response") from exc
+        rows.sort(key=lambda row: row.trade_date)
+        statuses = {row.status for row in rows}
+        if statuses == {"AVAILABLE"}:
+            status, reason = "available", "source_records_available"
+        elif statuses == {"MISSING"}:
+            status, reason = "missing", "coverage_missing"
+        elif statuses == {"EMPTY"}:
+            status, reason = "empty", "source_reported_empty"
+        elif statuses == {"CLOSED"}:
+            status, reason = "closed", "source_reports_closed_date"
+        elif "FAILED" in statuses and not statuses.intersection({"AVAILABLE", "EMPTY", "CLOSED"}):
+            status, reason = "error", "source_reported_failure"
+        elif "MISSING" in statuses or "FAILED" in statuses:
+            status, reason = "partial", "some_requested_dates_missing_or_failed"
+        else:
+            status, reason = "partial", "mixed_source_coverage_statuses"
+        return TwmdBrokerFlowCoverageRead(
+            instrument_id=instrument_id,
+            endpoint=_BROKER_FLOW_COVERAGE_ENDPOINT,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            data=rows,
+            status=status,
+            reason=reason,
+        )
+
+    def broker_flow_price_levels(
+        self,
+        symbol: Symbol | str,
+        trade_date: date | str,
+        *,
+        today_taipei: date | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdBrokerFlowPriceLevelsRead:
+        """Read one exact TWSE BSR price date; this does not materialize detail."""
+        day = _date_value(trade_date, "trade_date")
+        today = today_taipei or datetime.now(_TAIPEI).date()
+        if not date(2024, 1, 1) <= day <= today:
+            raise ValueError("trade_date must be between 2024-01-01 and the current Asia/Taipei date")
+        instrument_id = self._canonical_id(symbol)
+        if not re.fullmatch(r"TWSE:[0-9]{4}", instrument_id):
+            return TwmdBrokerFlowPriceLevelsRead(
+                instrument_id=instrument_id,
+                endpoint=_BROKER_FLOW_PRICE_LEVELS_ENDPOINT,
+                trade_date=day.isoformat(),
+                data=[],
+                status="unsupported",
+                reason="twse_four_digit_only",
+            )
+        if day < _BROKER_FLOW_CUTOVER:
+            return TwmdBrokerFlowPriceLevelsRead(
+                instrument_id=instrument_id,
+                endpoint=_BROKER_FLOW_PRICE_LEVELS_ENDPOINT,
+                trade_date=day.isoformat(),
+                data=[],
+                status="unsupported",
+                reason="unsupported_before_twse_bsr_cutover",
+            )
+        try:
+            payload, _headers = self.get_response(
+                "broker-flow/price-levels",
+                instrument_id=instrument_id,
+                **{"date": day.isoformat()},
+                parse="json_decimal",
+                timeout_sec=timeout_sec,
+            )
+        except TwmdReadError as exc:
+            if exc.status_code == 409:
+                return TwmdBrokerFlowPriceLevelsRead(
+                    instrument_id=instrument_id,
+                    endpoint=_BROKER_FLOW_PRICE_LEVELS_ENDPOINT,
+                    trade_date=day.isoformat(),
+                    data=[],
+                    status="not_materialized",
+                    reason="detail_projection_not_materialized",
+                )
+            raise
+        if not isinstance(payload, list):
+            raise TwmdReadError("twmd broker-flow price-levels response must be a list", reason_code="invalid_response")
+        try:
+            rows = [_broker_flow_price_level(row, instrument_id) for row in payload]
+            if any(row.trade_date != day.isoformat() for row in rows):
+                raise ValueError("broker-flow price-level response contains a different date")
+            keys = [(row.source_branch_key, row.price) for row in rows]
+            if len(keys) != len(set(keys)):
+                raise ValueError("broker-flow price levels repeat a branch/price")
+        except (TypeError, ValueError) as exc:
+            raise TwmdReadError(f"invalid twmd broker-flow price-level response: {exc}", reason_code="invalid_response") from exc
+        rows.sort(key=lambda row: (row.price, row.source_branch_key))
+        return TwmdBrokerFlowPriceLevelsRead(
+            instrument_id=instrument_id,
+            endpoint=_BROKER_FLOW_PRICE_LEVELS_ENDPOINT,
+            trade_date=day.isoformat(),
+            data=rows,
+            status="available" if rows else "unknown",
+            reason="detail_rows_present" if rows else "materialized_no_rows_status_unknown",
         )
 
     def instruments(self) -> list[dict]:
