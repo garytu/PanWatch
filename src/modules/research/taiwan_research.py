@@ -9,7 +9,7 @@ import re
 import threading
 import time
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -24,6 +24,10 @@ from src.modules.research.twmd_profile_revenue import (
     ResearchDataBlock,
     company_profile_block,
     monthly_revenue_block,
+)
+from src.modules.research.twmd_margin_shareholders import (
+    margin_short_sale_block,
+    shareholder_distribution_block,
 )
 from src.platform.marketdata.marketdata_client import twmd_config
 
@@ -43,6 +47,8 @@ _CACHE_TTLS = {
     "institutional_flows": 300,
     "company_profile": 21_600,
     "monthly_revenues": 1_800,
+    "margin_short_sale": 300,
+    "shareholder_distribution": 300,
 }
 _CACHE: OrderedDict[tuple, tuple[float, Any]] = OrderedDict()
 _CACHE_LOCK = threading.RLock()
@@ -65,6 +71,14 @@ _FRESHNESS_HINTS = {
     "monthly_revenues": (
         "monthly",
         "月資料；期別距今從該月月底計算。來源未提供發布時間或申報期限；未取得覆蓋不代表零營收或未申報。",
+    ),
+    "margin_short_sale": (
+        "daily",
+        "日資料；按來源交易日期顯示，尚未核對交易日曆或來源更新期限。來源未提供逐列接收時間或修訂資訊。",
+    ),
+    "shareholder_distribution": (
+        "weekly",
+        "週資料；保管帳戶分級不是實際投資人身分。來源未提供逐列接收時間或更新期限。",
     ),
 }
 
@@ -467,6 +481,26 @@ def _freshness_observation(name: str, evidence: dict) -> dict:
             "source_received_at_utc": row.get("received_at_utc"),
             "first_observed_at": None,
         }
+    if name == "margin_short_sale":
+        rows = evidence.get("per_period_provenance") or []
+        row = max(rows, key=lambda item: _period_sort_key(item.get("trade_date")), default={})
+        return {
+            "data_period": row.get("trade_date"),
+            "report_date": None,
+            "publication_time": None,
+            "source_received_at_utc": None,
+            "first_observed_at": None,
+        }
+    if name == "shareholder_distribution":
+        rows = evidence.get("per_period_provenance") or []
+        row = max(rows, key=lambda item: _period_sort_key(item.get("report_date")), default={})
+        return {
+            "data_period": row.get("report_date"),
+            "report_date": row.get("report_date"),
+            "publication_time": None,
+            "source_received_at_utc": None,
+            "first_observed_at": None,
+        }
     return {
         "data_period": None,
         "report_date": None,
@@ -523,6 +557,16 @@ def _coverage_freshness(name: str, block: ResearchDataBlock) -> dict:
         coverage["retained_row_count"] = sum(1 for item in periods if item.get("retained_row"))
         coverage["interpretation"] = (
             "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
+        )
+    elif name in {"margin_short_sale", "shareholder_distribution"}:
+        entries = evidence.get("dataset_coverage") or []
+        coverage["reported_partition_count"] = len(entries)
+        coverage["reported_status_counts"] = {
+            status: sum(1 for item in entries if item.get("status") == status)
+            for status in sorted({item.get("status") for item in entries if item.get("status")})
+        }
+        coverage["interpretation"] = (
+            "Coverage describes source partitions only; it does not establish a trading calendar or selected-issuer absence."
         )
     return coverage
 
@@ -656,7 +700,7 @@ def _safe_block_error_reason(reason: str, http_status: object) -> str:
 
 
 class TaiwanResearchService:
-    """Merge four independent official TWMD reads with bounded scope and fan-out."""
+    """Merge six independent official TWMD reads with bounded scope and fan-out."""
 
     def __init__(self, *, client: TwmdClient | None = None, config: dict | None = None):
         self.config = dict(config if config is not None else twmd_config())
@@ -697,6 +741,12 @@ class TaiwanResearchService:
             "institutional_flows": ("/api/v1/institutional-flows", {"instrument_id": instrument_id, "start_date": selectors["start_date"], "end_date": selectors["end_date"]}),
             "company_profile": ("/api/v1/company-profiles", {"instrument_id": instrument_id}),
             "monthly_revenues": ("/api/v1/monthly-revenues", {"instrument_id": instrument_id, "start_month": selectors["start_month"], "end_month": selectors["end_month"]}),
+            "margin_short_sale": ("/api/v1/margin-short-sale", {"instrument_id": instrument_id, "start": selectors["start_date"], "end": selectors["end_date"]}),
+            "shareholder_distribution": ("/api/v1/shareholder-distribution", {
+                "instrument_id": instrument_id,
+                "start": (today - timedelta(days=90)).isoformat(),
+                "end": (today - timedelta(days=1)).isoformat(),
+            }),
         }
         if not _REQUEST_SLOTS.acquire(blocking=False):
             blocks = {
@@ -776,6 +826,14 @@ class TaiwanResearchService:
                 "monthly_revenues": lambda: monthly_revenue_block(self.client.monthly_revenues(
                     canonical, selectors["start_month"], selectors["end_month"], today_taipei=today
                 )),
+                "margin_short_sale": lambda: margin_short_sale_block(self.client.margin_short_sale(
+                    canonical, date_start, date_end, today_taipei=today
+                )),
+                "shareholder_distribution": lambda: shareholder_distribution_block(self.client.shareholder_distribution(
+                    canonical,
+                    today - timedelta(days=90),
+                    today - timedelta(days=1),
+                )),
             }
             tpex_code = canonical.split(":", 1)[1] if canonical.startswith("TPEX:") else ""
             if tpex_code and not re.fullmatch(r"\d{4}", tpex_code):
@@ -785,45 +843,77 @@ class TaiwanResearchService:
                     self.config, status="unsupported", instrument_id=canonical,
                 )
                 del builders["valuation"]
+            if canonical.startswith("TPEX:"):
+                endpoint, block_selectors = canonical_template["shareholder_distribution"]
+                blocks["shareholder_distribution"] = _error_block(
+                    "tdcc_contract_is_twse_four_digit_only", endpoint, block_selectors,
+                    self.config, status="unsupported", instrument_id=canonical,
+                )
+                del builders["shareholder_distribution"]
             names = list(builders)
             futures = {}
-            for name in names:
-                endpoint, block_selectors = canonical_template[name]
-                key = _cache_key(self.config, canonical, name, tuple(block_selectors.values()))
-                cached = _cache_get(key)
-                if cached is not None:
-                    blocks[name] = cached
-                    continue
-                try:
-                    future = _submit_read(self._load_block, name, key, builders[name])
-                except RuntimeError:
-                    blocks[name] = _error_block(
-                        "concurrency_limit", endpoint, block_selectors, self.config,
-                        instrument_id=canonical,
-                    )
-                    continue
-                futures[name] = future
-            remaining = max(0.0, deadline - time.monotonic())
-            _done, pending = wait(futures.values(), timeout=remaining)
-            pending_set = set(pending)
-            for name, future in futures.items():
-                if future in pending_set:
+            queued = iter(names)
+
+            def submit_available() -> None:
+                while len(futures) < 4:
+                    name = next(queued, None)
+                    if name is None:
+                        return
                     endpoint, block_selectors = canonical_template[name]
-                    future.cancel()
-                    blocks[name] = _error_block(
-                        "timeout", endpoint, block_selectors, self.config,
-                        instrument_id=canonical,
-                    )
-                    continue
-                try:
-                    blocks[name] = future.result()
-                except Exception as exc:  # each independent block remains isolated
-                    endpoint, block_selectors = canonical_template[name]
-                    reason, status = _status_error(exc)
-                    blocks[name] = _error_block(
-                        reason, endpoint, block_selectors, self.config,
-                        instrument_id=canonical, http_status=status,
-                    )
+                    key = _cache_key(self.config, canonical, name, tuple(block_selectors.values()))
+                    cached = _cache_get(key)
+                    if cached is not None:
+                        blocks[name] = cached
+                        continue
+                    if time.monotonic() >= deadline:
+                        blocks[name] = _error_block(
+                            "timeout", endpoint, block_selectors, self.config,
+                            instrument_id=canonical,
+                        )
+                        continue
+                    try:
+                        future = _submit_read(self._load_block, name, key, builders[name])
+                    except RuntimeError:
+                        blocks[name] = _error_block(
+                            "concurrency_limit", endpoint, block_selectors, self.config,
+                            instrument_id=canonical,
+                        )
+                        continue
+                    futures[future] = name
+
+            submit_available()
+            while futures:
+                remaining = max(0.0, deadline - time.monotonic())
+                done, _pending = wait(futures.keys(), timeout=remaining, return_when=FIRST_COMPLETED)
+                if not done:
+                    for future, name in list(futures.items()):
+                        endpoint, block_selectors = canonical_template[name]
+                        future.cancel()
+                        blocks[name] = _error_block(
+                            "timeout", endpoint, block_selectors, self.config,
+                            instrument_id=canonical,
+                        )
+                        del futures[future]
+                    for name in names:
+                        if name not in blocks:
+                            endpoint, block_selectors = canonical_template[name]
+                            blocks[name] = _error_block(
+                                "timeout", endpoint, block_selectors, self.config,
+                                instrument_id=canonical,
+                            )
+                    break
+                for future in done:
+                    name = futures.pop(future)
+                    try:
+                        blocks[name] = future.result()
+                    except Exception as exc:  # each independent block remains isolated
+                        endpoint, block_selectors = canonical_template[name]
+                        reason, status = _status_error(exc)
+                        blocks[name] = _error_block(
+                            reason, endpoint, block_selectors, self.config,
+                            instrument_id=canonical, http_status=status,
+                        )
+                submit_available()
             return self._result(canonical, instrument, selectors, blocks, request_clock)
         finally:
             _REQUEST_SLOTS.release()

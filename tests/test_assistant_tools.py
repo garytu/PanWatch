@@ -488,7 +488,7 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
         "blocks": {
             name: {
                 "data": {"marker": name},
-                "status": "available",
+                "status": "unknown" if name in {"margin_short_sale", "shareholder_distribution"} else "available",
                 "reason": "",
                 "evidence": {
                     "provider": "twmd", "endpoint": f"/{name}",
@@ -500,7 +500,8 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
                 },
             }
             for name in (
-                "valuation", "institutional_flows", "company_profile", "monthly_revenues"
+                "valuation", "institutional_flows", "company_profile", "monthly_revenues",
+                "margin_short_sale", "shareholder_distribution",
             )
         },
         "limitations": {
@@ -543,6 +544,7 @@ def test_taiwan_assistant_research_and_twmd_legacy_tools_share_structured_servic
     descriptor = next(item for item in PANWATCH_TOOL_DESCRIPTORS if item.tool_name == "get_taiwan_stock_research")
     assert descriptor.data_freshness == ToolDataFreshness.STATIC
     assert research.data["limitations"]["financial_statements"]["status"] == "not_integrated"
+    assert "4/6 個資料區塊有資料" in research.summary
     assert [instrument_id for instrument_id, _ in calls] == ["TWSE:2330"] * 3
     assert calls[2][1] == {"start_month": "2026-07", "end_month": "2026-08"}
     session.close()

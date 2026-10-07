@@ -23,6 +23,7 @@ function statusLabel(status?: string): string {
 
 function sourceLabel(block: AnyBlock): string {
   const evidence = block.evidence || {}
+  if (evidence.endpoint === '/api/v1/shareholder-distribution') return 'TDCC 集保來源'
   const identity = String(evidence.instrument_id || (block.data as any)?.instrument_id || '')
   const contract = String(evidence.source_contract || '').toLowerCase()
   if (identity.startsWith('TPEX:') || contract.startsWith('tpex')) return 'TPEx 官方來源'
@@ -54,6 +55,7 @@ function missingText(block: AnyBlock, securityType?: string): string {
     profile_snapshot_not_retained: '來源尚未保留可用的公司資料快照。',
     unsupported_etf: 'ETF 不適用發行公司月營收資料。',
     unsupported_valuation_selector: 'TPEx 估值來源目前只支援四位數證券代碼。',
+    tdcc_contract_is_twse_four_digit_only: '集保持股分布目前只支援四位數上市標的。',
     issuer_absent_from_available_report: '來源報告可用，但未包含此標的。',
     issuer_absent_from_latest_snapshot: '最新公司資料快照未列入此標的。',
     issuer_absent_from_latest_snapshot_retained_profile: '來源保留了公司資料，但最新快照未列入此標的。',
@@ -323,6 +325,86 @@ function RevenueBlock({ block, securityType }: { block: AnyBlock; securityType?:
   )
 }
 
+function MarginBlock({ block }: { block: AnyBlock }) {
+  const data = (block.data || {}) as any
+  const latest = data.latest
+  const previous = data.previous
+  const changes = data.changes || {}
+  const values: Array<[string, string]> = [
+    ['margin_balance_previous', '融資前日餘額'],
+    ['margin_purchase', '融資買進'],
+    ['margin_sale', '融資賣出'],
+    ['margin_cash_redemption', '融資現金償還'],
+    ['margin_balance', '融資今日餘額'],
+    ['margin_quota', '融資次一營業日限額'],
+    ['short_sale_balance_previous', '融券前日餘額'],
+    ['short_sale', '融券賣出'],
+    ['short_cover', '融券買進／券買'],
+    ['short_stock_redemption', '現券償還'],
+    ['short_sale_balance', '融券今日餘額'],
+    ['short_sale_quota', '融券次一營業日限額'],
+    ['offsetting', '資券互抵'],
+  ]
+  return (
+    <section className="rounded-lg border border-border/50 p-3 space-y-2">
+      {blockHeader('融資融券', block)}
+      {latest ? <>
+        <div className="text-[11px] text-muted-foreground">交易日 {latest.trade_date} · {sourceLabel(block)} · {data.native_unit || 'trading_units'}</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          {values.map(([key, label]) => <div key={key} className="contents"><span>{label}</span><span className="text-right font-mono">{exactValue(latest[key])}</span></div>)}
+          <span>融資餘額變化</span><span className="text-right font-mono">{exactValue(changes.margin_balance)}</span>
+          <span>融券餘額變化</span><span className="text-right font-mono">{exactValue(changes.short_sale_balance)}</span>
+          <span>融資使用率（%）</span><span className="text-right font-mono">{exactValue(latest.margin_utilization_rate)}</span>
+          <span>融券使用率（%）</span><span className="text-right font-mono">{exactValue(latest.short_sale_utilization_rate)}</span>
+        </div>
+        {previous ? <div className="text-[10px] text-muted-foreground">比較列 {previous.trade_date}；數量維持交易單位，未換算股數或金額。</div>
+          : <div className="text-[10px] text-muted-foreground">尚無可比較的前一筆資料。</div>}
+        {latest.note ? <div className="text-[10px] text-muted-foreground">來源註記：{latest.note}</div> : null}
+      </> : <p className="text-xs text-muted-foreground">{missingText(block)}</p>}
+      <FreshnessSummary block={block} />
+      <EvidenceDetails block={block} />
+    </section>
+  )
+}
+
+function ShareholderDistributionBlock({ block }: { block: AnyBlock }) {
+  const data = (block.data || {}) as any
+  const latest = data.latest
+  const previous = data.previous
+  const large = latest?.large_holding
+  const buckets = latest?.buckets || []
+  return (
+    <section className="rounded-lg border border-border/50 p-3 space-y-2">
+      {blockHeader('集保持股分布', block)}
+      {latest ? <>
+        <div className="text-[11px] text-muted-foreground">報表日 {latest.report_date} · {latest.report_variant} · {sourceLabel(block)} · 股數為股</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+          <span>集保總股數（官方總計）</span><span className="text-right font-mono">{exactValue(latest.total_share_count)}</span>
+          <span>保管帳戶總數</span><span className="text-right font-mono">{exactValue(latest.total_holder_accounts)}</span>
+          <span>大額分級股數（&gt;400,000 股）</span><span className="text-right font-mono">{exactValue(large?.share_count)}</span>
+          <span>占官方總股數（%）</span><span className="text-right font-mono">{exactValue(large?.percentage_of_official_total)}</span>
+        </div>
+        <div className="space-y-1 rounded border border-border/30 p-2 text-[11px]">
+          <div className="font-medium">門檻分級（來源級別 12–15）</div>
+          {buckets.filter((row: any) => [12, 13, 14, 15].includes(row.source_level)).map((row: any) => (
+            <div key={row.source_level} className="flex justify-between gap-2">
+              <span>{row.source_tier_label || `第 ${row.source_level} 級`} · {exactValue(row.holder_count)} 個帳戶</span>
+              <span className="font-mono">{exactValue(row.share_count)} 股</span>
+            </div>
+          ))}
+        </div>
+        {previous ? <div className="text-[10px] text-muted-foreground">
+          同來源變體前週 {previous.report_date} · 大額股數變化 {exactValue(data.changes?.large_holding_share_count)} 股 · 占比變化 {exactValue(data.changes?.large_holding_percentage_points)} 個百分點
+        </div> : <div className="text-[10px] text-muted-foreground">{data.comparison_reason === 'previous_week_unavailable_or_variant_changed' ? '同一來源變體的前一週資料缺少，未計算變化。' : '尚無可比較的前一週資料。'}</div>}
+        <p className="text-[10px] text-muted-foreground">大額占比＝第 12–15 級股數 ÷ 官方總計股數；保管帳戶分布不代表實際股東或投資人身分。</p>
+        {latest.adjustment ? <p className="text-[10px] text-muted-foreground">調整股數 {exactValue(latest.adjustment.share_count)}；官方總計已扣除調整列，大額分級股數保留來源原值。</p> : null}
+      </> : <p className="text-xs text-muted-foreground">{missingText(block)}</p>}
+      <FreshnessSummary block={block} />
+      <EvidenceDetails block={block} />
+    </section>
+  )
+}
+
 function revenuePresenceLabel(item: any): string {
   if (item.presence === 'present') return '來源報告有列示'
   if (item.presence === 'missing') return '來源沒有此月份覆蓋'
@@ -385,7 +467,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">官方台股研究</h3>
-          <p className="text-[11px] text-muted-foreground">估值、法人、公司資料與月營收各自標示資料期間和來源</p>
+          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、融資融券與集保持股各自標示期間、單位和來源</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading} aria-label="重新載入官方研究資料">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -401,6 +483,8 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           <FlowBlock block={blocks.institutional_flows as AnyBlock} />
           <ProfileBlock block={blocks.company_profile as AnyBlock} securityType={payload?.instrument?.security_type} />
           <RevenueBlock block={blocks.monthly_revenues as AnyBlock} securityType={payload?.instrument?.security_type} />
+          <MarginBlock block={blocks.margin_short_sale as AnyBlock} />
+          <ShareholderDistributionBlock block={blocks.shareholder_distribution as AnyBlock} />
         </div>
       </> : null}
       {!loading && !error && !payload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}

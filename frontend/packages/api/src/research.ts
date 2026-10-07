@@ -50,6 +50,8 @@ export interface TaiwanResearchPayload {
     institutional_flows: ResearchDataBlock<{ instrument_id: string; native_unit: string; observations: Array<Record<string, unknown>> }>
     company_profile: ResearchDataBlock<Record<string, any>>
     monthly_revenues: ResearchDataBlock<Record<string, any>>
+    margin_short_sale: ResearchDataBlock<Record<string, any>>
+    shareholder_distribution: ResearchDataBlock<Record<string, any>>
   }
   limitations: {
     financial_statements: {

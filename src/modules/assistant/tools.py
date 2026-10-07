@@ -162,7 +162,7 @@ async def _fetch_taiwan_research(arguments: dict[str, Any], symbol: str) -> Tool
     statuses = [block.get("status") for block in data.get("blocks", {}).values()]
     available = sum(status in {"available", "partial"} for status in statuses)
     return ToolResult.success(
-        summary=f"已查詢 {data.get('instrument_id') or instrument_id} 的官方研究資料，{available}/4 個資料區塊有資料。",
+        summary=f"已查詢 {data.get('instrument_id') or instrument_id} 的官方研究資料，{available}/{len(statuses)} 個資料區塊有資料。",
         data=data,
         sources=[{"name": "TWMD 官方台灣研究資料"}],
         observed_at=datetime.now(UTC),
@@ -1358,8 +1358,9 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
             name="get_taiwan_stock_research",
             title="查詢台股官方研究資料",
             description=(
-                "查詢 TWMD 官方估值、三大法人股數、公司資料和月營收。資料區塊各自帶有狀態、覆蓋、資料期別、來源報表日、receipt 年齡、評估時間、單位與 evidence。"
+                "查詢 TWMD 官方估值、三大法人股數、公司資料、月營收、融資融券和集保分級持股。資料區塊各自帶有狀態、覆蓋、資料期別、來源報表日、receipt 年齡、評估時間、單位與 evidence。"
                 "來源發布時間或更新 SLA 未提供時，依 evidence 明確標示未知；不要把較早資料當成查詢日資料。"
+                "集保僅支援四位數 TWSE 標的；保管帳戶分級不識別實際投資人。大額比例以官方總計為分母，週變化需同變體精確前週。"
                 "台股財報尚未接入；月營收和報價都不能當成完整損益表、資產負債表或現金流量表。"
             ),
             risk=ToolRisk.READ,

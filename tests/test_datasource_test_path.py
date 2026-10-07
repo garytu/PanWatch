@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from marketdata import Bar, Quote
+from marketdata.types import MarginItem
 from src.modules.market.data_collector import DataCollectorManager
 
 
@@ -154,6 +155,30 @@ class TestKlineSourceTestPath(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.success)
         self.assertIn("tushare", result.error)
         self.assertEqual(result.count, 0)
+
+
+class TestMarginSourceTestPath(unittest.IsolatedAsyncioTestCase):
+    async def test_twmd_quantities_are_preserved_without_cash_balance(self):
+        row = MarginItem(
+            date="2026-10-06",
+            symbol="2330",
+            quantity_unit="trading_units",
+            margin_balance_lots=123456.0,
+            short_balance_lots=789.0,
+            total_balance=None,
+            evidence={"provider": "twmd", "observation": {"margin_balance": 123456}},
+        )
+        with mock.patch("marketdata.MarketData.margin", lambda *_args, **_kwargs: [row]):
+            manager = DataCollectorManager()
+            source = _make_source(type="margin", provider="twmd", test_symbols=["TWSE:2330"])
+            result = await manager._test_margin_source(source)
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.data[0]["quantity_unit"], "trading_units")
+        self.assertEqual(result.data[0]["margin_balance"], 123456.0)
+        self.assertEqual(result.data[0]["short_balance"], 789.0)
+        self.assertIsNone(result.data[0]["total_balance"])
+        self.assertEqual(result.data[0]["evidence"]["observation"]["margin_balance"], 123456)
 
 
 if __name__ == "__main__":

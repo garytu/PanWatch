@@ -32,11 +32,18 @@ from marketdata.types import (
     TwmdMonthlyRevenueMonth,
     TwmdMonthlyRevenueRead,
     TwmdMonthlyRevenueRow,
+    TwmdCoverageObservation,
+    TwmdMarginShortSaleObservation,
+    TwmdMarginShortSaleRead,
+    TwmdShareholderDistributionObservation,
+    TwmdShareholderDistributionRead,
+    MarginItem,
 )
 from marketdata.vendors.base import (
     CapitalFlowVendor,
     FundamentalsVendor,
     KlineVendor,
+    MarginVendor,
     QuoteVendor,
 )
 
@@ -47,6 +54,9 @@ _VALUATION_ENDPOINT = "/api/v1/valuations"
 _FLOW_ENDPOINT = "/api/v1/institutional-flows"
 _COMPANY_PROFILE_ENDPOINT = "/api/v1/company-profiles"
 _MONTHLY_REVENUE_ENDPOINT = "/api/v1/monthly-revenues"
+_MARGIN_SHORT_SALE_ENDPOINT = "/api/v1/margin-short-sale"
+_SHAREHOLDER_DISTRIBUTION_ENDPOINT = "/api/v1/shareholder-distribution"
+_COVERAGE_ENDPOINT = "/api/v1/coverage"
 _MONTHLY_REVENUE_FLOOR = date(2024, 1, 1)
 _MONTHLY_REVENUE_MAX_MONTHS = 120
 _RESEARCH_READ_CACHE_TTL_SEC = 300.0
@@ -171,6 +181,134 @@ def _source_decimal_string(value, field_name: str, *, required: bool = False) ->
     if not number.is_finite():
         raise ValueError(f"{field_name} must be finite")
     return raw
+
+
+def _source_decimal(value, field_name: str) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        raise ValueError(f"{field_name} must be a decimal or null")
+    try:
+        number = Decimal(str(value))
+    except InvalidOperation as exc:
+        raise ValueError(f"{field_name} must be a decimal or null") from exc
+    if not number.is_finite():
+        raise ValueError(f"{field_name} must be finite")
+    return number
+
+
+def _twmd_coverage_row(value, dataset: str) -> TwmdCoverageObservation:
+    if not isinstance(value, dict):
+        raise ValueError("coverage entry must be an object")
+    if value.get("dataset") != dataset:
+        raise ValueError("coverage dataset does not match request")
+    partition = _source_string(value.get("partition_key"), "coverage.partition_key", required=True) or ""
+    status = _source_string(value.get("status"), "coverage.status", required=True) or ""
+    count = _source_int(value.get("record_count"), "coverage.record_count")
+    if count is None or count < 0 or status not in {"AVAILABLE", "EMPTY", "MISSING"}:
+        raise ValueError("coverage entry has invalid status or record_count")
+    return TwmdCoverageObservation(
+        dataset=dataset,
+        partition_key=partition,
+        status=status,
+        record_count=count,
+        acquired_at=_source_string(value.get("acquired_at"), "coverage.acquired_at"),
+        checksum=_source_string(value.get("checksum"), "coverage.checksum"),
+    )
+
+
+_MARGIN_INTEGER_FIELDS = (
+    "margin_balance_previous", "margin_purchase", "margin_sale", "margin_cash_redemption",
+    "margin_balance", "margin_quota", "short_sale_balance_previous", "short_sale",
+    "short_cover", "short_stock_redemption", "short_sale_balance", "short_sale_quota", "offsetting",
+)
+
+
+def _margin_observation(value, instrument_id: str) -> TwmdMarginShortSaleObservation:
+    if not isinstance(value, dict):
+        raise ValueError("margin observation must be an object")
+    if value.get("instrument_id") != instrument_id:
+        raise ValueError("margin instrument_id does not match request")
+    symbol = _source_string(value.get("symbol"), "symbol", required=True) or ""
+    if instrument_id != f"{instrument_id.split(':', 1)[0]}:{symbol}":
+        raise ValueError("margin symbol does not match canonical identity")
+    trade_date = _validate_source_date(value.get("trade_date"), "trade_date")
+    parsed: dict[str, int | None] = {}
+    for field_name in _MARGIN_INTEGER_FIELDS:
+        if field_name not in value:
+            raise ValueError(f"missing {field_name}")
+        number = _source_int(value.get(field_name), field_name)
+        if number is None or number < 0:
+            raise ValueError(f"{field_name} must be a non-negative integer")
+        parsed[field_name] = number
+    for field_name in ("margin_securities_finance_balance", "short_sale_securities_finance_balance"):
+        if field_name not in value:
+            raise ValueError(f"missing {field_name}")
+        number = _source_int(value.get(field_name), field_name)
+        if number is not None and number < 0:
+            raise ValueError(f"{field_name} must be non-negative or null")
+        parsed[field_name] = number
+    margin_rate = _source_decimal(value.get("margin_utilization_rate"), "margin_utilization_rate")
+    short_rate = _source_decimal(value.get("short_sale_utilization_rate"), "short_sale_utilization_rate")
+    if "margin_utilization_rate" not in value or "short_sale_utilization_rate" not in value:
+        raise ValueError("margin utilization fields are missing")
+    note = _source_string(value.get("note"), "note")
+    fields = {name: parsed[name] for name in _MARGIN_INTEGER_FIELDS}
+    return TwmdMarginShortSaleObservation(
+        instrument_id=instrument_id,
+        symbol=symbol,
+        trade_date=trade_date,
+        **fields,
+        margin_securities_finance_balance=parsed["margin_securities_finance_balance"],
+        margin_utilization_rate=margin_rate,
+        short_sale_securities_finance_balance=parsed["short_sale_securities_finance_balance"],
+        short_sale_utilization_rate=short_rate,
+        note=note,
+    )
+
+
+def _shareholder_observation(value, instrument_id: str) -> TwmdShareholderDistributionObservation:
+    if not isinstance(value, dict):
+        raise ValueError("shareholder-distribution row must be an object")
+    if value.get("instrument_id") != instrument_id:
+        raise ValueError("shareholder-distribution instrument_id does not match request")
+    symbol = _source_string(value.get("symbol"), "symbol", required=True) or ""
+    if instrument_id != f"{instrument_id.split(':', 1)[0]}:{symbol}":
+        raise ValueError("shareholder-distribution symbol does not match canonical identity")
+    variant = value.get("report_variant")
+    if variant not in {"bulk_current", "historical_html"}:
+        raise ValueError("unsupported shareholder-distribution report_variant")
+    level = _source_int(value.get("source_level"), "source_level")
+    holders = _source_int(value.get("holder_count"), "holder_count")
+    shares = _source_int(value.get("share_count"), "share_count")
+    if any(number is None or number < 0 for number in (level, holders, shares)):
+        raise ValueError("shareholder-distribution counts must be non-negative integers")
+    total_level = 17 if variant == "bulk_current" else 16
+    if level < 1 or level > total_level:
+        raise ValueError("shareholder-distribution source_level is invalid for variant")
+    kind = "total" if level == total_level else "adjustment" if variant == "bulk_current" and level == 16 else "bucket"
+    if value.get("row_kind") != kind:
+        raise ValueError("shareholder-distribution row_kind does not match source_level")
+    provider = "tdcc_open_data_1_5" if variant == "bulk_current" else "tdcc_qry_stock"
+    if value.get("provider") != provider or value.get("native_unit") != "shares":
+        raise ValueError("shareholder-distribution provenance or unit is invalid")
+    percentage = _source_decimal(value.get("share_percentage_points"), "share_percentage_points")
+    if percentage is None or not Decimal(0) <= percentage <= Decimal(100):
+        raise ValueError("share_percentage_points must be in 0..100")
+    return TwmdShareholderDistributionObservation(
+        report_date=_validate_source_date(value.get("report_date"), "report_date"),
+        instrument_id=instrument_id,
+        symbol=symbol,
+        report_variant=variant,
+        row_kind=kind,
+        source_level=level,
+        source_tier_label=_source_string(value.get("source_tier_label"), "source_tier_label"),
+        holder_count=holders,  # type: ignore[arg-type]
+        share_count=shares,  # type: ignore[arg-type]
+        share_percentage_points=percentage,
+        provider=provider,
+        native_unit="shares",
+    )
 
 
 def _source_units(value, field_name: str) -> dict[str, str]:
@@ -613,6 +751,7 @@ class TwmdClient:
         *,
         timeout_sec: float | None = None,
         retries: int | None = None,
+        parse: str = "json",
         **params,
     ) -> tuple[object, dict[str, str]]:
         """Read JSON while retaining HTTP headers and surfacing every failure."""
@@ -629,7 +768,7 @@ class TwmdClient:
                 headers={"Authorization": f"Bearer {token}"} if token else None,
                 timeout=timeout,
                 retries=retry_count,
-                parse="json",
+                parse=parse,
                 proxy=self.config.get("proxy"),
                 log_label="twmd",
                 raise_for_status=False,
@@ -1236,6 +1375,206 @@ class TwmdClient:
             today_taipei=today_taipei,
         )
 
+    def _coverage_rows(
+        self,
+        dataset: str,
+        start: date,
+        end: date,
+        *,
+        instrument_id: str | None = None,
+    ) -> tuple[list[TwmdCoverageObservation], str | None]:
+        params = {
+            "dataset": dataset,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+        }
+        expected: set[str] | None = None
+        if dataset == "tdcc_shareholder_distribution_history" and instrument_id:
+            params["start"] = f"{instrument_id}|{start.isoformat()}"
+            params["end"] = f"{instrument_id}|{end.isoformat()}"
+            expected = {
+                f"{instrument_id}|{(start + timedelta(days=offset)).isoformat()}"
+                for offset in range((end - start).days + 1)
+            }
+        else:
+            expected = {
+                (start + timedelta(days=offset)).isoformat()
+                for offset in range((end - start).days + 1)
+            }
+        try:
+            payload, _headers = self.get_response("coverage", **params)
+        except TwmdReadError as exc:
+            return [], exc.reason_code or "provider_error"
+        if not isinstance(payload, list):
+            return [], "invalid_response"
+        try:
+            rows = [_twmd_coverage_row(row, dataset) for row in payload]
+            if any(row.partition_key not in expected for row in rows):
+                raise ValueError("coverage response has a partition outside the requested range")
+            if len({row.partition_key for row in rows}) != len(rows):
+                raise ValueError("coverage response has duplicate partition keys")
+        except (TypeError, ValueError):
+            return [], "invalid_response"
+        return rows, None
+
+    def margin_short_sale(
+        self,
+        symbol: Symbol | str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        today_taipei: date | None = None,
+    ) -> TwmdMarginShortSaleRead:
+        """Read official daily margin/short rows and their reported partition coverage."""
+        start, end = _query_bounds(
+            {"start_date": start_date, "end_date": end_date}, today_taipei=today_taipei
+        )
+        if (end - start).days + 1 > 366:
+            raise ValueError("margin reads are limited to 366 calendar days")
+        instrument_id = self._canonical_id(symbol)
+        payload, _headers = self.get_response(
+            "margin-short-sale",
+            instrument_id=instrument_id,
+            start=start.isoformat(),
+            end=end.isoformat(),
+            parse="json_decimal",
+        )
+        if not isinstance(payload, list):
+            raise TwmdReadError("twmd margin-short-sale response must be a list", reason_code="invalid_response")
+        try:
+            rows = [_margin_observation(row, instrument_id) for row in payload]
+            row_dates = [date.fromisoformat(row.trade_date) for row in rows]
+            if any(day < start or day > end for day in row_dates):
+                raise ValueError("margin response contains a row outside the requested range")
+            if len(set(row_dates)) != len(row_dates):
+                raise ValueError("margin response contains duplicate trade dates")
+        except (TypeError, ValueError) as exc:
+            raise TwmdReadError(f"invalid twmd margin response: {exc}", reason_code="invalid_response") from exc
+
+        dataset = "tpex_margin_short_sale" if instrument_id.startswith("TPEX:") else "twse_margin_short_sale"
+        coverage, coverage_error = self._coverage_rows(dataset, start, end)
+        coverage_by_day = {row.partition_key: row for row in coverage}
+        if any(
+            row.trade_date in coverage_by_day and coverage_by_day[row.trade_date].status != "AVAILABLE"
+            for row in rows
+        ):
+            raise TwmdReadError("margin rows conflict with partition coverage", reason_code="invalid_response")
+        statuses = {row.status for row in coverage}
+        complete_coverage = len(coverage) == (end - start).days + 1 and coverage_error is None
+        if rows:
+            status, reason = "available", "selected_record_present"
+        elif complete_coverage and statuses == {"EMPTY"}:
+            status, reason = "empty", "source_report_explicitly_no_data"
+        elif complete_coverage and statuses == {"MISSING"}:
+            status, reason = "missing", "coverage_missing"
+        else:
+            status, reason = "unknown", "selected_presence_unreported"
+        return TwmdMarginShortSaleRead(
+            instrument_id=instrument_id,
+            endpoint=_MARGIN_SHORT_SALE_ENDPOINT,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            data=sorted(rows, key=lambda row: row.trade_date),
+            coverage=coverage,
+            status=status,
+            reason=reason,
+            coverage_error_reason=coverage_error,
+        )
+
+    def shareholder_distribution(
+        self,
+        symbol: Symbol | str,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        report_variant: str | None = None,
+    ) -> TwmdShareholderDistributionRead:
+        """Read TDCC custody-account buckets without implying beneficial owners."""
+        start = _date_value(start_date, "start_date")
+        end = _date_value(end_date, "end_date")
+        if start > end:
+            raise ValueError("start_date must not be after end_date")
+        if (end - start).days + 1 > 366:
+            raise ValueError("shareholder-distribution reads are limited to 366 calendar days")
+        if report_variant not in {None, "bulk_current", "historical_html"}:
+            raise ValueError("unsupported shareholder-distribution report_variant")
+        instrument_id = self._canonical_id(symbol)
+        if not re.fullmatch(r"TWSE:[0-9]{4}", instrument_id):
+            return TwmdShareholderDistributionRead(
+                instrument_id=instrument_id,
+                endpoint=_SHAREHOLDER_DISTRIBUTION_ENDPOINT,
+                start_date=start.isoformat(),
+                end_date=end.isoformat(),
+                report_variant=report_variant,
+                data=[], coverage=[], status="unsupported",
+                reason="tdcc_contract_is_twse_four_digit_only",
+            )
+        params = {
+            "instrument_id": instrument_id,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+        }
+        if report_variant is not None:
+            params["report_variant"] = report_variant
+        payload, _headers = self.get_response(
+            "shareholder-distribution", parse="json_decimal", **params
+        )
+        if not isinstance(payload, list):
+            raise TwmdReadError(
+                "twmd shareholder-distribution response must be a list",
+                reason_code="invalid_response",
+            )
+        try:
+            rows = [_shareholder_observation(row, instrument_id) for row in payload]
+            if report_variant is not None and any(row.report_variant != report_variant for row in rows):
+                raise ValueError("response report_variant does not match request")
+            if any(not start <= date.fromisoformat(row.report_date) <= end for row in rows):
+                raise ValueError("shareholder-distribution row is outside the requested range")
+            keys = [(row.report_date, row.report_variant, row.source_level) for row in rows]
+            if len(keys) != len(set(keys)):
+                raise ValueError("shareholder-distribution response repeats a report row")
+        except (TypeError, ValueError) as exc:
+            raise TwmdReadError(
+                f"invalid twmd shareholder-distribution response: {exc}",
+                reason_code="invalid_response",
+            ) from exc
+
+        datasets = ("tdcc_shareholder_distribution", "tdcc_shareholder_distribution_history")
+        if report_variant is not None:
+            datasets = (datasets[0 if report_variant == "bulk_current" else 1],)
+        coverage: list[TwmdCoverageObservation] = []
+        coverage_errors: dict[str, str] = {}
+        for dataset in datasets:
+            entries, error = self._coverage_rows(dataset, start, end, instrument_id=instrument_id)
+            coverage.extend(entries)
+            if error:
+                coverage_errors[dataset] = error
+        statuses = {row.status for row in coverage}
+        complete_coverage = (
+            len(coverage) == len(datasets) * ((end - start).days + 1)
+            and not coverage_errors
+        )
+        if rows:
+            status, reason = "available", "selected_record_present"
+        elif complete_coverage and statuses == {"EMPTY"}:
+            status, reason = "empty", "source_report_explicitly_no_data"
+        elif complete_coverage and statuses == {"MISSING"}:
+            status, reason = "missing", "coverage_missing"
+        else:
+            status, reason = "unknown", "selected_presence_unreported"
+        return TwmdShareholderDistributionRead(
+            instrument_id=instrument_id,
+            endpoint=_SHAREHOLDER_DISTRIBUTION_ENDPOINT,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            report_variant=report_variant,
+            data=sorted(rows, key=lambda row: (row.report_date, row.report_variant, row.source_level)),
+            coverage=coverage,
+            status=status,
+            reason=reason,
+            coverage_error_reasons=coverage_errors,
+        )
+
     def instruments(self) -> list[dict]:
         key = (self.base_url, self.config.get("token"))
         cached = _catalog_cache.get(key)
@@ -1443,6 +1782,52 @@ class TwmdCapitalFlowVendor(CapitalFlowVendor):
                 institutional_net_5d_shares=None,
                 native_components=native,
                 evidence=evidence,
+            ))
+        return out
+
+
+class TwmdMarginVendor(MarginVendor):
+    """Compatibility adapter for MarketData.margin using official TWMD units."""
+
+    name = "twmd"
+    supports_markets = {"TW"}
+
+    def fetch(self, symbols: list[Symbol], config: dict) -> list[MarginItem]:
+        if not symbols:
+            return []
+        today_taipei = _configured_today(config) or datetime.now(_TAIPEI).date()
+        start, end = _query_bounds(
+            {"start_date": config.get("start_date"), "end_date": config.get("end_date")},
+            today_taipei=today_taipei,
+        )
+        client = TwmdClient(config)
+        out: list[MarginItem] = []
+        for symbol in symbols:
+            read = client.margin_short_sale(symbol, start, end, today_taipei=today_taipei)
+            row = max(read.data, key=lambda item: item.trade_date, default=None)
+            if row is None:
+                continue
+            observation = asdict(row)
+            for field_name in ("margin_utilization_rate", "short_sale_utilization_rate"):
+                value = observation[field_name]
+                observation[field_name] = str(value) if value is not None else None
+            out.append(MarginItem(
+                date=row.trade_date,
+                symbol=symbol.code,
+                quantity_unit="trading_units",
+                margin_balance_lots=float(row.margin_balance),
+                margin_buy_lots=float(row.margin_purchase),
+                margin_cash_repayment_lots=float(row.margin_cash_redemption),
+                short_balance_lots=float(row.short_sale_balance),
+                short_sell_lots=float(row.short_sale),
+                short_repayment_lots=float(row.short_cover),
+                evidence={
+                    "provider": "twmd",
+                    "instrument_id": row.instrument_id,
+                    "native_unit": row.native_unit,
+                    "observation": observation,
+                    "coverage": [asdict(item) for item in read.coverage],
+                },
             ))
         return out
 

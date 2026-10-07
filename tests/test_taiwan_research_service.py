@@ -82,6 +82,8 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
             return profile, {}
         if path == "monthly-revenues":
             return revenue["response"], {}
+        if path in {"margin-short-sale", "shareholder-distribution", "coverage"}:
+            return [], {}
         raise AssertionError(path)
 
     monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
@@ -131,7 +133,7 @@ def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(
         start_month="2026-07", end_month="2026-08", today_taipei=date(2026, 10, 7),
         now_utc=frozen_now + timedelta(hours=1),
     )
-    assert len(calls) == 5
+    assert len(calls) == 10
     assert later["blocks"]["monthly_revenues"]["evidence"]["freshness"]["source_receipt_age_seconds"] == (
         revenue_freshness["source_receipt_age_seconds"] + 3600
     )
@@ -254,6 +256,7 @@ def test_one_provider_failure_does_not_erase_other_blocks(monkeypatch):
         if path == "institutional-flows": raise TwmdReadError("private URL/token details", status_code=503, reason_code="http_503")
         if path == "company-profiles": return profile, {}
         if path == "monthly-revenues": return revenue["response"], {}
+        if path in {"margin-short-sale", "shareholder-distribution", "coverage"}: return [], {}
         raise AssertionError(path)
 
     monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
@@ -564,7 +567,10 @@ def test_service_cache_isolated_by_venue_credentials_service_and_range(monkeypat
     from src.modules.research.twmd_profile_revenue import ResearchDataBlock
 
     monkeypatch.setattr(research, "_instrument_catalog", lambda *_: _catalog("TWSE:2330") + _catalog("TPEX:2330"))
-    for adapter in ("_valuation_block", "_flow_block", "company_profile_block", "monthly_revenue_block"):
+    for adapter in (
+        "_valuation_block", "_flow_block", "company_profile_block", "monthly_revenue_block",
+        "margin_short_sale_block", "shareholder_distribution_block",
+    ):
         monkeypatch.setattr(research, adapter, lambda read: ResearchDataBlock(read, "available", "selected_record_present", {"instrument_id": read["identity"]}))
     calls = []
 
@@ -577,6 +583,7 @@ def test_service_cache_isolated_by_venue_credentials_service_and_range(monkeypat
             return {"identity": identity, "marker": self.marker}
 
         valuation_history = institutional_flows = company_profile = monthly_revenues = read
+        margin_short_sale = shareholder_distribution = read
 
     def collect(marker, *, token="one", url="http://fixture", identity="TWSE:2330", month="2026-08"):
         return TaiwanResearchService(client=Client(marker), config={"base_url": url, "token": token}).collect(
@@ -587,11 +594,336 @@ def test_service_cache_isolated_by_venue_credentials_service_and_range(monkeypat
     first = collect(1)
     first["blocks"]["valuation"]["data"]["marker"] = "mutated"
     assert collect(9)["blocks"]["valuation"]["data"]["marker"] == 1
-    assert len(calls) == 4
+    assert len(calls) == 6
     assert collect(2, token="two")["blocks"]["valuation"]["data"]["marker"] == 2
     assert collect(3, url="http://other")["blocks"]["valuation"]["data"]["marker"] == 3
     assert collect(4, identity="TPEX:2330")["blocks"]["valuation"]["data"]["marker"] == 4
     changed_range = collect(5, month="2026-07")
     assert changed_range["blocks"]["valuation"]["data"]["marker"] == 1
     assert changed_range["blocks"]["monthly_revenues"]["data"]["marker"] == 5
-    assert len(calls) == 17
+    assert len(calls) == 24
+
+
+def _tdcc_observations(variant: str, report_date: str):
+    from decimal import Decimal
+    from marketdata.types import TwmdShareholderDistributionObservation
+
+    provider = "tdcc_open_data_1_5" if variant == "bulk_current" else "tdcc_qry_stock"
+    rows = []
+    for level in range(1, 16):
+        label = {
+            12: "400,001-600,000", 13: "600,001-800,000",
+            14: "800,001-1,000,000", 15: "1,000,001以上",
+        }.get(level) if variant == "historical_html" else None
+        shares = 1 if level < 12 else (level - 11) * 10000
+        rows.append(TwmdShareholderDistributionObservation(
+            report_date=report_date, instrument_id="TWSE:2330", symbol="2330",
+            report_variant=variant, row_kind="bucket", source_level=level,
+            source_tier_label=label, holder_count=level,
+            share_count=shares, share_percentage_points=Decimal("1.0"),
+            provider=provider, native_unit="shares",
+        ))
+    total_level = 17 if variant == "bulk_current" else 16
+    adjustment = None
+    bucket_shares = sum(row.share_count for row in rows)
+    if variant == "bulk_current":
+        adjustment = TwmdShareholderDistributionObservation(
+            report_date=report_date, instrument_id="TWSE:2330", symbol="2330",
+            report_variant=variant, row_kind="adjustment", source_level=16,
+            source_tier_label=None, holder_count=0, share_count=100,
+            share_percentage_points=Decimal("0"), provider=provider, native_unit="shares",
+        )
+    total = TwmdShareholderDistributionObservation(
+        report_date=report_date, instrument_id="TWSE:2330", symbol="2330",
+        report_variant=variant, row_kind="total", source_level=total_level,
+        source_tier_label="合計", holder_count=sum(row.holder_count for row in rows),
+        share_count=bucket_shares - (adjustment.share_count if adjustment else 0),
+        share_percentage_points=Decimal("100"), provider=provider, native_unit="shares",
+    )
+    return rows + ([adjustment] if adjustment else []) + [total]
+
+
+def test_tdcc_large_holding_uses_adjusted_official_total_and_exact_week_same_variant():
+    from src.modules.research.twmd_margin_shareholders import shareholder_distribution_block
+    from marketdata.types import TwmdShareholderDistributionRead
+
+    rows = _tdcc_observations("bulk_current", "2026-10-02")
+    rows += _tdcc_observations("bulk_current", "2026-09-18")  # 09-25 is missing
+    rows += _tdcc_observations("historical_html", "2026-09-25")  # variant cannot be mixed
+    read = TwmdShareholderDistributionRead(
+        instrument_id="TWSE:2330", endpoint="/api/v1/shareholder-distribution",
+        start_date="2026-09-01", end_date="2026-10-06", report_variant=None,
+        data=rows, coverage=[], status="available", reason="selected_record_present",
+    )
+
+    block = shareholder_distribution_block(read)
+    latest = block.data["latest"]
+    large = latest["large_holding"]
+    assert latest["report_variant"] == "bulk_current"
+    assert latest["official_total"]["source_level"] == 17
+    assert latest["adjustment"]["source_level"] == 16
+    assert large["threshold"] == ">400,000 shares"
+    assert large["minimum_shares"] == 400001
+    assert large["share_count"] == sum(row.share_count for row in rows[:15] if row.source_level >= 12)
+    assert large["denominator_share_count"] == latest["official_total"]["share_count"]
+    assert block.data["previous"] is None
+    assert block.data["changes"] is None
+    assert block.data["comparison_reason"] == "previous_week_unavailable_or_variant_changed"
+
+
+def test_tdcc_exact_previous_week_same_variant_computes_changes_and_prefers_current_on_tie():
+    from dataclasses import replace
+    from decimal import Decimal
+    from src.modules.research.twmd_margin_shareholders import shareholder_distribution_block
+    from marketdata.types import TwmdShareholderDistributionRead
+
+    latest = _tdcc_observations("bulk_current", "2026-10-02")
+    prior = []
+    for row in _tdcc_observations("bulk_current", "2026-09-25"):
+        if row.row_kind == "bucket" and 12 <= row.source_level <= 15:
+            row = replace(row, share_count=row.share_count - 100)
+        elif row.row_kind == "total":
+            row = replace(row, share_count=row.share_count - 400)
+        prior.append(row)
+    same_day_history = _tdcc_observations("historical_html", "2026-10-02")
+    read = TwmdShareholderDistributionRead(
+        instrument_id="TWSE:2330", endpoint="/api/v1/shareholder-distribution",
+        start_date="2026-09-01", end_date="2026-10-06", report_variant=None,
+        data=prior + same_day_history + latest, coverage=[], status="available",
+        reason="selected_record_present",
+    )
+
+    block = shareholder_distribution_block(read)
+    assert block.data["latest"]["report_variant"] == "bulk_current"
+    assert block.data["latest_report_selection_policy"] == "prefer_bulk_current_when_both_variants_share_latest_report_date"
+    assert block.data["previous"]["report_date"] == "2026-09-25"
+    assert block.data["previous"]["report_variant"] == "bulk_current"
+    assert block.data["changes"]["total_share_count"] == 400
+    assert block.data["changes"]["large_holding_share_count"] == 400
+    assert block.data["changes"]["large_holding_percentage_points"] == str(
+        Decimal(block.data["latest"]["large_holding"]["percentage_of_official_total"])
+        - Decimal(block.data["previous"]["large_holding"]["percentage_of_official_total"])
+    )
+    assert block.data["comparison_reason"] is None
+
+
+def test_tdcc_partial_buckets_do_not_create_a_large_holder_denominator():
+    from src.modules.research.twmd_margin_shareholders import shareholder_distribution_block
+    from marketdata.types import TwmdShareholderDistributionRead
+
+    read = TwmdShareholderDistributionRead(
+        instrument_id="TWSE:2330", endpoint="/api/v1/shareholder-distribution",
+        start_date="2026-10-01", end_date="2026-10-06", report_variant="bulk_current",
+        data=_tdcc_observations("bulk_current", "2026-10-02")[:-1],
+        coverage=[], status="available", reason="selected_record_present",
+    )
+    with pytest.raises(ValueError, match="every required source level"):
+        shareholder_distribution_block(read)
+
+
+def test_tdcc_unreconciled_official_total_is_rejected_before_ratio_calculation():
+    from dataclasses import replace
+    from src.modules.research.twmd_margin_shareholders import shareholder_distribution_block
+    from marketdata.types import TwmdShareholderDistributionRead
+
+    rows = _tdcc_observations("bulk_current", "2026-10-02")
+    rows[-1] = replace(rows[-1], share_count=rows[-1].share_count + 1)
+    read = TwmdShareholderDistributionRead(
+        instrument_id="TWSE:2330", endpoint="/api/v1/shareholder-distribution",
+        start_date="2026-10-01", end_date="2026-10-06", report_variant="bulk_current",
+        data=rows, coverage=[], status="available", reason="selected_record_present",
+    )
+
+    with pytest.raises(ValueError, match="does not reconcile with adjustment"):
+        shareholder_distribution_block(read)
+
+
+def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import src.modules.research.taiwan_research as research
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+
+    pool = ThreadPoolExecutor(max_workers=4)
+    caller_pool = ThreadPoolExecutor(max_workers=1)
+    slots = threading.BoundedSemaphore(4)
+    all_started = threading.Event()
+    release_initial = threading.Event()
+    guard = threading.Lock()
+    started: list[str] = []
+    active = 0
+    max_active = 0
+
+    def identity_adapter(read):
+        return ResearchDataBlock(read, "available", "selected_record_present", {"provider": "fixture"})
+
+    for adapter in (
+        "_valuation_block", "_flow_block", "company_profile_block", "monthly_revenue_block",
+        "margin_short_sale_block", "shareholder_distribution_block",
+    ):
+        monkeypatch.setattr(research, adapter, identity_adapter)
+    monkeypatch.setattr(research, "_READ_POOL", pool)
+    monkeypatch.setattr(research, "_READ_SLOTS", slots)
+
+    class Client:
+        def get_response(self, path, **params):
+            assert path == "instruments"
+            return _catalog(), {}
+
+        def _read(self, name):
+            nonlocal active, max_active
+            with guard:
+                started.append(name)
+                active += 1
+                max_active = max(max_active, active)
+                if len(started) == 4:
+                    all_started.set()
+            if name in {"valuation", "institutional_flows", "company_profile", "monthly_revenues"}:
+                assert release_initial.wait(2)
+            with guard:
+                active -= 1
+            return {"identity": name}
+
+        def valuation_history(self, *_args, **_kwargs): return self._read("valuation")
+        def institutional_flows(self, *_args, **_kwargs): return self._read("institutional_flows")
+        def company_profile(self, *_args, **_kwargs): return self._read("company_profile")
+        def monthly_revenues(self, *_args, **_kwargs): return self._read("monthly_revenues")
+        def margin_short_sale(self, *_args, **_kwargs): return self._read("margin_short_sale")
+        def shareholder_distribution(self, *_args, **_kwargs): return self._read("shareholder_distribution")
+
+    future = caller_pool.submit(lambda: TaiwanResearchService(
+        client=Client(), config={"base_url": "http://fixture"}
+    ).collect("TWSE:2330", today_taipei=date(2026, 10, 7)))
+    try:
+        assert all_started.wait(2)
+        assert set(started) == {"valuation", "institutional_flows", "company_profile", "monthly_revenues"}
+        release_initial.set()
+        payload = future.result(timeout=3)
+        assert set(payload["blocks"]) == {
+            "valuation", "institutional_flows", "company_profile", "monthly_revenues",
+            "margin_short_sale", "shareholder_distribution",
+        }
+        assert set(started) == set(payload["blocks"])
+        assert max_active <= 4
+    finally:
+        release_initial.set()
+        pool.shutdown(wait=True)
+        caller_pool.shutdown(wait=True)
+
+
+def test_timed_out_reads_keep_permits_and_queued_blocks_are_explicit(monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import src.modules.research.taiwan_research as research
+
+    slots = threading.BoundedSemaphore(4)
+    pool = ThreadPoolExecutor(max_workers=4)
+    release = threading.Event()
+    monkeypatch.setattr(research, "_READ_POOL", pool)
+    monkeypatch.setattr(research, "_READ_SLOTS", slots)
+    monkeypatch.setattr(research, "_REQUEST_DEADLINE_SECONDS", 0.02)
+    catalog_key = (*_scope({"base_url": "http://fixture"}), "catalog", "TW")
+    research._cache_set(catalog_key, _catalog(), 300)
+
+    class Client:
+        def _stall(self, name):
+            assert release.wait(2)
+            return {"name": name}
+        valuation_history = lambda self, *_a, **_k: self._stall("valuation")
+        institutional_flows = lambda self, *_a, **_k: self._stall("flows")
+        company_profile = lambda self, *_a, **_k: self._stall("profile")
+        monthly_revenues = lambda self, *_a, **_k: self._stall("revenue")
+        margin_short_sale = lambda self, *_a, **_k: self._stall("margin")
+        shareholder_distribution = lambda self, *_a, **_k: self._stall("tdcc")
+
+    try:
+        payload = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
+            "TWSE:2330", today_taipei=date(2026, 10, 7)
+        )
+        assert len(payload["blocks"]) == 6
+        assert {block["reason"] for block in payload["blocks"].values()} == {"timeout"}
+        assert slots._value == 0
+        again = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
+            "TWSE:2330", today_taipei=date(2026, 10, 7)
+        )
+        assert {block["reason"] for block in again["blocks"].values()} == {"concurrency_limit"}
+    finally:
+        release.set()
+        pool.shutdown(wait=True)
+
+
+def test_read_lease_keeps_running_permit_and_releases_cancelled_queued_read(monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import src.modules.research.taiwan_research as research
+
+    pool = ThreadPoolExecutor(max_workers=1)
+    slots = threading.BoundedSemaphore(2)
+    started = threading.Event()
+    release = threading.Event()
+    monkeypatch.setattr(research, "_READ_POOL", pool)
+    monkeypatch.setattr(research, "_READ_SLOTS", slots)
+
+    def blocked_read():
+        started.set()
+        assert release.wait(2)
+        return "finished"
+
+    try:
+        running = research._submit_read(blocked_read)
+        assert started.wait(2)
+        queued = research._submit_read(lambda: "must be cancelled")
+        assert slots._value == 0
+        assert queued.cancel()
+        assert slots._value == 1
+        later = research._submit_read(lambda: "finished after the first read")
+        assert slots._value == 0
+        with pytest.raises(RuntimeError, match="concurrency_limit"):
+            research._submit_read(lambda: None)
+        release.set()
+        assert running.result(timeout=2) == "finished"
+        assert later.result(timeout=2) == "finished after the first read"
+        assert slots._value == 2
+    finally:
+        release.set()
+        pool.shutdown(wait=True)
+
+
+def test_tdcc_zero_previous_denominator_preserves_counts_and_null_percentage_delta():
+    from dataclasses import replace
+    from marketdata.types import TwmdShareholderDistributionRead
+    from src.modules.research.twmd_margin_shareholders import shareholder_distribution_block
+    latest = _tdcc_observations('historical_html', '2026-10-02')
+    previous = [replace(row, holder_count=0, share_count=0) for row in _tdcc_observations('historical_html', '2026-09-25')]
+    read = TwmdShareholderDistributionRead('TWSE:2330', '/api/v1/shareholder-distribution',
+        '2026-09-25', '2026-10-02', None, previous + latest, [], 'available', 'selected_record_present')
+    block = shareholder_distribution_block(read)
+    assert block.data['latest']['large_holding']['percentage_of_official_total'] is not None
+    assert block.data['previous']['large_holding']['percentage_of_official_total'] is None
+    assert block.data['changes']['large_holding_percentage_points'] is None
+    assert block.data['changes']['large_holding_share_count'] == block.data['latest']['large_holding']['share_count']
+
+
+def test_finished_batch_after_deadline_does_not_launch_remaining_reads(monkeypatch):
+    import src.modules.research.taiwan_research as research
+    from concurrent.futures import Future
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+    clock = [0.0]
+    monkeypatch.setattr(research.time, 'monotonic', lambda: clock[0])
+    monkeypatch.setattr(research, '_REQUEST_DEADLINE_SECONDS', 1)
+    research._cache_set((*_scope({'base_url': 'http://deadline-fixture'}), 'catalog', 'TW'), _catalog(), 300)
+    submitted = []
+    def submit(function, name, key, builder):
+        submitted.append(name)
+        future = Future()
+        future.set_result(ResearchDataBlock({}, 'available', 'selected_record_present', {}))
+        return future
+    def expired_wait(futures, **kwargs):
+        clock[0] = 2.0
+        return set(futures), set()
+    monkeypatch.setattr(research, '_submit_read', submit)
+    monkeypatch.setattr(research, 'wait', expired_wait)
+    payload = TaiwanResearchService(client=object(), config={'base_url': 'http://deadline-fixture'}).collect('TWSE:2330', today_taipei=date(2026, 10, 7))
+    assert submitted == ['valuation', 'institutional_flows', 'company_profile', 'monthly_revenues']
+    assert payload['blocks']['margin_short_sale']['reason'] == 'timeout'
+    assert payload['blocks']['shareholder_distribution']['reason'] == 'timeout'

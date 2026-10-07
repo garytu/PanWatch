@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     tw_data_provider: str = "twmd"
     tw_fundamentals_provider: Literal["twmd", "finmind"] = "twmd"
     tw_capital_flow_provider: Literal["twmd", "finmind"] = "twmd"
+    tw_margin_provider: Literal["twmd", "finmind"] = "twmd"
     twmd_base_url: str = "http://127.0.0.1:8000"
     twmd_api_token: str = ""
     twmd_timeout_sec: float = Field(default=5, gt=0)

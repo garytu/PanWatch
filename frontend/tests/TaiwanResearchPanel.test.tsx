@@ -11,12 +11,20 @@ function block(data: any, status = 'available', reason = 'selected_record_presen
   return { data, status, reason, evidence: { provider: 'twmd', ...evidence } }
 }
 
+function supplementalBlocks() {
+  return {
+    margin_short_sale: block({ instrument_id: 'TWSE:2330', native_unit: 'trading_units', latest: null }, 'unknown', 'selected_presence_unreported'),
+    shareholder_distribution: block({ instrument_id: 'TWSE:2330', native_unit: 'shares', latest: null }, 'unknown', 'selected_presence_unreported'),
+  }
+}
+
 it('shows source dates, exact values, units, nulls, and partial month coverage', async () => {
   vi.mocked(researchApi.taiwan).mockResolvedValue({
     instrument_id: 'TWSE:2330',
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
     selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10' },
     blocks: {
+      ...supplementalBlocks(),
       valuation: block({ instrument_id: 'TWSE:2330', observations: [{ trade_date: '2026-10-02', close_price: '1234.5000', pe_ratio: null, pb_ratio: '3.50', dividend_yield_pct: '0.88', dividend_reference_year: 114 }] }, 'partial', 'some_requested_dates_missing_or_absent', {
         source_contract: 'twse_daily_valuation/v1',
         freshness: {
@@ -82,7 +90,7 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
   expect(screen.getByText(/來源接收後 1 小時 · 覆蓋：已取得 1 日 · 未取得覆蓋 1 日/)).toBeTruthy()
   expect(screen.getByText(/2 個月：未取得覆蓋 1 月、有列示 1 月/)).toBeTruthy()
   expect(screen.getByText(/月份結束距今 37 個日曆日/)).toBeTruthy()
-  expect(screen.getAllByText('來源發布時間：未提供').length).toBe(4)
+  expect(screen.getAllByText('來源發布時間：未提供').length).toBe(6)
   expect(screen.getByText('來源 TWSE 官方來源 · 報表日 2026-09-10')).toBeTruthy()
   expect(screen.getByText('來源契約：mops_t21_sii_monthly_revenue/v1')).toBeTruthy()
   expect(screen.getByText('來源接收時間：2026-09-11T01:00:00Z')).toBeTruthy()
@@ -93,12 +101,75 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
   expect(screen.getByText(/月營收是月度公告資料/)).toBeTruthy()
 })
 
+it('shows native margin lots and TDCC denominator, and leaves a missing prior week uncomputed', async () => {
+  vi.mocked(researchApi.taiwan).mockResolvedValue({
+    instrument_id: 'TWSE:2330',
+    instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
+    selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10' },
+    blocks: {
+      valuation: block({ observations: [] }, 'unknown', 'selected_presence_unreported'),
+      institutional_flows: block({ observations: [] }, 'unknown', 'selected_presence_unreported'),
+      company_profile: block(null, 'unknown', 'selected_presence_unreported'),
+      monthly_revenues: block({ months: [] }, 'unknown', 'selected_presence_unreported'),
+      margin_short_sale: block({
+        instrument_id: 'TWSE:2330', native_unit: 'trading_units',
+        latest: { trade_date: '2026-10-06', margin_balance: 123456, short_sale_balance: 789 },
+        previous: null, changes: { margin_balance: null, short_sale_balance: null },
+      }, 'available', 'selected_record_present', {
+        endpoint: '/api/v1/margin-short-sale',
+        dataset_coverage: [{ dataset: 'twse_margin_short_sale', partition_key: '2026-10-06', status: 'AVAILABLE', record_count: 1 }],
+        freshness: { frequency: 'daily', data_period: '2026-10-06', data_period_age_days: 1,
+          coverage: { reported_status_counts: { AVAILABLE: 1 } }, frequency_hint: '日資料；來源未提供發布 SLA。' },
+      }),
+      shareholder_distribution: block({
+        instrument_id: 'TWSE:2330', native_unit: 'shares', report_date: '2026-10-02',
+        report_variant: 'bulk_current', previous: null, changes: null,
+        comparison_reason: 'previous_week_unavailable_or_variant_changed',
+        latest: {
+          report_date: '2026-10-02', report_variant: 'bulk_current', total_share_count: 1000000,
+          total_holder_accounts: 20000,
+          large_holding: { threshold: '>400,000 shares', minimum_shares: 400001, share_count: 500000,
+            percentage_of_official_total: '50.000000', denominator_share_count: 1000000 },
+          buckets: [
+            { source_level: 12, source_tier_label: '400,001-600,000', holder_count: 10, share_count: 200000 },
+            { source_level: 13, source_tier_label: '600,001-800,000', holder_count: 5, share_count: 150000 },
+            { source_level: 14, source_tier_label: '800,001-1,000,000', holder_count: 3, share_count: 100000 },
+            { source_level: 15, source_tier_label: '1,000,001以上', holder_count: 2, share_count: 50000 },
+          ],
+        },
+      }, 'available', 'selected_record_present', {
+        endpoint: '/api/v1/shareholder-distribution',
+        per_period_provenance: [{ report_date: '2026-10-02', report_variant: 'bulk_current', provider: 'tdcc_open_data_1_5' }],
+        freshness: { frequency: 'weekly', data_period: '2026-10-02', report_date: '2026-10-02', data_period_age_days: 5,
+          coverage: { reported_status_counts: { AVAILABLE: 1 } }, frequency_hint: '週資料；來源未提供發布 SLA。' },
+      }),
+    },
+    limitations: { financial_statements: { status: 'not_integrated', data: null, message: 'Not integrated.' } },
+  } as any)
+
+  render(<TaiwanResearchPanel symbol="2330" market="TW" open />)
+
+  await waitFor(() => expect(screen.getByText('融資融券')).toBeTruthy())
+  expect(screen.getByText('交易日 2026-10-06 · TWSE 官方來源 · trading_units')).toBeTruthy()
+  expect(screen.getByText('123456')).toBeTruthy()
+  expect(screen.getByText('集保持股分布')).toBeTruthy()
+  expect(screen.getByText('報表日 2026-10-02 · bulk_current · TDCC 集保來源 · 股數為股')).toBeTruthy()
+  expect(screen.getByText('集保總股數（官方總計）')).toBeTruthy()
+  expect(screen.getByText('1000000')).toBeTruthy()
+  expect(screen.getByText('500000')).toBeTruthy()
+  expect(screen.getByText('50.000000')).toBeTruthy()
+  expect(screen.getByText('同一來源變體的前一週資料缺少，未計算變化。')).toBeTruthy()
+  expect(screen.getByText(/保管帳戶分布不代表實際股東或投資人身分/)).toBeTruthy()
+})
+
 it('explains ETF profile and revenue scope while showing the available blocks', async () => {
   vi.mocked(researchApi.taiwan).mockResolvedValue({
     instrument_id: 'TPEX:006201',
     instrument: { venue: 'TPEX', symbol: '006201', security_type: 'ETF', is_active: true, name: '元大富櫃50' },
     selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10' },
     blocks: {
+      ...supplementalBlocks(),
+      shareholder_distribution: block(null, 'unsupported', 'tdcc_contract_is_twse_four_digit_only'),
       valuation: block({ instrument_id: 'TPEX:006201', observations: [] }, 'unsupported', 'unsupported_valuation_selector', { source_contract: 'tpex_daily_valuation/v1' }),
       institutional_flows: block({ observations: [{ trade_date: '2026-10-02', native_values: { total_institutional_net_shares: 1000 } }] }),
       company_profile: block(null, 'unsupported', 'unsupported_etf'),
@@ -111,11 +182,12 @@ it('explains ETF profile and revenue scope while showing the available blocks', 
 
   render(<TaiwanResearchPanel symbol="TPEX:006201" market="TW" open />)
 
-  await waitFor(() => expect(screen.getAllByText('不適用').length).toBe(3))
+  await waitFor(() => expect(screen.getAllByText('不適用').length).toBe(4))
   expect(screen.getByText('TPEx 估值來源目前只支援四位數證券代碼。')).toBeTruthy()
   expect(screen.getByText('1000')).toBeTruthy()
   expect(screen.getByText('ETF 不發布這類發行公司月營收資料。')).toBeTruthy()
   expect(screen.getByText('ETF 不發布這類發行公司月營收或公司 profile 資料。')).toBeTruthy()
+  expect(screen.getByText('集保持股分布目前只支援四位數上市標的。')).toBeTruthy()
   expect(screen.getByText(/月營收是月度公告資料/)).toBeTruthy()
 })
 
@@ -132,6 +204,7 @@ it('keeps dated flow coverage visible beside a timed-out profile without treatin
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
     selectors: { start_date: '2026-10-02', end_date: '2026-10-05', start_month: '2026-07', end_month: '2026-08' },
     blocks: {
+      ...supplementalBlocks(),
       valuation: block({ observations: [{ trade_date: '2026-10-05', close_price: '1234.50' }] }),
       institutional_flows: block({ observations: [{ trade_date: '2026-10-02', native_values: { total_institutional_net_shares: -123 } }] }, 'partial', 'some_requested_dates_missing', {
         freshness: { frequency: 'daily', data_period: '2026-10-02', report_date: null, data_period_age_days: 5, source_receipt_age_seconds: null,
@@ -162,6 +235,8 @@ it('ignores a late response for the prior venue of the same code', async () => {
     instrument: { venue: 'TPEX', symbol: '2330', security_type: 'EQUITY', is_active: true, name: 'TPEx 公司' },
     selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10' },
     blocks: {
+      ...supplementalBlocks(),
+      shareholder_distribution: block(null, 'unsupported', 'tdcc_contract_is_twse_four_digit_only'),
       valuation: block({ observations: [{ trade_date: '2026-10-02', close_price: '22.00' }] }),
       institutional_flows: block({ observations: [] }),
       company_profile: block(null, 'missing', 'profile_snapshot_not_retained'),

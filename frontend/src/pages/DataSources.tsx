@@ -721,12 +721,19 @@ export default function DataSourcesPage() {
 
                   {/* Margin type */}
                   {testResult.source_type === 'margin' && testResult.items.map((item, i) => {
-                    const marginItem = item as { symbol?: string; date?: string; total_balance?: number }
+                    const marginItem = item as {
+                      symbol?: string; date?: string; total_balance?: number | null; quantity_unit?: string | null
+                      margin_balance?: number | null; margin_buy?: number | null; margin_cash_repayment?: number | null
+                      short_balance?: number | null; short_sell?: number | null; short_repayment?: number | null
+                    }
+                    const hasQuantities = Boolean(marginItem.quantity_unit)
                     return (
                       <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-accent/30">
                         <span className="text-[12px] font-medium text-foreground">{marginItem.symbol}</span>
                         <div className="flex items-center gap-3">
-                          <span className="text-[12px] font-mono">{((marginItem.total_balance ?? 0) / 10000).toFixed(2)}萬</span>
+                          {hasQuantities ? <span className="text-[11px] text-muted-foreground">融資 {marginItem.margin_balance ?? '—'} · 融券 {marginItem.short_balance ?? '—'} {marginItem.quantity_unit}</span>
+                            : marginItem.total_balance != null ? <span className="text-[12px] font-mono">{marginItem.total_balance.toLocaleString()}（來源金額）</span>
+                              : <span className="text-[12px] text-muted-foreground">未提供餘額</span>}
                           <span className="text-[11px] text-muted-foreground">{marginItem.date}</span>
                         </div>
                       </div>

@@ -20,7 +20,7 @@ def test_package_vendors_by_type_content():
         "news": frozenset({"xueqiu", "eastmoney_news", "eastmoney", "finmind", "yahoo_tw"}),
         "fundamentals": frozenset({"tencent", "eastmoney", "finmind", "twmd"}),
         "dragon_tiger": frozenset({"eastmoney"}),
-        "margin": frozenset({"eastmoney", "finmind"}),
+        "margin": frozenset({"eastmoney", "finmind", "twmd"}),
         "shareholders": frozenset({"eastmoney"}),
         "dividend": frozenset({"eastmoney", "finmind"}),
         "northbound": frozenset({"ths"}),

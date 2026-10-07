@@ -898,6 +898,14 @@ class DataCollectorManager:
                     "symbol": i.symbol,
                     "date": i.date,
                     "total_balance": i.total_balance,
+                    "quantity_unit": i.quantity_unit,
+                    "margin_balance": i.margin_balance_lots,
+                    "margin_buy": i.margin_buy_lots,
+                    "margin_cash_repayment": i.margin_cash_repayment_lots,
+                    "short_balance": i.short_balance_lots,
+                    "short_sell": i.short_sell_lots,
+                    "short_repayment": i.short_repayment_lots,
+                    "evidence": i.evidence,
                 }
                 for i in items[:10]
             ],

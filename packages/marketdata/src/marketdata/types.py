@@ -452,6 +452,89 @@ class InstitutionalFlowRead:
     response_headers: dict[str, str] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class TwmdMarginShortSaleObservation:
+    """One official TWMD margin observation; every quantity is a trading unit."""
+
+    instrument_id: str
+    symbol: str
+    trade_date: str
+    margin_balance_previous: int
+    margin_purchase: int
+    margin_sale: int
+    margin_cash_redemption: int
+    margin_balance: int
+    margin_securities_finance_balance: int | None
+    margin_utilization_rate: Decimal | None
+    margin_quota: int
+    short_sale_balance_previous: int
+    short_sale: int
+    short_cover: int
+    short_stock_redemption: int
+    short_sale_balance: int
+    short_sale_securities_finance_balance: int | None
+    short_sale_utilization_rate: Decimal | None
+    short_sale_quota: int
+    offsetting: int
+    note: str | None
+    native_unit: str = "trading_units"
+
+
+@dataclass(frozen=True)
+class TwmdCoverageObservation:
+    dataset: str
+    partition_key: str
+    status: str
+    record_count: int
+    acquired_at: str | None = None
+    checksum: str | None = None
+
+
+@dataclass(frozen=True)
+class TwmdMarginShortSaleRead:
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    data: list[TwmdMarginShortSaleObservation]
+    coverage: list[TwmdCoverageObservation]
+    status: str
+    reason: str
+    coverage_error_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class TwmdShareholderDistributionObservation:
+    """TDCC custody-account bucket. Accounts are not investor identities."""
+
+    report_date: str
+    instrument_id: str
+    symbol: str
+    report_variant: str
+    row_kind: str
+    source_level: int
+    source_tier_label: str | None
+    holder_count: int
+    share_count: int
+    share_percentage_points: Decimal
+    provider: str
+    native_unit: str
+
+
+@dataclass(frozen=True)
+class TwmdShareholderDistributionRead:
+    instrument_id: str
+    endpoint: str
+    start_date: str
+    end_date: str
+    report_variant: str | None
+    data: list[TwmdShareholderDistributionObservation]
+    coverage: list[TwmdCoverageObservation]
+    status: str
+    reason: str
+    coverage_error_reasons: dict[str, str] = field(default_factory=dict)
+
+
 @dataclass
 class DragonTigerItem:
     """龍虎榜(東財每日龍虎榜明細,市場級,按 date 過濾)。欄位待實抓校準。"""
@@ -470,7 +553,7 @@ class DragonTigerItem:
 
 @dataclass
 class MarginItem:
-    """融資融券(東財 datacenter,按 symbol,取最新一條快照)。欄位待實抓校準。"""
+    """Legacy margin snapshot; native quantity fields can be lots, trading units, or shares by provider."""
 
     date: str
     symbol: str
@@ -481,13 +564,14 @@ class MarginItem:
     rq_sell_vol: float | None = None    # 融券賣出量(股)
     rq_repay_vol: float | None = None   # 融券償還量(股)
     total_balance: float | None = None  # 兩融餘額(元)
-    quantity_unit: str | None = None
+    quantity_unit: str | None = None   # Describes the margin/short balance quantities below.
     margin_balance_lots: float | None = None
     margin_buy_lots: float | None = None
     margin_cash_repayment_lots: float | None = None
     short_balance_lots: float | None = None
     short_sell_lots: float | None = None
     short_repayment_lots: float | None = None
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

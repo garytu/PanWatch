@@ -56,6 +56,7 @@ from marketdata.vendors.twmd import (
     TwmdFundamentalsVendor,
     TwmdIntradayVendor,
     TwmdKlineVendor,
+    TwmdMarginVendor,
     TwmdQuoteVendor,
 )
 
@@ -115,6 +116,7 @@ VENDOR_CLASSES_BY_TYPE: dict[str, dict[str, type]] = {
     "margin": {
         "eastmoney": EastmoneyMarginVendor,
         "finmind": FinMindMarginVendor,
+        "twmd": TwmdMarginVendor,
     },
     "shareholders": {
         "eastmoney": EastmoneyShareholdersVendor,

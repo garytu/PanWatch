@@ -7,12 +7,14 @@
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 import random
 import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -101,7 +103,7 @@ def market_get(
     retries: int = 2,
     backoff: float = 0.4,
     jitter: float = 0.25,
-    parse: str = "text",   # "text" | "json" | "content"
+    parse: str = "text",   # "text" | "json" | "json_decimal" | "content"
     encoding: str | None = None,
     symbol: str = "",
     log_label: str = "",
@@ -145,6 +147,13 @@ def market_get(
                     except ValueError:
                         # A proxy can return an HTML error page. Preserve its
                         # HTTP status instead of misclassifying it as bad JSON.
+                        if not include_response or 200 <= resp.status_code < 300:
+                            raise
+                        result = resp.text
+                elif parse == "json_decimal":
+                    try:
+                        result = json.loads(resp.text, parse_float=Decimal)
+                    except ValueError:
                         if not include_response or 200 <= resp.status_code < 300:
                             raise
                         result = resp.text

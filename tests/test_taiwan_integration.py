@@ -41,11 +41,13 @@ def test_default_taiwan_routes_all_price_types_to_twmd(monkeypatch):
 def test_taiwan_research_provider_selection_is_explicit_without_fallback(monkeypatch):
     monkeypatch.setenv("TW_FUNDAMENTALS_PROVIDER", "finmind")
     monkeypatch.setenv("TW_CAPITAL_FLOW_PROVIDER", "twmd")
+    monkeypatch.setenv("TW_MARGIN_PROVIDER", "finmind")
     monkeypatch.setenv("FINMIND_API_TOKEN", "test-finmind-token")
     cp = mc.DbConfigProvider()
 
     fundamentals = cp.sources_for("fundamentals", "TW")
     flows = cp.sources_for("capital_flow", "TW")
+    margin = cp.sources_for("margin", "TW")
 
     assert [(source.vendor, source.config.get("token")) for source in fundamentals] == [
         ("finmind", "test-finmind-token")
@@ -53,6 +55,16 @@ def test_taiwan_research_provider_selection_is_explicit_without_fallback(monkeyp
     assert [(source.vendor, source.config.get("base_url")) for source in flows] == [
         ("twmd", "http://127.0.0.1:8000")
     ]
+    assert [(source.vendor, source.config.get("token")) for source in margin] == [
+        ("finmind", "test-finmind-token")
+    ]
+
+
+def test_taiwan_margin_provider_defaults_to_twmd_without_env_file(monkeypatch):
+    from src.platform.runtime.config import Settings
+
+    monkeypatch.delenv("TW_MARGIN_PROVIDER", raising=False)
+    assert Settings(_env_file=None).tw_margin_provider == "twmd"
 
 
 def test_profile_and_revenue_reads_have_dedicated_twmd_configuration(monkeypatch):

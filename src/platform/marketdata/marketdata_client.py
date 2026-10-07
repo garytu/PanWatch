@@ -81,14 +81,16 @@ class DbConfigProvider:
         if market_code == "TW":
             from src.platform.runtime.config import Settings
             settings = Settings()
-            if datatype in {"company_profile", "monthly_revenue"}:
+            if datatype in {"company_profile", "monthly_revenue", "shareholder_distribution"}:
                 return [SourceConfig(vendor="twmd", priority=0, enabled=True,
                                      config=twmd_config(), supports_batch=False)]
-            if datatype in {"fundamentals", "capital_flow"}:
+            if datatype in {"fundamentals", "capital_flow", "margin"}:
                 provider = (
                     settings.tw_fundamentals_provider
                     if datatype == "fundamentals"
                     else settings.tw_capital_flow_provider
+                    if datatype == "capital_flow"
+                    else settings.tw_margin_provider
                 )
                 config = (
                     twmd_config()

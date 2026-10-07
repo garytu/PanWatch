@@ -25,6 +25,7 @@ Set these values in PanWatch's `.env` or process environment:
 TW_DATA_PROVIDER=twmd
 TW_FUNDAMENTALS_PROVIDER=twmd
 TW_CAPITAL_FLOW_PROVIDER=twmd
+TW_MARGIN_PROVIDER=twmd
 TWMD_BASE_URL=http://127.0.0.1:8000
 TWMD_API_TOKEN=
 TWMD_TIMEOUT_SEC=5
@@ -68,20 +69,24 @@ date, currency, volume unit and adjustment mode.
 `TW_DATA_PROVIDER=external` selects the older `/quotes?symbols=...` protocol and
 FinMind daily history. Native twmd integration is the default.
 
-`TW_FUNDAMENTALS_PROVIDER` and `TW_CAPITAL_FLOW_PROVIDER` each accept `twmd`
-(default) or `finmind`, independently of the price provider. Each route selects
-one source; an official query error or missing partition does not trigger a
-FinMind fallback. Official reads default to a 30-calendar-day window ending on
-the previous Taipei date, as required by the completed-date API policy. Generic
-official PE is returned as `pe_ratio`, with `pe_ttm`/`pe_static` left null. Source
-valuation dates and exact original values remain in `valuation_evidence`;
-financial `report_date` stays separate. Flow evidence preserves each date's
-coverage, selected presence, native share categories and source receipts. Neither
-provider claims a five-trading-day sum without proven complete session coverage.
+`TW_FUNDAMENTALS_PROVIDER`, `TW_CAPITAL_FLOW_PROVIDER`, and
+`TW_MARGIN_PROVIDER` each accept `twmd` (default) or `finmind`, independently of
+the price provider. Each route selects one source; an official query error or
+missing partition does not trigger a FinMind fallback. Official daily reads
+default to a 30-calendar-day window ending on the previous Taipei date, as
+selected by PanWatch's completed-date policy. Generic official PE is returned as
+`pe_ratio`, with `pe_ttm`/`pe_static` left null. Source valuation dates and exact
+original values remain in `valuation_evidence`; financial `report_date` stays
+separate. Flow evidence preserves each date's coverage, selected presence,
+native share categories and source receipts. Neither provider claims a
+five-trading-day sum without proven complete session coverage. Margin quantities
+remain integer trading units (lots), and the TWMD route separately reads date
+coverage; it does not map those quantities into cash balances.
 
 The stock research panel and `GET /api/research/taiwan` use the shared, read-only
-TWMD research service for four independent blocks: official valuation,
-institutional share counts, company profile and monthly revenue. The dedicated
+TWMD research service for six independent blocks: official valuation,
+institutional share counts, company profile, monthly revenue, margin and short
+sale, and TDCC shareholder distribution. The dedicated
 `get_taiwan_stock_research` assistant tool uses this same service regardless of
 the legacy provider selectors; `get_stock_fundamentals` and `get_capital_flow`
 continue to respect their individual `TW_*_PROVIDER` setting. TradingAgents
@@ -107,8 +112,33 @@ or cash-flow statements.
 | Paper trading | Taiwan allocation is configurable and defaults to 0. Entries, exits and manual closes require a confirmed session and unexpired live quote. Regular lots default to 1,000 shares; `TW_PAPER_LOT_SIZE=1` selects an odd-lot quantity assumption. |
 | Costs | Stock sell tax 0.3%; ETF sell tax 0.1%; bond ETF exemption through 2026. Commission and minimum commission are configurable broker assumptions. Taiwan has no mainland transfer fee. |
 | Calendar | Validated TWSE annual schedule cached on disk, including settlement-only closures. Unknown/out-of-year coverage stops Taiwan trading-session jobs. `TW_EXTRA_CLOSED_DATES` adds emergency closure dates. |
-| Financial and chip data | Official twmd valuation and institutional flows are the defaults; FinMind is an explicit alternate for those two routes and continues to provide news, dividends and margin. Institutional flows use integer shares, preserve native categories/evidence, and leave cash and unproven five-day totals null; margin quantities use lots. |
+| Financial and chip data | Official twmd valuation, institutional flows and margin are the defaults; FinMind is an explicit alternate for those routes and continues to provide news and dividends. Institutional flows use integer shares, preserve native categories/evidence, and leave cash and unproven five-day totals null. Margin evidence retains integer trading units, coverage and the provider choice without presenting lots as currency. TDCC shareholder distribution is TWSE four-digit only; its large-holding share ratio uses levels 12–15 (>400,000 shares) over the official total row, and weekly comparison requires the exact prior report date and same variant. |
 | Readiness and subscriptions | `/api/quotes/taiwan/status` reports collection health, durable requested subscriptions, confirmed subscriptions, calendar status and active cash-instrument counts by venue. The watchlist can explicitly request or cancel a subscription through PanWatch's authenticated proxy to twmd control port 9200. Requested subscriptions may remain pending until the collector confirms them. |
+
+### PW-07 margin and shareholder research
+
+The six-block research service reads TWSE and TPEx margin/short-sale rows in the
+official trading-unit quantity and keeps TWMD as the default for the legacy
+margin source. `TW_MARGIN_PROVIDER=finmind` explicitly selects the alternate
+provider; failures do not mix provider results. The research panel shows native
+quantities and coverage separately from any cash-balance fields.
+
+For supported four-digit TWSE securities, the panel reads TDCC bulk-current and
+historical distributions from the preceding 90 completed calendar days as typed rows. Large holdings are levels 12–15, which
+start at 400,001 shares, divided by the official total-row share count. The bulk
+adjustment row stays outside the bucket numerator; incomplete or unreconciled
+reports do not produce a ratio. When both layouts exist on the newest report
+date, the panel prefers `bulk_current`; weekly change requires the exact prior
+week and the same layout. TDCC holder counts describe custody accounts, not
+beneficial owners. TPEX TDCC queries remain explicitly unsupported. The service
+keeps four reads active at once under its existing 25-second request deadline
+and marks each of the six blocks independently.
+
+On 2026-10-07, a bounded read-only query returned three margin rows for each of
+`TWSE:2330` and `TPEX:5347`; the TDCC query returned 17 rows for report date
+2026-09-04 and no preceding-week report. These samples confirm the observed
+response shapes and the missing-week behavior, not complete date coverage or a
+publisher delivery guarantee. See the [saved live-contract evidence](plans/twmd-integration/evidence/PW-07-live-contract-2026-10-07.json).
 
 The cost assumptions follow the [TWSE securities guide](https://www.twse.com.tw/en/about/company/guide.html)
 and [ETF trading rules](https://www.twse.com.tw/en/products/securities/etf/overview/rules.html).
@@ -406,3 +436,15 @@ and diff checks passed. PW-06 is completed in code and offline verification,
 through [PR #1](https://github.com/garytu/PanWatch/pull/1); no merge, deployment,
 upstream acquisition/schedule/subscription change or new live acceptance was
 performed. The default next task is **PW-07 ready**; PW-13 still needs PW-11/PW-12.
+
+
+PW-07 coordinator verification (2026-10-07): 1234 backend/package tests passed,
+3 skipped; 55 frontend tests passed; TypeScript, Vite production build, and diff
+checks passed. Independent review fixed partial-coverage classification,
+margin period-age evidence, zero-denominator TDCC comparisons and queued reads
+after the aggregate deadline. A [shared-service smoke](plans/twmd-integration/evidence/PW-07-shared-service-2026-10-07.json)
+returned all six blocks for TWSE:2330 in 12.956 seconds and TPEX:5347 in 10.296
+seconds, with TPEX TDCC explicitly unsupported and TWSE TDCC still dated
+2026-09-04 without a prior-week delta. PW-07 is completed in code and bounded
+read-only verification; the current default next task is **PW-08 ready**.
+The PR remains unmerged and the change is not deployed.

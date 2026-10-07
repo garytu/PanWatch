@@ -32,6 +32,8 @@ from marketdata.types import (
     ShareholderItem,
     TwmdCompanyProfileRead,
     TwmdMonthlyRevenueRead,
+    TwmdMarginShortSaleRead,
+    TwmdShareholderDistributionRead,
     TaiwanDiscoveryPool,
 )
 from marketdata.vendors.discovery import DiscoveryVendor
@@ -161,8 +163,8 @@ class MarketData:
             config=config, metrics=self.metrics,
             cache=TTLCache(default_ttl_sec=300.0), default_ttl=300.0,
         )
-        # 龍虎榜/融資融券/股東戶數/分紅:市場/資金面,均走東財 datacenter 同構介面,
-        # 更新頻率低(日頻/期頻),沿用 fundamentals 同款 300s TTL。
+        # 龍虎榜/融資融券/股東戶數/分紅:資金面低頻快照,沿用 fundamentals 同款 300s TTL。
+        # Taiwan margin still uses the compatibility Engine; its selected vendor may be TWMD or FinMind.
         self._dragon_tiger_engine = Engine(
             datatype="dragon_tiger",
             vendors=build_vendors("dragon_tiger"),
@@ -327,6 +329,32 @@ class MarketData:
             symbol, month, today_taipei=today_taipei
         )
 
+    def margin_short_sale(
+        self,
+        symbol: str,
+        start_date: str | date,
+        end_date: str | date,
+        *,
+        today_taipei: date | None = None,
+    ) -> TwmdMarginShortSaleRead:
+        """Read the selected official TWMD margin source with coverage evidence."""
+        return self._twmd_research_client("margin").margin_short_sale(
+            symbol, start_date, end_date, today_taipei=today_taipei
+        )
+
+    def shareholder_distribution(
+        self,
+        symbol: str,
+        start_date: str | date,
+        end_date: str | date,
+        *,
+        report_variant: str | None = None,
+    ) -> TwmdShareholderDistributionRead:
+        """Read dedicated TDCC holder-distribution rows for one canonical issuer."""
+        return self._twmd_research_client("shareholder_distribution").shareholder_distribution(
+            symbol, start_date, end_date, report_variant=report_variant
+        )
+
     def events(self, symbols: list[str], *, market: str = "CN", since_days: int = 7) -> list[EventItem]:
         """結構化事件(東財公告)。批次 symbols。不在包內快取(cache_ttl_sec=0);宿主自行快取。"""
         req = Request(symbols=tuple(symbols), market=market, since_hours=since_days * 24,
@@ -461,7 +489,7 @@ class MarketData:
         return resp.data or []
 
     def margin(self, symbols: list[str | Symbol], *, market: str | None = None) -> list[MarginItem]:
-        """批次融資融券(按 symbol,取每隻最新一條快照)。照 fundamentals() 分組範式。"""
+        """Batch margin observations; TWMD rows retain their source trading-unit evidence."""
         groups: dict[str, list[Symbol]] = {}
         for raw in symbols:
             sym = raw if isinstance(raw, Symbol) else Symbol.parse(raw, market)
@@ -469,8 +497,12 @@ class MarketData:
 
         out: list[MarginItem] = []
         for mkt, syms in groups.items():
-            req = Request(symbols=tuple(s.code for s in syms), market=mkt)
+            request_symbols = tuple(s.identity if mkt == "TW" else s.code for s in syms)
+            req = Request(symbols=request_symbols, market=mkt)
             resp = self._margin_engine.fetch(req)
+            if not resp.ok and mkt == "TW" and self._uses_twmd("margin", "TW"):
+                from marketdata.errors import VendorError
+                raise VendorError(resp.error or "twmd margin read failed")
             if resp.ok and resp.data:
                 out.extend(resp.data)
         return out
