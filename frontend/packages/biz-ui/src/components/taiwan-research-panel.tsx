@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import { researchApi, type ResearchBlockName, type ResearchDataBlock, type ResearchFreshness, type TaiwanResearchPayload } from '@panwatch/api'
 import { Button } from '@panwatch/base-ui/components/ui/button'
 import { BrokerFlowPanel } from './broker-flow-panel'
-import { FinancialStatementsPanel, defaultFiscalScope, maxCompletedQuarter, taipeiTodayParts } from './financial-statements-panel'
+import { FinancialStatementsPanel, defaultFiscalScope, taipeiTodayParts } from './financial-statements-panel'
 
 type AnyBlock = ResearchDataBlock<Record<string, any>>
 
@@ -11,6 +11,7 @@ const RESEARCH_BLOCK_NAMES: ResearchBlockName[] = [
   'valuation', 'institutional_flows', 'company_profile', 'monthly_revenues', 'margin_short_sale',
   'shareholder_distribution', 'broker_flow', 'financial_statements', 'corporate_actions', 'benchmark_comparison',
 ]
+const MAIN_RESEARCH_BLOCK_NAMES = RESEARCH_BLOCK_NAMES.filter((name) => name !== 'financial_statements')
 
 const BLOCK_SELECTOR_FIELDS: Record<ResearchBlockName, Array<keyof TaiwanResearchPayload['selectors']>> = {
   valuation: ['start_date', 'end_date'],
@@ -613,29 +614,39 @@ function monthProvenance(item: any, coverage: any[]): string {
 
 export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; market: string; open: boolean }) {
   const [payload, setPayload] = useState<TaiwanResearchPayload | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [mainLoading, setMainLoading] = useState(false)
+  const [mainError, setMainError] = useState('')
+  const [financialBlock, setFinancialBlock] = useState<AnyBlock | null>(null)
+  const [financialLoading, setFinancialLoading] = useState(false)
+  const [financialError, setFinancialError] = useState('')
+  const [financialUnsupported, setFinancialUnsupported] = useState<{ symbolScope: string; reason: string } | null>(null)
   const [fiscalScope, setFiscalScope] = useState(defaultFiscalScope)
-  const requestSequence = useRef(0)
+  const mainRequestSequence = useRef(0)
+  const financialRequestSequence = useRef(0)
   const payloadRef = useRef<TaiwanResearchPayload | null>(null)
   const payloadInputRef = useRef<string | null>(null)
-  const controllerRef = useRef<AbortController | null>(null)
+  const financialBlockRef = useRef<AnyBlock | null>(null)
+  const financialInputScopeRef = useRef<string | null>(null)
+  const unsupportedFinancialScopeRef = useRef<{ symbolScope: string; reason: string } | null>(null)
+  const mainControllerRef = useRef<AbortController | null>(null)
+  const financialControllerRef = useRef<AbortController | null>(null)
   const inputScope = `${market}:${symbol}`
 
-  const load = useCallback(async (reason: 'auto' | 'refresh' = 'auto') => {
+  const loadMain = useCallback(async (reason: 'auto' | 'refresh' = 'auto') => {
     if (!symbol || market !== 'TW') return
     const requestScope = `${market}:${symbol}`
-    const sequence = ++requestSequence.current
+    const sequence = ++mainRequestSequence.current
     let currentPayload = payloadInputRef.current === requestScope ? payloadRef.current : null
     if (!currentPayload) {
       payloadRef.current = null
       payloadInputRef.current = requestScope
       setPayload(null)
     }
-    controllerRef.current?.abort()
+    mainControllerRef.current?.abort()
     const controller = new AbortController()
-    controllerRef.current = controller
-    const targetSelectors = expectedSelectors(fiscalScope.year, fiscalScope.quarter)
+    mainControllerRef.current = controller
+    const defaultScope = defaultFiscalScope()
+    const targetSelectors = expectedSelectors(defaultScope.year, defaultScope.quarter)
     if (currentPayload) {
       currentPayload = retainSelectorCompatibleBlocks(currentPayload, targetSelectors)
       payloadRef.current = currentPayload
@@ -643,7 +654,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     }
     let requestedBlocks: ResearchBlockName[] | undefined
     if (currentPayload) {
-      requestedBlocks = RESEARCH_BLOCK_NAMES.filter((name) => {
+      requestedBlocks = MAIN_RESEARCH_BLOCK_NAMES.filter((name) => {
         const oldBlock = currentPayload.blocks[name]
         const failed = oldBlock?.status === 'error'
         const selectorsChanged = BLOCK_SELECTOR_FIELDS[name].some((field) => (
@@ -652,89 +663,184 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
         return !oldBlock || failed || selectorsChanged
       })
       if (reason === 'refresh' && requestedBlocks.length === 0) {
-        requestedBlocks = [...RESEARCH_BLOCK_NAMES]
+        requestedBlocks = [...MAIN_RESEARCH_BLOCK_NAMES]
       }
       if (requestedBlocks.length === 0) {
-        setLoading(false)
+        setMainLoading(false)
         return
       }
-      if (requestedBlocks.length === RESEARCH_BLOCK_NAMES.length) requestedBlocks = undefined
     }
-    setLoading(true)
-    setError('')
+    setMainLoading(true)
+    setMainError('')
     try {
       const result = await researchApi.taiwan(symbol, {
-        fiscal_year: fiscalScope.year,
-        fiscal_quarter: fiscalScope.quarter,
-        ...(requestedBlocks ? { blocks: requestedBlocks } : {}),
+        blocks: requestedBlocks || [...MAIN_RESEARCH_BLOCK_NAMES],
       }, { signal: controller.signal })
-      if (sequence === requestSequence.current) {
+      if (sequence === mainRequestSequence.current) {
         const merged = mergeResearchPayload(currentPayload, result)
         payloadRef.current = merged
         payloadInputRef.current = requestScope
         setPayload(merged)
       }
     } catch (cause) {
-      if (sequence === requestSequence.current && !controller.signal.aborted) {
-        setError(cause instanceof Error ? cause.message : '研究資料載入失敗。')
+      if (sequence === mainRequestSequence.current && !controller.signal.aborted) {
+        setMainError(cause instanceof Error ? cause.message : '研究資料載入失敗。')
       }
     } finally {
-      if (sequence === requestSequence.current) setLoading(false)
+      if (sequence === mainRequestSequence.current) setMainLoading(false)
+    }
+  }, [market, symbol])
+
+  useEffect(() => {
+    if (open && market === 'TW') void loadMain('auto')
+    else {
+      mainRequestSequence.current++
+      mainControllerRef.current?.abort()
+      mainControllerRef.current = null
+      payloadRef.current = null
+      payloadInputRef.current = null
+      setPayload(null)
+      setMainError('')
+      setMainLoading(false)
+    }
+    return () => {
+      mainRequestSequence.current++
+      mainControllerRef.current?.abort()
+    }
+  }, [open, market, loadMain])
+
+  const loadFinancial = useCallback(async () => {
+    if (!symbol || market !== 'TW') return
+    const symbolScope = `${market}:${symbol}`
+    const requestScope = `${symbolScope}:${fiscalScope.year}:${fiscalScope.quarter}`
+    const sequence = ++financialRequestSequence.current
+    financialControllerRef.current?.abort()
+    financialControllerRef.current = null
+
+    const previousRequestScope = financialInputScopeRef.current
+    financialInputScopeRef.current = requestScope
+    setFinancialError('')
+    if (!financialBlockRef.current || previousRequestScope !== requestScope) {
+      financialBlockRef.current = null
+      setFinancialBlock(null)
+    }
+
+    if (symbol.toUpperCase().startsWith('TPEX:')) {
+      setFinancialUnsupported({ symbolScope, reason: 'financial_statements_twse_only' })
+      setFinancialLoading(false)
+      return
+    }
+
+    const cachedUnsupported = unsupportedFinancialScopeRef.current
+    if (cachedUnsupported?.symbolScope === symbolScope) {
+      setFinancialBlock(null)
+      setFinancialUnsupported(cachedUnsupported)
+      setFinancialLoading(false)
+      return
+    }
+
+    setFinancialUnsupported(null)
+    setFinancialLoading(true)
+    const controller = new AbortController()
+    financialControllerRef.current = controller
+    try {
+      const result = await researchApi.taiwan(symbol, {
+        fiscal_year: fiscalScope.year,
+        fiscal_quarter: fiscalScope.quarter,
+        blocks: ['financial_statements'],
+      }, { signal: controller.signal })
+      if (sequence === financialRequestSequence.current) {
+        const resultBlock = result.blocks?.financial_statements as AnyBlock | undefined
+        if (!resultBlock) throw new Error('財報回應未包含所選期別。')
+        const data = resultBlock.data as any
+        const evidenceSelectors = resultBlock.evidence?.selectors as Record<string, unknown> | undefined
+        const requestedSymbol = symbol.trim().toUpperCase()
+        const identities = [result.instrument_id, data?.instrument_id, resultBlock.evidence?.instrument_id, evidenceSelectors?.instrument_id]
+          .filter((value) => value != null)
+        const instrumentMatches = identities.length > 0 && identities.every((value) => {
+          const identity = String(value).toUpperCase()
+          const canonicalParts = /^(TWSE|TPEX):(\d{4,6})$/.exec(identity)
+          return Boolean(canonicalParts && (
+            requestedSymbol.includes(':') ? identity === requestedSymbol : canonicalParts[2] === requestedSymbol
+          ))
+        })
+        const years = [data?.fiscal_year, evidenceSelectors?.fiscal_year, result.selectors?.fiscal_year].filter((value) => value != null)
+        const quarters = [data?.fiscal_quarter, evidenceSelectors?.fiscal_quarter, result.selectors?.fiscal_quarter].filter((value) => value != null)
+        if (!instrumentMatches || !years.length || !quarters.length
+          || !years.every((value) => Number(value) === fiscalScope.year)
+          || !quarters.every((value) => Number(value) === fiscalScope.quarter)) {
+          throw new Error('財報回應標的或期別與所選查詢不符。')
+        }
+        financialBlockRef.current = resultBlock
+        setFinancialBlock(resultBlock)
+        if (resultBlock.status === 'unsupported' || (resultBlock.data as any)?.qualification?.status === 'unsupported') {
+          unsupportedFinancialScopeRef.current = { symbolScope, reason: resultBlock.reason || (resultBlock.data as any)?.qualification?.reason || 'unsupported' }
+        }
+      }
+    } catch (cause) {
+      if (sequence === financialRequestSequence.current && !controller.signal.aborted) {
+        setFinancialError(cause instanceof Error ? cause.message : '財報讀取失敗。')
+      }
+    } finally {
+      if (sequence === financialRequestSequence.current) setFinancialLoading(false)
     }
   }, [fiscalScope.quarter, fiscalScope.year, market, symbol])
 
   useEffect(() => {
-    if (open && market === 'TW') void load('auto')
+    if (open && market === 'TW') void loadFinancial()
     else {
-      requestSequence.current++
-      controllerRef.current?.abort()
-      controllerRef.current = null
-      payloadRef.current = null
-      payloadInputRef.current = null
-      setPayload(null)
-      setError('')
-      setLoading(false)
+      financialRequestSequence.current++
+      financialControllerRef.current?.abort()
+      financialControllerRef.current = null
+      financialBlockRef.current = null
+      financialInputScopeRef.current = null
+      unsupportedFinancialScopeRef.current = null
+      setFinancialBlock(null)
+      setFinancialError('')
+      setFinancialUnsupported(null)
+      setFinancialLoading(false)
     }
     return () => {
-      requestSequence.current++
-      controllerRef.current?.abort()
+      financialRequestSequence.current++
+      financialControllerRef.current?.abort()
     }
-  }, [open, market, load])
+  }, [open, market, loadFinancial])
 
   if (market !== 'TW') return null
   const visiblePayload = payloadInputRef.current === inputScope ? payload : null
   const blocks = visiblePayload?.blocks
+  const financialScopeKey = `${inputScope}:${fiscalScope.year}:${fiscalScope.quarter}`
+  const visibleFinancialBlock = financialInputScopeRef.current === financialScopeKey ? financialBlock : null
+  const visibleFinancialUnsupportedReason = symbol.toUpperCase().startsWith('TPEX:')
+    ? 'financial_statements_twse_only'
+    : financialUnsupported?.symbolScope === inputScope ? financialUnsupported.reason : ''
+  const visibleFinancialLoading = financialInputScopeRef.current === financialScopeKey && financialLoading
+  const visibleFinancialError = financialInputScopeRef.current === financialScopeKey ? financialError : ''
+  const visibleMainLoading = payloadInputRef.current === inputScope && mainLoading
+  const visibleMainError = payloadInputRef.current === inputScope ? mainError : ''
   return (
     <section className="card p-4 space-y-3" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">官方台股研究</h3>
-          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點、財報、公司行動與 raw 大盤比較各自保留來源期間、單位和證據</p>
+          <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點、公司行動與 raw 大盤比較保留來源期間、單位和證據；財報獨立載入</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => void load('refresh')} disabled={loading} aria-label="重新載入官方研究資料">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+        <Button variant="ghost" size="sm" onClick={() => void loadMain('refresh')} disabled={visibleMainLoading} aria-label="重新載入官方研究資料">
+          <RefreshCw className={`h-3.5 w-3.5 ${visibleMainLoading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
-      {loading && visiblePayload ? <div className="text-[10px] text-muted-foreground">正在更新；目前顯示的是上一版相容資料。</div> : null}
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="space-y-1 text-[10px] text-muted-foreground">財報年度
-          <select aria-label="財報年度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.year} onChange={(event) => {
-            const year = Number(event.target.value)
-            const latestQuarter = maxCompletedQuarter(year)
-            setFiscalScope({ year, quarter: Math.min(fiscalScope.quarter, latestQuarter) || 1 })
-          }}>
-            {Array.from({ length: Math.max(1, taipeiTodayParts().year - 2023) }, (_, index) => 2024 + index).map((year) => <option key={year} value={year} disabled={maxCompletedQuarter(year) === 0}>{year}</option>)}
-          </select>
-        </label>
-        <label className="space-y-1 text-[10px] text-muted-foreground">財報季度
-          <select aria-label="財報季度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.quarter} onChange={(event) => setFiscalScope((scope) => ({ ...scope, quarter: Number(event.target.value) }))}>
-            {Array.from({ length: Math.max(1, maxCompletedQuarter(fiscalScope.year)) }, (_, index) => index + 1).map((quarter) => <option key={quarter} value={quarter}>Q{quarter}</option>)}
-          </select>
-        </label>
-        <span className="pb-1 text-[10px] text-muted-foreground">只選已結束的季度；duration 期間以來源事實原樣顯示。</span>
-      </div>
-      {loading && !visiblePayload ? <div className="text-xs text-muted-foreground py-3">正在載入官方研究資料…</div> : null}
-      {error ? <div className="rounded border border-destructive/30 p-3 text-xs text-destructive">{error}</div> : null}
+      {visibleMainLoading && visiblePayload ? <div className="text-[10px] text-muted-foreground">正在更新研究資料；目前顯示相容的上一版結果。</div> : null}
+      {visibleMainLoading && !visiblePayload ? <div className="text-xs text-muted-foreground py-3">正在載入其他官方研究資料…</div> : null}
+      {visibleMainError ? <div className="rounded border border-destructive/30 p-3 text-xs text-destructive">研究資料讀取失敗：{visibleMainError}</div> : null}
+      <FinancialStatementsPanel
+        block={visibleFinancialBlock || undefined}
+        fiscalScope={fiscalScope}
+        onFiscalScopeChange={setFiscalScope}
+        loading={visibleFinancialLoading}
+        error={visibleFinancialError}
+        unsupportedReason={visibleFinancialUnsupportedReason}
+        onRetry={() => void loadFinancial()}
+      />
       {blocks ? <>
         <div className="text-[11px] text-muted-foreground">{visiblePayload?.instrument_id} · {visiblePayload?.instrument?.security_type || '標的類型未知'} · 區間 {visiblePayload?.selectors.start_date} 至 {visiblePayload?.selectors.end_date}</div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -745,12 +851,11 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           {blocks.margin_short_sale ? <MarginBlock block={blocks.margin_short_sale as AnyBlock} /> : null}
           {blocks.shareholder_distribution ? <ShareholderDistributionBlock block={blocks.shareholder_distribution as AnyBlock} /> : null}
           {blocks.broker_flow ? <BrokerFlowPanel block={blocks.broker_flow as AnyBlock} /> : null}
-          {blocks.financial_statements ? <FinancialStatementsPanel block={blocks.financial_statements as AnyBlock} /> : null}
           {blocks.corporate_actions ? <CorporateActionsBlock block={blocks.corporate_actions as AnyBlock} /> : null}
           {blocks.benchmark_comparison ? <BenchmarkComparisonBlock block={blocks.benchmark_comparison as AnyBlock} /> : null}
         </div>
       </> : null}
-      {!loading && !error && !visiblePayload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}
+      {!visibleMainLoading && !visibleMainError && !visiblePayload ? <div className="text-xs text-muted-foreground">尚未載入其他研究資料。</div> : null}
     </section>
   )
 }

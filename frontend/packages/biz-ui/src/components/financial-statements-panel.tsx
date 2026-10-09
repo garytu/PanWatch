@@ -83,17 +83,71 @@ function blockHeading(block: AnyBlock) {
   return <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-semibold">台股財報（來源原始事實）</h4><span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground">{labels[block.status] || block.status}</span></div>
 }
 
-export function FinancialStatementsPanel({ block }: { block?: AnyBlock }) {
-  if (!block) return null
-  const data = block.data as any
+export interface FinancialFiscalScope {
+  year: number
+  quarter: number
+}
+
+export interface FinancialStatementsPanelProps {
+  block?: AnyBlock
+  fiscalScope?: FinancialFiscalScope
+  onFiscalScopeChange?: (scope: FinancialFiscalScope) => void
+  loading?: boolean
+  error?: string
+  unsupportedReason?: string
+  onRetry?: () => void
+}
+
+export function FinancialStatementsPanel({
+  block,
+  fiscalScope,
+  onFiscalScopeChange,
+  loading = false,
+  error = '',
+  unsupportedReason = '',
+  onRetry,
+}: FinancialStatementsPanelProps) {
+  const hasPeriodSelector = Boolean(fiscalScope && onFiscalScopeChange)
+  if (!block && !hasPeriodSelector && !loading && !error && !unsupportedReason) return null
+  const data = block?.data as any
   const report = data?.report
   const qualification = data?.qualification
   const coverage = data?.coverage
   const facts = Array.isArray(data?.facts) ? data.facts as FinancialStatementFact[] : []
   const year = Number(data?.fiscal_year)
+  const unsupportedLabel = unsupportedReason === 'financial_statements_twse_only'
+    ? '目前財報來源只支援符合範圍的上市公司'
+    : unsupportedReason === 'financial_statements_security_type_not_supported'
+      ? '此財報來源不支援這類證券'
+      : unsupportedReason
   return (
     <section className="rounded-lg border border-border/50 p-3 space-y-2 lg:col-span-2">
-      {blockHeading(block)}
+      {block ? blockHeading(block) : <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-semibold">台股財報（來源原始事實）</h4><span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground">{loading ? '載入中' : unsupportedReason ? '不適用' : error ? '讀取失敗' : '待查詢'}</span></div>}
+      {hasPeriodSelector && fiscalScope && onFiscalScopeChange ? <>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="space-y-1 text-[10px] text-muted-foreground">財報年度
+            <select aria-label="財報年度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.year} onChange={(event) => {
+              const year = Number(event.target.value)
+              const latestCompleted = maxCompletedQuarter(year)
+              onFiscalScopeChange({ year, quarter: Math.min(fiscalScope.quarter, Math.max(1, latestCompleted)) })
+            }}>
+              {Array.from({ length: Math.max(1, taipeiTodayParts().year - 2023) }, (_, index) => 2024 + index).map((year) => <option key={year} value={year} disabled={maxCompletedQuarter(year) === 0}>{year}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1 text-[10px] text-muted-foreground">財報季度
+            <select aria-label="財報季度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.quarter} onChange={(event) => onFiscalScopeChange({ ...fiscalScope, quarter: Number(event.target.value) })}>
+              {Array.from({ length: Math.max(1, maxCompletedQuarter(fiscalScope.year)) }, (_, index) => index + 1).map((quarter) => <option key={quarter} value={quarter}>Q{quarter}</option>)}
+            </select>
+          </label>
+          <span className="pb-1 text-[10px] text-muted-foreground">只查已結束的季度；來源尚未提供留存期別清單，可用期間待確認。</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground">目前選擇 {fiscalScope.year} Q{fiscalScope.quarter} 僅是查詢條件，不代表該期已留存或為最新可用期間；缺少資料或讀取逾時後會保留所選期別。</p>
+      </> : null}
+      {loading ? <div className="text-xs text-muted-foreground" role="status">{block ? '正在更新所選期別；目前保留已取得的財報。' : `正在載入 ${fiscalScope ? `${fiscalScope.year} Q${fiscalScope.quarter}` : '所選期別'} 財報…`}</div> : null}
+      {!loading && error ? <div className="rounded border border-destructive/30 p-2 text-xs text-destructive" role="alert">財報讀取失敗：{error}</div> : null}
+      {!block && !loading && !error && unsupportedReason ? <div className="text-xs text-muted-foreground">不支援：{unsupportedLabel}。</div> : null}
+      {!block && !loading && !error && unsupportedReason ? <details className="text-[10px] text-muted-foreground"><summary className="cursor-pointer">來源限制詳情</summary><code>{unsupportedReason}</code></details> : null}
+      {!block && !loading && !error && !unsupportedReason && hasPeriodSelector ? <div className="text-xs text-muted-foreground">尚未取得所選期別的財報。</div> : null}
       {report ? <>
         <div className="break-all text-[11px] text-muted-foreground">{data.fiscal_year}Q{data.fiscal_quarter} · 合併 · {report.member_filename} · 修訂 {report.semantic_revision_id}</div>
         <div className="text-[11px] text-muted-foreground">報表接收 {report.original_received_at_utc || '未知'} · 最新發現 {coverage?.latest_discovery_presence || '未知'}{coverage?.original_received_at_utc ? `（${coverage.original_received_at_utc}）` : ''} · 發布時間未知</div>
@@ -123,7 +177,7 @@ export function FinancialStatementsPanel({ block }: { block?: AnyBlock }) {
             )
           })}
         </div>
-      </> : <div className="text-xs text-muted-foreground">
+      </> : block ? <div className="text-xs text-muted-foreground">
         {block.status === 'unsupported' || qualification?.status === 'unsupported'
           ? `不支援：${qualification?.reason || block.reason}`
           : block.status === 'error'
@@ -135,9 +189,10 @@ export function FinancialStatementsPanel({ block }: { block?: AnyBlock }) {
                 : coverage?.reason === 'never_collected'
                   ? '此期尚無留存報表或有效發現證據。'
                   : `此期沒有留存報表（${block.reason || coverage?.reason || 'coverage unknown'}）。`}
-      </div>}
+      </div> : null}
+      {onRetry && !loading && (error || block?.status === 'error') ? <button type="button" className="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted" onClick={onRetry}>重新載入財報</button> : null}
       {data ? <div className="text-[10px] text-muted-foreground">資格 {qualification?.status || '未知'} · 報表覆蓋 {coverage?.status || '未知'} · 最新發現 {coverage?.latest_discovery_presence || '未知'} · {data.returned_fact_count ?? 0}/{data.total_fact_count ?? 0} 筆</div> : null}
-      <details className="text-[10px] text-muted-foreground"><summary className="cursor-pointer">財報來源 evidence</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(block.evidence, null, 2)}</pre></details>
+      {block ? <details className="text-[10px] text-muted-foreground"><summary className="cursor-pointer">財報來源 evidence</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all">{JSON.stringify(block.evidence, null, 2)}</pre></details> : null}
     </section>
   )
 }

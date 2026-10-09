@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TaiwanResearchPanel } from '@panwatch/biz-ui/components/taiwan-research-panel'
 import { BrokerFlowPanel } from '@panwatch/biz-ui/components/broker-flow-panel'
 import { defaultFiscalScope, FinancialStatementsPanel, taipeiTodayParts } from '@panwatch/biz-ui/components/financial-statements-panel'
 import { researchApi } from '@panwatch/api'
 
 vi.mock('@panwatch/api', () => ({ researchApi: { taiwan: vi.fn() } }))
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-09T04:00:00Z'))
+})
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
 function block(data: any, status = 'available', reason = 'selected_record_present', evidence: any = {}) {
   return { data, status, reason, evidence: { provider: 'twmd', ...evidence } }
@@ -60,6 +64,50 @@ function completeBlocks(providerScope: string, overrides: Record<string, any> = 
     ...value,
     evidence: { ...value.evidence, provider_scope: providerScope },
   }]))
+}
+
+function researchEnvelope(instrumentId: string, blocks: Record<string, any>, year = defaultFiscalScope().year, quarter = defaultFiscalScope().quarter) {
+  const match = /^(TWSE|TPEX):(\d{4,6})$/.exec(instrumentId)
+  const venue = match?.[1] || 'TWSE'
+  const symbol = match?.[2] || instrumentId
+  return {
+    instrument_id: instrumentId,
+    instrument: { venue, symbol, security_type: 'EQUITY', is_active: true, name: '測試公司' },
+    selectors: currentSelectors(year, quarter),
+    requested_blocks: Object.keys(blocks),
+    blocks,
+    limitations: { financial_statements: { status: 'limited_scope', message: '' } },
+  }
+}
+
+function financialEnvelope(
+  instrumentId: string,
+  year: number,
+  quarter: number,
+  status: string,
+  reason: string,
+  report: Record<string, unknown> | null = null,
+) {
+  const unsupported = status === 'unsupported'
+  const data = status === 'error' ? null : {
+    instrument_id: instrumentId,
+    fiscal_year: year,
+    fiscal_quarter: quarter,
+    report_scope: 'consolidated',
+    qualification: { status: unsupported ? 'unsupported' : 'qualified', reason },
+    coverage: { status: status === 'available' ? 'AVAILABLE' : 'MISSING', reason, latest_discovery_presence: 'missing' },
+    report,
+    facts: [],
+    returned_fact_count: 0,
+    total_fact_count: 0,
+    truncated: false,
+  }
+  return researchEnvelope(instrumentId, {
+    financial_statements: block(data, status, reason, {
+      instrument_id: instrumentId,
+      selectors: { instrument_id: instrumentId, fiscal_year: year, fiscal_quarter: quarter },
+    }),
+  }, year, quarter)
 }
 
 it('shows source dates, exact values, units, nulls, and partial month coverage', async () => {
@@ -146,36 +194,170 @@ it('shows source dates, exact values, units, nulls, and partial month coverage',
 })
 
 it('lets the stock research entry select a historical fiscal year and quarter', async () => {
-  vi.mocked(researchApi.taiwan).mockResolvedValue({
+  const scope = defaultFiscalScope()
+  const selectors = currentSelectors(scope.year, scope.quarter)
+  const mainResult = {
     instrument_id: 'TWSE:2330',
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
-    selectors: { start_date: '2026-09-08', end_date: '2026-10-06', start_month: '2025-11', end_month: '2026-10', fiscal_year: 2026, fiscal_quarter: 3, statement: null },
-    blocks: {
-      valuation: block({ observations: [] }),
-      institutional_flows: block({ observations: [] }),
-      company_profile: block(null),
-      monthly_revenues: block({ months: [] }),
-      ...supplementalBlocks(),
-      financial_statements: block(null, 'missing', 'never_collected'),
-    },
+    selectors, blocks: { valuation: block({ observations: [] }) },
     limitations: { financial_statements: { status: 'limited_scope', message: '' } },
-  } as any)
+  }
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
+    const year = params.fiscal_year || scope.year
+    const quarter = params.fiscal_quarter || scope.quarter
+    if (params.blocks?.includes('financial_statements')) {
+      const data = { instrument_id: 'TWSE:2330', fiscal_year: year, fiscal_quarter: quarter, qualification: { status: 'qualified' }, coverage: { status: 'MISSING' }, report: null, facts: [], returned_fact_count: 0, total_fact_count: 0, truncated: false }
+      return Promise.resolve({
+        ...mainResult, selectors: currentSelectors(year, quarter), requested_blocks: ['financial_statements'],
+        blocks: { financial_statements: block(data, 'missing', 'never_collected', { instrument_id: 'TWSE:2330', selectors: { instrument_id: 'TWSE:2330', fiscal_year: year, fiscal_quarter: quarter } }) },
+      } as any)
+    }
+    return Promise.resolve({ ...mainResult, requested_blocks: params.blocks } as any)
+  })
 
   render(<TaiwanResearchPanel symbol="2330" market="TW" open />)
 
-  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalled())
-  const firstCall = vi.mocked(researchApi.taiwan).mock.calls[0]
-  expect(firstCall[0]).toBe('2330')
-  expect(firstCall[1]).toEqual({ fiscal_year: expect.any(Number), fiscal_quarter: expect.any(Number) })
-  expect(firstCall[2]?.signal).toBeInstanceOf(AbortSignal)
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
+  const calls = vi.mocked(researchApi.taiwan).mock.calls
+  expect(calls[0][0]).toBe('2330')
+  expect(calls[0][1]?.blocks).not.toContain('financial_statements')
+  expect(calls[0][2]?.signal).toBeInstanceOf(AbortSignal)
+  expect(calls[1][1]).toEqual({ fiscal_year: scope.year, fiscal_quarter: scope.quarter, blocks: ['financial_statements'] })
+  expect(calls[1][2]?.signal).toBeInstanceOf(AbortSignal)
+  expect(screen.getByText(/可用期間待確認/)).toBeTruthy()
   fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2024' } })
-  fireEvent.change(screen.getByRole('combobox', { name: '財報季度' }), { target: { value: '4' } })
-
   await waitFor(() => expect(vi.mocked(researchApi.taiwan).mock.calls.at(-1)?.[1]?.fiscal_year).toBe(2024))
+  fireEvent.change(screen.getByRole('combobox', { name: '財報季度' }), { target: { value: '4' } })
+  await waitFor(() => expect(vi.mocked(researchApi.taiwan).mock.calls.at(-1)?.[1]?.fiscal_quarter).toBe(4))
   const lastCall = vi.mocked(researchApi.taiwan).mock.calls.at(-1)
-  expect(lastCall?.[1]?.fiscal_quarter).toBe(4)
-  expect(lastCall?.[1]?.blocks).toContain('financial_statements')
+  expect(lastCall?.[1]).toEqual({ fiscal_year: 2024, fiscal_quarter: 4, blocks: ['financial_statements'] })
   expect(lastCall?.[2]?.signal).toBeInstanceOf(AbortSignal)
+})
+
+it('shows the other research blocks while the independent financial request is still pending', async () => {
+  const fiscalScope = defaultFiscalScope()
+  let resolveFinancial!: (payload: any) => void
+  const delayedFinancial = new Promise<any>((resolve) => { resolveFinancial = resolve })
+  const main = researchEnvelope('TWSE:2330', {
+    valuation: block({ instrument_id: 'TWSE:2330', observations: [{ trade_date: '2026-10-08', close_price: '321.5000' }] }),
+  }, fiscalScope.year, fiscalScope.quarter)
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => params.blocks?.includes('financial_statements')
+    ? delayedFinancial
+    : Promise.resolve({ ...main, requested_blocks: params.blocks } as any))
+
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+
+  await screen.findByText('官方估值')
+  expect(screen.getByText('321.5000')).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toContain('正在載入')
+  expect(vi.mocked(researchApi.taiwan).mock.calls).toHaveLength(2)
+  expect(vi.mocked(researchApi.taiwan).mock.calls[0][1]?.blocks).not.toContain('financial_statements')
+  expect(vi.mocked(researchApi.taiwan).mock.calls[1][1]?.blocks).toEqual(['financial_statements'])
+
+  resolveFinancial(financialEnvelope('TWSE:2330', fiscalScope.year, fiscalScope.quarter, 'missing', 'never_collected'))
+  await screen.findByText(/此期尚無留存報表或有效發現證據/)
+})
+
+it('keeps a manually selected missing period and reports a source timeout without changing the selection', async () => {
+  const initialScope = defaultFiscalScope()
+  const main = researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) })
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
+    if (!params.blocks?.includes('financial_statements')) return Promise.resolve({ ...main, requested_blocks: params.blocks } as any)
+    const year = params.fiscal_year as number
+    const quarter = params.fiscal_quarter as number
+    return Promise.resolve(financialEnvelope(
+      'TWSE:2330', year, quarter,
+      year === 2026 && quarter === 3 ? 'error' : 'missing',
+      year === 2026 && quarter === 3 ? 'timeout' : 'never_collected',
+    ))
+  })
+
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText('來源讀取失敗（timeout）。')
+
+  fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2024' } })
+  await waitFor(() => expect(vi.mocked(researchApi.taiwan).mock.calls.at(-1)?.[1]?.fiscal_year).toBe(2024))
+  fireEvent.change(screen.getByRole('combobox', { name: '財報季度' }), { target: { value: '2' } })
+  await waitFor(() => expect(vi.mocked(researchApi.taiwan).mock.calls.at(-1)?.[1]?.fiscal_quarter).toBe(2))
+  await screen.findByText(/此期尚無留存報表或有效發現證據/)
+  expect((screen.getByRole('combobox', { name: '財報年度' }) as HTMLSelectElement).value).toBe('2024')
+  expect((screen.getByRole('combobox', { name: '財報季度' }) as HTMLSelectElement).value).toBe('2')
+
+  fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2026' } })
+  await waitFor(() => expect(vi.mocked(researchApi.taiwan).mock.calls.at(-1)?.[1]?.fiscal_year).toBe(2026))
+  fireEvent.change(screen.getByRole('combobox', { name: '財報季度' }), { target: { value: '3' } })
+  await screen.findByText('來源讀取失敗（timeout）。')
+  expect((screen.getByRole('combobox', { name: '財報年度' }) as HTMLSelectElement).value).toBe('2026')
+  expect((screen.getByRole('combobox', { name: '財報季度' }) as HTMLSelectElement).value).toBe('3')
+  expect(initialScope.year).toBeGreaterThan(2024)
+  expect(vi.mocked(researchApi.taiwan).mock.calls.filter(([, params]) => !params?.blocks?.includes('financial_statements'))).toHaveLength(1)
+})
+
+it('ignores a late financial response from the previously selected fiscal period', async () => {
+  const initialScope = defaultFiscalScope()
+  let resolveInitial!: (payload: any) => void
+  let resolveSelected!: (payload: any) => void
+  const delayedInitial = new Promise<any>((resolve) => { resolveInitial = resolve })
+  const delayedSelected = new Promise<any>((resolve) => { resolveSelected = resolve })
+  const main = researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) })
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
+    if (!params.blocks?.includes('financial_statements')) return Promise.resolve({ ...main, requested_blocks: params.blocks } as any)
+    return params.fiscal_year === 2024 ? delayedSelected : delayedInitial
+  })
+
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
+  fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2024' } })
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(3))
+  const selectedQuarter = Number((screen.getByRole('combobox', { name: '財報季度' }) as HTMLSelectElement).value)
+  resolveSelected(financialEnvelope('TWSE:2330', 2024, selectedQuarter, 'missing', 'never_collected'))
+  await screen.findByText(/此期尚無留存報表或有效發現證據/)
+  resolveInitial(financialEnvelope('TWSE:2330', initialScope.year, initialScope.quarter, 'available', 'selected_record_present', { member_filename: 'late-prior-period-report.html' }))
+  await Promise.resolve()
+
+  expect((screen.getByRole('combobox', { name: '財報年度' }) as HTMLSelectElement).value).toBe('2024')
+  expect(screen.queryByText(/late-prior-period-report\.html/)).toBeNull()
+  expect(vi.mocked(researchApi.taiwan).mock.calls[1][1]?.blocks).toEqual(['financial_statements'])
+  expect(vi.mocked(researchApi.taiwan).mock.calls[2][1]?.blocks).toEqual(['financial_statements'])
+})
+
+it.each(['issuer', 'period', 'conflicting envelope'] as const)('rejects a financial response with a wrong %s', async (mismatch) => {
+  const scope = defaultFiscalScope()
+  const main = researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) })
+  const finance = financialEnvelope('TWSE:2330', scope.year, scope.quarter, 'available', 'selected_record_present', { member_filename: 'wrong-scope.html' })
+  if (mismatch === 'issuer') finance.instrument_id = 'TWSE:2454'
+  else if (mismatch === 'period') finance.selectors.fiscal_quarter = scope.quarter === 1 ? 2 : 1
+  else finance.blocks.financial_statements.evidence.selectors.instrument_id = 'TWSE:2454'
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => Promise.resolve(
+    (params.blocks?.includes('financial_statements') ? finance : main) as any,
+  ))
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText(/財報回應標的或期別與所選查詢不符/)
+  expect(screen.queryByText(/wrong-scope\.html/)).toBeNull()
+  expect(screen.getByText('官方估值')).toBeTruthy()
+})
+
+it('retries a financial error by itself and does not reload the other research blocks', async () => {
+  const fiscalScope = defaultFiscalScope()
+  const main = researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) })
+  let financialCalls = 0
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
+    if (!params.blocks?.includes('financial_statements')) return Promise.resolve({ ...main, requested_blocks: params.blocks } as any)
+    financialCalls++
+    return financialCalls === 1
+      ? Promise.reject(new Error('財報上游逾時'))
+      : Promise.resolve(financialEnvelope('TWSE:2330', fiscalScope.year, fiscalScope.quarter, 'missing', 'never_collected'))
+  })
+
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText(/財報讀取失敗：財報上游逾時/)
+  fireEvent.click(screen.getByRole('button', { name: '重新載入財報' }))
+  await screen.findByText(/此期尚無留存報表或有效發現證據/)
+
+  expect(researchApi.taiwan).toHaveBeenCalledTimes(3)
+  expect(vi.mocked(researchApi.taiwan).mock.calls[0][1]?.blocks).not.toContain('financial_statements')
+  expect(vi.mocked(researchApi.taiwan).mock.calls[1][1]?.blocks).toEqual(['financial_statements'])
+  expect(vi.mocked(researchApi.taiwan).mock.calls[2][1]?.blocks).toEqual(['financial_statements'])
 })
 
 it('keeps compatible successful blocks and retries only failed blocks', async () => {
@@ -191,70 +373,114 @@ it('keeps compatible successful blocks and retries only failed blocks', async ()
   }, units: { paid_in_capital: 'TWD', issued_share_count: 'shares' } }, 'available', 'selected_record_present', {
     provider_scope: 'https://provider.example',
   })
-  vi.mocked(researchApi.taiwan)
-    .mockResolvedValueOnce({
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
+    if (params.blocks?.includes('financial_statements')) {
+      return Promise.resolve({
+        instrument_id: 'TWSE:2330', instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
+        selectors, requested_blocks: ['financial_statements'],
+        blocks: { financial_statements: block(null, 'missing', 'never_collected', { instrument_id: 'TWSE:2330', selectors: { instrument_id: 'TWSE:2330', fiscal_year: fiscalScope.year, fiscal_quarter: fiscalScope.quarter } }) },
+        limitations: { financial_statements: { status: 'limited_scope', message: '' } },
+      } as any)
+    }
+    if (params.blocks?.length === 1 && params.blocks[0] === 'company_profile') {
+      return Promise.resolve({
+        instrument_id: 'TWSE:2330',
+        instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
+        selectors, requested_blocks: ['company_profile'], blocks: { company_profile: refreshedProfile },
+        limitations: { financial_statements: { status: 'limited_scope', message: '' } },
+      } as any)
+    }
+    return Promise.resolve({
       instrument_id: 'TWSE:2330',
       instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
       selectors, requested_blocks: Object.keys(firstBlocks), blocks: firstBlocks,
       limitations: { financial_statements: { status: 'limited_scope', message: '' } },
     } as any)
-    .mockResolvedValueOnce({
-      instrument_id: 'TWSE:2330',
-      instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
-      selectors, requested_blocks: ['company_profile'], blocks: { company_profile: refreshedProfile },
-      limitations: { financial_statements: { status: 'limited_scope', message: '' } },
-    } as any)
+  })
 
   render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
   await screen.findByText('來源讀取逾時。')
   expect(screen.getByText('1234.50')).toBeTruthy()
 
   fireEvent.click(screen.getByRole('button', { name: '重新載入官方研究資料' }))
-  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
-  expect(vi.mocked(researchApi.taiwan).mock.calls[1][1]?.blocks).toEqual(['company_profile'])
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(3))
+  expect(vi.mocked(researchApi.taiwan).mock.calls[2][1]?.blocks).toEqual(['company_profile'])
   await screen.findByText('259323700670')
   expect(screen.getByText('1234.50')).toBeTruthy()
   expect(screen.queryByText('來源讀取逾時。')).toBeNull()
 })
 
-it('drops period-incompatible and other-provider blocks before merging a selective response', async () => {
+it('clears prior-period financial data while preserving independently loaded research', async () => {
   const initialScope = defaultFiscalScope()
   const selectors = currentSelectors(initialScope.year, initialScope.quarter)
   const newQuarter = initialScope.quarter
   let resolveNext!: (payload: any) => void
   const nextResponse = new Promise<any>((resolve) => { resolveNext = resolve })
-  vi.mocked(researchApi.taiwan)
-    .mockResolvedValueOnce({
-      instrument_id: 'TWSE:2330',
-      instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
-      selectors, requested_blocks: Object.keys(completeBlocks('https://old-provider.example')),
-      blocks: completeBlocks('https://old-provider.example', {
-        valuation: block({ observations: [{ trade_date: selectors.end_date, close_price: '1234.50' }] }),
-        financial_statements: block({ fiscal_year: initialScope.year, fiscal_quarter: initialScope.quarter,
-          report: { member_filename: 'old-period-report.html', semantic_revision_id: 'old-revision' }, facts: [] }),
-      }),
-      limitations: { financial_statements: { status: 'limited_scope', message: '' } },
-    } as any)
-    .mockReturnValueOnce(nextResponse)
+  const mainResult = {
+    instrument_id: 'TWSE:2330',
+    instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
+    selectors, requested_blocks: ['valuation'],
+    blocks: { valuation: block({ observations: [{ trade_date: selectors.end_date, close_price: '1234.50' }] }) },
+    limitations: { financial_statements: { status: 'limited_scope', message: '' } },
+  }
+  const priorFinancialResult = {
+    ...mainResult,
+    blocks: { financial_statements: block({ instrument_id: 'TWSE:2330', fiscal_year: initialScope.year, fiscal_quarter: initialScope.quarter,
+      qualification: { status: 'qualified' }, coverage: { status: 'AVAILABLE' }, report: { member_filename: 'old-period-report.html', semantic_revision_id: 'old-revision' }, facts: [], returned_fact_count: 0, total_fact_count: 0, truncated: false }, 'available', 'selected_record_present', { instrument_id: 'TWSE:2330', selectors: { instrument_id: 'TWSE:2330', fiscal_year: initialScope.year, fiscal_quarter: initialScope.quarter } }) },
+  }
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
+    if (params.blocks?.includes('financial_statements')) {
+      if (params.fiscal_year === 2024) return nextResponse
+      return Promise.resolve(priorFinancialResult as any)
+    }
+    return Promise.resolve(mainResult as any)
+  })
 
   render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
   await screen.findByText('1234.50')
   const oldPeriodLabel = new RegExp(`${initialScope.year}Q${initialScope.quarter} · 合併 · old-period-report.html`)
   expect(screen.getByText(oldPeriodLabel)).toBeTruthy()
   fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2024' } })
-  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(3))
   expect(screen.queryByText(oldPeriodLabel)).toBeNull()
   expect(screen.getByText('1234.50')).toBeTruthy()
-  expect(vi.mocked(researchApi.taiwan).mock.calls[1][1]?.blocks).toEqual(['financial_statements'])
+  expect(vi.mocked(researchApi.taiwan).mock.calls[2][1]?.blocks).toEqual(['financial_statements'])
   resolveNext({
     instrument_id: 'TWSE:2330',
     instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: '台積電' },
     selectors: currentSelectors(2024, newQuarter), requested_blocks: ['financial_statements'],
-    blocks: { financial_statements: block(null, 'missing', 'never_collected', { provider_scope: 'https://new-provider.example' }) },
+    blocks: { financial_statements: block({ instrument_id: 'TWSE:2330', fiscal_year: 2024, fiscal_quarter: newQuarter,
+      qualification: { status: 'qualified' }, coverage: { status: 'MISSING' }, report: null, facts: [], returned_fact_count: 0, total_fact_count: 0, truncated: false }, 'missing', 'never_collected', { provider_scope: 'https://new-provider.example', instrument_id: 'TWSE:2330', selectors: { instrument_id: 'TWSE:2330', fiscal_year: 2024, fiscal_quarter: newQuarter } }) },
     limitations: { financial_statements: { status: 'limited_scope', message: '' } },
   })
-  await waitFor(() => expect(screen.getByText(/TWSE:2330 · EQUITY · 區間/)).toBeTruthy())
-  expect(screen.queryByText('1234.50')).toBeNull()
+  await waitFor(() => expect(screen.getByText(/此期沒有留存報表/)).toBeTruthy())
+  expect((screen.getByRole('combobox', { name: '財報年度' }) as HTMLSelectElement).value).toBe('2024')
+  expect((screen.getByRole('combobox', { name: '財報季度' }) as HTMLSelectElement).value).toBe(String(newQuarter))
+  expect(screen.getByText('1234.50')).toBeTruthy()
+})
+
+it('does not retain another provider during a selective main research refresh', async () => {
+  const scope = defaultFiscalScope()
+  const oldBlocks = completeBlocks('https://old-provider.example', {
+    valuation: block({ observations: [{ trade_date: '2026-10-08', close_price: '987.654' }] }),
+    company_profile: block(null, 'error', 'timeout'),
+  })
+  delete oldBlocks.financial_statements
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
+    if (params.blocks?.includes('financial_statements')) return Promise.resolve(
+      financialEnvelope('TWSE:2330', scope.year, scope.quarter, 'missing', 'never_collected') as any,
+    )
+    if (params.blocks?.length === 1) return Promise.resolve(researchEnvelope('TWSE:2330', {
+      company_profile: block({ profile: null }, 'missing', 'profile_snapshot_not_retained', { provider_scope: 'https://new-provider.example' }),
+    }) as any)
+    return Promise.resolve(researchEnvelope('TWSE:2330', oldBlocks) as any)
+  })
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText('987.654')
+  fireEvent.click(screen.getByRole('button', { name: '重新載入官方研究資料' }))
+  await screen.findByText('來源尚未保留可用的公司資料快照。')
+  expect(screen.queryByText('987.654')).toBeNull()
+  expect(vi.mocked(researchApi.taiwan).mock.calls.at(-1)?.[1]?.blocks).toEqual(['company_profile'])
 })
 
 it('renders current and comparative source facts without deriving quarterly values or rescaling twice', () => {
@@ -397,7 +623,8 @@ it('explains ETF profile and revenue scope while showing the available blocks', 
 
   render(<TaiwanResearchPanel symbol="TPEX:006201" market="TW" open />)
 
-  await waitFor(() => expect(screen.getAllByText('不適用').length).toBe(4))
+  await waitFor(() => expect(screen.getAllByText('不適用').length).toBe(5))
+  expect(vi.mocked(researchApi.taiwan).mock.calls.filter(([, params]) => params?.blocks?.includes('financial_statements'))).toHaveLength(0)
   expect(screen.getByText('TPEx 估值來源目前只支援四位數證券代碼。')).toBeTruthy()
   expect(screen.getByText('1000')).toBeTruthy()
   expect(screen.getByText('ETF 不發布這類發行公司月營收資料。')).toBeTruthy()
@@ -407,10 +634,29 @@ it('explains ETF profile and revenue scope while showing the available blocks', 
   expect(screen.getByText(/月營收是月度公告資料/)).toBeTruthy()
 })
 
+it('does not probe more fiscal periods after the provider marks a security unsupported', async () => {
+  const scope = defaultFiscalScope()
+  const main = researchEnvelope('TWSE:006201', { valuation: block({ observations: [] }) }, scope.year, scope.quarter)
+  main.instrument.security_type = 'ETF'
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => params.blocks?.includes('financial_statements')
+    ? Promise.resolve(financialEnvelope('TWSE:006201', scope.year, scope.quarter, 'unsupported', 'financial_statements_security_type_not_supported'))
+    : Promise.resolve({ ...main, requested_blocks: params.blocks } as any))
+
+  render(<TaiwanResearchPanel symbol="TWSE:006201" market="TW" open />)
+  await screen.findByText(/不支援：financial_statements_security_type_not_supported/)
+  expect(screen.getByText(/財報來源 evidence/)).toBeTruthy()
+
+  fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2024' } })
+  await waitFor(() => expect((screen.getByRole('combobox', { name: '財報年度' }) as HTMLSelectElement).value).toBe('2024'))
+  expect(screen.getByText(/此財報來源不支援這類證券/)).toBeTruthy()
+  expect(screen.queryByText(/財報來源 evidence/)).toBeNull()
+  expect(vi.mocked(researchApi.taiwan).mock.calls).toHaveLength(2)
+})
+
 it('shows a provider error without inventing zero data', async () => {
   vi.mocked(researchApi.taiwan).mockRejectedValue(new Error('研究服務逾時'))
   render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
-  await waitFor(() => expect(screen.getByText('研究服務逾時')).toBeTruthy())
+  await waitFor(() => expect(screen.getByText(/研究資料讀取失敗：研究服務逾時/)).toBeTruthy())
   expect(screen.queryByText('0')).toBeNull()
 })
 
@@ -489,7 +735,10 @@ it('keeps dated flow coverage visible beside a timed-out profile without treatin
 
 it('ignores a late response for the prior venue of the same code', async () => {
   let resolveTwse!: (payload: any) => void
+  let resolveTwseFinancial!: (payload: any) => void
   const twse = new Promise<any>((resolve) => { resolveTwse = resolve })
+  const twseFinancial = new Promise<any>((resolve) => { resolveTwseFinancial = resolve })
+  const fiscalScope = defaultFiscalScope()
   const tpexPayload = {
     instrument_id: 'TPEX:2330',
     instrument: { venue: 'TPEX', symbol: '2330', security_type: 'EQUITY', is_active: true, name: 'TPEx 公司' },
@@ -504,12 +753,16 @@ it('ignores a late response for the prior venue of the same code', async () => {
     },
     limitations: { financial_statements: { status: 'limited_scope', message: 'TWSE industry-24 retained reports.' } },
   }
-  vi.mocked(researchApi.taiwan).mockReturnValueOnce(twse).mockResolvedValueOnce(tpexPayload as any)
+  vi.mocked(researchApi.taiwan).mockImplementation((requestedSymbol, params) => {
+    if (params.blocks?.includes('financial_statements')) return twseFinancial as any
+    return requestedSymbol === 'TPEX:2330' ? Promise.resolve(tpexPayload as any) : twse as any
+  })
   const view = render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
-  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(1))
-  view.rerender(<TaiwanResearchPanel symbol="TPEX:2330" market="TW" open />)
   await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
+  view.rerender(<TaiwanResearchPanel symbol="TPEX:2330" market="TW" open />)
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(3))
   await waitFor(() => expect(screen.getByText('TPEX:2330 · EQUITY · 區間 2026-09-08 至 2026-10-06')).toBeTruthy())
+  expect(vi.mocked(researchApi.taiwan).mock.calls[2][1]?.blocks).not.toContain('financial_statements')
   expect(screen.getByText('官方殖利率（%，股利年度 未提供）')).toBeTruthy()
   expect(screen.getByText('來源未提供股利年度，無法確認採計期間；此處保留官方原值。')).toBeTruthy()
   resolveTwse({
@@ -518,9 +771,17 @@ it('ignores a late response for the prior venue of the same code', async () => {
     selectors: tpexPayload.selectors,
     blocks: tpexPayload.blocks,
   })
+  resolveTwseFinancial({
+    instrument_id: 'TWSE:2330', instrument: { venue: 'TWSE', symbol: '2330', security_type: 'EQUITY', is_active: true, name: 'TWSE 公司' },
+    selectors: currentSelectors(fiscalScope.year, fiscalScope.quarter), requested_blocks: ['financial_statements'],
+    blocks: { financial_statements: block({ instrument_id: 'TWSE:2330', fiscal_year: fiscalScope.year, fiscal_quarter: fiscalScope.quarter,
+      qualification: { status: 'qualified' }, coverage: { status: 'AVAILABLE' }, report: { member_filename: 'late-twse-report.html' }, facts: [], returned_fact_count: 0, total_fact_count: 0, truncated: false }, 'available', 'selected_record_present', { instrument_id: 'TWSE:2330', selectors: { instrument_id: 'TWSE:2330', fiscal_year: fiscalScope.year, fiscal_quarter: fiscalScope.quarter } }) },
+  })
   await Promise.resolve()
   expect(screen.getByText('TPEX:2330 · EQUITY · 區間 2026-09-08 至 2026-10-06')).toBeTruthy()
   expect(screen.queryByText('TWSE:2330 · EQUITY · 區間 2026-09-08 至 2026-10-06')).toBeNull()
+  expect(screen.queryByText(/late-twse-report\.html/)).toBeNull()
+  expect(screen.getByText(/目前財報來源只支援符合範圍的上市公司/)).toBeTruthy()
 })
 
 it('shows producer failure, ambiguous empty detail and revision limits beside independent component states', () => {

@@ -1,6 +1,6 @@
 # TWUX-03：財報可用期間與獨立載入
 
-優先級：P2。狀態：in_progress。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
+優先級：P2。狀態：blocked（PanWatch 部分已交付）。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
 
 ## 問題與交付結果
 
@@ -53,8 +53,25 @@
 
 2026-10-10：開始 PanWatch 可獨立交付的載入／選期改善。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。上游索引未提供，完整驗收仍等待。
 
+2026-10-10：已完成可獨立交付步驟 2、3、5，交 coordinator 審查。主研究請求只選擇九個非財報區塊；財報另用既有 selective-block API、共用排程與快取讀取。兩邊有各自的載入、錯誤、重試、取消與標的／期間序號檢查。回應必須符合所選 canonical 標的及財年／季度才會呈現。索引未知時明示可用期間待確認；缺少、錯誤／逾時、unsupported 分開保留；使用者所選期別不自動回退。仍等待上游索引契約；最新已留存預設與整卡完整驗收維持 blocked，不得標 completed。
+
 ## Handoff
 
-尚未交付。
+PanWatch 部分已由 coordinator 獨立複核並提交，未部署；整卡維持 blocked，等待上游期別索引。改動為 `taiwan-research-panel.tsx`、`financial-statements-panel.tsx`、其前端回歸測試，以及[上游期別索引需求草案](../contracts/TWUX-03-retained-period-index.md)。
+
+主研究以九個非財報區塊單獨請求，刷新只處理主研究失敗區塊；選期與財報重試不重載主研究。財報載入、錯誤、重試、取消與主標的／期別序號隔離；只呈現 canonical 標的和財年／季度符合本次請求的回應。預設選擇的已結束季度只當查詢條件，介面明示可用期間待確認，不能推論它已留存或最新。missing／provider timeout／unsupported 保留各自結果，明選期別不回退。已知 TPEX 不送財報讀取；供應商回報證券類型不支援後，不再逐季請求，也不把舊期間的 unsupported evidence 假裝成新期別結果。財報來源事實、精度、尺度、單位與筆數呈現未改。
+
+財報 typed client 的上游查核只支持明確 issuer／year／quarter 讀取，無留存期別索引。coordinator 於 2026-10-10 執行單次唯讀檢查：執行中 twmd OpenAPI 只有 `/api/v1/financial-statements` 且必填年度／季度；`TWSE:2330` 2024Q4 回傳 `available`、394/394 facts，耗時 12.266 秒，執行映像 digest `sha256:c6bfd31e9fc2d65f1abfa95dffab789e648e7a0a37d8292df3eeb99d77543795`。這只證明該指定期別可讀；2026Q3 timeout 不證明缺少，不能據此稱最新已留存。
+
+驗證結果：
+
+- `frontend` 固定 Node 24.14.0／pnpm 9.15.9：`pnpm exec vitest run tests/TaiwanResearchPanel.test.tsx tests/api/research.test.ts`，23 passed。
+- `pnpm exec tsc -b` 通過；`pnpm build` 通過（只出現既有 Browserslist 資料過舊提示）。
+- `.venv/bin/python -m pytest -q tests/test_taiwan_research_service.py tests/test_taiwan_research_api.py packages/marketdata/tests/test_twmd_financial_statements.py`，71 passed；`packages/marketdata/tests/test_twmd.py`，17 passed。
+- `git diff --check` 通過。
+
+整卡仍 blocked on upstream：twmd 需正式確認並部署有界、唯讀、按 canonical issuer／venue／產業／報表 scope／statement selectors 篩選的 retained-period index，提供 period presence、coverage completeness、讀取狀態及 authority／revision 證據，與 latest discovery 分離，且不得觸發採集。恢復條件、範圍與查詢預算已記錄於期別索引需求草案；待雙方確認契約、typed client/UI 接入和多期唯讀驗收後，才能驗收「最新已留存」預設並完成整卡。
 
 2026-10-10 readiness：TWUX-02 已交付選擇性區塊契約，可開始步驟 2、3、5 的 PanWatch 獨立載入／明確選期與上游需求記錄。執行中的 twmd OpenAPI（HTTP 200、0.235 秒）財報路徑僅 /api/v1/financial-statements，沒有留存期別索引；最新已留存預設仍待外部契約與聯合驗收，不能將整卡標 completed。
+
+2026-10-10 coordinator 複核：補強回應各層標的／年度／季度的一致性核對，新增錯標的、錯季度與欄位衝突回歸；測試日期固定為 2026-10-09 台北時間，驗證 2026Q3 timeout 不變成 missing 或回退期別；保留主研究 selective refresh 的跨 provider 隔離回歸。獨立驗證 `pnpm exec vitest run tests/TaiwanResearchPanel.test.tsx tests/api/research.test.ts`：27 passed；`pnpm exec tsc -b`、`pnpm build` 通過；`.venv/bin/python -m pytest -q tests/test_taiwan_integration.py tests/test_taiwan_research_service.py tests/test_taiwan_research_api.py packages/marketdata/tests/test_twmd_financial_statements.py packages/marketdata/tests/test_twmd.py`：126 passed；`git diff --check` 通過。
