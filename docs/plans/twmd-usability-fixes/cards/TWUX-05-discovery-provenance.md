@@ -1,6 +1,6 @@
 # TWUX-05：熱門股榜保留行情來源資訊
 
-優先級：P2。狀態：ready。依賴：TWUX-01 的共用行情標示。
+優先級：P2。狀態：in_progress。依賴：TWUX-01 的共用行情標示。
 
 ## 問題與交付結果
 
@@ -38,7 +38,7 @@ provider 與 collector 已有 price_kind、trade_date、freshness，但熱門股
 
 ## Progress checkpoint
 
-2026-10-10：使用者已授權依序執行，等待前卡交付／依賴確認。
+2026-10-10：開始熱門榜 provenance 任務。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。依賴 TWUX-01 與前序 TWUX-04 已完成；TWUX-03 的期別索引 blocker 不影響本卡。保持現有排序／候選範圍，不增加逐股報價或上游採集。
 
 ## Handoff
 
