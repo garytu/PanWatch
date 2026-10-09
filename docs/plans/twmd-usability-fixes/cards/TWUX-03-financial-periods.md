@@ -1,6 +1,6 @@
 # TWUX-03：財報可用期間與獨立載入
 
-優先級：P2。狀態：ready。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
+優先級：P2。狀態：in_progress。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
 
 ## 問題與交付結果
 
@@ -51,7 +51,7 @@
 
 ## Progress checkpoint
 
-2026-10-10：使用者已授權依序執行，等待前卡交付／依賴確認。
+2026-10-10：開始 PanWatch 可獨立交付的載入／選期改善。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。上游索引未提供，完整驗收仍等待。
 
 ## Handoff
 
