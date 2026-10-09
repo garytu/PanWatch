@@ -52,7 +52,9 @@ describe('buildQuoteMarketContext', () => {
     const context = buildQuoteMarketContext({}, 'TW', null)
 
     expect(context.quoteLabel).toContain('行情日期未知')
+    expect(context.quoteLabel).not.toContain('行情日期 行情日期未知')
     expect(context.quoteLabel).toContain('價格種類未知')
+    expect(context.quoteLabel).not.toContain('價格種類 價格種類未知')
     expect(context.quoteLabel).toContain('可交易狀態未知')
     expect(context.marketLabel).toContain('日曆未知')
     expect(context.marketLabel).toContain('Asia/Taipei')

@@ -21,12 +21,36 @@ def instrument(identity, **extra):
 
 
 def snapshot(identity="TWSE:2330"):
-    return {"instrument_id": identity, "symbol": identity.split(":")[1], "name": "台積電", "provider": "TWSE",
+    trade_date = "2026-09-29"
+    coverage = {
+        "dataset": f"{identity.split(':')[0].lower()}_daily_price",
+        "partition_key": trade_date,
+        "status": "AVAILABLE",
+        "record_count": 100,
+        "acquired_at": "2026-09-29T06:30:01Z",
+    }
+    availability = {
+        "status": "available",
+        "latest_observation_date": trade_date,
+        "latest_observation_status": "traded",
+        "latest_observation_coverage": coverage,
+        "observation_coverage": coverage,
+        "latest_dataset_trade_date": trade_date,
+        "assessed_date_coverage": {
+            **coverage,
+            "partition_key": "2026-09-30",
+            "status": "EMPTY",
+            "record_count": 0,
+            "acquired_at": "2026-09-30T06:30:00Z",
+        },
+        "freshness": {"status": "current", "known_sessions_behind": 0},
+    }
+    return {"instrument_id": identity, "symbol": identity.split(":")[1], "name": "台積電", "provider": identity.split(":")[0],
             "close": "100", "open": "99", "high": "101", "low": "98", "volume": 10000, "value": 1000000,
-            "trade_date": "2026-09-29", "change": "2", "change_pct": "2.04", "change_basis": "raw_close",
+            "trade_date": trade_date, "change": "2", "change_pct": "2.04", "change_basis": "raw_close",
             "previous_observation": {"close": "98", "trade_date": "2026-09-24"}, "adjustment_mode": "raw",
-            "availability": {"status": "available", "freshness": {"status": "current"}},
-            "units": {"currency": "TWD", "volume": "shares"}}
+            "availability": availability,
+            "units": {"currency": "TWD", "price": "TWD", "volume": "shares", "value": "TWD"}}
 
 
 def live(identity="TWSE:2330", **extra):
@@ -169,6 +193,14 @@ def test_taiwan_discovery_uses_current_eod_not_unsubscribed_live_universe(monkey
     rows = md.hot_stocks(market="TW", mode="turnover", limit=10)
     assert [row.symbol for row in rows] == ["TPEX:6488", "TWSE:2330"]
     assert all(row.price_kind == "eod" for row in rows)
+    assert rows[0].trade_date == "2026-09-29"
+    assert rows[0].provider == "TPEX"
+    assert rows[0].adjustment_mode == "raw"
+    assert rows[0].change_basis == "raw_close"
+    assert rows[0].units == {"currency": "TWD", "price": "TWD", "volume": "shares", "value": "TWD"}
+    assert rows[0].availability["observation_coverage"]["acquired_at"] == "2026-09-29T06:30:01Z"
+    assert rows[0].availability["assessed_date_coverage"]["status"] == "EMPTY"
+    assert rows[0].freshness == rows[0].availability["freshness"]
 
     pool = md.taiwan_discovery_pool(mode="turnover", limit=10, max_universe_size=10)
     assert [row.symbol for row in pool.items] == ["TPEX:6488", "TWSE:2330"]

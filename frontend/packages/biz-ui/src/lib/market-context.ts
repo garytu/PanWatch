@@ -58,7 +58,7 @@ function observationTime(timestamp: string | null | undefined, timezone: string)
   return `來源觀察時間 ${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}`
 }
 
-function priceKindLabel(quote: QuoteMarketContextInput): string {
+function priceKindLabel(quote: QuoteMarketContextInput): string | null {
   const kind = nonEmpty(quote.price_kind)
   if (kind === 'eod') return 'eod（收盤行情）'
   if (kind === 'live') {
@@ -68,7 +68,7 @@ function priceKindLabel(quote: QuoteMarketContextInput): string {
     if (freshness === 'closed') return 'live（已收盤盤中報價）'
     return 'live（盤中報價時效未知）'
   }
-  return kind ? `${kind}（價格種類未映射）` : '價格種類未知'
+  return kind ? `${kind}（價格種類未映射）` : null
 }
 
 function tradabilityLabel(value: boolean | null | undefined): string {
@@ -100,12 +100,13 @@ export function buildQuoteMarketContext(
 ): QuoteMarketContext {
   const normalizedMarket = market.trim().toUpperCase()
   const timezone = nonEmpty(marketStatus?.timezone) || MARKET_TIMEZONES[normalizedMarket] || 'UTC'
-  const tradeDate = nonEmpty(quote.trade_date) || '行情日期未知'
+  const tradeDate = nonEmpty(quote.trade_date)
   const freshness = nonEmpty(quote.freshness?.status) || '未知'
   const availability = nonEmpty(quote.availability) || '未知'
+  const priceKind = priceKindLabel(quote)
   const quoteLabel = [
-    `行情日期 ${tradeDate}`,
-    `價格種類 ${priceKindLabel(quote)}`,
+    tradeDate ? `行情日期 ${tradeDate}` : '行情日期未知',
+    priceKind ? `價格種類 ${priceKind}` : '價格種類未知',
     `時效 ${freshness}`,
     `資料狀態 ${availability}`,
     tradabilityLabel(quote.usable_for_trading),

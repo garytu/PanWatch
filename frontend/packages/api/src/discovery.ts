@@ -22,6 +22,14 @@ export interface HotStockItem {
   change_pct: number | null
   turnover: number | null
   volume?: number | null
+  price_kind?: string | null
+  trade_date?: string | null
+  freshness?: { status?: string | null; [key: string]: unknown } | null
+  provider?: string | null
+  adjustment_mode?: string | null
+  change_basis?: string | null
+  units?: Record<string, string> | null
+  availability?: { status?: string | null; [key: string]: unknown } | string | null
 }
 
 export interface HotBoardItem {
@@ -29,6 +37,9 @@ export interface HotBoardItem {
   name: string
   change_pct: number | null
   turnover: number | null
+  constituent_provenance?: Array<Pick<HotStockItem,
+    'symbol' | 'market' | 'price_kind' | 'trade_date' | 'freshness' | 'provider' |
+    'adjustment_mode' | 'change_basis' | 'units' | 'availability'>>
 }
 
 export interface TaiwanOfficialDiscoveryRequest {

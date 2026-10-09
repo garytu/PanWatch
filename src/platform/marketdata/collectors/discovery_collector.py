@@ -16,6 +16,11 @@ class HotStock:
     price_kind: str | None = None
     trade_date: str | None = None
     freshness: dict | None = None
+    provider: str | None = None
+    adjustment_mode: str | None = None
+    change_basis: str | None = None
+    units: dict | None = None
+    availability: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +73,11 @@ class EastMoneyDiscoveryCollector:
                 price_kind=getattr(it, "price_kind", None),
                 trade_date=getattr(it, "trade_date", None),
                 freshness=getattr(it, "freshness", None),
+                provider=getattr(it, "provider", None),
+                adjustment_mode=getattr(it, "adjustment_mode", None),
+                change_basis=getattr(it, "change_basis", None),
+                units=getattr(it, "units", None),
+                availability=getattr(it, "availability", None),
             )
             for it in pkg_items
         ]
@@ -124,6 +134,14 @@ class EastMoneyDiscoveryCollector:
                 change_pct=it.change_pct,
                 turnover=it.turnover,
                 volume=it.volume,
+                price_kind=getattr(it, "price_kind", None),
+                trade_date=getattr(it, "trade_date", None),
+                freshness=getattr(it, "freshness", None),
+                provider=getattr(it, "provider", None),
+                adjustment_mode=getattr(it, "adjustment_mode", None),
+                change_basis=getattr(it, "change_basis", None),
+                units=getattr(it, "units", None),
+                availability=getattr(it, "availability", None),
             )
             for it in pkg_items
         ]

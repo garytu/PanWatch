@@ -1,0 +1,382 @@
+{
+  "date": "2026-10-10",
+  "query_service_image": "sha256:c6bfd31e9fc2d65f1abfa95dffab789e648e7a0a37d8292df3eeb99d77543795",
+  "seconds": 2.211,
+  "scope": "Three-identity process-local catalog fixture; actual source prices; actual new provider/collector/API projection, synthetic theme and constituent helpers. Not a whole-market ranking or deployed PanWatch acceptance.",
+  "logical_http_reads": {
+    "/api/v1/price-snapshots": 1
+  },
+  "pool_counts": {
+    "catalog_count": 3,
+    "scanned_instrument_count": 3,
+    "price_snapshot_request_count": 1,
+    "partial_scan": false
+  },
+  "metadata_matches": {
+    "TWSE:2330": {
+      "price_kind": true,
+      "trade_date": true,
+      "freshness": true,
+      "provider": true,
+      "adjustment_mode": true,
+      "change_basis": true,
+      "units": true,
+      "availability": true
+    },
+    "TPEX:5347": {
+      "price_kind": true,
+      "trade_date": true,
+      "freshness": true,
+      "provider": true,
+      "adjustment_mode": true,
+      "change_basis": true,
+      "units": true,
+      "availability": true
+    },
+    "TPEX:006201": {
+      "price_kind": true,
+      "trade_date": true,
+      "freshness": true,
+      "provider": true,
+      "adjustment_mode": true,
+      "change_basis": true,
+      "units": true,
+      "availability": true
+    }
+  },
+  "api_rows": [
+    {
+      "symbol": "TWSE:2330",
+      "market": "TW",
+      "name": "台積電",
+      "price": 2550.0,
+      "change_pct": -1.3539651837524178,
+      "turnover": 51508925000.0,
+      "volume": 20154000.0,
+      "price_kind": "eod",
+      "trade_date": "2026-10-08",
+      "freshness": {
+        "status": "current",
+        "reason": "covered_through_completed_date",
+        "assessed_through": "2026-10-09",
+        "evidence_start": "2025-10-09",
+        "evidence_truncated": false,
+        "calendar_days_old": 1,
+        "known_sessions_behind": 0,
+        "trading_days_behind": 0,
+        "missing_partition_count": 0
+      },
+      "provider": "TWSE",
+      "adjustment_mode": "raw",
+      "change_basis": "raw_close",
+      "units": {
+        "currency": "TWD",
+        "price": "TWD",
+        "volume": "shares",
+        "value": "TWD",
+        "transactions": "trades"
+      },
+      "availability": {
+        "status": "available",
+        "latest_observation_date": "2026-10-08",
+        "latest_observation_status": "traded",
+        "latest_observation_coverage": {
+          "dataset": "twse_daily_price",
+          "partition_key": "2026-10-08",
+          "status": "AVAILABLE",
+          "record_count": 1380,
+          "acquired_at": "2026-10-08T06:30:01+00:00",
+          "checksum": null
+        },
+        "observation_coverage": {
+          "dataset": "twse_daily_price",
+          "partition_key": "2026-10-08",
+          "status": "AVAILABLE",
+          "record_count": 1380,
+          "acquired_at": "2026-10-08T06:30:01+00:00",
+          "checksum": null
+        },
+        "latest_dataset_trade_date": "2026-10-08",
+        "assessed_date_coverage": {
+          "dataset": "twse_daily_price",
+          "partition_key": "2026-10-09",
+          "status": "EMPTY",
+          "record_count": 0,
+          "acquired_at": "2026-10-09T06:30:00+00:00",
+          "checksum": null
+        },
+        "freshness": {
+          "status": "current",
+          "reason": "covered_through_completed_date",
+          "assessed_through": "2026-10-09",
+          "evidence_start": "2025-10-09",
+          "evidence_truncated": false,
+          "calendar_days_old": 1,
+          "known_sessions_behind": 0,
+          "trading_days_behind": 0,
+          "missing_partition_count": 0
+        }
+      }
+    },
+    {
+      "symbol": "TPEX:5347",
+      "market": "TW",
+      "name": "世界",
+      "price": 186.5,
+      "change_pct": -1.8421052631578947,
+      "turnover": 2003588029.0,
+      "volume": 10670455.0,
+      "price_kind": "eod",
+      "trade_date": "2026-10-08",
+      "freshness": {
+        "status": "current",
+        "reason": "covered_through_completed_date",
+        "assessed_through": "2026-10-09",
+        "evidence_start": "2025-10-09",
+        "evidence_truncated": false,
+        "calendar_days_old": 1,
+        "known_sessions_behind": 0,
+        "trading_days_behind": 0,
+        "missing_partition_count": 0
+      },
+      "provider": "TPEX",
+      "adjustment_mode": "raw",
+      "change_basis": "raw_close",
+      "units": {
+        "currency": "TWD",
+        "price": "TWD",
+        "volume": "shares",
+        "value": "TWD",
+        "transactions": "trades"
+      },
+      "availability": {
+        "status": "available",
+        "latest_observation_date": "2026-10-08",
+        "latest_observation_status": "traded",
+        "latest_observation_coverage": {
+          "dataset": "tpex_daily_price",
+          "partition_key": "2026-10-08",
+          "status": "AVAILABLE",
+          "record_count": 12221,
+          "acquired_at": "2026-10-08T10:30:04+00:00",
+          "checksum": null
+        },
+        "observation_coverage": {
+          "dataset": "tpex_daily_price",
+          "partition_key": "2026-10-08",
+          "status": "AVAILABLE",
+          "record_count": 12221,
+          "acquired_at": "2026-10-08T10:30:04+00:00",
+          "checksum": null
+        },
+        "latest_dataset_trade_date": "2026-10-08",
+        "assessed_date_coverage": {
+          "dataset": "tpex_daily_price",
+          "partition_key": "2026-10-09",
+          "status": "EMPTY",
+          "record_count": 0,
+          "acquired_at": "2026-10-09T10:30:00+00:00",
+          "checksum": null
+        },
+        "freshness": {
+          "status": "current",
+          "reason": "covered_through_completed_date",
+          "assessed_through": "2026-10-09",
+          "evidence_start": "2025-10-09",
+          "evidence_truncated": false,
+          "calendar_days_old": 1,
+          "known_sessions_behind": 0,
+          "trading_days_behind": 0,
+          "missing_partition_count": 0
+        }
+      }
+    },
+    {
+      "symbol": "TPEX:006201",
+      "market": "TW",
+      "name": "元大富櫃50",
+      "price": 47.82,
+      "change_pct": -1.3613861386138615,
+      "turnover": 11629139.0,
+      "volume": 243420.0,
+      "price_kind": "eod",
+      "trade_date": "2026-10-08",
+      "freshness": {
+        "status": "current",
+        "reason": "covered_through_completed_date",
+        "assessed_through": "2026-10-09",
+        "evidence_start": "2025-10-09",
+        "evidence_truncated": false,
+        "calendar_days_old": 1,
+        "known_sessions_behind": 0,
+        "trading_days_behind": 0,
+        "missing_partition_count": 0
+      },
+      "provider": "TPEX",
+      "adjustment_mode": "raw",
+      "change_basis": "raw_close",
+      "units": {
+        "currency": "TWD",
+        "price": "TWD",
+        "volume": "shares",
+        "value": "TWD",
+        "transactions": "trades"
+      },
+      "availability": {
+        "status": "available",
+        "latest_observation_date": "2026-10-08",
+        "latest_observation_status": "traded",
+        "latest_observation_coverage": {
+          "dataset": "tpex_daily_price",
+          "partition_key": "2026-10-08",
+          "status": "AVAILABLE",
+          "record_count": 12221,
+          "acquired_at": "2026-10-08T10:30:04+00:00",
+          "checksum": null
+        },
+        "observation_coverage": {
+          "dataset": "tpex_daily_price",
+          "partition_key": "2026-10-08",
+          "status": "AVAILABLE",
+          "record_count": 12221,
+          "acquired_at": "2026-10-08T10:30:04+00:00",
+          "checksum": null
+        },
+        "latest_dataset_trade_date": "2026-10-08",
+        "assessed_date_coverage": {
+          "dataset": "tpex_daily_price",
+          "partition_key": "2026-10-09",
+          "status": "EMPTY",
+          "record_count": 0,
+          "acquired_at": "2026-10-09T10:30:00+00:00",
+          "checksum": null
+        },
+        "freshness": {
+          "status": "current",
+          "reason": "covered_through_completed_date",
+          "assessed_through": "2026-10-09",
+          "evidence_start": "2025-10-09",
+          "evidence_truncated": false,
+          "calendar_days_old": 1,
+          "known_sessions_behind": 0,
+          "trading_days_behind": 0,
+          "missing_partition_count": 0
+        }
+      }
+    }
+  ],
+  "derived_boards": [
+    {
+      "code": "TW_GAINERS",
+      "name": "台股漲幅領先",
+      "change_pct": -1.5191521951747247,
+      "change_amount": null,
+      "turnover": 53524142168.0,
+      "constituent_identities": [
+        "TWSE:2330",
+        "TPEX:006201",
+        "TPEX:5347"
+      ],
+      "constituent_metadata_matches_api": {
+        "TWSE:2330": true,
+        "TPEX:006201": true,
+        "TPEX:5347": true
+      }
+    },
+    {
+      "code": "TW_TURNOVER",
+      "name": "台股成交額領先",
+      "change_pct": -1.5191521951747247,
+      "change_amount": null,
+      "turnover": 53524142168.0,
+      "constituent_identities": [
+        "TWSE:2330",
+        "TPEX:5347",
+        "TPEX:006201"
+      ],
+      "constituent_metadata_matches_api": {
+        "TWSE:2330": true,
+        "TPEX:5347": true,
+        "TPEX:006201": true
+      }
+    },
+    {
+      "code": "TW_VOLATILITY",
+      "name": "台股波動活躍",
+      "change_pct": -1.5191521951747247,
+      "change_amount": null,
+      "turnover": 53524142168.0,
+      "constituent_identities": [
+        "TPEX:5347",
+        "TPEX:006201",
+        "TWSE:2330"
+      ],
+      "constituent_metadata_matches_api": {
+        "TPEX:5347": true,
+        "TPEX:006201": true,
+        "TWSE:2330": true
+      }
+    }
+  ],
+  "derived_constituents": [
+    {
+      "symbol": "TWSE:2330",
+      "market": "TW",
+      "price_kind": "eod",
+      "trade_date": "2026-10-08",
+      "freshness": {
+        "status": "current",
+        "reason": "covered_through_completed_date",
+        "assessed_through": "2026-10-09",
+        "evidence_start": "2025-10-09",
+        "evidence_truncated": false,
+        "calendar_days_old": 1,
+        "known_sessions_behind": 0,
+        "trading_days_behind": 0,
+        "missing_partition_count": 0
+      },
+      "provider": "TWSE"
+    },
+    {
+      "symbol": "TPEX:006201",
+      "market": "TW",
+      "price_kind": "eod",
+      "trade_date": "2026-10-08",
+      "freshness": {
+        "status": "current",
+        "reason": "covered_through_completed_date",
+        "assessed_through": "2026-10-09",
+        "evidence_start": "2025-10-09",
+        "evidence_truncated": false,
+        "calendar_days_old": 1,
+        "known_sessions_behind": 0,
+        "trading_days_behind": 0,
+        "missing_partition_count": 0
+      },
+      "provider": "TPEX"
+    },
+    {
+      "symbol": "TPEX:5347",
+      "market": "TW",
+      "price_kind": "eod",
+      "trade_date": "2026-10-08",
+      "freshness": {
+        "status": "current",
+        "reason": "covered_through_completed_date",
+        "assessed_through": "2026-10-09",
+        "evidence_start": "2025-10-09",
+        "evidence_truncated": false,
+        "calendar_days_old": 1,
+        "known_sessions_behind": 0,
+        "trading_days_behind": 0,
+        "missing_partition_count": 0
+      },
+      "provider": "TPEX"
+    }
+  ],
+  "limitations": [
+    "No source mutations, subscriptions, acquisition, database writes or deployment",
+    "Collector/API reuse the single real bounded pool for provenance comparison, without another source request",
+    "No source timestamps or contracts synthesized"
+  ]
+}

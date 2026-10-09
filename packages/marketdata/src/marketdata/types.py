@@ -118,6 +118,11 @@ class HotStock:
     price_kind: str | None = None
     trade_date: str | None = None
     freshness: dict = field(default_factory=dict)
+    provider: str | None = None
+    adjustment_mode: str | None = None
+    change_basis: str | None = None
+    units: dict = field(default_factory=dict)
+    availability: dict | None = None
 
 
 @dataclass(frozen=True)

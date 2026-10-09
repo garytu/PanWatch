@@ -2,6 +2,7 @@ import { DEFAULT_MARKET, MARKET_OPTIONS } from '@/lib/markets'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layers, RefreshCw } from 'lucide-react'
+import { buildQuoteMarketContext } from '@panwatch/biz-ui/lib/market-context'
 import {
   dashboardApi,
   discoveryApi,
@@ -47,6 +48,49 @@ const officialReasonLabels: Record<string, string> = {
 }
 
 const officialReasonLabel = (reason: string) => officialReasonLabels[reason] || reason
+
+function quoteMarketContext(stock: Pick<HotStockItem, 'market' | 'trade_date' | 'price_kind' | 'freshness' | 'availability'>) {
+  const availability = stock.availability
+  const availabilityStatus = typeof availability === 'string' ? availability : availability?.status
+  const context = buildQuoteMarketContext({
+    trade_date: stock.trade_date,
+    price_kind: stock.price_kind,
+    freshness: stock.freshness,
+    availability: typeof availabilityStatus === 'string' ? availabilityStatus : null,
+  }, stock.market || DEFAULT_MARKET)
+  return {
+    full: context.quoteLabel,
+    compact: context.quoteLabel.split(' · ').slice(0, 3).join(' · '),
+  }
+}
+
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00Z`)
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
+function unifiedCloseBoardLabel(stocks: HotStockItem[]): string | null {
+  if (stocks.length === 0) return null
+  const tradeDate = stocks[0]?.trade_date?.trim()
+  if (!tradeDate || !isIsoDate(tradeDate)) return null
+  if (!stocks.every((stock) => stock.price_kind === 'eod' && stock.trade_date?.trim() === tradeDate)) return null
+  const month = tradeDate.slice(5, 7)
+  const day = tradeDate.slice(8, 10)
+  return `${month}/${day} 收盤榜`
+}
+
+function constituentMarketLabel(board: HotBoardItem): string | null {
+  const constituents = board.constituent_provenance || []
+  if (constituents.length === 0) return null
+  const tradeDate = constituents[0]?.trade_date?.trim()
+  if (!tradeDate || !isIsoDate(tradeDate)
+      || !constituents.every((item) => item.price_kind === 'eod' && item.trade_date?.trim() === tradeDate)) {
+    return '成分股行情日期與種類依個股標示'
+  }
+  const dateLabel = quoteMarketContext(constituents[0]).compact.split(' · ')[0]?.replace('行情日期 ', '')
+  return `${dateLabel || tradeDate} 收盤行情`
+}
 
 export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
   const navigate = useNavigate()
@@ -262,6 +306,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
     () => (stocksMode === 'for_you' ? personalizedHotStocks.slice(0, 8) : hotStocks.slice(0, 8)),
     [stocksMode, personalizedHotStocks, hotStocks],
   )
+  const closeBoardLabel = useMemo(() => unifiedCloseBoardLabel(hotStocks), [hotStocks])
 
   useEffect(() => {
     loadDiscovery('boards', { silent: true })
@@ -473,7 +518,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
           ) : discoverTab === 'boards' ? (
             hotBoards.length === 0 ? (
               <div className="py-6 text-center text-[12px] text-muted-foreground">
-                {discoverError || (discoverMarket === 'CN' ? '暫無資料' : `${discoverMarket === 'HK' ? '港股' : '美股'}暫不提供板塊榜，已支援熱門股票`)}
+                {discoverError || (discoverMarket === 'CN' ? '暫無資料' : `${discoverMarket === 'HK' ? '港股' : discoverMarket === 'TW' ? '台股' : '美股'}暫不提供板塊榜，已支援熱門股票`)}
                 {discoverMarket !== 'CN' && (
                   <div className="mt-2">
                     <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setDiscoverTab('stocks')}>
@@ -487,6 +532,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
                 {hotBoards.slice(0, 6).map((b) => {
                   const pct = b.change_pct ?? 0
                   const color = pct > 0 ? 'text-rose-500' : pct < 0 ? 'text-emerald-500' : 'text-muted-foreground'
+                  const constituentLabel = constituentMarketLabel(b)
                   return (
                     <button
                       key={b.code}
@@ -497,6 +543,9 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
                       <div className="min-w-0">
                         <div className="truncate text-[13px] font-medium text-foreground">{b.name}</div>
                         <div className="truncate font-mono text-[11px] text-muted-foreground">{b.code}</div>
+                        {constituentLabel && (
+                          <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{constituentLabel}</div>
+                        )}
                       </div>
                       <div className={`font-mono text-[12px] font-semibold ${color}`}>{pct >= 0 ? '+' : ''}{pct.toFixed(2)}%</div>
                     </button>
@@ -508,12 +557,17 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
             <div className="py-6 text-center text-[12px] text-muted-foreground">{discoverError || '暫無資料'}</div>
           ) : (
             <div className="space-y-2">
+              <div className="px-1 text-[11px] text-muted-foreground">
+                {closeBoardLabel || '行情日期與種類依個股標示'}
+              </div>
               {stocksMode === 'for_you' && <div className="px-1 text-[11px] text-muted-foreground">根據持倉/自選/監控訊號/風格偏好排序</div>}
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {visibleHotStocks.slice(0, 6).map((s) => {
                   const pct = s.change_pct ?? 0
                   const color = pct > 0 ? 'text-rose-500' : pct < 0 ? 'text-emerald-500' : 'text-muted-foreground'
                   const reasons = (s as HotStockItem & { _reasons?: string[] })._reasons
+                  const context = quoteMarketContext(s)
+                  const visibleMarketContext = closeBoardLabel ? context.compact.split(' · ')[2] : context.compact
                   return (
                     <div
                       key={`${s.market || discoverMarket}:${s.symbol}`}
@@ -527,6 +581,9 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
                         {reasons && reasons.length > 0 && (
                           <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{reasons.join(' · ')}</div>
                         )}
+                        <div className="mt-0.5 truncate text-[10px] text-muted-foreground" title={context.full}>
+                          {visibleMarketContext}
+                        </div>
                       </div>
                       <div className="text-right">
                         <div className="font-mono text-[12px] text-foreground">{s.price != null ? s.price.toFixed(2) : '--'}</div>
@@ -554,6 +611,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
               {boardStocks.map((s) => {
                 const pct = s.change_pct ?? 0
                 const color = pct > 0 ? 'text-rose-500' : pct < 0 ? 'text-emerald-500' : 'text-muted-foreground'
+                const marketContext = quoteMarketContext(s)
                 return (
                   <div
                     key={s.symbol}
@@ -566,6 +624,9 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
                     <div className="min-w-0">
                       <div className="truncate text-[13px] font-medium text-foreground">{s.name}</div>
                       <div className="font-mono text-[11px] text-muted-foreground">{s.symbol}</div>
+                      <div className="mt-0.5 truncate text-[10px] text-muted-foreground" title={marketContext.full}>
+                        {marketContext.compact}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="font-mono text-[12px] text-foreground">{s.price != null ? s.price.toFixed(2) : '--'}</div>

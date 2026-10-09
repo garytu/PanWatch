@@ -908,6 +908,11 @@ class MarketData:
                 turnover=number(row.get("value")), volume=number(row.get("volume")),
                 price_kind="eod", trade_date=row.get("trade_date"),
                 freshness=(row.get("availability") or {}).get("freshness") or {},
+                provider=row.get("provider"),
+                adjustment_mode=row.get("adjustment_mode"),
+                change_basis=row.get("change_basis"),
+                units=row.get("units") or {},
+                availability=row.get("availability"),
             )
             for row in rows[:selected_limit]
         ]

@@ -12,7 +12,7 @@
 | TWUX-02 | P1 | [研究讀取排程與區塊重試](cards/TWUX-02-research-loading.md) | completed | 無 |
 | TWUX-03 | P2 | [財報可用期間與獨立載入](cards/TWUX-03-financial-periods.md) | blocked（部分已交付） | TWUX-02 已完成；最新留存預設等待 twmd 期別索引 |
 | TWUX-04 | P2 | [歷史分 K 日期選擇](cards/TWUX-04-intraday-dates.md) | completed | 無；TWUX-01 已完成 |
-| TWUX-05 | P2 | [熱門股榜保留行情來源資訊](cards/TWUX-05-discovery-provenance.md) | in_progress | TWUX-01 的共用行情標示 |
+| TWUX-05 | P2 | [熱門股榜保留行情來源資訊](cards/TWUX-05-discovery-provenance.md) | completed | TWUX-01 的共用行情標示 |
 
 建議交付順序：**TWUX-01 → TWUX-02 → TWUX-04 → TWUX-05 → TWUX-03**。財報可用期的契約確認可提前進行；不需要等上游擴充，才開始其他四項修正。
 
@@ -69,3 +69,12 @@ pnpm build
 若在隔離容器測試，先初始化測試需要的認證與資料庫。測試檔名若標示「新增」，代表待實作，不表示檔案已存在。
 
 完成卡片時記錄實際修改、測試命令／結果、唯讀實測的服務版本與資料日期，以及剩餘限制。功能完成後的 Docker 重建、切換與盤中驗收另依當次指令執行；本次沒有重建或部署。
+
+## 本次交付與整體驗證
+
+2026-10-10 按使用者要求依 TWUX-01 → 02 → 03 → 04 → 05 執行，01／02／04／05 completed；03 的獨立載入與明確選期已交付，完整卡仍 blocked，等待 [twmd 留存期別索引契約](contracts/TWUX-03-retained-period-index.md) 落實。沒有把已知 2024Q4 或最近完成季度冒稱最新可用期。
+
+- `.venv/bin/python -m pytest -q tests packages/marketdata/tests`：1465 passed、3 skipped、14 warnings，19.12 秒。
+- `pnpm exec vitest run`：27 test files／113 tests passed；`pnpm exec tsc -b`、`pnpm build` 通過，使用固定 Node 24.14.0／pnpm 9.15.9。
+- `git diff --check` 通過。各卡記錄獨立審查、相關測試、唯讀資料日期與版本。原有未提交檔案不納入本次交付。
+- 沒有合併、重建或部署；盤中 ready／PW-14 驗收仍另行處理。03 待上游提供有界索引、版本與 fixtures 後，接入選期及共同唯讀驗收，才可完成完整卡。

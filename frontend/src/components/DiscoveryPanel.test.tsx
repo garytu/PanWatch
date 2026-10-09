@@ -11,6 +11,7 @@ const { dashboardApi, discoveryApi } = vi.hoisted(() => ({
   discoveryApi: {
     listHotBoards: vi.fn(),
     listHotStocks: vi.fn(),
+    listBoardStocks: vi.fn(),
     screenTaiwanOfficialStocks: vi.fn(),
   },
 }))
@@ -89,6 +90,7 @@ describe('Taiwan official discovery UI', () => {
     dashboardApi.portfolioSummary.mockResolvedValue({ accounts: [] })
     discoveryApi.listHotStocks.mockResolvedValue([])
     discoveryApi.listHotBoards.mockResolvedValue([])
+    discoveryApi.listBoardStocks.mockReset()
     discoveryApi.screenTaiwanOfficialStocks.mockReset()
   })
 
@@ -151,6 +153,166 @@ it('discards the old response after conditions change and allows a new screen', 
   const calls = discoveryApi.screenTaiwanOfficialStocks.mock.calls
   expect(calls[calls.length - 1]?.[0]).toEqual({ pe_max: 10, limit: 20 })
   cleanup()
+})
+
+it('labels one shared EOD date while keeping each row freshness visible', async () => {
+  const stocks = Array.from({ length: 3 }, (_, index) => ({
+    symbol: `TWSE:${2330 + index}`,
+    market: 'TW',
+    name: `公司${index}`,
+    price: 100,
+    change_pct: 1,
+    turnover: 1000,
+    price_kind: 'eod',
+    trade_date: '2026-10-08',
+    freshness: { status: index === 1 ? 'stale' : 'current' },
+    provider: 'TWSE',
+    units: { volume: 'shares' },
+    availability: { status: 'available', observation_coverage: { acquired_at: '2026-10-08T06:30:01Z' } },
+  }))
+  discoveryApi.listHotStocks.mockReset()
+  discoveryApi.listHotStocks.mockImplementation(async ({ mode }) => stocks.map((item) => ({ ...item, source_mode: mode })))
+
+  render(<DiscoveryPanel monitorStocks={[]} onOpenStock={vi.fn()} />)
+
+  expect(await screen.findByText('10/08 收盤榜')).toBeTruthy()
+  expect(screen.getByText('時效 stale')).toBeTruthy()
+  expect(discoveryApi.listHotStocks).toHaveBeenCalledTimes(2)
+  expect(discoveryApi.listHotStocks).toHaveBeenNthCalledWith(1, { market: 'TW', mode: 'turnover', limit: 20 })
+  expect(discoveryApi.listHotStocks).toHaveBeenNthCalledWith(2, { market: 'TW', mode: 'gainers', limit: 20 })
+})
+
+it('checks the full combined list and shows mixed, duplicate-winning, and legacy provenance per row', async () => {
+  const turnoverRows = Array.from({ length: 7 }, (_, index) => ({
+    symbol: `TWSE:${2400 + index}`,
+    market: 'TW',
+    name: `成交額${index}`,
+    price: 100,
+    change_pct: 1,
+    turnover: 1000,
+    price_kind: 'eod',
+    trade_date: index === 6 ? '2026-10-07' : '2026-10-08',
+    freshness: { status: 'current' },
+  }))
+  const winningDuplicate = {
+    ...turnoverRows[0],
+    name: '漲幅榜來源勝出',
+    price_kind: 'live',
+    trade_date: '2026-10-07',
+    freshness: { status: 'stale' },
+    provider: 'twse-live',
+    availability: { status: 'available' },
+  }
+  discoveryApi.listHotStocks.mockReset()
+  discoveryApi.listHotStocks.mockImplementation(async ({ mode }) => mode === 'turnover'
+    ? turnoverRows
+    : [winningDuplicate])
+
+  render(<DiscoveryPanel monitorStocks={[]} onOpenStock={vi.fn()} />)
+
+  expect(await screen.findByText('行情日期與種類依個股標示')).toBeTruthy()
+  expect(screen.queryByText('10/08 收盤榜')).toBeNull()
+  expect(screen.getByText('漲幅榜來源勝出')).toBeTruthy()
+  expect(screen.getByText('行情日期 2026-10-07 · 價格種類 live（過期盤中報價） · 時效 stale')).toBeTruthy()
+  expect(screen.queryByText('成交額6')).toBeNull()
+  expect(screen.getAllByText('行情日期 2026-10-08 · 價格種類 eod（收盤行情） · 時效 current').length).toBeGreaterThan(0)
+  expect(discoveryApi.listHotStocks).toHaveBeenCalledTimes(2)
+  expect(discoveryApi.listHotStocks).toHaveBeenNthCalledWith(1, { market: 'TW', mode: 'turnover', limit: 20 })
+  expect(discoveryApi.listHotStocks).toHaveBeenNthCalledWith(2, { market: 'TW', mode: 'gainers', limit: 20 })
+})
+
+it('marks rows from an old cache with missing provenance as unknown', async () => {
+  discoveryApi.listHotStocks.mockReset()
+  discoveryApi.listHotStocks.mockImplementation(async ({ mode }) => mode === 'turnover' ? [{
+    symbol: 'TPEX:006201', market: 'TW', name: '舊快取 ETF', price: 20, change_pct: 1, turnover: 100,
+  }] : [])
+
+  render(<DiscoveryPanel monitorStocks={[]} onOpenStock={vi.fn()} />)
+
+  expect(await screen.findByText('舊快取 ETF')).toBeTruthy()
+  expect(screen.getByText('行情日期未知 · 價格種類未知 · 時效 未知')).toBeTruthy()
+  expect(screen.getByText('行情日期與種類依個股標示')).toBeTruthy()
+})
+
+it('does not title an EOD board from six visible rows when a seventh row has another date', async () => {
+  const rows = Array.from({ length: 7 }, (_, index) => ({
+    symbol: `TWSE:${2500 + index}`,
+    market: 'TW',
+    name: `收盤榜${index}`,
+    price: 100,
+    change_pct: 1,
+    turnover: 1000,
+    price_kind: 'eod',
+    trade_date: index === 6 ? '2026-10-07' : '2026-10-08',
+    freshness: { status: 'current' },
+  }))
+  discoveryApi.listHotStocks.mockReset()
+  discoveryApi.listHotStocks.mockImplementation(async ({ mode }) => mode === 'turnover' ? rows : [])
+
+  render(<DiscoveryPanel monitorStocks={[]} onOpenStock={vi.fn()} />)
+
+  expect(await screen.findByText('行情日期與種類依個股標示')).toBeTruthy()
+  expect(screen.queryByText('10/08 收盤榜')).toBeNull()
+  expect(screen.queryByText('收盤榜6')).toBeNull()
+  expect(screen.getAllByText('行情日期 2026-10-08 · 價格種類 eod（收盤行情） · 時效 current').length).toBeGreaterThan(0)
+})
+
+it('labels synthetic themes with a shared date only when every constituent agrees', async () => {
+  discoveryApi.listHotBoards.mockResolvedValue([
+    {
+      code: 'TW_GAINERS', name: '台股漲幅領先', change_pct: 2, turnover: 300,
+      constituent_provenance: [
+        { symbol: 'TWSE:2330', market: 'TW', price_kind: 'eod', trade_date: '2026-10-08', freshness: { status: 'current' } },
+        { symbol: 'TPEX:5347', market: 'TW', price_kind: 'eod', trade_date: '2026-10-08', freshness: { status: 'current' } },
+      ],
+    },
+    {
+      code: 'TW_TURNOVER', name: '台股成交額領先', change_pct: 1, turnover: 200,
+      constituent_provenance: [
+        { symbol: 'TWSE:2330', market: 'TW', price_kind: 'eod', trade_date: '2026-10-08', freshness: { status: 'current' } },
+        { symbol: 'TPEX:5347', market: 'TW', price_kind: 'live', trade_date: '2026-10-07', freshness: { status: 'stale' } },
+      ],
+    },
+  ])
+
+  render(<DiscoveryPanel monitorStocks={[]} onOpenStock={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '熱門板塊' }))
+
+  expect(await screen.findByText('2026-10-08 收盤行情')).toBeTruthy()
+  expect(screen.getByText('成分股行情日期與種類依個股標示')).toBeTruthy()
+})
+
+it.each([false, true])('preserves real constituent dates in the theme and dialog (mixed=%s)', async (mixed) => {
+  const stocks = [
+    { symbol: 'TWSE:2330', market: 'TW', name: '來源公司', price: 100, change_pct: 2, turnover: 1e8,
+      price_kind: 'eod', trade_date: '2026-10-08', freshness: { status: 'current' }, provider: 'TWSE' },
+    { symbol: 'TPEX:006201', market: 'TW', name: '來源ETF', price: 20, change_pct: 1, turnover: 1e7,
+      price_kind: 'eod', trade_date: mixed ? '2026-10-07' : '2026-10-08', freshness: { status: 'current' }, provider: 'TPEX' },
+  ]
+  discoveryApi.listHotBoards.mockResolvedValue([
+    { code: 'TW_GAINERS', name: '台股主題', change_pct: 1.5, turnover: 1.1e8, constituent_provenance: stocks },
+  ])
+  discoveryApi.listBoardStocks.mockResolvedValue(stocks)
+  const onOpenStock = vi.fn()
+  render(<DiscoveryPanel monitorStocks={[]} onOpenStock={onOpenStock} />)
+  await waitFor(() => expect(discoveryApi.listHotBoards).toHaveBeenCalled())
+  fireEvent.click(screen.getByRole('button', { name: '熱門板塊' }))
+  const theme = await screen.findByRole('button', { name: /台股主題/ })
+  expect(within(theme).getByText(mixed ? '成分股行情日期與種類依個股標示' : '2026-10-08 收盤行情')).toBeTruthy()
+  fireEvent.click(theme)
+  const dialog = await screen.findByRole('dialog')
+  await waitFor(() => expect(within(dialog).getByText('來源ETF')).toBeTruthy())
+  expect(within(dialog).getAllByText(`行情日期 ${mixed ? '2026-10-07' : '2026-10-08'} · 價格種類 eod（收盤行情） · 時效 current`)).toHaveLength(mixed ? 1 : 2)
+  fireEvent.click(within(dialog).getByText('來源ETF'))
+  expect(onOpenStock).toHaveBeenCalledWith('TPEX:006201', 'TW', '來源ETF', false)
+  expect(discoveryApi.listBoardStocks).toHaveBeenCalledWith('TW_GAINERS', { mode: 'gainers', limit: 20 })
+})
+
+it('keeps an empty cached list free of a closing-date heading', async () => {
+  discoveryApi.listHotStocks.mockReset().mockResolvedValue([])
+  render(<DiscoveryPanel monitorStocks={[]} onOpenStock={vi.fn()} />)
+  await waitFor(() => expect(discoveryApi.listHotStocks).toHaveBeenCalledTimes(2))
+  expect(screen.queryByText(/收盤榜/)).toBeNull()
 })
 
 })

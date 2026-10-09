@@ -25,6 +25,17 @@ def test_fetch_hot_stocks_uses_marketdata(monkeypatch):
                     change_pct=1.23,
                     turnover=999999.0,
                     volume=1000.0,
+                    price_kind="eod",
+                    trade_date="2026-10-08",
+                    freshness={"status": "current"},
+                    provider="TWSE",
+                    adjustment_mode="raw",
+                    change_basis="raw_close",
+                    units={"currency": "TWD", "volume": "shares"},
+                    availability={
+                        "status": "available",
+                        "observation_coverage": {"acquired_at": "2026-10-08T06:30:01Z"},
+                    },
                 )
             ]
 
@@ -48,6 +59,14 @@ def test_fetch_hot_stocks_uses_marketdata(monkeypatch):
     assert item.change_pct == 1.23
     assert item.turnover == 999999.0
     assert item.volume == 1000.0
+    assert item.price_kind == "eod"
+    assert item.trade_date == "2026-10-08"
+    assert item.freshness == {"status": "current"}
+    assert item.provider == "TWSE"
+    assert item.adjustment_mode == "raw"
+    assert item.change_basis == "raw_close"
+    assert item.units == {"currency": "TWD", "volume": "shares"}
+    assert item.availability["observation_coverage"]["acquired_at"] == "2026-10-08T06:30:01Z"
 
 
 def test_fetch_hot_boards_uses_marketdata(monkeypatch):
@@ -113,6 +132,14 @@ def test_fetch_board_stocks_uses_marketdata(monkeypatch):
                     change_pct=3.3,
                     turnover=55555.0,
                     volume=200.0,
+                    price_kind="eod",
+                    trade_date="2026-10-08",
+                    freshness={"status": "current"},
+                    provider="TWSE",
+                    adjustment_mode="raw",
+                    change_basis="raw_close",
+                    units={"currency": "CNY", "volume": "shares"},
+                    availability={"status": "available"},
                 )
             ]
 
@@ -136,6 +163,14 @@ def test_fetch_board_stocks_uses_marketdata(monkeypatch):
     assert item.change_pct == 3.3
     assert item.turnover == 55555.0
     assert item.volume == 200.0
+    assert item.price_kind == "eod"
+    assert item.trade_date == "2026-10-08"
+    assert item.freshness == {"status": "current"}
+    assert item.provider == "TWSE"
+    assert item.adjustment_mode == "raw"
+    assert item.change_basis == "raw_close"
+    assert item.units == {"currency": "CNY", "volume": "shares"}
+    assert item.availability == {"status": "available"}
 
 
 def test_taiwan_empty_live_discovery_does_not_fall_back_to_local_snapshot(monkeypatch):
@@ -154,6 +189,151 @@ def test_taiwan_empty_live_discovery_does_not_fall_back_to_local_snapshot(monkey
         collector=_Collector(), db=None, market="TW", mode="turnover", limit=20,
     ))
     assert result == []
+
+
+def test_hot_stocks_api_preserves_provenance_and_leaves_legacy_cache_unknown(monkeypatch):
+    from src.modules.market.api import discovery
+
+    availability = {
+        "status": "available",
+        "latest_observation_coverage": {
+            "dataset": "twse_daily_price",
+            "partition_key": "2026-10-08",
+            "status": "AVAILABLE",
+            "acquired_at": "2026-10-08T06:30:01Z",
+        },
+        "freshness": {"status": "current", "known_sessions_behind": 0},
+    }
+    item = dc.HotStock(
+        symbol="TWSE:2330", market="TW", name="台積電", price=100,
+        change_pct=1.5, turnover=1000, volume=10, price_kind="eod",
+        trade_date="2026-10-08", freshness=availability["freshness"],
+        provider="TWSE", adjustment_mode="raw", change_basis="raw_close",
+        units={"currency": "TWD", "volume": "shares"}, availability=availability,
+    )
+
+    class _Collector:
+        calls = 0
+
+        async def fetch_hot_stocks(self, **_kwargs):
+            self.calls += 1
+            return [item]
+
+    collector = _Collector()
+    monkeypatch.setattr(discovery, "EastMoneyDiscoveryCollector", lambda **_kwargs: collector)
+    monkeypatch.setattr(discovery, "_resolve_proxy", lambda: "")
+    discovery._cache.clear()
+
+    expected = {
+        "symbol": "TWSE:2330", "market": "TW", "name": "台積電", "price": 100,
+        "change_pct": 1.5, "turnover": 1000, "volume": 10, "price_kind": "eod",
+        "trade_date": "2026-10-08", "freshness": availability["freshness"],
+        "provider": "TWSE", "adjustment_mode": "raw", "change_basis": "raw_close",
+        "units": {"currency": "TWD", "volume": "shares"}, "availability": availability,
+    }
+    result = asyncio.run(discovery.get_hot_stocks(market="TW", db=None))
+    assert result == [expected]
+    assert asyncio.run(discovery.get_hot_stocks(market="TW", db=None)) == [expected]
+    assert collector.calls == 1
+
+    legacy = [{
+        "symbol": "TWSE:2330", "market": "TW", "name": "舊快取",
+        "price": 100, "change_pct": 1.5, "turnover": 1000, "volume": 10,
+    }]
+    discovery._cache_set("stocks:TW:gainers:20", legacy)
+    assert asyncio.run(discovery.get_hot_stocks(market="TW", mode="gainers", db=None)) == legacy
+    assert collector.calls == 1
+    discovery._cache.clear()
+
+    class _LegacyRow:
+        symbol = "TPEX:006201"
+        market = "TW"
+        name = "舊供應商"
+        price = 20
+        change_pct = 0
+        turnover = 100
+        volume = 10
+
+    class _LegacyCollector:
+        async def fetch_hot_stocks(self, **_kwargs):
+            return [_LegacyRow()]
+
+    monkeypatch.setattr(discovery, "EastMoneyDiscoveryCollector", lambda **_kwargs: _LegacyCollector())
+    result = asyncio.run(discovery.get_hot_stocks(market="TW", mode="gainers", db=None))
+    assert result[0]["symbol"] == "TPEX:006201"
+    assert result[0]["price_kind"] is None
+    assert result[0]["trade_date"] is None
+    assert result[0]["freshness"] is None
+    assert result[0]["provider"] is None
+    discovery._cache.clear()
+
+
+def test_synthetic_boards_keep_each_constituents_provenance(monkeypatch):
+    from src.modules.market.api import discovery
+
+    availability = {"status": "available", "observation_coverage": {"acquired_at": "2026-10-08T06:30:01Z"}}
+    items = [
+        dc.HotStock(
+            symbol="TWSE:2330", market="TW", name="台積電", price=100,
+            change_pct=5, turnover=300, volume=30, price_kind="eod", trade_date="2026-10-08",
+            freshness={"status": "current"}, provider="TWSE", adjustment_mode="raw",
+            change_basis="raw_close", units={"volume": "shares"}, availability=availability,
+        ),
+        dc.HotStock(
+            symbol="TPEX:5347", market="TW", name="世界", price=50,
+            change_pct=4, turnover=200, volume=20, price_kind="live", trade_date="2026-10-07",
+            freshness={"status": "stale"}, provider="tpex-live", adjustment_mode="raw",
+            change_basis="live_reference", units={"volume": "shares"},
+            availability={"status": "available", "freshness": {"status": "stale"}},
+        ),
+        dc.HotStock(
+            symbol="TPEX:006201", market="TW", name="ETF", price=20,
+            change_pct=3, turnover=100, volume=10,
+        ),
+    ]
+
+    class _Collector:
+        async def fetch_hot_boards(self, **_kwargs):
+            return []
+
+        async def fetch_hot_stocks(self, **_kwargs):
+            return items
+
+    monkeypatch.setattr(discovery, "EastMoneyDiscoveryCollector", lambda **_kwargs: _Collector())
+    monkeypatch.setattr(discovery, "_resolve_proxy", lambda: "")
+    monkeypatch.setattr(discovery, "_watchlist_symbols", lambda *_args: set())
+    discovery._cache.clear()
+
+    boards = asyncio.run(discovery.get_hot_boards(market="TW", mode="gainers", limit=12, db=None))
+    gainers = next(board for board in boards if board["code"] == "TW_GAINERS")
+    provenance = gainers["constituent_provenance"]
+    assert [row["symbol"] for row in provenance] == ["TWSE:2330", "TPEX:5347", "TPEX:006201"]
+    assert provenance[0]["trade_date"] == "2026-10-08"
+    assert provenance[0]["availability"] == availability
+    assert provenance[1]["trade_date"] == "2026-10-07"
+    assert provenance[1]["freshness"] == {"status": "stale"}
+    assert provenance[2]["trade_date"] is None
+    constituents = discovery._stocks_by_synthetic_board(
+        code="TW_GAINERS", market="TW", stocks=[{
+            "symbol": item.symbol,
+            "market": item.market,
+            "name": item.name,
+            "change_pct": item.change_pct,
+            "turnover": item.turnover,
+            "trade_date": item.trade_date,
+            "price_kind": item.price_kind,
+            "freshness": item.freshness,
+            "provider": item.provider,
+            "adjustment_mode": item.adjustment_mode,
+            "change_basis": item.change_basis,
+            "units": item.units,
+            "availability": item.availability,
+        } for item in items], watchlist=set(), limit=20,
+    )
+    assert [row["symbol"] for row in constituents] == ["TWSE:2330", "TPEX:5347", "TPEX:006201"]
+    assert constituents[1]["trade_date"] == "2026-10-07"
+    assert constituents[2]["price_kind"] is None
+    discovery._cache.clear()
 
 
 def test_taiwan_official_screen_route_is_opt_in_and_returns_result_envelope(monkeypatch):

@@ -105,6 +105,14 @@ def _latest_snapshot_stocks(db: Session, market: str, limit: int = 120) -> list[
                 "change_pct": _pick_num(quote, ["change_pct", "pct_change", "chg_pct"]),
                 "turnover": _pick_num(quote, ["turnover", "amount", "turnover_value"]),
                 "volume": _pick_num(quote, ["volume", "vol"]),
+                "price_kind": quote.get("price_kind"),
+                "trade_date": quote.get("trade_date"),
+                "freshness": quote.get("freshness"),
+                "provider": quote.get("provider"),
+                "adjustment_mode": quote.get("adjustment_mode"),
+                "change_basis": quote.get("change_basis"),
+                "units": quote.get("units"),
+                "availability": quote.get("availability"),
             }
         )
     return out
@@ -130,6 +138,14 @@ async def _hot_stocks_live_or_snapshot(
                 "change_pct": it.change_pct,
                 "turnover": it.turnover,
                 "volume": it.volume,
+                "price_kind": getattr(it, "price_kind", None),
+                "trade_date": getattr(it, "trade_date", None),
+                "freshness": getattr(it, "freshness", None),
+                "provider": getattr(it, "provider", None),
+                "adjustment_mode": getattr(it, "adjustment_mode", None),
+                "change_basis": getattr(it, "change_basis", None),
+                "units": getattr(it, "units", None),
+                "availability": getattr(it, "availability", None),
             }
             for it in items
         ]
@@ -203,6 +219,21 @@ def _build_synthetic_boards(
             "change_pct": _avg([_to_number(x.get("change_pct")) for x in top]),
             "change_amount": None,
             "turnover": _sum([_to_number(x.get("turnover")) for x in top]),
+            "constituent_provenance": [
+                {
+                    "symbol": item.get("symbol"),
+                    "market": item.get("market"),
+                    "price_kind": item.get("price_kind"),
+                    "trade_date": item.get("trade_date"),
+                    "freshness": item.get("freshness"),
+                    "provider": item.get("provider"),
+                    "adjustment_mode": item.get("adjustment_mode"),
+                    "change_basis": item.get("change_basis"),
+                    "units": item.get("units"),
+                    "availability": item.get("availability"),
+                }
+                for item in top
+            ],
         }
 
     market_name = {"CN": "A股", "HK": "港股", "US": "美股", "TW": "台股"}.get(mkt, mkt)
@@ -435,6 +466,14 @@ async def get_board_stocks(
             "change_pct": it.change_pct,
             "turnover": it.turnover,
             "volume": it.volume,
+            "price_kind": getattr(it, "price_kind", None),
+            "trade_date": getattr(it, "trade_date", None),
+            "freshness": getattr(it, "freshness", None),
+            "provider": getattr(it, "provider", None),
+            "adjustment_mode": getattr(it, "adjustment_mode", None),
+            "change_basis": getattr(it, "change_basis", None),
+            "units": getattr(it, "units", None),
+            "availability": getattr(it, "availability", None),
         }
         for it in items
     ]
