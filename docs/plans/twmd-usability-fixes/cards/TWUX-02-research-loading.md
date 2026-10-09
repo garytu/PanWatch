@@ -1,6 +1,6 @@
 # TWUX-02：研究讀取排程與區塊重試
 
-優先級：P1。狀態：ready。依賴：無；提供 TWUX-03 的區塊選擇契約。
+優先級：P1。狀態：in_progress。依賴：無；提供 TWUX-03 的區塊選擇契約。
 
 ## 問題與交付結果
 
@@ -41,7 +41,7 @@
 
 ## Progress checkpoint
 
-2026-10-10：使用者已授權依序執行，等待前卡交付／依賴確認。
+2026-10-10：TWUX-01 已完成；開始實作 TWUX-02。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。
 
 ## Handoff
 
