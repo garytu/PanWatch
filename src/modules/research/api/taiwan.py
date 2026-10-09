@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from src.modules.research.taiwan_research import (
     TaiwanResearchService,
+    _requested_blocks,
     get_taiwan_research_service,
     serialize_taiwan_research,
 )
@@ -24,12 +25,12 @@ def get_taiwan_research(
     fiscal_year: int | None = Query(None, ge=2024),
     fiscal_quarter: int | None = Query(None, ge=1, le=4),
     statement: str | None = Query(None, pattern="^(balance_sheet|comprehensive_income|cash_flows)$"),
+    blocks: list[str] | None = Query(None),
 ):
     if not is_market_enabled("TW"):
         raise HTTPException(status_code=404, detail="Taiwan market is disabled")
     try:
-        payload = get_taiwan_research_service().collect(
-            instrument_id,
+        selectors = dict(
             start_date=start_date,
             end_date=end_date,
             start_month=start_month,
@@ -38,6 +39,10 @@ def get_taiwan_research(
             fiscal_quarter=fiscal_quarter,
             statement=statement,
         )
+        # Omitting `blocks` preserves the legacy all-block request contract.
+        if blocks is not None:
+            selectors["blocks"] = _requested_blocks(blocks)
+        payload = get_taiwan_research_service().collect(instrument_id, **selectors)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # provider errors are normally isolated into block results

@@ -1,11 +1,100 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { researchApi, type ResearchDataBlock, type ResearchFreshness, type TaiwanResearchPayload } from '@panwatch/api'
+import { researchApi, type ResearchBlockName, type ResearchDataBlock, type ResearchFreshness, type TaiwanResearchPayload } from '@panwatch/api'
 import { Button } from '@panwatch/base-ui/components/ui/button'
 import { BrokerFlowPanel } from './broker-flow-panel'
 import { FinancialStatementsPanel, defaultFiscalScope, maxCompletedQuarter, taipeiTodayParts } from './financial-statements-panel'
 
 type AnyBlock = ResearchDataBlock<Record<string, any>>
+
+const RESEARCH_BLOCK_NAMES: ResearchBlockName[] = [
+  'valuation', 'institutional_flows', 'company_profile', 'monthly_revenues', 'margin_short_sale',
+  'shareholder_distribution', 'broker_flow', 'financial_statements', 'corporate_actions', 'benchmark_comparison',
+]
+
+const BLOCK_SELECTOR_FIELDS: Record<ResearchBlockName, Array<keyof TaiwanResearchPayload['selectors']>> = {
+  valuation: ['start_date', 'end_date'],
+  institutional_flows: ['start_date', 'end_date'],
+  company_profile: [],
+  monthly_revenues: ['start_month', 'end_month'],
+  margin_short_sale: ['start_date', 'end_date'],
+  shareholder_distribution: ['end_date'],
+  broker_flow: ['start_date', 'end_date'],
+  financial_statements: ['fiscal_year', 'fiscal_quarter', 'statement'],
+  corporate_actions: ['start_date', 'end_date'],
+  benchmark_comparison: ['start_date', 'end_date'],
+}
+
+function providerScopes(payload: TaiwanResearchPayload): Set<string> {
+  return new Set(Object.values(payload.blocks)
+    .map((block) => String(block?.evidence?.provider_scope || ''))
+    .filter(Boolean))
+}
+
+function retainSelectorCompatibleBlocks(
+  payload: TaiwanResearchPayload,
+  selectors: TaiwanResearchPayload['selectors'],
+): TaiwanResearchPayload {
+  const blocks: TaiwanResearchPayload['blocks'] = {}
+  for (const name of Object.keys(payload.blocks) as ResearchBlockName[]) {
+    const changed = BLOCK_SELECTOR_FIELDS[name].some((field) => payload.selectors?.[field] !== selectors[field])
+    if (!changed) blocks[name] = payload.blocks[name] as never
+  }
+  return { ...payload, blocks, requested_blocks: Object.keys(blocks) as ResearchBlockName[] }
+}
+
+function mergeResearchPayload(
+  previous: TaiwanResearchPayload | null,
+  incoming: TaiwanResearchPayload,
+): TaiwanResearchPayload {
+  const receivedBlocks = incoming.blocks || {}
+  const incomingNames = new Set<ResearchBlockName>(
+    incoming.requested_blocks || Object.keys(receivedBlocks) as ResearchBlockName[],
+  )
+  let canMerge = previous?.instrument_id === incoming.instrument_id
+  if (canMerge && previous) {
+    const previousScopes = providerScopes(previous)
+    const nextScopes = providerScopes(incoming)
+    if ((previousScopes.size || nextScopes.size) && (
+      previousScopes.size !== nextScopes.size
+      || [...previousScopes].some((scope) => !nextScopes.has(scope))
+    )) canMerge = false
+  }
+
+  const mergedBlocks: TaiwanResearchPayload['blocks'] = {}
+  if (canMerge && previous) {
+    for (const name of Object.keys(previous.blocks) as ResearchBlockName[]) {
+      if (incomingNames.has(name)) continue
+      const fields = BLOCK_SELECTOR_FIELDS[name]
+      const scopeChanged = fields.some((field) => previous.selectors?.[field] !== incoming.selectors?.[field])
+      if (!scopeChanged) mergedBlocks[name] = previous.blocks[name] as never
+    }
+  }
+  Object.assign(mergedBlocks, receivedBlocks)
+  return {
+    ...incoming,
+    requested_blocks: Object.keys(mergedBlocks) as ResearchBlockName[],
+    blocks: mergedBlocks,
+  }
+}
+
+function expectedSelectors(year: number, quarter: number): TaiwanResearchPayload['selectors'] {
+  const { year: todayYear, month: todayMonth, day: todayDay } = taipeiTodayParts()
+  const todayUtc = Date.UTC(todayYear, todayMonth - 1, todayDay)
+  const isoDate = (offsetDays: number) => new Date(todayUtc + offsetDays * 86_400_000).toISOString().slice(0, 10)
+  const endMonthDate = new Date(Date.UTC(todayYear, todayMonth - 2, 1))
+  const monthStartDate = new Date(Date.UTC(endMonthDate.getUTCFullYear(), endMonthDate.getUTCMonth() - 11, 1))
+  const monthLabel = (value: Date) => `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}`
+  return {
+    start_date: isoDate(-30),
+    end_date: isoDate(-1),
+    start_month: monthLabel(monthStartDate),
+    end_month: monthLabel(endMonthDate),
+    fiscal_year: year,
+    fiscal_quarter: quarter,
+    statement: null,
+  }
+}
 
 const STATUS_LABELS: Record<string, string> = {
   available: '可用',
@@ -528,21 +617,65 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
   const [error, setError] = useState('')
   const [fiscalScope, setFiscalScope] = useState(defaultFiscalScope)
   const requestSequence = useRef(0)
+  const payloadRef = useRef<TaiwanResearchPayload | null>(null)
+  const payloadInputRef = useRef<string | null>(null)
+  const controllerRef = useRef<AbortController | null>(null)
+  const inputScope = `${market}:${symbol}`
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (reason: 'auto' | 'refresh' = 'auto') => {
     if (!symbol || market !== 'TW') return
+    const requestScope = `${market}:${symbol}`
     const sequence = ++requestSequence.current
+    let currentPayload = payloadInputRef.current === requestScope ? payloadRef.current : null
+    if (!currentPayload) {
+      payloadRef.current = null
+      payloadInputRef.current = requestScope
+      setPayload(null)
+    }
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
+    const targetSelectors = expectedSelectors(fiscalScope.year, fiscalScope.quarter)
+    if (currentPayload) {
+      currentPayload = retainSelectorCompatibleBlocks(currentPayload, targetSelectors)
+      payloadRef.current = currentPayload
+      setPayload(currentPayload)
+    }
+    let requestedBlocks: ResearchBlockName[] | undefined
+    if (currentPayload) {
+      requestedBlocks = RESEARCH_BLOCK_NAMES.filter((name) => {
+        const oldBlock = currentPayload.blocks[name]
+        const failed = oldBlock?.status === 'error'
+        const selectorsChanged = BLOCK_SELECTOR_FIELDS[name].some((field) => (
+          currentPayload.selectors?.[field] !== targetSelectors[field]
+        ))
+        return !oldBlock || failed || selectorsChanged
+      })
+      if (reason === 'refresh' && requestedBlocks.length === 0) {
+        requestedBlocks = [...RESEARCH_BLOCK_NAMES]
+      }
+      if (requestedBlocks.length === 0) {
+        setLoading(false)
+        return
+      }
+      if (requestedBlocks.length === RESEARCH_BLOCK_NAMES.length) requestedBlocks = undefined
+    }
     setLoading(true)
     setError('')
-    setPayload(null)
     try {
       const result = await researchApi.taiwan(symbol, {
         fiscal_year: fiscalScope.year,
         fiscal_quarter: fiscalScope.quarter,
-      })
-      if (sequence === requestSequence.current) setPayload(result)
-    } catch (cause) {
+        ...(requestedBlocks ? { blocks: requestedBlocks } : {}),
+      }, { signal: controller.signal })
       if (sequence === requestSequence.current) {
+        const merged = mergeResearchPayload(currentPayload, result)
+        payloadRef.current = merged
+        payloadInputRef.current = requestScope
+        setPayload(merged)
+      }
+    } catch (cause) {
+      if (sequence === requestSequence.current && !controller.signal.aborted) {
         setError(cause instanceof Error ? cause.message : '研究資料載入失敗。')
       }
     } finally {
@@ -551,18 +684,26 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
   }, [fiscalScope.quarter, fiscalScope.year, market, symbol])
 
   useEffect(() => {
-    if (open && market === 'TW') void load()
+    if (open && market === 'TW') void load('auto')
     else {
       requestSequence.current++
+      controllerRef.current?.abort()
+      controllerRef.current = null
+      payloadRef.current = null
+      payloadInputRef.current = null
       setPayload(null)
       setError('')
       setLoading(false)
     }
-    return () => { requestSequence.current++ }
+    return () => {
+      requestSequence.current++
+      controllerRef.current?.abort()
+    }
   }, [open, market, load])
 
   if (market !== 'TW') return null
-  const blocks = payload?.blocks
+  const visiblePayload = payloadInputRef.current === inputScope ? payload : null
+  const blocks = visiblePayload?.blocks
   return (
     <section className="card p-4 space-y-3" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
@@ -570,10 +711,11 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           <h3 className="text-sm font-semibold">官方台股研究</h3>
           <p className="text-[11px] text-muted-foreground">估值、法人、公司、營收、籌碼、券商分點、財報、公司行動與 raw 大盤比較各自保留來源期間、單位和證據</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading} aria-label="重新載入官方研究資料">
+        <Button variant="ghost" size="sm" onClick={() => void load('refresh')} disabled={loading} aria-label="重新載入官方研究資料">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
+      {loading && visiblePayload ? <div className="text-[10px] text-muted-foreground">正在更新；目前顯示的是上一版相容資料。</div> : null}
       <div className="flex flex-wrap items-end gap-2">
         <label className="space-y-1 text-[10px] text-muted-foreground">財報年度
           <select aria-label="財報年度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.year} onChange={(event) => {
@@ -591,24 +733,24 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
         </label>
         <span className="pb-1 text-[10px] text-muted-foreground">只選已結束的季度；duration 期間以來源事實原樣顯示。</span>
       </div>
-      {loading && !payload ? <div className="text-xs text-muted-foreground py-3">正在載入官方研究資料…</div> : null}
+      {loading && !visiblePayload ? <div className="text-xs text-muted-foreground py-3">正在載入官方研究資料…</div> : null}
       {error ? <div className="rounded border border-destructive/30 p-3 text-xs text-destructive">{error}</div> : null}
       {blocks ? <>
-        <div className="text-[11px] text-muted-foreground">{payload?.instrument_id} · {payload?.instrument?.security_type || '標的類型未知'} · 區間 {payload?.selectors.start_date} 至 {payload?.selectors.end_date}</div>
+        <div className="text-[11px] text-muted-foreground">{visiblePayload?.instrument_id} · {visiblePayload?.instrument?.security_type || '標的類型未知'} · 區間 {visiblePayload?.selectors.start_date} 至 {visiblePayload?.selectors.end_date}</div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <ValuationBlock block={blocks.valuation as AnyBlock} />
-          <FlowBlock block={blocks.institutional_flows as AnyBlock} />
-          <ProfileBlock block={blocks.company_profile as AnyBlock} securityType={payload?.instrument?.security_type} />
-          <RevenueBlock block={blocks.monthly_revenues as AnyBlock} securityType={payload?.instrument?.security_type} />
-          <MarginBlock block={blocks.margin_short_sale as AnyBlock} />
-          <ShareholderDistributionBlock block={blocks.shareholder_distribution as AnyBlock} />
-          <BrokerFlowPanel block={blocks.broker_flow as AnyBlock} />
-          <FinancialStatementsPanel block={blocks.financial_statements as AnyBlock | undefined} />
-          <CorporateActionsBlock block={blocks.corporate_actions as AnyBlock} />
-          <BenchmarkComparisonBlock block={blocks.benchmark_comparison as AnyBlock} />
+          {blocks.valuation ? <ValuationBlock block={blocks.valuation as AnyBlock} /> : null}
+          {blocks.institutional_flows ? <FlowBlock block={blocks.institutional_flows as AnyBlock} /> : null}
+          {blocks.company_profile ? <ProfileBlock block={blocks.company_profile as AnyBlock} securityType={visiblePayload?.instrument?.security_type} /> : null}
+          {blocks.monthly_revenues ? <RevenueBlock block={blocks.monthly_revenues as AnyBlock} securityType={visiblePayload?.instrument?.security_type} /> : null}
+          {blocks.margin_short_sale ? <MarginBlock block={blocks.margin_short_sale as AnyBlock} /> : null}
+          {blocks.shareholder_distribution ? <ShareholderDistributionBlock block={blocks.shareholder_distribution as AnyBlock} /> : null}
+          {blocks.broker_flow ? <BrokerFlowPanel block={blocks.broker_flow as AnyBlock} /> : null}
+          {blocks.financial_statements ? <FinancialStatementsPanel block={blocks.financial_statements as AnyBlock} /> : null}
+          {blocks.corporate_actions ? <CorporateActionsBlock block={blocks.corporate_actions as AnyBlock} /> : null}
+          {blocks.benchmark_comparison ? <BenchmarkComparisonBlock block={blocks.benchmark_comparison as AnyBlock} /> : null}
         </div>
       </> : null}
-      {!loading && !error && !payload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}
+      {!loading && !error && !visiblePayload ? <div className="text-xs text-muted-foreground">尚未載入資料。</div> : null}
     </section>
   )
 }

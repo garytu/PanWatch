@@ -214,7 +214,6 @@ def test_material_information_cache_is_defensive_scoped_and_does_not_cache_error
 
 
 def test_material_information_timeout_holds_the_actual_read_permit(monkeypatch):
-    from concurrent.futures import ThreadPoolExecutor
     import threading
 
     gate = threading.Event()
@@ -232,17 +231,19 @@ def test_material_information_timeout_holds_the_actual_read_permit(monkeypatch):
     service = taiwan_research.TaiwanResearchService(client=client, config={'base_url': 'http://slow-offline-material-service'})
     selectors = dict(start_date='2026-10-07', end_date='2026-10-07', source='current', limit=50,
                      today_taipei=date(2026, 10, 7))
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        monkeypatch.setattr(taiwan_research, '_READ_POOL', pool)
-        monkeypatch.setattr(taiwan_research, '_READ_SLOTS', threading.BoundedSemaphore(1))
-        monkeypatch.setattr(taiwan_research, '_REQUEST_DEADLINE_SECONDS', 0.05)
-        try:
-            timed_out = service.material_information('TWSE:2330', **selectors)
-            assert started.is_set()
-            assert timed_out.reason == 'timeout'
-            assert service.material_information('TWSE:2330', **selectors).reason == 'concurrency_limit'
-        finally:
-            gate.set()
+    scheduler = taiwan_research._FairReadScheduler(max_workers=1, queue_capacity=1)
+    monkeypatch.setattr(taiwan_research, '_READ_SCHEDULER', scheduler)
+    monkeypatch.setattr(taiwan_research, '_REQUEST_DEADLINE_SECONDS', 0.05)
+    try:
+        timed_out = service.material_information('TWSE:2330', **selectors)
+        assert started.is_set()
+        assert timed_out.reason == 'timeout'
+        assert service.material_information('TWSE:2330', **selectors).reason == 'timeout'
+        assert scheduler.snapshot() == {'active': 1, 'queued': 0, 'in_flight': 1}
+    finally:
+        gate.set()
+        scheduler.shutdown(wait_for_workers=True)
+    assert scheduler.snapshot() == {'active': 0, 'queued': 0, 'in_flight': 0}
     assert len([call for call in client.calls if call[0] == 'material-information']) == 1
     taiwan_research.clear_taiwan_research_cache()
 

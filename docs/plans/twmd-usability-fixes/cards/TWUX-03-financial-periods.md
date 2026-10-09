@@ -1,6 +1,6 @@
 # TWUX-03：財報可用期間與獨立載入
 
-優先級：P2。狀態：planned。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
+優先級：P2。狀態：ready。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
 
 ## 問題與交付結果
 
@@ -56,3 +56,5 @@
 ## Handoff
 
 尚未交付。
+
+2026-10-10 readiness：TWUX-02 已交付選擇性區塊契約，可開始步驟 2、3、5 的 PanWatch 獨立載入／明確選期與上游需求記錄。執行中的 twmd OpenAPI（HTTP 200、0.235 秒）財報路徑僅 /api/v1/financial-statements，沒有留存期別索引；最新已留存預設仍待外部契約與聯合驗收，不能將整卡標 completed。

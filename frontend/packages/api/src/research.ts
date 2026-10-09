@@ -30,6 +30,18 @@ export interface ResearchFreshness {
   }
 }
 
+export type ResearchBlockName =
+  | 'valuation'
+  | 'institutional_flows'
+  | 'company_profile'
+  | 'monthly_revenues'
+  | 'margin_short_sale'
+  | 'shareholder_distribution'
+  | 'broker_flow'
+  | 'financial_statements'
+  | 'corporate_actions'
+  | 'benchmark_comparison'
+
 export interface TaiwanResearchPayload {
   instrument_id: string
   instrument: {
@@ -48,7 +60,8 @@ export interface TaiwanResearchPayload {
     fiscal_quarter: number
     statement: string | null
   }
-  blocks: {
+  requested_blocks?: ResearchBlockName[]
+  blocks: Partial<{
     valuation: ResearchDataBlock<{ instrument_id: string; observations: Array<Record<string, unknown>> }>
     institutional_flows: ResearchDataBlock<{ instrument_id: string; native_unit: string; observations: Array<Record<string, unknown>> }>
     company_profile: ResearchDataBlock<Record<string, any>>
@@ -59,7 +72,7 @@ export interface TaiwanResearchPayload {
     financial_statements: ResearchDataBlock<FinancialStatementsResearchData>
     corporate_actions: ResearchDataBlock<CorporateActionsResearchData>
     benchmark_comparison: ResearchDataBlock<BenchmarkComparisonResearchData>
-  }
+  }>
   limitations: {
     financial_statements: {
       status: 'limited_scope' | string
@@ -387,11 +400,17 @@ export interface TaiwanResearchParams {
   fiscal_year?: number
   fiscal_quarter?: number
   statement?: FinancialStatementName
+  blocks?: ResearchBlockName[]
 }
 
-function withQuery(path: string, params: Record<string, string | number | undefined>): string {
+function withQuery(path: string, params: Record<string, string | number | string[] | undefined>): string {
   const query = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, rawValue] of Object.entries(params)) {
+    if (Array.isArray(rawValue)) {
+      for (const value of rawValue) query.append(key, value)
+      continue
+    }
+    const value = rawValue as string | number | undefined
     if (value !== undefined && value !== null && value !== '') query.set(key, String(value))
   }
   const suffix = query.toString()
@@ -399,10 +418,10 @@ function withQuery(path: string, params: Record<string, string | number | undefi
 }
 
 export const researchApi = {
-  taiwan: (instrumentId: string, params: TaiwanResearchParams = {}) =>
+  taiwan: (instrumentId: string, params: TaiwanResearchParams = {}, options?: { signal?: AbortSignal }) =>
     fetchAPI<TaiwanResearchPayload>(
       withQuery('/research/taiwan', { instrument_id: instrumentId, ...params }),
-      { timeoutMs: 30_000 },
+      { timeoutMs: 30_000, ...options },
     ),
   corporateActions: (instrumentId: string, startDate: string, endDate: string) =>
     fetchAPI<CorporateActionResearchResult>(

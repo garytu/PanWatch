@@ -91,6 +91,48 @@ def test_taiwan_research_api_rejects_bad_bounds_and_disabled_market(monkeypatch)
     assert disabled.status_code == 404
 
 
+def test_taiwan_research_api_accepts_repeated_allowlisted_block_selectors(monkeypatch):
+    calls = []
+
+    class FakeService:
+        def collect(self, instrument_id, **selectors):
+            calls.append((instrument_id, selectors))
+            requested = list(selectors["blocks"])
+            return {
+                "instrument_id": instrument_id,
+                "requested_blocks": requested,
+                "blocks": {name: {"data": None, "status": "error", "reason": "timeout", "evidence": {}} for name in requested},
+            }
+
+    monkeypatch.setattr(taiwan, "is_market_enabled", lambda _market: True)
+    monkeypatch.setattr(taiwan, "get_taiwan_research_service", FakeService)
+    app = _app()
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/research/taiwan",
+            params=[
+                ("instrument_id", "TWSE:2330"),
+                ("blocks", "valuation"),
+                ("blocks", "monthly_revenues"),
+            ],
+        )
+        invalid = client.get(
+            "/api/research/taiwan",
+            params=[("instrument_id", "TWSE:2330"), ("blocks", "valuation"), ("blocks", "private_block")],
+        )
+
+    assert response.status_code == 200
+    assert response.json()["requested_blocks"] == ["valuation", "monthly_revenues"]
+    assert set(response.json()["blocks"]) == {"valuation", "monthly_revenues"}
+    assert calls == [("TWSE:2330", {
+        "start_date": None, "end_date": None, "start_month": None, "end_month": None,
+        "fiscal_year": None, "fiscal_quarter": None, "statement": None,
+        "blocks": ("valuation", "monthly_revenues"),
+    })]
+    assert invalid.status_code == 422
+
+
 def test_corporate_action_route_protects_reads_and_retains_unknown_coverage(monkeypatch):
     from src.modules.research.twmd_profile_revenue import ResearchDataBlock
     calls = []

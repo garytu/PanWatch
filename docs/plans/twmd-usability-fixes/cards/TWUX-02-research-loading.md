@@ -1,6 +1,6 @@
 # TWUX-02：研究讀取排程與區塊重試
 
-優先級：P1。狀態：in_progress。依賴：無；提供 TWUX-03 的區塊選擇契約。
+優先級：P1。狀態：completed。依賴：無；提供 TWUX-03 的區塊選擇契約。
 
 ## 問題與交付結果
 
@@ -43,6 +43,16 @@
 
 2026-10-10：TWUX-01 已完成；開始實作 TWUX-02。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。
 
+2026-10-10：完成實作供獨立審查。共用排程最多同時執行 4 個 provider read、最多等待 16 個未合併工作；request admission 仍為 4，單次 request deadline 仍為 25 秒。排程按 request caller 輪替；相同 scope 的 in-flight 工作合併成一個 worker，各等待者可獨立逾時／取消，已啟動 worker 直到實際結束才釋放容量。直接公司行動與研究整包中的公司行動使用同一 key。
+
+選擇性區塊契約供 TWUX-03 使用：`GET /api/research/taiwan?instrument_id=TWSE%3A2330&blocks=valuation&blocks=financial_statements`。`blocks` 可重複傳入，allowlist 為 `valuation`、`institutional_flows`、`company_profile`、`monthly_revenues`、`margin_short_sale`、`shareholder_distribution`、`broker_flow`、`financial_statements`、`corporate_actions`、`benchmark_comparison`；重複值會去重，空清單或未知名稱回 422。省略 `blocks` 維持整包讀取。回應的 `requested_blocks` 表示本次要求，`blocks` 只含本次要求的結果。
+
+驗證：`.venv/bin/python -m pytest -q tests/test_taiwan_research_service.py tests/test_taiwan_research_api.py` 43 passed；前端 `pnpm exec vitest run tests/TaiwanResearchPanel.test.tsx` 15 passed、`pnpm exec tsc -b` 通過、`pnpm build` 通過；`git diff --check` 通過。唯讀冷載入／重疊 smoke 留給 coordinator 依獨立審查後執行。
+
 ## Handoff
 
-尚未交付。
+實作與本地針對性驗證已交給 coordinator 獨立審查；未建立 commit。TWUX-03 可用 `blocks=financial_statements` 單獨讀取財報，未傳 `blocks` 時仍讀取完整區塊集合。Coordinator 已完成唯讀 cold／overlap smoke 及整體回歸，結果如下。
+
+Coordinator 最終複核（2026-10-10）：修正共用 fetchAPI，在取消訊號存在時仍保留 timeout；新增 repeated block query、原整包呼叫、外部取消及 30 秒期限測試。修正公告回歸測試以新排程驗證兩個逾時等待者共用同一持續執行工作；將排隊到期測試改用可控制時鐘，避免短等待判定。
+
+獨立驗證：pytest（六項跨模組回歸加 test_twmd_material_information.py、test_twmd_corporate_actions.py）133 passed；Vitest（TaiwanResearchPanel、api/research、api/klines、api/chatStream）22 passed；固定 Node 24.14.0／pnpm 9.15.9 的 tsc -b、build 通過；git diff --check 通過。唯讀 cold／overlap：兩個相同 TWSE:2330 研究＋一個公告請求 12.538 秒，valuation/profile available，flows coverage_missing，公告 no_retained_current_observation；五種 HTTP 路徑各一次，峰值並行 4，完成後 active/queued/in_flight 全為 0，無 concurrency_limit。詳細證據：[有界實測](../evidence/TWUX-02-read-only-smoke-2026-10-10.json)。未部署；上游缺資料維持原語意。

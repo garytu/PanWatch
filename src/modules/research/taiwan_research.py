@@ -8,8 +8,8 @@ import hashlib
 import re
 import threading
 import time
-from collections import OrderedDict
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from collections import OrderedDict, deque
+from concurrent.futures import FIRST_COMPLETED, Future, InvalidStateError, ThreadPoolExecutor, wait
 from dataclasses import asdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -66,8 +66,20 @@ _CACHE_TTLS = {
 _CACHE: OrderedDict[tuple, tuple[float, Any]] = OrderedDict()
 _CACHE_LOCK = threading.RLock()
 _REQUEST_SLOTS = threading.BoundedSemaphore(4)
-_READ_SLOTS = threading.BoundedSemaphore(4)
-_READ_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tw-research")
+_MAX_ACTIVE_READS = 4
+_MAX_QUEUED_READS = 16
+_RESEARCH_BLOCK_NAMES = (
+    "valuation",
+    "institutional_flows",
+    "company_profile",
+    "monthly_revenues",
+    "margin_short_sale",
+    "shareholder_distribution",
+    "broker_flow",
+    "financial_statements",
+    "corporate_actions",
+    "benchmark_comparison",
+)
 _FRESHNESS_HINTS = {
     "valuation": (
         "daily",
@@ -132,39 +144,224 @@ def _public_provider_scope(config: dict) -> str:
         return "configured_twmd_service"
 
 
-class _ReadLease:
-    """Own one global read permit until the underlying worker actually stops."""
+class _ReadJob:
+    def __init__(self, caller_id: object, coalesce_key: tuple | None, function):
+        self.caller_id = caller_id
+        self.coalesce_key = coalesce_key
+        self.function = function
+        self.waiters: list[_ReadWaiterFuture] = []
+        self.state = "queued"
+        self.executor_future: Future | None = None
 
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._released = False
 
-    def release(self) -> None:
+class _ReadWaiterFuture(Future):
+    """A caller-local future; cancelling it only detaches that caller."""
+
+    def __init__(self, scheduler: "_FairReadScheduler", job: _ReadJob, deadline: float | None):
+        super().__init__()
+        self._scheduler = scheduler
+        self._job = job
+        self.deadline = deadline
+
+    def cancel(self) -> bool:
+        cancelled = super().cancel()
+        if cancelled:
+            self._scheduler._cancel_waiter(self, self._job)
+        return cancelled
+
+
+class _FairReadScheduler:
+    """Bounded shared readers with round-robin admission across requests."""
+
+    def __init__(self, *, max_workers: int = _MAX_ACTIVE_READS, queue_capacity: int = _MAX_QUEUED_READS):
+        self._max_workers = max_workers
+        self._queue_capacity = queue_capacity
+        self._lock = threading.RLock()
+        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="tw-research")
+        self._pending: OrderedDict[object, deque[_ReadJob]] = OrderedDict()
+        self._caller_order: deque[object] = deque()
+        self._in_flight: dict[tuple, _ReadJob] = {}
+        self._queued = 0
+        self._running = 0
+
+    def submit(
+        self,
+        function,
+        *,
+        coalesce_key: tuple | None = None,
+        caller_id: object | None = None,
+        deadline: float | None = None,
+    ) -> Future:
+        caller = caller_id if caller_id is not None else object()
         with self._lock:
-            if self._released:
+            self._dispatch_locked()
+            if deadline is not None and time.monotonic() >= deadline:
+                raise TimeoutError()
+            if coalesce_key is not None:
+                existing = self._in_flight.get(coalesce_key)
+                if existing is not None and existing.state in {"queued", "running"}:
+                    waiter = _ReadWaiterFuture(self, existing, deadline)
+                    existing.waiters.append(waiter)
+                    return waiter
+            if self._queued >= self._queue_capacity:
+                raise RuntimeError("concurrency_limit")
+
+            job = _ReadJob(caller, coalesce_key, function)
+            waiter = _ReadWaiterFuture(self, job, deadline)
+            job.waiters.append(waiter)
+            if coalesce_key is not None:
+                self._in_flight[coalesce_key] = job
+            bucket = self._pending.get(caller)
+            if bucket is None:
+                bucket = deque()
+                self._pending[caller] = bucket
+                self._caller_order.append(caller)
+            bucket.append(job)
+            self._queued += 1
+            self._dispatch_locked()
+            return waiter
+
+    def _next_job_locked(self) -> _ReadJob | None:
+        while self._caller_order:
+            caller = self._caller_order.popleft()
+            bucket = self._pending.get(caller)
+            if not bucket:
+                self._pending.pop(caller, None)
+                continue
+            job = bucket.popleft()
+            if bucket:
+                self._caller_order.append(caller)
+            else:
+                self._pending.pop(caller, None)
+            self._queued -= 1
+            return job
+        return None
+
+    def _dispatch_locked(self) -> None:
+        while self._running < self._max_workers and self._queued:
+            job = self._next_job_locked()
+            if job is None:
                 return
-            self._released = True
-        _READ_SLOTS.release()
+            if job.state != "queued" or not job.waiters:
+                job.state = "cancelled"
+                if job.coalesce_key is not None and self._in_flight.get(job.coalesce_key) is job:
+                    self._in_flight.pop(job.coalesce_key, None)
+                continue
+            now = time.monotonic()
+            active_waiters = []
+            for waiter in job.waiters:
+                if waiter.deadline is not None and now >= waiter.deadline:
+                    try:
+                        waiter.set_exception(TimeoutError())
+                    except InvalidStateError:
+                        pass
+                else:
+                    active_waiters.append(waiter)
+            job.waiters = active_waiters
+            if not job.waiters:
+                job.state = "finished"
+                if job.coalesce_key is not None and self._in_flight.get(job.coalesce_key) is job:
+                    self._in_flight.pop(job.coalesce_key, None)
+                continue
+            job.state = "running"
+            self._running += 1
+            try:
+                future = self._executor.submit(job.function)
+            except Exception as exc:
+                self._running -= 1
+                waiters = self._finish_locked(job)
+                self._resolve_waiters(waiters, error=exc)
+                continue
+            job.executor_future = future
+            future.add_done_callback(lambda done, scheduled=job: self._finished(scheduled, done))
 
+    def _finish_locked(self, job: _ReadJob) -> list[_ReadWaiterFuture]:
+        job.state = "finished"
+        if job.coalesce_key is not None and self._in_flight.get(job.coalesce_key) is job:
+            self._in_flight.pop(job.coalesce_key, None)
+        waiters, job.waiters = job.waiters, []
+        return waiters
 
-def _submit_read(function, *args):
-    if not _READ_SLOTS.acquire(blocking=False):
-        raise RuntimeError("concurrency_limit")
-    lease = _ReadLease()
+    @staticmethod
+    def _resolve_waiters(waiters: list[_ReadWaiterFuture], *, value=None, error: Exception | None = None) -> None:
+        for waiter in waiters:
+            try:
+                if error is None:
+                    waiter.set_result(value)
+                else:
+                    waiter.set_exception(error)
+            except InvalidStateError:
+                pass
 
-    def run():
+    def _finished(self, job: _ReadJob, future: Future) -> None:
         try:
-            return function(*args)
-        finally:
-            lease.release()
+            value = future.result()
+            error = None
+        except Exception as exc:
+            value = None
+            error = exc
+        with self._lock:
+            self._running -= 1
+            waiters = self._finish_locked(job)
+            self._dispatch_locked()
+        # Resolve only this job's waiting callers. One cancelled waiter cannot
+        # cancel the shared worker or another caller's result.
+        for waiter in waiters:
+            try:
+                if error is None:
+                    waiter.set_result(value)
+                else:
+                    waiter.set_exception(error)
+            except InvalidStateError:
+                pass
 
-    try:
-        future = _READ_POOL.submit(run)
-    except Exception:
-        lease.release()
-        raise
-    future.add_done_callback(lambda done: lease.release() if done.cancelled() else None)
-    return future
+    def _cancel_waiter(self, waiter: _ReadWaiterFuture, job: _ReadJob) -> None:
+        with self._lock:
+            try:
+                job.waiters.remove(waiter)
+            except ValueError:
+                return
+            if job.state != "queued" or job.waiters:
+                return
+            bucket = self._pending.get(job.caller_id)
+            if bucket is not None:
+                try:
+                    bucket.remove(job)
+                    self._queued -= 1
+                except ValueError:
+                    pass
+                if not bucket:
+                    self._pending.pop(job.caller_id, None)
+                    try:
+                        self._caller_order.remove(job.caller_id)
+                    except ValueError:
+                        pass
+            job.state = "cancelled"
+            if job.coalesce_key is not None and self._in_flight.get(job.coalesce_key) is job:
+                self._in_flight.pop(job.coalesce_key, None)
+            self._dispatch_locked()
+
+    def snapshot(self) -> dict[str, int]:
+        with self._lock:
+            return {"active": self._running, "queued": self._queued, "in_flight": len(self._in_flight)}
+
+    def shutdown(self, *, wait_for_workers: bool = True) -> None:
+        self._executor.shutdown(wait=wait_for_workers, cancel_futures=True)
+
+
+_READ_SCHEDULER = _FairReadScheduler()
+
+
+def _submit_read(
+    function,
+    *args,
+    coalesce_key: tuple | None = None,
+    caller_id: object | None = None,
+    deadline: float | None = None,
+):
+    return _READ_SCHEDULER.submit(
+        lambda: function(*args), coalesce_key=coalesce_key, caller_id=caller_id, deadline=deadline
+    )
 
 
 def taiwan_research_identity(symbol: str, quote_identity: str | None = None) -> str:
@@ -823,6 +1020,35 @@ def _cache_key(config: dict, instrument_id: str, kind: str, selectors: tuple[Any
     return (*_scope(config), instrument_id, kind, *selectors)
 
 
+def _corporate_actions_key(config: dict, instrument_id: str, start_date: str, end_date: str) -> tuple:
+    """Share one canonical key between aggregate and direct action reads."""
+    return _cache_key(
+        config,
+        instrument_id,
+        "corporate_actions",
+        (instrument_id, start_date, end_date),
+    )
+
+
+def _requested_blocks(value: list[str] | tuple[str, ...] | None) -> tuple[str, ...]:
+    if value is None:
+        return _RESEARCH_BLOCK_NAMES
+    if isinstance(value, str):
+        raise ValueError("blocks must be a list of research block names")
+    provided = tuple(value)
+    if any(not isinstance(name, str) for name in provided):
+        raise ValueError("blocks must contain research block names")
+    names = tuple(dict.fromkeys(provided))
+    if not names:
+        raise ValueError("blocks must contain at least one research block")
+    if len(names) > len(_RESEARCH_BLOCK_NAMES):
+        raise ValueError("blocks may include at most ten research blocks")
+    unknown = sorted(set(names) - set(_RESEARCH_BLOCK_NAMES))
+    if unknown:
+        raise ValueError(f"unsupported research block: {unknown[0]}")
+    return names
+
+
 def _status_error(exc: Exception) -> tuple[str, int | None]:
     if isinstance(exc, TwmdReadError):
         status = exc.status_code if type(exc.status_code) is int and 100 <= exc.status_code <= 599 else None
@@ -928,9 +1154,12 @@ class TaiwanResearchService:
         fiscal_year: int | None = None,
         fiscal_quarter: int | None = None,
         statement: str | None = None,
+        blocks: list[str] | tuple[str, ...] | None = None,
         today_taipei: date | None = None,
         now_utc: datetime | None = None,
     ) -> dict[str, Any]:
+        requested_blocks = _requested_blocks(blocks)
+        read_caller = object()
         deadline = time.monotonic() + _REQUEST_DEADLINE_SECONDS
         request_clock = now_utc or datetime.now(timezone.utc)
         if request_clock.tzinfo is None or request_clock.utcoffset() is None:
@@ -1012,7 +1241,7 @@ class TaiwanResearchService:
                         today_taipei=today,
                         timeout_sec=max(0.1, min(20.0, deadline - time.monotonic())),
                     )
-                ))
+                ), coalesce_key=key, caller_id=read_caller, deadline=deadline)
                 return future.result(timeout=max(0.0, deadline - time.monotonic()))
             except Exception as exc:
                 if future is not None:
@@ -1026,14 +1255,18 @@ class TaiwanResearchService:
                 name: _error_block("concurrency_limit", endpoint, block_selectors, self.config, instrument_id=instrument_id)
                 for name, (endpoint, block_selectors) in template.items()
             }
-            return self._result(instrument_id, None, selectors, blocks, request_clock)
+            return self._result(instrument_id, None, selectors, blocks, request_clock, requested_blocks)
 
         try:
             catalog_future = None
             try:
                 rows = _cache_get((*_scope(self.config), "catalog", "TW"))
                 if rows is None:
-                    catalog_future = _submit_read(_instrument_catalog, self.client, self.config)
+                    catalog_future = _submit_read(
+                        _instrument_catalog, self.client, self.config,
+                        coalesce_key=(*_scope(self.config), "catalog", "TW"), caller_id=read_caller,
+                        deadline=deadline,
+                    )
                     rows = catalog_future.result(timeout=max(0.0, deadline - time.monotonic()))
                 canonical, instrument = _resolve(rows, instrument_id)
             except Exception as exc:
@@ -1059,9 +1292,13 @@ class TaiwanResearchService:
                 }
                 # Retained reports use frozen admission, independent of a later
                 # omission from the current catalog.
-                if reason == "instrument_not_found" and re.fullmatch(r"TWSE:[0-9]{4,6}", instrument_id):
+                if (
+                    "financial_statements" in requested_blocks
+                    and reason == "instrument_not_found"
+                    and re.fullmatch(r"TWSE:[0-9]{4,6}", instrument_id)
+                ):
                     blocks["financial_statements"] = retained_financial(instrument_id)
-                return self._result(instrument_id, None, selectors, blocks, request_clock)
+                return self._result(instrument_id, None, selectors, blocks, request_clock, requested_blocks)
 
             if time.monotonic() >= deadline:
                 blocks = {
@@ -1069,7 +1306,7 @@ class TaiwanResearchService:
                                        instrument_id=canonical)
                     for name, (endpoint, block_selectors) in template.items()
                 }
-                return self._result(canonical, instrument, selectors, blocks, request_clock)
+                return self._result(canonical, instrument, selectors, blocks, request_clock, requested_blocks)
 
             canonical_template = {
                 name: (endpoint, {**block_selectors, "instrument_id": canonical})
@@ -1087,9 +1324,13 @@ class TaiwanResearchService:
                                        self.config, status="unsupported", instrument_id=canonical)
                     for name, (endpoint, block_selectors) in canonical_template.items()
                 }
-                if canonical.startswith("TWSE:") and instrument["security_type"] == "EQUITY":
+                if (
+                    "financial_statements" in requested_blocks
+                    and canonical.startswith("TWSE:")
+                    and instrument["security_type"] == "EQUITY"
+                ):
                     blocks["financial_statements"] = retained_financial(canonical)
-                return self._result(canonical, instrument, selectors, blocks, request_clock)
+                return self._result(canonical, instrument, selectors, blocks, request_clock, requested_blocks)
             if instrument["security_type"] not in {"EQUITY", "ETF"}:
                 reason = "unsupported_warrant" if instrument["security_type"] == "WARRANT" else "unsupported_security_type"
                 blocks = {
@@ -1097,7 +1338,7 @@ class TaiwanResearchService:
                                        status="unsupported", instrument_id=canonical)
                     for name, (endpoint, block_selectors) in canonical_template.items()
                 }
-                return self._result(canonical, instrument, selectors, blocks, request_clock)
+                return self._result(canonical, instrument, selectors, blocks, request_clock, requested_blocks)
 
             blocks: dict[str, ResearchDataBlock] = {}
             builders = {
@@ -1186,7 +1427,7 @@ class TaiwanResearchService:
                     canonical, "twse_four_digit_only"
                 )
                 del builders["broker_flow"]
-            names = list(builders)
+            names = [name for name in builders if name in requested_blocks]
             futures = {}
             queued = iter(names)
 
@@ -1196,7 +1437,12 @@ class TaiwanResearchService:
                     if name is None:
                         return
                     endpoint, block_selectors = canonical_template[name]
-                    key = _cache_key(self.config, canonical, name, tuple(block_selectors.values()))
+                    if name == "corporate_actions":
+                        key = _corporate_actions_key(
+                            self.config, canonical, block_selectors["start_date"], block_selectors["end_date"]
+                        )
+                    else:
+                        key = _cache_key(self.config, canonical, name, tuple(block_selectors.values()))
                     cached = _cache_get(key)
                     if cached is not None:
                         blocks[name] = cached
@@ -1208,7 +1454,16 @@ class TaiwanResearchService:
                         )
                         continue
                     try:
-                        future = _submit_read(self._load_block, name, key, builders[name])
+                        future = _submit_read(
+                            self._load_block, name, key, builders[name],
+                            coalesce_key=key, caller_id=read_caller, deadline=deadline,
+                        )
+                    except TimeoutError:
+                        blocks[name] = _error_block(
+                            "timeout", endpoint, block_selectors, self.config,
+                            instrument_id=canonical,
+                        )
+                        continue
                     except RuntimeError:
                         blocks[name] = _error_block(
                             "concurrency_limit", endpoint, block_selectors, self.config,
@@ -1250,7 +1505,7 @@ class TaiwanResearchService:
                             instrument_id=canonical, http_status=status,
                         )
                 submit_available()
-            return self._result(canonical, instrument, selectors, blocks, request_clock)
+            return self._result(canonical, instrument, selectors, blocks, request_clock, requested_blocks)
         finally:
             _REQUEST_SLOTS.release()
 
@@ -1287,6 +1542,7 @@ class TaiwanResearchService:
         }
         endpoint = "/api/v1/material-information"
         deadline = time.monotonic() + _REQUEST_DEADLINE_SECONDS
+        read_caller = object()
         if not _REQUEST_SLOTS.acquire(blocking=False):
             return _error_block("concurrency_limit", endpoint, selectors, self.config, instrument_id=instrument_id)
         try:
@@ -1294,7 +1550,11 @@ class TaiwanResearchService:
             try:
                 rows = _cache_get((*_scope(self.config), "catalog", "TW"))
                 if rows is None:
-                    catalog_future = _submit_read(_instrument_catalog, self.client, self.config)
+                    catalog_future = _submit_read(
+                        _instrument_catalog, self.client, self.config,
+                        coalesce_key=(*_scope(self.config), "catalog", "TW"), caller_id=read_caller,
+                        deadline=deadline,
+                    )
                     rows = catalog_future.result(timeout=max(0.0, deadline - time.monotonic()))
                 canonical, instrument = _resolve(rows, instrument_id)
             except Exception as exc:
@@ -1339,7 +1599,9 @@ class TaiwanResearchService:
                     limit=limit,
                     today_taipei=today,
                     timeout_sec=timeout,
-                ))
+                ), coalesce_key=key, caller_id=read_caller, deadline=deadline)
+            except TimeoutError:
+                return _error_block("timeout", endpoint, canonical_selectors, self.config, instrument_id=canonical)
             except RuntimeError:
                 return _error_block("concurrency_limit", endpoint, canonical_selectors, self.config, instrument_id=canonical)
             try:
@@ -1387,8 +1649,9 @@ class TaiwanResearchService:
                 "instrument_id": instrument_id, "start_date": selectors[0], "end_date": selectors[1],
             }, self.config, instrument_id=instrument_id)
         deadline = time.monotonic() + _REQUEST_DEADLINE_SECONDS
+        read_caller = object()
         try:
-            key = _cache_key(self.config, instrument_id, "corporate_actions", selectors)
+            key = _corporate_actions_key(self.config, instrument_id, *selectors)
             cached = _cache_get(key)
             if cached is not None:
                 return cached
@@ -1400,7 +1663,12 @@ class TaiwanResearchService:
                 future = _submit_read(
                     _corporate_actions_for_client,
                     self.client, instrument_id, start, end, today, deadline,
+                    coalesce_key=key, caller_id=read_caller, deadline=deadline,
                 )
+            except TimeoutError:
+                return _error_block("timeout", endpoint, {
+                    "instrument_id": instrument_id, "start_date": selectors[0], "end_date": selectors[1],
+                }, self.config, instrument_id=instrument_id)
             except RuntimeError:
                 return _error_block("concurrency_limit", endpoint, {
                     "instrument_id": instrument_id, "start_date": selectors[0], "end_date": selectors[1],
@@ -1452,9 +1720,12 @@ class TaiwanResearchService:
         selectors: dict[str, Any],
         blocks: dict[str, ResearchDataBlock],
         evaluated_at_utc: datetime,
+        requested_blocks: tuple[str, ...] = _RESEARCH_BLOCK_NAMES,
     ) -> dict[str, Any]:
         serialized_blocks = {}
         for name, block in blocks.items():
+            if name not in requested_blocks:
+                continue
             evidence = copy.deepcopy(block.evidence)
             evidence["freshness"] = _freshness_metadata(name, block, evaluated_at_utc)
             serialized_blocks[name] = asdict(ResearchDataBlock(
@@ -1473,6 +1744,7 @@ class TaiwanResearchService:
                 "name": instrument.get("name"),
             } if instrument else None),
             "selectors": dict(selectors),
+            "requested_blocks": list(requested_blocks),
             "blocks": serialized_blocks,
             "limitations": {
                 "financial_statements": {

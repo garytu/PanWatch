@@ -601,37 +601,49 @@ def test_catalog_deadline_keeps_actual_read_permits_until_workers_finish(monkeyp
     import src.modules.research.taiwan_research as research
 
     released = threading.Event()
-    pool = ThreadPoolExecutor(max_workers=4)
+    started = threading.Event()
+    caller_pool = ThreadPoolExecutor(max_workers=5)
+    scheduler = research._FairReadScheduler(max_workers=4, queue_capacity=16)
     calls = []
+    calls_lock = threading.Lock()
 
     class StalledCatalog:
         def get_response(self, path, **params):
-            calls.append(path)
+            with calls_lock:
+                calls.append(path)
+                if len(calls) == 4:
+                    started.set()
             assert released.wait(2)
             return _catalog(), {}
 
-    monkeypatch.setattr(research, "_READ_POOL", pool)
-    monkeypatch.setattr(research, "_READ_SLOTS", threading.BoundedSemaphore(4))
-    monkeypatch.setattr(research, "_REQUEST_DEADLINE_SECONDS", 0.02)
+    monkeypatch.setattr(research, "_READ_SCHEDULER", scheduler)
+    monkeypatch.setattr(research, "_REQUEST_DEADLINE_SECONDS", 0.2)
     frozen_now = datetime(2026, 10, 7, 0, 0, tzinfo=timezone.utc)
     try:
-        service = TaiwanResearchService(client=StalledCatalog(), config={"base_url": "http://fixture"})
-        began = time.monotonic()
-        results = [service.collect(
-            "TWSE:2330", today_taipei=date(2026, 10, 7), now_utc=frozen_now
-        ) for _ in range(5)]
-        assert time.monotonic() - began < 0.5
+        services = [TaiwanResearchService(
+            client=StalledCatalog(), config={"base_url": f"http://fixture-{index}"}
+        ) for index in range(4)]
+        futures = [caller_pool.submit(
+            service.collect, "TWSE:2330", today_taipei=date(2026, 10, 7), now_utc=frozen_now
+        ) for service in services]
+        assert started.wait(2)
+        overflow = TaiwanResearchService(
+            client=StalledCatalog(), config={"base_url": "http://fixture-overflow"}
+        ).collect("TWSE:2330", today_taipei=date(2026, 10, 7), now_utc=frozen_now)
+        assert all(block["reason"] == "concurrency_limit" for block in overflow["blocks"].values())
+        results = [future.result(timeout=2) for future in futures]
         assert len(calls) == 4
-        assert all(block["reason"] == "timeout" for result in results[:4] for block in result["blocks"].values())
+        assert all(block["reason"] == "timeout" for result in results for block in result["blocks"].values())
         assert all(
             block["evidence"]["freshness"]["evaluated_at_utc"] == "2026-10-07T00:00:00Z"
             and block["evidence"]["freshness"]["age_status"] == "age_unknown"
-            for result in results[:4] for block in result["blocks"].values()
+            for result in results for block in result["blocks"].values()
         )
-        assert all(block["reason"] == "concurrency_limit" for block in results[4]["blocks"].values())
+        assert scheduler.snapshot() == {"active": 4, "queued": 0, "in_flight": 4}
     finally:
         released.set()
-        pool.shutdown(wait=True)
+        scheduler.shutdown(wait_for_workers=True)
+        caller_pool.shutdown(wait=True)
 
 
 def test_valuation_evidence_exports_only_contract_headers():
@@ -844,9 +856,8 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
     import src.modules.research.taiwan_research as research
     from src.modules.research.twmd_profile_revenue import ResearchDataBlock
 
-    pool = ThreadPoolExecutor(max_workers=4)
+    scheduler = research._FairReadScheduler(max_workers=4, queue_capacity=16)
     caller_pool = ThreadPoolExecutor(max_workers=1)
-    slots = threading.BoundedSemaphore(4)
     all_started = threading.Event()
     release_initial = threading.Event()
     guard = threading.Lock()
@@ -863,8 +874,7 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
     ):
         monkeypatch.setattr(research, adapter, identity_adapter)
     monkeypatch.setattr(research, "_corporate_actions_for_client", lambda client, *_args: identity_adapter(client._read("corporate_actions")))
-    monkeypatch.setattr(research, "_READ_POOL", pool)
-    monkeypatch.setattr(research, "_READ_SLOTS", slots)
+    monkeypatch.setattr(research, "_READ_SCHEDULER", scheduler)
 
     class Client:
         def get_response(self, path, **params):
@@ -911,22 +921,20 @@ def test_research_reads_queue_all_six_blocks_with_four_active_workers(monkeypatc
             "margin_short_sale", "shareholder_distribution", "financial_statements", "corporate_actions",
         }
         assert max_active <= 4
+        assert scheduler.snapshot() == {"active": 0, "queued": 0, "in_flight": 0}
     finally:
         release_initial.set()
-        pool.shutdown(wait=True)
+        scheduler.shutdown(wait_for_workers=True)
         caller_pool.shutdown(wait=True)
 
 
 def test_timed_out_reads_keep_permits_and_queued_blocks_are_explicit(monkeypatch):
     import threading
-    from concurrent.futures import ThreadPoolExecutor
     import src.modules.research.taiwan_research as research
 
-    slots = threading.BoundedSemaphore(4)
-    pool = ThreadPoolExecutor(max_workers=4)
+    scheduler = research._FairReadScheduler(max_workers=4, queue_capacity=16)
     release = threading.Event()
-    monkeypatch.setattr(research, "_READ_POOL", pool)
-    monkeypatch.setattr(research, "_READ_SLOTS", slots)
+    monkeypatch.setattr(research, "_READ_SCHEDULER", scheduler)
     monkeypatch.setattr(research, "_REQUEST_DEADLINE_SECONDS", 0.02)
     catalog_key = (*_scope({"base_url": "http://fixture"}), "catalog", "TW")
     research._cache_set(catalog_key, _catalog(), 300)
@@ -948,27 +956,263 @@ def test_timed_out_reads_keep_permits_and_queued_blocks_are_explicit(monkeypatch
         )
         assert len(payload["blocks"]) == 10
         assert {block["reason"] for block in payload["blocks"].values()} == {"timeout"}
-        assert slots._value == 0
+        assert scheduler.snapshot() == {"active": 4, "queued": 0, "in_flight": 4}
         again = TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
             "TWSE:2330", today_taipei=date(2026, 10, 7)
         )
-        assert {block["reason"] for block in again["blocks"].values()} == {"concurrency_limit"}
+        assert {block["reason"] for block in again["blocks"].values()} == {"timeout"}
     finally:
         release.set()
-        pool.shutdown(wait=True)
+        scheduler.shutdown(wait_for_workers=True)
+
+
+def test_fair_scheduler_round_robins_callers_and_coalesces_with_independent_waiters():
+    import threading
+    import src.modules.research.taiwan_research as research
+
+    scheduler = research._FairReadScheduler(max_workers=1, queue_capacity=8)
+    first_started = threading.Event()
+    release_first = threading.Event()
+    a1_started = threading.Event()
+    release_a1 = threading.Event()
+    b1_started = threading.Event()
+    release_b1 = threading.Event()
+    a2_started = threading.Event()
+    release_a2 = threading.Event()
+    shared_started = threading.Event()
+    release_shared = threading.Event()
+    calls = []
+
+    def first():
+        first_started.set()
+        assert release_first.wait(2)
+        return "first"
+
+    def gated(name, started, release):
+        def run():
+            calls.append(name)
+            started.set()
+            assert release.wait(2)
+            return name
+        return run
+
+    def shared():
+        calls.append("shared")
+        shared_started.set()
+        assert release_shared.wait(2)
+        return "shared-result"
+
+    try:
+        running = scheduler.submit(first, caller_id="head")
+        assert first_started.wait(2)
+        a1 = scheduler.submit(gated("a1", a1_started, release_a1), caller_id="a")
+        a2 = scheduler.submit(gated("a2", a2_started, release_a2), caller_id="a")
+        b1 = scheduler.submit(gated("b1", b1_started, release_b1), caller_id="b")
+        release_first.set()
+        assert a1_started.wait(2)
+        release_a1.set()
+        assert b1_started.wait(2)
+        release_b1.set()
+        assert a2_started.wait(2)
+        release_a2.set()
+        assert running.result(timeout=2) == "first"
+        assert a1.result(timeout=2) == "a1"
+        assert b1.result(timeout=2) == "b1"
+        assert a2.result(timeout=2) == "a2"
+
+        one = scheduler.submit(shared, coalesce_key=("provider", "auth", "TWSE:2330", "valuation", "2026-10-06"), caller_id="one")
+        assert shared_started.wait(2)
+        two = scheduler.submit(
+            lambda: pytest.fail("coalesced waiter submitted a second worker"),
+            coalesce_key=("provider", "auth", "TWSE:2330", "valuation", "2026-10-06"),
+            caller_id="two",
+        )
+        assert one.cancel()
+        release_shared.set()
+        assert two.result(timeout=2) == "shared-result"
+        assert calls.count("shared") == 1
+        assert scheduler.snapshot() == {"active": 0, "queued": 0, "in_flight": 0}
+    finally:
+        release_first.set()
+        release_a1.set()
+        release_b1.set()
+        release_a2.set()
+        release_shared.set()
+        scheduler.shutdown(wait_for_workers=True)
+
+
+def test_fair_scheduler_bounds_queue_and_does_not_start_expired_jobs(monkeypatch):
+    import threading
+    from types import SimpleNamespace
+    from concurrent.futures import TimeoutError as FutureTimeoutError
+    import src.modules.research.taiwan_research as research
+
+    scheduler = research._FairReadScheduler(max_workers=4, queue_capacity=16)
+    release = threading.Event()
+    all_active = threading.Event()
+    guard = threading.Lock()
+    active_started = 0
+
+    def active_read():
+        nonlocal active_started
+        with guard:
+            active_started += 1
+            if active_started == 4:
+                all_active.set()
+        assert release.wait(2)
+        return "active"
+
+    try:
+        active = [scheduler.submit(active_read, caller_id=f"active-{index}") for index in range(4)]
+        assert all_active.wait(2)
+        queued = [
+            scheduler.submit(lambda index=index: index, caller_id=f"queued-{index}")
+            for index in range(16)
+        ]
+        assert scheduler.snapshot() == {"active": 4, "queued": 16, "in_flight": 0}
+        with pytest.raises(RuntimeError, match="concurrency_limit"):
+            scheduler.submit(lambda: "over-capacity", caller_id="overflow")
+
+        assert queued[5].cancel()
+        replacement = scheduler.submit(lambda: "replacement", caller_id="replacement")
+        assert scheduler.snapshot() == {"active": 4, "queued": 16, "in_flight": 0}
+        release.set()
+        assert [future.result(timeout=2) for future in active] == ["active"] * 4
+        assert [future.result(timeout=2) for index, future in enumerate(queued) if index != 5] == [
+            index for index in range(16) if index != 5
+        ]
+        assert replacement.result(timeout=2) == "replacement"
+        assert scheduler.snapshot() == {"active": 0, "queued": 0, "in_flight": 0}
+    finally:
+        release.set()
+        scheduler.shutdown(wait_for_workers=True)
+
+    expired_scheduler = research._FairReadScheduler(max_workers=1, queue_capacity=1)
+    clock = [0.0]
+    monkeypatch.setattr(research, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
+    expired_release = threading.Event()
+    active_started_event = threading.Event()
+    queued_started_event = threading.Event()
+
+    def held_read():
+        active_started_event.set()
+        assert expired_release.wait(2)
+        return "held"
+
+    try:
+        active_future = expired_scheduler.submit(held_read, caller_id="held")
+        assert active_started_event.wait(2)
+        queued_future = expired_scheduler.submit(
+            lambda: queued_started_event.set(),
+            caller_id="expired",
+            deadline=1.0,
+        )
+        clock[0] = 2.0
+        expired_release.set()
+        assert active_future.result(timeout=2) == "held"
+        with pytest.raises(FutureTimeoutError):
+            queued_future.result(timeout=2)
+        assert not queued_started_event.is_set()
+        assert expired_scheduler.snapshot() == {"active": 0, "queued": 0, "in_flight": 0}
+    finally:
+        expired_release.set()
+        expired_scheduler.shutdown(wait_for_workers=True)
+
+
+def test_selective_research_returns_only_allowlisted_requested_blocks(monkeypatch):
+    import src.modules.research.taiwan_research as research
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+
+    class Client:
+        def valuation_history(self, *_args, **_kwargs):
+            return {"observations": [{"trade_date": "2026-10-06"}]}
+
+    monkeypatch.setattr(research, "_instrument_catalog", lambda *_args: _catalog())
+    monkeypatch.setattr(research, "_valuation_block", lambda read: ResearchDataBlock(
+        read, "available", "selected_record_present", {"selectors": {"start": "2026-10-06", "end": "2026-10-06"}},
+    ))
+    payload = TaiwanResearchService(
+        client=Client(), config={"base_url": "http://fixture"}
+    ).collect(
+        "TWSE:2330", blocks=["valuation"], start_date="2026-10-06", end_date="2026-10-06",
+        today_taipei=date(2026, 10, 7),
+    )
+
+    assert payload["requested_blocks"] == ["valuation"]
+    assert list(payload["blocks"]) == ["valuation"]
+    assert payload["blocks"]["valuation"]["data"]["observations"][0]["trade_date"] == "2026-10-06"
+    with pytest.raises(ValueError, match="unsupported research block"):
+        TaiwanResearchService(client=Client(), config={"base_url": "http://fixture"}).collect(
+            "TWSE:2330", blocks=["valuation", "unknown"], today_taipei=date(2026, 10, 7),
+        )
+
+
+def test_direct_and_aggregate_corporate_actions_coalesce_for_the_same_scope(monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import src.modules.research.taiwan_research as research
+    from src.modules.research.twmd_profile_revenue import ResearchDataBlock
+
+    started = threading.Event()
+    release = threading.Event()
+    second_action_submit = threading.Event()
+    action_keys = []
+    key_lock = threading.Lock()
+
+    class ObservedScheduler(research._FairReadScheduler):
+        def submit(self, function, **kwargs):
+            coalesce_key = kwargs.get("coalesce_key")
+            if coalesce_key is not None and "corporate_actions" in coalesce_key:
+                with key_lock:
+                    action_keys.append(coalesce_key)
+                    if len(action_keys) == 2:
+                        second_action_submit.set()
+            return super().submit(function, **kwargs)
+
+    scheduler = ObservedScheduler(max_workers=1, queue_capacity=16)
+    monkeypatch.setattr(research, "_READ_SCHEDULER", scheduler)
+    monkeypatch.setattr(research, "_corporate_actions_for_client", lambda *_args: (
+        started.set(), release.wait(2),
+        ResearchDataBlock({}, "available", "selected_record_present", {}),
+    )[-1])
+
+    config = {"base_url": "http://fixture"}
+    research._cache_set((*_scope(config), "catalog", "TW"), _catalog(), 300)
+    service = TaiwanResearchService(client=object(), config=config)
+    caller_pool = ThreadPoolExecutor(max_workers=2)
+    selectors = {"start_date": "2026-10-01", "end_date": "2026-10-06"}
+    try:
+        direct = caller_pool.submit(
+            service.corporate_actions, "TWSE:2330", **selectors, today_taipei=date(2026, 10, 7)
+        )
+        assert started.wait(2)
+        aggregate = caller_pool.submit(
+            service.collect, "TWSE:2330", blocks=["corporate_actions"],
+            **selectors, today_taipei=date(2026, 10, 7),
+        )
+        assert second_action_submit.wait(2)
+        assert len(action_keys) == 2 and action_keys[0] == action_keys[1]
+        assert scheduler.snapshot() == {"active": 1, "queued": 0, "in_flight": 1}
+        release.set()
+        assert direct.result(timeout=2).status == "available"
+        payload = aggregate.result(timeout=2)
+        assert payload["requested_blocks"] == ["corporate_actions"]
+        assert payload["blocks"]["corporate_actions"]["status"] == "available"
+        assert scheduler.snapshot() == {"active": 0, "queued": 0, "in_flight": 0}
+    finally:
+        release.set()
+        caller_pool.shutdown(wait=True)
+        scheduler.shutdown(wait_for_workers=True)
 
 
 def test_read_lease_keeps_running_permit_and_releases_cancelled_queued_read(monkeypatch):
     import threading
-    from concurrent.futures import ThreadPoolExecutor
     import src.modules.research.taiwan_research as research
 
-    pool = ThreadPoolExecutor(max_workers=1)
-    slots = threading.BoundedSemaphore(2)
+    scheduler = research._FairReadScheduler(max_workers=1, queue_capacity=1)
     started = threading.Event()
     release = threading.Event()
-    monkeypatch.setattr(research, "_READ_POOL", pool)
-    monkeypatch.setattr(research, "_READ_SLOTS", slots)
+    monkeypatch.setattr(research, "_READ_SCHEDULER", scheduler)
 
     def blocked_read():
         started.set()
@@ -979,20 +1223,20 @@ def test_read_lease_keeps_running_permit_and_releases_cancelled_queued_read(monk
         running = research._submit_read(blocked_read)
         assert started.wait(2)
         queued = research._submit_read(lambda: "must be cancelled")
-        assert slots._value == 0
+        assert scheduler.snapshot() == {"active": 1, "queued": 1, "in_flight": 0}
         assert queued.cancel()
-        assert slots._value == 1
+        assert scheduler.snapshot() == {"active": 1, "queued": 0, "in_flight": 0}
         later = research._submit_read(lambda: "finished after the first read")
-        assert slots._value == 0
+        assert scheduler.snapshot() == {"active": 1, "queued": 1, "in_flight": 0}
         with pytest.raises(RuntimeError, match="concurrency_limit"):
             research._submit_read(lambda: None)
         release.set()
         assert running.result(timeout=2) == "finished"
         assert later.result(timeout=2) == "finished after the first read"
-        assert slots._value == 2
+        assert scheduler.snapshot() == {"active": 0, "queued": 0, "in_flight": 0}
     finally:
         release.set()
-        pool.shutdown(wait=True)
+        scheduler.shutdown(wait_for_workers=True)
 
 
 def test_tdcc_zero_previous_denominator_preserves_counts_and_null_percentage_delta():
@@ -1019,7 +1263,7 @@ def test_finished_batch_after_deadline_does_not_launch_remaining_reads(monkeypat
     monkeypatch.setattr(research, '_REQUEST_DEADLINE_SECONDS', 1)
     research._cache_set((*_scope({'base_url': 'http://deadline-fixture'}), 'catalog', 'TW'), _catalog(), 300)
     submitted = []
-    def submit(function, name, key, builder):
+    def submit(function, name, key, builder, **_kwargs):
         submitted.append(name)
         future = Future()
         future.set_result(ResearchDataBlock({}, 'available', 'selected_record_present', {}))
