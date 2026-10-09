@@ -1,6 +1,6 @@
 # TWUX-01：行情日期、休市背景與 AI 上下文
 
-優先級：P1。狀態：in_progress。依賴：無。
+優先級：P1。狀態：completed。依賴：無。
 
 ## 問題與交付結果
 
@@ -40,8 +40,28 @@
 
 ## Progress checkpoint
 
-2026-10-10：開始實作。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。
+2026-10-10：完成詳情行情／問 AI 共用標示、日報日期背景與有界下一交易日日曆 helper。詳情與 AI 共用 `market-context` 輸出，來源 `timestamp=null` 保持未知，API 的 `usable_for_trading=false` 明示不可交易；日報以 Asia/Taipei 產製時間另列每檔行情日期、價格種類、時效及來源觀察時間。下一交易日只在 TWSE／A 股日曆覆蓋內提供，跨年或未知時顯示待確認。Owner：implementation worker；coordinator：Codex。
 
 ## Handoff
 
-尚未交付。
+已完成實作與 coordinator 獨立複核：
+
+- `frontend/packages/biz-ui/src/components/stock-insight-modal.tsx`、`frontend/packages/biz-ui/src/lib/market-context.ts`：詳情行情與「問 AI」使用同一行情／日曆上下文；保留 EOD、過期 live、來源觀察時間與可交易狀態。狀態來自既有 `/stocks/markets/status` API；盤中更新仍可執行。
+- `frontend/packages/api/src/dashboard.ts`：補上市場時區與日曆回應型別。
+- `src/platform/scheduling/trading_calendar.py`：新增只在明確日曆覆蓋內回傳的下一交易日和市場日曆背景；不改交易排程守衛。
+- `src/modules/automation/daily_report.py`、`prompts/daily_report.txt`：分開報告產製日與每檔行情日期、價格種類、時效、可交易狀態、來源觀察時間；指數缺日期／種類時保留未知；下一交易日未知時提示待確認。新建議用「下次開盤關注」，並相容舊模型的「明日關注」輸入。
+- 回歸測試：`tests/test_daily_report_index.py`、`tests/test_trading_calendar.py`、`frontend/tests/research/market-context.test.ts`。
+
+驗證結果：
+
+- `.venv/bin/python -m pytest -q tests/test_trading_calendar.py tests/test_daily_report_index.py`：28 passed。
+- `.venv/bin/python -m pytest -q tests/test_taiwan_integration.py tests/test_taiwan_research_api.py tests/test_taiwan_research_service.py tests/test_taiwan_discovery.py tests/test_discovery_routing.py packages/marketdata/tests/test_twmd.py`：115 passed。
+- 固定 Node 24.14.0／pnpm 9.15.9：`pnpm exec vitest run tests/research/market-context.test.ts`：4 passed；`pnpm exec tsc -b` 通過；`pnpm build` 通過。
+- `git diff --check` 通過。
+
+唯讀欄位核對（coordinator，2026-10-10）：報價請求 HTTP 200、1.433 秒；TWSE:2330 回傳 stale live、trade_date `2026-10-08`、來源觀察時間 `2026-10-08T13:30:00+08:00`、freshness 標示不可交易；TPEX:5347 與 TPEX:006201 使用 EOD fallback、trade_date `2026-10-08`、來源觀察時間為 null。查詢 image digest 為 `sha256:c6bfd31e9fc2d65f1abfa95dffab789e648e7a0a37d8292df3eeb99d77543795`。執行中的 PanWatch image 仍是舊版 `sha256:d4223a4a4b831d74d412228afc6e0abb0934582e39393ca77f0a22bf0f7dfa8f`，因此這是欄位契約核對，不是本次程式碼的部署驗收；本次未重建或部署。
+
+
+Coordinator 最終複核（2026-10-10）：已修正 analysis_date 以台北日期正規化，補 UTC 跨日儲存／模型輸入一致性測試；日曆 fixture 改為 monkeypatch 復原。另為詳情報價及市場狀態加入序號，忽略切換標的／關閉後晚到回應；新增實際 modal 的「問 AI」背景與晚回應測試。獨立執行指定日曆／日報加跨模組 pytest：144 passed；前端 market-context 與 StockInsightMaterialInformation：9 passed；固定 Node 24.14.0／pnpm 9.15.9 的 tsc -b、build 通過。
+
+共用呈現契約：buildQuoteMarketContext 使用 trade_date、price_kind、freshness.status、timestamp、availability、usable_for_trading；market status 使用 calendar.status/date/is_trading_day 及 timezone。EOD 為收盤行情，stale live 為過期盤中報價；缺日期／時間／時區或交易可用性明示未知，不使用生成時間補值。TWUX-04、05 可重用此規則。新成果未部署；既有使用者修改保留。

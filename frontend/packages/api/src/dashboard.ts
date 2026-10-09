@@ -48,6 +48,15 @@ export interface DashboardMarketStatus {
   is_trading: boolean
   sessions: string[]
   local_time: string
+  timezone?: string
+  calendar?: {
+    status: 'known' | 'unknown' | string
+    date?: string | null
+    is_trading_day?: boolean | null
+    source?: string | null
+    coverage_start?: string | null
+    coverage_end?: string | null
+  }
 }
 
 export interface DashboardPosition {

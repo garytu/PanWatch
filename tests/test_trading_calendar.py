@@ -316,3 +316,39 @@ def test_台股交易日與休市(monkeypatch):
     assert m_tw.is_trading_time(datetime(2026, 8, 10, 10, 0, tzinfo=ZoneInfo("Asia/Taipei"))) is True
     # 13:30 收盤，13:31 非交易時段
     assert m_tw.is_trading_time(datetime(2026, 8, 10, 13, 31, tzinfo=ZoneInfo("Asia/Taipei"))) is False
+
+
+def test_下一交易日只使用有覆蓋證據的台股日曆(monkeypatch):
+    tc._TW_TRADING_DATES = frozenset({date(2026, 10, 8), date(2026, 10, 12)})
+    tc._TW_RANGE = (date(2026, 10, 1), date(2026, 10, 31))
+
+    context = tc.market_calendar_context("TW", date(2026, 10, 9))
+
+    assert context == {
+        "status": "known",
+        "date": "2026-10-09",
+        "timezone": "Asia/Taipei",
+        "is_trading_day": False,
+        "source": "TWSE annual schedule",
+        "coverage_start": "2026-10-01",
+        "coverage_end": "2026-10-31",
+        "next_trading_day": "2026-10-12",
+    }
+
+
+def test_跨年下一交易日超出覆蓋範圍時保持未知():
+    tc._TW_TRADING_DATES = frozenset({date(2026, 12, 31)})
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+
+    context = tc.market_calendar_context("TW", date(2026, 12, 31))
+
+    assert context["status"] == "known"
+    assert context["next_trading_day"] is None
+
+
+def test_台股日曆未載入時明示未知且不提供下一交易日():
+    context = tc.market_calendar_context("TW", date(2026, 10, 9))
+
+    assert context["status"] == "unknown"
+    assert context["is_trading_day"] is None
+    assert context["next_trading_day"] is None

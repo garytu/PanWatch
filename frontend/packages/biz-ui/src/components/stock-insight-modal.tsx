@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Copy, Download, ExternalLink, RefreshCw, Share2, Sparkles } from 'lucide-react'
 import {
+  dashboardApi,
   insightApi,
   stocksApi,
   tradingAgentsApi,
+  type DashboardMarketStatus,
   type DeepAnalysisResult,
   type HistoryComparisonResponse,
 } from '@panwatch/api'
@@ -26,6 +28,7 @@ import { TaiwanResearchPanel } from './taiwan-research-panel'
 import {
   buildMaterialInformationDisplay,
 } from '../lib/material-information-display'
+import { buildQuoteMarketContext } from '../lib/market-context'
 import { MaterialInformationTimeline } from './material-information-timeline'
 
 interface QuoteResponse {
@@ -45,6 +48,18 @@ interface QuoteResponse {
   pe_ratio?: number | null
   total_market_value?: number | null
   circulating_market_value?: number | null
+  timestamp?: string | null
+  instrument_id?: string | null
+  venue?: string | null
+  price_kind?: string | null
+  provider?: string | null
+  trade_date?: string | null
+  reference_price?: number | null
+  change_basis?: string | null
+  adjustment_mode?: string | null
+  availability?: string | null
+  freshness?: { status?: string | null } | null
+  usable_for_trading?: boolean | null
 }
 
 interface KlineSummaryResponse {
@@ -390,6 +405,7 @@ export default function StockInsightModal(props: {
     20
   )
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
+  const [marketStatus, setMarketStatus] = useState<DashboardMarketStatus | null>(null)
   const [klineSummary, setKlineSummary] = useState<KlineSummary | null>(null)
   const [miniKlines, setMiniKlines] = useState<MiniKlineResponse['klines']>([])
   const [miniKlineLoading, setMiniKlineLoading] = useState(false)
@@ -425,13 +441,32 @@ export default function StockInsightModal(props: {
   const autoTriggeredRef = useRef<Record<string, number>>({})
   const stockCacheRef = useRef<Record<string, StockItem>>({})
   const announcementSequenceRef = useRef(0)
+  const quoteSequenceRef = useRef(0)
+  const marketStatusSequenceRef = useRef(0)
   const resolvedName = useMemo(() => props.stockName || quote?.name || symbol, [props.stockName, quote?.name, symbol])
+  const quoteMarketContext = useMemo(
+    () => buildQuoteMarketContext(quote || {}, market, marketStatus),
+    [quote, market, marketStatus],
+  )
 
   const loadQuote = useCallback(async () => {
     if (!symbol) return
+    const sequence = ++quoteSequenceRef.current
     const data = await insightApi.quote<QuoteResponse>(symbol, market)
-    setQuote(data || null)
+    if (sequence === quoteSequenceRef.current) setQuote(data || null)
   }, [symbol, market])
+
+  const loadMarketStatus = useCallback(async () => {
+    const sequence = ++marketStatusSequenceRef.current
+    try {
+      const statuses = await dashboardApi.marketStatus()
+      if (sequence === marketStatusSequenceRef.current) {
+        setMarketStatus((statuses || []).find(item => item.code.toUpperCase() === market) || null)
+      }
+    } catch {
+      if (sequence === marketStatusSequenceRef.current) setMarketStatus(null)
+    }
+  }, [market])
 
   const loadKline = useCallback(async () => {
     if (!symbol) return
@@ -722,29 +757,29 @@ export default function StockInsightModal(props: {
     if (!symbol) return
     setLoading(true)
     try {
-      await Promise.allSettled([loadQuote(), loadKline(), loadMiniKline(), loadHoldingAgg()])
+      await Promise.allSettled([loadQuote(), loadMarketStatus(), loadKline(), loadMiniKline(), loadHoldingAgg()])
     } catch (e) {
       toast(e instanceof Error ? e.message : '載入失敗', 'error')
     } finally {
       setLoading(false)
     }
-  }, [symbol, loadQuote, loadKline, loadMiniKline, loadHoldingAgg, toast])
+  }, [symbol, loadQuote, loadMarketStatus, loadKline, loadMiniKline, loadHoldingAgg, toast])
 
   const handleRefreshAll = useCallback(async () => {
     if (!symbol) return
     setLoading(true)
     try {
-      await Promise.allSettled([loadQuote(), loadKline(), loadMiniKline(), loadSuggestions(), loadNews(), loadAnnouncements(), loadHoldingAgg(), loadReports()])
+      await Promise.allSettled([loadQuote(), loadMarketStatus(), loadKline(), loadMiniKline(), loadSuggestions(), loadNews(), loadAnnouncements(), loadHoldingAgg(), loadReports()])
     } catch (e) {
       toast(e instanceof Error ? e.message : '載入失敗', 'error')
     } finally {
       setLoading(false)
     }
-  }, [symbol, loadQuote, loadKline, loadMiniKline, loadSuggestions, loadNews, loadAnnouncements, loadHoldingAgg, loadReports, toast])
+  }, [symbol, loadQuote, loadMarketStatus, loadKline, loadMiniKline, loadSuggestions, loadNews, loadAnnouncements, loadHoldingAgg, loadReports, toast])
 
   const refreshForAuto = useCallback(async () => {
     if (!symbol) return
-    const tasks: Promise<any>[] = [loadQuote(), loadHoldingAgg()]
+    const tasks: Promise<any>[] = [loadQuote(), loadMarketStatus(), loadHoldingAgg()]
     if (tab === 'overview' || tab === 'kline') {
       tasks.push(loadKline(), loadMiniKline({ silent: true }))
     }
@@ -761,7 +796,7 @@ export default function StockInsightModal(props: {
       tasks.push(loadReports())
     }
     await Promise.allSettled(tasks)
-  }, [symbol, tab, loadQuote, loadHoldingAgg, loadKline, loadMiniKline, loadSuggestions, loadNews, loadAnnouncements, loadReports])
+  }, [symbol, tab, loadQuote, loadMarketStatus, loadHoldingAgg, loadKline, loadMiniKline, loadSuggestions, loadNews, loadAnnouncements, loadReports])
 
   const loadDeepResult = useCallback(async () => {
     if (!symbol) return
@@ -787,6 +822,8 @@ export default function StockInsightModal(props: {
   useEffect(() => {
     if (!props.open || !symbol) return
     setTab('overview')
+    setQuote(null)
+    setMarketStatus(null)
     setSuggestions([])
     setNews([])
     setAnnouncements([])
@@ -797,6 +834,10 @@ export default function StockInsightModal(props: {
     setDeepLoaded(false)
     setDeepHistory(null)
     loadCore()
+    return () => {
+      quoteSequenceRef.current++
+      marketStatusSequenceRef.current++
+    }
   }, [props.open, symbol, market, loadCore])
 
   // 切到「深度」tab 時按需拉取(僅首次)
@@ -888,12 +929,14 @@ export default function StockInsightModal(props: {
   const buildPageContext = useCallback(() => {
     const parts: string[] = []
     if (quote) {
-      const items = [`價格${quote.current_price}`, `漲跌幅${quote.change_pct}%`]
+      const items: string[] = []
       if (quote.volume != null) items.push(`成交量${quote.volume}`)
       if (quote.turnover_rate != null) items.push(`周轉率${quote.turnover_rate}%`)
       if (quote.pe_ratio != null) items.push(`市盈率${quote.pe_ratio}`)
       if (quote.total_market_value != null) items.push(`總市值${quote.total_market_value}`)
-      parts.push(`即時行情：${items.join('，')}`)
+      parts.push(`${quoteMarketContext.aiContext}\n其他行情數值：${items.join('，')}`)
+    } else {
+      parts.push(`行情背景：行情資料未知\n市場背景：${quoteMarketContext.marketLabel}`)
     }
     if (klineSummary) {
       const k = klineSummary as any
@@ -923,7 +966,7 @@ export default function StockInsightModal(props: {
       parts.push(`持倉：${holdingAgg.quantity}股，成本${holdingAgg.unitCost}，市值${holdingAgg.marketValue}，損益${holdingAgg.pnl}`)
     }
     return parts.join('\n')
-  }, [quote, klineSummary, technicalScored, suggestions, holdingAgg])
+  }, [quote, quoteMarketContext, klineSummary, technicalScored, suggestions, holdingAgg])
 
   const quoteUp = (quote?.change_pct || 0) > 0
   const quoteDown = (quote?.change_pct || 0) < 0
@@ -1493,8 +1536,10 @@ export default function StockInsightModal(props: {
                         {quote?.change_pct != null ? `${quote.change_pct >= 0 ? '+' : ''}${quote.change_pct.toFixed(2)}%` : '--'}
                       </div>
                     </div>
+                    {quote ? <div className="mt-2 text-[10px] text-muted-foreground">{quoteMarketContext.quoteLabel}</div> : null}
+                    <div className="mt-1 text-[10px] text-muted-foreground">{quoteMarketContext.marketLabel}</div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-[12px]">
-                      <div className="rounded bg-accent/15 px-2 py-1.5"><div className="text-[10px] text-muted-foreground">今開</div><div className={`font-mono ${levelColor(quote?.open_price)}`}>{formatNumber(quote?.open_price)}</div></div>
+                      <div className="rounded bg-accent/15 px-2 py-1.5"><div className="text-[10px] text-muted-foreground">開盤</div><div className={`font-mono ${levelColor(quote?.open_price)}`}>{formatNumber(quote?.open_price)}</div></div>
                       <div className="rounded bg-accent/15 px-2 py-1.5"><div className="text-[10px] text-muted-foreground">最高</div><div className={`font-mono ${levelColor(quote?.high_price)}`}>{formatNumber(quote?.high_price)}</div></div>
                       <div className="rounded bg-accent/15 px-2 py-1.5"><div className="text-[10px] text-muted-foreground">最低</div><div className={`font-mono ${levelColor(quote?.low_price)}`}>{formatNumber(quote?.low_price)}</div></div>
                       <div className="rounded bg-accent/15 px-2 py-1.5"><div className="text-[10px] text-muted-foreground">成交量</div><div className="font-mono">{formatCompactNumber(quote?.volume)}</div></div>

@@ -245,6 +245,70 @@ def calendar_status(market, d: date | datetime | None = None) -> dict:
             "coverage_end": _TW_RANGE[1].isoformat() if code == MarketCode.TW and _TW_RANGE else None}
 
 
+def next_trading_day(market, d: date | datetime | None = None) -> date | None:
+    """Return the next open date only when an authoritative calendar covers it.
+
+    TWSE and the loaded CN calendar have explicit coverage ranges. A weekend-only
+    fallback is not enough evidence to predict the next opening date because a
+    weekday holiday may intervene.
+    """
+    from src.platform.marketdata.models import MarketCode
+
+    code = _to_market_code(market)
+    target = _resolve_date(code, d)
+    if code == MarketCode.TW:
+        dates, covered_range = _TW_TRADING_DATES, _TW_RANGE
+    elif code == MarketCode.CN:
+        dates, covered_range = _CN_TRADING_DATES, _CN_RANGE
+    else:
+        return None
+    if not dates or not covered_range or not (covered_range[0] <= target <= covered_range[1]):
+        return None
+
+    candidate = target + timedelta(days=1)
+    while candidate <= covered_range[1]:
+        if candidate in dates and is_trading_day(code, candidate):
+            return candidate
+        candidate += timedelta(days=1)
+    return None
+
+
+def market_calendar_context(market, d: date | datetime | None = None) -> dict:
+    """Return date, timezone, calendar certainty, and a covered next open date."""
+    from src.platform.marketdata.models import MarketCode, MARKETS
+
+    code = _to_market_code(market)
+    target = _resolve_date(code, d)
+    market_def = MARKETS.get(code) if code else None
+    timezone = market_def.timezone if market_def else _FALLBACK_TZ
+    status = calendar_status(code, target)
+
+    if code == MarketCode.TW:
+        dates, covered_range = _TW_TRADING_DATES, _TW_RANGE
+    elif code == MarketCode.CN:
+        dates, covered_range = _CN_TRADING_DATES, _CN_RANGE
+    else:
+        dates, covered_range = None, None
+        # Weekends are known closed days; weekday holidays are not covered for HK/US.
+    covered = (
+        bool(dates and covered_range and covered_range[0] <= target <= covered_range[1])
+        if code in {MarketCode.TW, MarketCode.CN}
+        else target.weekday() >= 5
+    )
+    next_day = next_trading_day(code, target) if covered else None
+
+    return {
+        "status": "known" if covered else "unknown",
+        "date": target.isoformat(),
+        "timezone": timezone,
+        "is_trading_day": status["is_trading_day"] if covered else None,
+        "source": status.get("source") if covered else ("weekend rule" if target.weekday() >= 5 else None),
+        "coverage_start": covered_range[0].isoformat() if covered_range else None,
+        "coverage_end": covered_range[1].isoformat() if covered_range else None,
+        "next_trading_day": next_day.isoformat() if next_day else None,
+    }
+
+
 def any_market_trading_day(d: date | datetime | None = None) -> bool:
     """已啟用市場任一為交易日即 `True`。"""
 

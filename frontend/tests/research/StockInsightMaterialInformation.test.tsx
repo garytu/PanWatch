@@ -2,9 +2,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import StockInsightModal from '@panwatch/biz-ui/components/stock-insight-modal'
-import { insightApi } from '@panwatch/api'
+import { dashboardApi, insightApi } from '@panwatch/api'
 
 vi.mock('@panwatch/api', () => ({
+  dashboardApi: { marketStatus: vi.fn().mockResolvedValue([{
+    code: 'TW', timezone: 'Asia/Taipei', status_text: '休市（交易日曆）',
+    calendar: { status: 'known', date: '2026-10-09', is_trading_day: false },
+  }]) },
   insightApi: {
     quote: vi.fn().mockResolvedValue({ name: '測試公司', current_price: null }),
     klineSummary: vi.fn().mockResolvedValue({ summary: null }),
@@ -71,4 +75,39 @@ it('isolates late official responses after switching stocks in the mounted annou
   })
   expect(screen.queryByText('舊股票公告')).toBeNull()
   expect(screen.getByText('新股票公告')).toBeTruthy()
+})
+
+it('passes the displayed source quote and holiday background to ask AI and ignores late old quotes', async () => {
+  const oldQuote = deferred<any>()
+  vi.mocked(insightApi.quote).mockImplementation((symbol) => symbol === 'TWSE:2330'
+    ? oldQuote.promise : Promise.resolve({
+      name: '世界', current_price: 50, change_pct: 0.5, trade_date: '2026-10-08',
+      price_kind: 'eod', timestamp: null, freshness: { status: 'closed' }, usable_for_trading: false,
+    }))
+  vi.mocked(insightApi.materialInformation).mockResolvedValue(payload('TPEX:5347', 'current') as any)
+  const listener = vi.fn()
+  window.addEventListener('panwatch-open-chat', listener)
+  try {
+    const { rerender } = render(<StockInsightModal open onOpenChange={() => {}} symbol="TWSE:2330" market="TW" />)
+    await waitFor(() => expect(insightApi.quote).toHaveBeenCalled())
+    rerender(<StockInsightModal open onOpenChange={() => {}} symbol="TPEX:5347" market="TW" />)
+    await waitFor(() => expect(screen.getByText(/行情日期 2026-10-08.*eod（收盤行情）/)).toBeTruthy())
+    await act(async () => oldQuote.resolve({
+      name: '台積電', current_price: 1450, trade_date: '2026-10-07', price_kind: 'live',
+      freshness: { status: 'stale' }, usable_for_trading: false,
+    }))
+    expect(screen.queryByText(/行情日期 2026-10-07/)).toBeNull()
+    fireEvent.click(screen.getAllByRole('button', { name: '問 AI' })[0])
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail
+    expect(detail.symbol).toBe('TPEX:5347')
+    expect(detail.pageContext).toContain('行情日期 2026-10-08')
+    expect(detail.pageContext).toContain('eod（收盤行情）')
+    expect(detail.pageContext).toContain('來源觀察時間未知')
+    expect(detail.pageContext).toContain('API 標示不可交易')
+    expect(detail.pageContext).toContain('2026-10-09 · 休市')
+    expect(detail.pageContext).not.toContain('即時行情')
+    expect(dashboardApi.marketStatus).toHaveBeenCalled()
+  } finally {
+    window.removeEventListener('panwatch-open-chat', listener)
+  }
 })

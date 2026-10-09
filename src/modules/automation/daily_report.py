@@ -3,6 +3,7 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from src.modules.automation.base import BaseAgent, AgentContext, AnalysisResult
 from src.modules.research.analysis_history import save_analysis
@@ -29,7 +30,9 @@ DAILY_ACTION_MAP = {
     "考慮加碼": {"action": "add", "label": "考慮加碼"},
     "考慮減碼": {"action": "reduce", "label": "考慮減碼"},
     "考慮停損": {"action": "sell", "label": "考慮停損"},
-    "明日關注": {"action": "watch", "label": "明日關注"},
+    "下次開盤關注": {"action": "watch", "label": "下次開盤關注"},
+    # Accept historical model wording, but normalize new saved suggestions.
+    "明日關注": {"action": "watch", "label": "下次開盤關注"},
     "暫時迴避": {"action": "avoid", "label": "暫時迴避"},
 }
 
@@ -37,6 +40,79 @@ PROMPT_PATH = Path(__file__).parent.parent.parent.parent / "prompts" / "daily_re
 
 # A 股大盤指數的顯式騰訊符號（與 akshare_collector.CN_INDICES 口徑一致）
 _CN_INDEX_TENCENT_SYMBOLS = ["sh000001", "sz399001", "sz399006"]
+_TAIPEI_TZ = ZoneInfo("Asia/Taipei")
+
+
+def _report_datetime(data: dict) -> datetime:
+    """Resolve the report production time in Taiwan time, never from a quote."""
+    raw = data.get("timestamp")
+    if isinstance(raw, datetime):
+        value = raw
+    elif raw:
+        try:
+            value = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            value = datetime.now(_TAIPEI_TZ)
+    else:
+        value = datetime.now(_TAIPEI_TZ)
+    # Legacy callers may still supply a naive report timestamp. New collection
+    # timestamps are timezone-aware and this compatibility path is Taiwan-local.
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=_TAIPEI_TZ)
+    return value.astimezone(_TAIPEI_TZ)
+
+
+def _quote_observation_time(value, market_timezone: str) -> str:
+    if value is None:
+        return "來源觀察時間未知"
+    if isinstance(value, datetime):
+        observed = value
+    else:
+        try:
+            observed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return "來源觀察時間未知"
+    if observed.tzinfo is None:
+        return f"來源觀察時間 {observed.isoformat()}（時區未知）"
+    return f"來源觀察時間 {observed.astimezone(ZoneInfo(market_timezone)).isoformat()}"
+
+
+def _quote_market_context(quote) -> str:
+    market = getattr(quote, "market", None)
+    market_code = market.value if isinstance(market, MarketCode) else str(market or "")
+    from src.platform.marketdata.models import MARKETS
+    market_def = MARKETS.get(MarketCode(market_code)) if market_code in MarketCode._value2member_map_ else None
+    timezone = market_def.timezone if market_def else "Asia/Taipei"
+
+    trade_date = getattr(quote, "trade_date", None) or "未知"
+    price_kind = getattr(quote, "price_kind", None)
+    if price_kind == "eod":
+        kind_text = "eod（收盤行情）"
+    elif price_kind == "live":
+        freshness = getattr(quote, "freshness", None) or {}
+        freshness_status = freshness.get("status") if isinstance(freshness, dict) else None
+        if freshness_status == "stale":
+            kind_text = "live（過期盤中報價）"
+        elif freshness_status == "fresh":
+            kind_text = "live（新鮮盤中報價）"
+        elif freshness_status == "closed":
+            kind_text = "live（已收盤盤中報價）"
+        else:
+            kind_text = "live（盤中報價時效未知）"
+    else:
+        kind_text = f"{price_kind}（價格種類未知）" if price_kind else "價格種類未知"
+
+    freshness = getattr(quote, "freshness", None) or {}
+    freshness_status = freshness.get("status") if isinstance(freshness, dict) else None
+    freshness_text = str(freshness_status) if freshness_status else "未知"
+    usable = getattr(quote, "usable_for_trading", None)
+    usable_text = "可交易 true" if usable is True else "不可交易 false" if usable is False else "可交易狀態未知"
+    availability = getattr(quote, "availability", None) or "未知"
+    observation = _quote_observation_time(getattr(quote, "timestamp", None), timezone)
+    return (
+        f"行情日期 {trade_date}；價格種類 {kind_text}；時效 {freshness_text}；"
+        f"資料狀態 {availability}；{usable_text}；{observation}（{timezone}）"
+    )
 
 
 def get_market_data():
@@ -51,7 +127,7 @@ class DailyReportAgent(BaseAgent):
 
     name = "daily_report"
     display_name = "收盤覆盤"
-    description = "每日收盤後生成自選股日報，包含大盤概覽、個股分析和明日關注"
+    description = "生成市場日報，包含大盤概覽、個股分析和下次開盤關注"
 
     async def _fetch_index_for_market(self, market_code: MarketCode) -> list[IndexData]:
         """按 market 取大盤指數。
@@ -72,7 +148,7 @@ class DailyReportAgent(BaseAgent):
                 change_amount=item["change_amount"],
                 volume=item["volume"],
                 turnover=item["turnover"],
-                timestamp=datetime.now(),
+                timestamp=datetime.now(ZoneInfo("Asia/Shanghai")),
             )
             for item in items
         ]
@@ -123,12 +199,13 @@ class DailyReportAgent(BaseAgent):
         if not all_indices and not any(p.quote for p in packs.values()):
             raise RuntimeError("資料採集失敗：未獲取到任何行情資料，請檢查網路連線")
 
+        generated_at = datetime.now(_TAIPEI_TZ)
         return {
             "indices": all_indices,
             "signal_packs": packs,
             "symbol_contexts": context_pack.get("symbols", {}),
             "quality_overview": context_pack.get("quality_overview", {}),
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": generated_at.isoformat(),
         }
 
     def build_prompt(self, data: dict, context: AgentContext) -> tuple[str, str]:
@@ -141,7 +218,33 @@ class DailyReportAgent(BaseAgent):
 
         # 構建使用者輸入：結構化的市場資料
         lines = []
-        lines.append(f"## 日期：{datetime.now().strftime('%Y-%m-%d')}\n")
+        report_at = _report_datetime(data)
+        report_date = report_at.date()
+        from src.platform.scheduling.trading_calendar import market_calendar_context
+
+        market_codes = []
+        for stock in context.watchlist:
+            market = stock.market.value if isinstance(stock.market, MarketCode) else str(stock.market)
+            if market not in market_codes:
+                market_codes.append(market)
+        calendar_contexts = {
+            market: market_calendar_context(market, report_at)
+            for market in market_codes
+        }
+        lines.append(f"## 報告產製日：{report_date.isoformat()}（Asia/Taipei）\n")
+        lines.append("## 市場日曆與資料日期")
+        for market in market_codes:
+            calendar = calendar_contexts[market]
+            if calendar["status"] != "known" or calendar["is_trading_day"] is None:
+                day_status = "日曆未知"
+            else:
+                day_status = "交易日" if calendar["is_trading_day"] else "休市"
+            next_day = calendar.get("next_trading_day")
+            next_text = f"下一交易日 {next_day}" if next_day else "下次開盤待確認"
+            lines.append(
+                f"- {market}：{calendar['date']} {day_status}；時區 {calendar['timezone']}；{next_text}"
+            )
+        lines.append("")
         symbol_contexts = data.get("symbol_contexts", {}) or {}
         quality_overview = data.get("quality_overview", {}) or {}
 
@@ -160,8 +263,10 @@ class DailyReportAgent(BaseAgent):
         for idx in data["indices"]:
             change_pct = safe_num(idx.change_pct)
             direction = "↑" if change_pct > 0 else "↓" if change_pct < 0 else "→"
+            index_trade_date = getattr(idx, "trade_date", None) or "未知"
+            index_price_kind = getattr(idx, "price_kind", None) or "未知"
             lines.append(
-                f"- {idx.name}: {safe_num(idx.current_price):.2f} "
+                f"- {idx.name}（行情日期 {index_trade_date}；價格種類 {index_price_kind}）: {safe_num(idx.current_price):.2f} "
                 f"{direction} {change_pct:+.2f}% "
                 f"成交額:{safe_num(idx.turnover) / 1e8:.0f}億"
             )
@@ -177,13 +282,23 @@ class DailyReportAgent(BaseAgent):
             quote = pack.quote if pack else None
             stock_name = (w.name or (quote.name if quote else "") or w.symbol).strip()
             lines.append(f"\n### {stock_name}（{w.symbol}）")
+            market_code = w.market.value if isinstance(w.market, MarketCode) else str(w.market)
+            market_calendar = calendar_contexts.get(market_code)
+            if market_calendar:
+                if market_calendar["status"] != "known" or market_calendar["is_trading_day"] is None:
+                    day_status = "日曆未知"
+                else:
+                    day_status = "交易日" if market_calendar["is_trading_day"] else "休市"
+                lines.append(
+                    f"- 產製日市場背景：{market_calendar['date']} {day_status}（{market_calendar['timezone']}）"
+                )
             if stock_quality:
                 lines.append(
                     f"- 資料質量：{stock_quality.get('score', 0)}（即時新聞 {stock_quality.get('realtime_news_count', 0)} 條，擴充套件新聞 {stock_quality.get('extended_news_count', 0)} 條，歷史新聞 {stock_quality.get('history_news_count', 0)} 條）"
                 )
 
             # 基本行情
-            if quote and quote.current_price is not None:
+            if quote:
                 change_pct = quote.change_pct
                 direction = "↑" if change_pct and change_pct > 0 else "↓" if change_pct and change_pct < 0 else "→"
                 change_text = f"{direction} {change_pct:+.2f}%" if change_pct is not None else "N/A"
@@ -192,11 +307,13 @@ class DailyReportAgent(BaseAgent):
                 reference = (quote.reference_price if quote.reference_price is not None else quote.prev_close) if quote.market == MarketCode.TW else quote.prev_close
                 turnover = quote.turnover
 
-                lines.append(
-                    f"- 價格：{current_price:.2f} {change_text}"
-                )
-                if quote.market == MarketCode.TW:
-                    lines.append(f"- 價格種類：{quote.price_kind}，資料日期 {quote.trade_date}，漲跌基準 {quote.change_basis}")
+                if current_price is not None:
+                    lines.append(f"- 價格：{current_price:.2f} {change_text}")
+                else:
+                    lines.append("- 價格：未知")
+                lines.append(f"- 行情背景：{_quote_market_context(quote)}")
+                if quote.market == MarketCode.TW and quote.change_basis:
+                    lines.append(f"- 漲跌基準：{quote.change_basis}")
                 amplitude = ((high_price - low_price) / reference * 100
                              if high_price is not None and low_price is not None and reference and reference > 0 else None)
                 amplitude_text = f"{amplitude:.1f}%" if amplitude is not None else "N/A"
@@ -209,7 +326,7 @@ class DailyReportAgent(BaseAgent):
                 lines.append(f"- 成交額：{turnover_text}")
             else:
                 current_price = None
-                lines.append("- 今日：行情資料缺失")
+                lines.append("- 行情資料缺失；行情日期、價格種類、時效、來源觀察時間及可交易狀態未知")
 
             # 技術指標
             tech = (pack.technical if pack else None) or {"error": "無技術指標資料"}
@@ -551,6 +668,8 @@ class DailyReportAgent(BaseAgent):
                 continue
             action = (it.get("action") or "hold").strip()
             action_label = (it.get("action_label") or "繼續持有").strip()
+            if action == "watch" and action_label == "明日關注":
+                action_label = "下次開盤關注"
             reason = (it.get("reason") or "").strip()
             signal = (it.get("signal") or "").strip()
 
@@ -617,9 +736,7 @@ class DailyReportAgent(BaseAgent):
         stock_map = {s.symbol: s for s in context.watchlist}
         packs = data.get("signal_packs", {}) or {}
         symbol_contexts = data.get("symbol_contexts", {}) or {}
-        analysis_date = (data.get("timestamp") or "")[:10] or datetime.now().strftime(
-            "%Y-%m-%d"
-        )
+        analysis_date = _report_datetime(data).date().isoformat()
         for symbol, sug in suggestions.items():
             stock = stock_map.get(symbol)
             if stock:
