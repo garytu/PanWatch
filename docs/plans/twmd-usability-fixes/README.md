@@ -11,7 +11,7 @@
 | TWUX-01 | P1 | [行情日期、休市背景與 AI 上下文](cards/TWUX-01-market-context.md) | completed | 無 |
 | TWUX-02 | P1 | [研究讀取排程與區塊重試](cards/TWUX-02-research-loading.md) | completed | 無 |
 | TWUX-03 | P2 | [財報可用期間與獨立載入](cards/TWUX-03-financial-periods.md) | blocked（部分已交付） | TWUX-02 已完成；最新留存預設等待 twmd 期別索引 |
-| TWUX-04 | P2 | [歷史分 K 日期選擇](cards/TWUX-04-intraday-dates.md) | ready | 無；沿用 TWUX-01 的日期呈現規則 |
+| TWUX-04 | P2 | [歷史分 K 日期選擇](cards/TWUX-04-intraday-dates.md) | in_progress | 無；TWUX-01 已完成 |
 | TWUX-05 | P2 | [熱門股榜保留行情來源資訊](cards/TWUX-05-discovery-provenance.md) | ready | TWUX-01 的共用行情標示 |
 
 建議交付順序：**TWUX-01 → TWUX-02 → TWUX-04 → TWUX-05 → TWUX-03**。財報可用期的契約確認可提前進行；不需要等上游擴充，才開始其他四項修正。

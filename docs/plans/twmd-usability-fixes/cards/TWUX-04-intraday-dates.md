@@ -1,6 +1,6 @@
 # TWUX-04：歷史分 K 日期選擇
 
-優先級：P2。狀態：ready。依賴：無；日期呈現沿用 TWUX-01。
+優先級：P2。狀態：in_progress。依賴：無；日期呈現沿用 TWUX-01。
 
 ## 問題與交付結果
 
@@ -39,7 +39,7 @@
 
 ## Progress checkpoint
 
-2026-10-10：使用者已授權依序執行，等待前卡交付／依賴確認。
+2026-10-10：開始歷史分 K 日期選擇。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。TWUX-01 已完成，TWUX-03 可獨立交付部分已提交，完整財報索引仍 blocked，不阻擋本卡。已核對既有 coverage 與 bars 能力，沒有新增上游 API／採集。
 
 ## Handoff
 
