@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -526,6 +526,36 @@ class TwmdDailyBarsRead:
     partial: bool
     bars: tuple[TwmdDailyPriceBar, ...]
     latest_dataset_trade_date: str | None
+
+
+@dataclass(frozen=True)
+class TwmdIntradayCoverageObservation:
+    """One retained session's coverage and independent calendar evidence."""
+
+    trade_date: date
+    session: str
+    status: str
+    calendar_status: str
+    expected_minutes: int
+    observed_minutes: int
+    missing_minutes: int
+    pending_minutes: int
+    raw: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class TwmdIntradayCoverageRead:
+    """A bounded read of stored minute-bar session coverage."""
+
+    instrument_id: str
+    session: str
+    start_date: date
+    end_date: date
+    schema_ready: bool
+    coverage_complete: bool
+    coverage: tuple[TwmdIntradayCoverageObservation, ...]
+    served_at: str | None
+    raw: dict[str, Any]
 
 
 @dataclass(frozen=True)

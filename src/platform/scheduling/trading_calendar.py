@@ -273,6 +273,29 @@ def next_trading_day(market, d: date | datetime | None = None) -> date | None:
     return None
 
 
+def previous_trading_day(market, d: date | datetime | None = None) -> date | None:
+    """Return the prior open date only when an authoritative calendar covers it."""
+    from src.platform.marketdata.models import MarketCode
+
+    code = _to_market_code(market)
+    target = _resolve_date(code, d)
+    if code == MarketCode.TW:
+        dates, covered_range = _TW_TRADING_DATES, _TW_RANGE
+    elif code == MarketCode.CN:
+        dates, covered_range = _CN_TRADING_DATES, _CN_RANGE
+    else:
+        return None
+    if not dates or not covered_range or not (covered_range[0] <= target <= covered_range[1]):
+        return None
+
+    candidate = target - timedelta(days=1)
+    while candidate >= covered_range[0]:
+        if candidate in dates and is_trading_day(code, candidate):
+            return candidate
+        candidate -= timedelta(days=1)
+    return None
+
+
 def market_calendar_context(market, d: date | datetime | None = None) -> dict:
     """Return date, timezone, calendar certainty, and a covered next open date."""
     from src.platform.marketdata.models import MarketCode, MARKETS

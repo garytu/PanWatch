@@ -1,6 +1,6 @@
 # TWUX-04：歷史分 K 日期選擇
 
-優先級：P2。狀態：in_progress。依賴：無；日期呈現沿用 TWUX-01。
+優先級：P2。狀態：completed。依賴：無；日期呈現沿用 TWUX-01。
 
 ## 問題與交付結果
 
@@ -41,6 +41,14 @@
 
 2026-10-10：開始歷史分 K 日期選擇。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。TWUX-01 已完成，TWUX-03 可獨立交付部分已提交，完整財報索引仍 blocked，不阻擋本卡。已核對既有 coverage 與 bars 能力，沒有新增上游 API／採集。
 
+2026-10-10：完成 TWUX-04 implementation checkpoint，交 coordinator review。加入日期／上一交易日／自動選日、bounded coverage 與 bars 解析、typed coverage read、calendar provenance 和切換請求防護；保留舊版無日期 klines route 行為。驗證：`pytest -q tests/test_taiwan_integration.py tests/test_trading_calendar.py packages/marketdata/tests/test_twmd.py`（97 passed）；Vitest 指定兩個檔案（12 passed）；`tsc -b`、`pnpm build`、`git diff --check` 通過。Ruff 未執行：工作環境未安裝 ruff。Live deployed resolver smoke 由 coordinator 使用既有唯讀證據核對，implementation worker 未重複探測。
+
 ## Handoff
 
-尚未交付。
+2026-10-10：coordinator 已完成完整 diff／呼叫端審查、修整與獨立驗證，本卡 completed。
+
+- 自動模式限 30 日、一筆 coverage、最多三筆 bars／八秒總額度；1m／5m 分別限 270／54 列。日曆確認完成交易日與完整留存各自判斷，允許可畫價格的不完整日，但不宣稱完整。明選日期／上一交易日不自動改日，切換週期保留已解析日期；無日期舊呼叫維持原行為。
+- coordinator 修正查找額度耗盡提示、來源日期損壞的 502 分類、缺時間戳／時區／identity 防護、截斷顯示判斷、未知日曆／不支援提示與圖表僅採有效 observed 價格。補 54 棒休市說明、晚到日期／週期、截斷及未知年份不查來源測試。
+- 獨立驗證：`.venv/bin/python -m pytest -q tests/test_taiwan_integration.py tests/test_trading_calendar.py packages/marketdata/tests/test_twmd.py tests/test_taiwan_research_api.py tests/test_taiwan_research_service.py`：144 passed。`pnpm exec vitest run tests/TaiwanIntradayChart.test.tsx tests/api/klines.test.ts`：17 passed；`pnpm exec tsc -b`、`pnpm build`、`git diff --check` 通過。正式建置僅既有 Browserslist 資料過期提示。
+- 新版 checkout API 對既有 query service 唯讀驗收：自動 5m 選 10/08，54/54、完整、0.107 秒；明選 10/08 的 1m 為 270/270（266 observed、4 no_trade），完整；明選 10/09 保留該日，54 列（53 no_trade、1 incomplete），日曆休市、來源 calendar unknown／coverage incomplete 分開保留。總計一筆 coverage、三筆 bars 邏輯讀取；自動查找 retries=0。詳見 [實測證據](../evidence/TWUX-04-read-only-smoke-2026-10-10.json)。
+- 邊界：自動查找需 canonical TWSE／TPEX identity；未知日曆沒有證據時要求明確日期。資料仍為歷史分 K，live_collection／usable_for_trading false；沒有上游採集、訂閱、回補或部署。既有手動 bars 傳輸重試行為保留。

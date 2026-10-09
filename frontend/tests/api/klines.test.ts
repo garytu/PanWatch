@@ -43,6 +43,37 @@ describe('klinesApi', () => {
         { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
     await klinesApi.intraday('TPEX:00679B', '5m')
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/klines/TPEX%3A00679B/intraday?market=TW&timeframe=5m&limit=270')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/klines/TPEX%3A00679B/intraday?market=TW&timeframe=5m&limit=54')
+  })
+
+  it('sends an explicitly selected session as an exact paired date range', async () => {
+    let releaseFetch!: (response: Response) => void
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockReturnValue(
+      new Promise<Response>(resolve => { releaseFetch = resolve }),
+    )
+    const controller = new AbortController()
+    const request = klinesApi.intraday('TWSE:2330', '1m', controller.signal, { mode: 'selected', date: '2026-10-08' })
+    await Promise.resolve()
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      '/api/klines/TWSE%3A2330/intraday?market=TW&timeframe=1m&limit=270&date_mode=selected&start_date=2026-10-08&end_date=2026-10-08',
+    )
+    const forwardedSignal = fetchMock.mock.calls[0]?.[1]?.signal
+    expect(forwardedSignal).toBeTruthy()
+    controller.abort()
+    expect(forwardedSignal?.aborted).toBe(true)
+    releaseFetch(new Response(JSON.stringify({ code: 0, success: true, data: { klines: [] }, message: '' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await request
+  })
+
+  it('uses the selected date as the previous trading day anchor', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ code: 0, success: true, data: { klines: [] }, message: '' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    await klinesApi.intraday('TWSE:2330', '5m', undefined, { mode: 'previous', date: '2026-10-12' })
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      '/api/klines/TWSE%3A2330/intraday?market=TW&timeframe=5m&limit=54&date_mode=previous&trade_date=2026-10-12',
+    )
   })
 })

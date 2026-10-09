@@ -269,7 +269,7 @@ def test_intraday_api_retains_missing_slots_and_disables_signal(monkeypatch):
                         {"bars": rows, "coverage_complete": False, "adjustment_mode": "provider_reported"})
     app = FastAPI(); app.include_router(klines.router, prefix="/klines")
     response = TestClient(app).get("/klines/TWSE:2330/intraday?timeframe=5m")
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["klines"][0]["close"] is None and payload["klines"][0]["status"] == "missing"
     assert payload["summary"] is None and payload["live_collection"] is False
@@ -281,6 +281,228 @@ def test_intraday_api_retains_missing_slots_and_disables_signal(monkeypatch):
 def test_intraday_api_rejects_unsupported_or_unbounded_requests(query):
     app = FastAPI(); app.include_router(klines.router, prefix="/klines")
     assert TestClient(app).get(f"/klines/TWSE:2330/intraday?{query}").status_code in {400, 422}
+
+
+def _intraday_coverage_read(rows):
+    from datetime import date as date_type
+
+    return SimpleNamespace(
+        instrument_id="TWSE:2330", session="regular", start_date=date_type(2026, 9, 11),
+        end_date=date_type(2026, 10, 10), schema_ready=True, coverage_complete=False,
+        coverage=[SimpleNamespace(**row) for row in rows],
+        raw={"instrument_id": "TWSE:2330", "session": "regular", "schema_ready": True,
+              "coverage_complete": False, "coverage": rows, "served_at": "2026-10-10T14:00:00+08:00"},
+    )
+
+
+def _intraday_coverage_row(day, *, status="available", calendar="observed_open", observed=270,
+                          missing=0, pending=0):
+    return {"trade_date": date.fromisoformat(day), "status": status,
+            "calendar_status": calendar, "expected_minutes": 270,
+            "observed_minutes": observed, "missing_minutes": missing, "pending_minutes": pending}
+
+
+def _intraday_bars_payload(day, timeframe="5m", *, complete=True, priced=True, row_count=None):
+    limit = 270 if timeframe == "1m" else 54
+    count = limit if row_count is None else row_count
+    bars = []
+    for index in range(count):
+        step = 1 if timeframe == "1m" else 5
+        minute = 9 * 60 + index * step
+        hh, mm = divmod(minute, 60)
+        end_hh, end_mm = divmod(minute + step, 60)
+        bars.append({"instrument_id": "TWSE:2330", "trade_date": day, "timeframe": timeframe,
+                     "timestamp": f"{day}T{hh:02d}:{mm:02d}:00+08:00",
+                     "interval_start": f"{day}T{hh:02d}:{mm:02d}:00+08:00",
+                     "interval_end": f"{day}T{end_hh:02d}:{end_mm:02d}:00+08:00",
+                     "provider_timestamp": None, "open": "100", "high": "101", "low": "99",
+                     "close": "100" if priced else None, "volume": 100 if priced else None,
+                     "status": "observed" if priced else "no_trade", "finalized": True})
+    return {"instrument_id": "TWSE:2330", "timeframe": timeframe, "price_kind": "intraday",
+            "adjustment_mode": "provider_reported", "limit": limit, "returned_count": count,
+            "total_count": limit, "truncated": False, "partial": not complete,
+            "coverage_complete": complete, "schema_ready": True, "start_date": day, "end_date": day,
+            "availability": "available" if complete else "incomplete", "units": {"price": "TWD"},
+            "coverage": [{"trade_date": day, "status": "available" if complete else "incomplete",
+                          "calendar_status": "observed_open"}], "bars": bars}
+
+
+@pytest.mark.parametrize(("timeframe", "limit"), [("1m", 270), ("5m", 54)])
+def test_intraday_auto_uses_covered_completed_date_and_exact_timeframe_limit(monkeypatch, timeframe, limit):
+    from zoneinfo import ZoneInfo
+    from marketdata.vendors.twmd import TwmdClient
+
+    tc._TW_TRADING_DATES = frozenset({date(2026, 10, 8)})
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+    monkeypatch.setattr(klines, "_taipei_now", lambda: datetime(2026, 10, 10, 14, 0, tzinfo=ZoneInfo("Asia/Taipei")))
+    read = _intraday_coverage_read([
+        _intraday_coverage_row("2026-10-08"),
+        _intraday_coverage_row("2026-10-09", status="incomplete", calendar="unknown", observed=269, missing=1),
+    ])
+    coverage_calls, bar_calls = [], []
+
+    def coverage(self, symbol, start, end, *, timeout_sec=None):
+        coverage_calls.append((symbol.identity, start, end, timeout_sec))
+        return read
+
+    def get_response(self, path, **kwargs):
+        bar_calls.append((path, kwargs))
+        return _intraday_bars_payload("2026-10-08", timeframe), {}
+
+    monkeypatch.setattr(TwmdClient, "bars_coverage", coverage)
+    monkeypatch.setattr(TwmdClient, "get_response", get_response)
+    app = FastAPI(); app.include_router(klines.router, prefix="/klines")
+    response = TestClient(app).get(
+        f"/klines/TWSE:2330/intraday?date_mode=auto&timeframe={timeframe}&limit={limit}"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["date_selection"]["selected_date"] == "2026-10-08"
+    assert payload["date_selection"]["coverage_status"] == "available"
+    assert payload["date_selection"]["display_coverage_complete"] is True
+    assert payload["selection_coverage"]["coverage"][1]["calendar_status"] == "unknown"
+    assert len(coverage_calls) == 1
+    assert coverage_calls[0][1:3] == (date(2026, 9, 11), date(2026, 10, 10))
+    assert 0 < coverage_calls[0][3] <= 3.0
+    assert len(bar_calls) == 1
+    assert bar_calls[0][1]["retries"] == 0
+    assert bar_calls[0][1]["limit"] == limit
+    assert bar_calls[0][1]["start_date"] == bar_calls[0][1]["end_date"] == "2026-10-08"
+
+
+def test_intraday_auto_can_select_incomplete_but_drawable_completed_session(monkeypatch):
+    from zoneinfo import ZoneInfo
+    from marketdata.vendors.twmd import TwmdClient
+
+    tc._TW_TRADING_DATES = frozenset({date(2026, 10, 8), date(2026, 10, 9)})
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+    monkeypatch.setattr(klines, "_taipei_now", lambda: datetime(2026, 10, 10, 14, 0, tzinfo=ZoneInfo("Asia/Taipei")))
+    read = _intraday_coverage_read([
+        _intraday_coverage_row("2026-10-08"),
+        _intraday_coverage_row("2026-10-09", status="incomplete", observed=269, missing=1),
+    ])
+    calls = []
+    monkeypatch.setattr(TwmdClient, "bars_coverage", lambda *_args, **_kwargs: read)
+    monkeypatch.setattr(TwmdClient, "get_response", lambda self, path, **kwargs: (
+        calls.append(kwargs) or (_intraday_bars_payload("2026-10-09", complete=False, row_count=53), {})
+    ))
+    app = FastAPI(); app.include_router(klines.router, prefix="/klines")
+    response = TestClient(app).get("/klines/TWSE:2330/intraday?date_mode=auto&timeframe=5m&limit=54")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["date_selection"]["selected_date"] == "2026-10-09"
+    assert payload["date_selection"]["coverage_status"] == "incomplete"
+    assert payload["display_coverage_complete"] is False
+    assert len(payload["klines"]) == 53 and payload["coverage_complete"] is False
+    assert len(calls) == 1 and calls[0]["start_date"] == "2026-10-09"
+
+
+def test_intraday_auto_stops_after_three_unpriced_bar_requests(monkeypatch):
+    from zoneinfo import ZoneInfo
+    from marketdata.vendors.twmd import TwmdClient
+
+    days = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"]
+    tc._TW_TRADING_DATES = frozenset(date.fromisoformat(day) for day in days)
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+    monkeypatch.setattr(klines, "_taipei_now", lambda: datetime(2026, 10, 10, 14, 0, tzinfo=ZoneInfo("Asia/Taipei")))
+    read = _intraday_coverage_read([_intraday_coverage_row(day, status="incomplete", observed=269, missing=1)
+                                    for day in days])
+    bar_dates = []
+    monkeypatch.setattr(TwmdClient, "bars_coverage", lambda *_args, **_kwargs: read)
+
+    def get_response(self, path, **kwargs):
+        day = kwargs["start_date"]
+        bar_dates.append(day)
+        return _intraday_bars_payload(day, priced=False, complete=False, row_count=1), {}
+
+    monkeypatch.setattr(TwmdClient, "get_response", get_response)
+    app = FastAPI(); app.include_router(klines.router, prefix="/klines")
+    response = TestClient(app).get("/klines/TWSE:2330/intraday?date_mode=auto&timeframe=5m&limit=54")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["date_selection"]["selected_date"] is None
+    assert payload["date_selection"]["reason"] == "request_budget_exhausted"
+    assert payload["date_selection"]["bar_request_count"] == 3
+    assert bar_dates == ["2026-10-08", "2026-10-07", "2026-10-06"]
+    assert payload["coverage_complete"] is False
+
+
+def test_intraday_manual_holiday_date_is_never_replaced_by_previous_data(monkeypatch):
+    from marketdata.vendors.twmd import TwmdClient
+
+    tc._TW_TRADING_DATES = frozenset({date(2026, 10, 8), date(2026, 10, 12)})
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+    calls = []
+    payload = _intraday_bars_payload("2026-10-09", complete=False, priced=False, row_count=1)
+    monkeypatch.setattr(TwmdClient, "bars", lambda self, symbol, **kwargs: (calls.append(kwargs) or payload))
+    monkeypatch.setattr(TwmdClient, "bars_coverage", lambda *_args, **_kwargs: pytest.fail("manual date queried auto coverage"))
+    app = FastAPI(); app.include_router(klines.router, prefix="/klines")
+    response = TestClient(app).get(
+        "/klines/TWSE:2330/intraday?date_mode=selected&timeframe=5m&start_date=2026-10-09&end_date=2026-10-09&limit=54"
+    )
+
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["date_selection"]["selected_date"] == "2026-10-09"
+    assert result["date_selection"]["calendar"]["is_trading_day"] is False
+    assert calls == [{"timeframe": "5m", "limit": 54, "start_date": "2026-10-09", "end_date": "2026-10-09"}]
+    assert result["klines"][0]["close"] is None
+
+
+def test_intraday_previous_trading_day_with_missing_bars_keeps_resolved_date(monkeypatch):
+    from marketdata.vendors.twmd import TwmdClient
+
+    tc._TW_TRADING_DATES = frozenset({date(2026, 10, 8), date(2026, 10, 12)})
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+    calls = []
+    payload = {"instrument_id": "TWSE:2330", "timeframe": "5m", "start_date": "2026-10-08",
+               "end_date": "2026-10-08", "coverage_complete": False, "availability": "unavailable",
+               "bars": [], "coverage": [{"trade_date": "2026-10-08", "status": "missing",
+                                            "calendar_status": "observed_open"}]}
+    monkeypatch.setattr(TwmdClient, "bars", lambda self, symbol, **kwargs: (calls.append(kwargs) or payload))
+    app = FastAPI(); app.include_router(klines.router, prefix="/klines")
+    response = TestClient(app).get(
+        "/klines/TWSE:2330/intraday?date_mode=previous&trade_date=2026-10-12&timeframe=5m"
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["date_selection"]["requested_date"] == "2026-10-12"
+    assert result["date_selection"]["selected_date"] == "2026-10-08"
+    assert result["date_selection"]["coverage_status"] == "missing"
+    assert calls[0]["start_date"] == calls[0]["end_date"] == "2026-10-08"
+    assert result["klines"] == []
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda payload: payload.update(start_date="not-a-date"),
+    lambda payload: payload["bars"][0].update(instrument_id="TPEX:2330"),
+    lambda payload: payload["bars"][0].pop("timestamp"),
+])
+def test_intraday_rejects_malformed_provider_identity_date_or_timestamp(monkeypatch, mutation):
+    from marketdata.vendors.twmd import TwmdClient
+
+    payload = _intraday_bars_payload("2026-10-08", timeframe="5m")
+    mutation(payload)
+    monkeypatch.setattr(TwmdClient, "bars", lambda *_args, **_kwargs: payload)
+    app = FastAPI(); app.include_router(klines.router, prefix="/klines")
+    response = TestClient(app).get(
+        "/klines/TWSE:2330/intraday?date_mode=selected&timeframe=5m&start_date=2026-10-08&end_date=2026-10-08&limit=54"
+    )
+
+    assert response.status_code == 502
+
+
+def test_intraday_auto_uses_taipei_cutoff_for_utc_crossing_dates():
+    from zoneinfo import ZoneInfo
+
+    before_cutoff_utc = datetime(2026, 10, 8, 0, 30, tzinfo=ZoneInfo("UTC"))
+    after_cutoff_utc = datetime(2026, 10, 8, 5, 31, tzinfo=ZoneInfo("UTC"))
+    assert klines._automatic_window(before_cutoff_utc) == (date(2026, 9, 8), date(2026, 10, 7))
+    assert klines._automatic_window(after_cutoff_utc) == (date(2026, 9, 9), date(2026, 10, 8))
 
 
 def test_unknown_taiwan_calendar_does_not_infer_a_weekday_session(monkeypatch):
@@ -388,3 +610,33 @@ def test_tw_backtest_uses_taiwan_fees_and_lot():
     assert trade.quantity == 1000
     expected = cost_model_for_market("TW").round_trip_pnl(100, 100, 1000)
     assert trade.pnl == expected["pnl"]
+
+
+@pytest.mark.parametrize('timeframe,limit', [('1m', 270), ('5m', 54)])
+def test_intraday_truncated_payload_never_reports_a_complete_display(monkeypatch, timeframe, limit):
+    from marketdata.vendors.twmd import TwmdClient
+
+    payload = _intraday_bars_payload('2026-10-08', timeframe, row_count=1)
+    payload.update(truncated=True, returned_count=1)
+    monkeypatch.setattr(TwmdClient, 'bars', lambda *_args, **_kwargs: payload)
+    app = FastAPI(); app.include_router(klines.router, prefix='/klines')
+    response = TestClient(app).get(
+        f'/klines/TWSE:2330/intraday?timeframe={timeframe}&limit={limit}'
+        '&start_date=2026-10-08&end_date=2026-10-08'
+    )
+    assert response.status_code == 200
+    assert response.json()['coverage_complete'] is True
+    assert response.json()['display_coverage_complete'] is False
+    assert response.json()['summary'] is None
+
+
+def test_intraday_unknown_calendar_previous_date_does_not_query_upstream(monkeypatch):
+    from marketdata.vendors.twmd import TwmdClient
+
+    tc.reset_cache()
+    monkeypatch.setattr(TwmdClient, 'bars', lambda *_args, **_kwargs: pytest.fail('unknown previous date queried bars'))
+    app = FastAPI(); app.include_router(klines.router, prefix='/klines')
+    response = TestClient(app).get('/klines/TWSE:2330/intraday?date_mode=previous&trade_date=2027-01-04')
+    assert response.status_code == 200
+    assert response.json()['date_selection']['reason'] == 'calendar_unknown'
+    assert response.json()['klines'] == []

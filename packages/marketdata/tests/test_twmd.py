@@ -223,3 +223,78 @@ def test_taiwan_discovery_hard_caps_custom_price_universe(monkeypatch):
     assert pool.scanned_instrument_count == 2000
     assert len(requested_batches) == 20
     assert pool.partial_scan is True
+
+
+def _intraday_coverage_payload(**extra):
+    return {
+        "instrument_id": "TWSE:2330",
+        "session": "regular",
+        "start_date": "2026-10-08",
+        "end_date": "2026-10-09",
+        "schema_ready": True,
+        "coverage_complete": False,
+        "coverage": [
+            {"trade_date": "2026-10-08", "session": "regular", "status": "available",
+             "calendar_status": "observed_open", "expected_minutes": 270, "observed_minutes": 270,
+             "missing_minutes": 0, "pending_minutes": 0, "revision": 481,
+             "source_contract": "shioaji-1.7.7/KBars/regular", "error": None},
+            {"trade_date": "2026-10-09", "session": "regular", "status": "incomplete",
+             "calendar_status": "unknown", "expected_minutes": 270, "observed_minutes": 269,
+             "missing_minutes": 1, "pending_minutes": 0, "revision": 538,
+             "source_contract": "shioaji-1.7.7/KBar/regular", "error": None},
+        ],
+        "served_at": "2026-10-10T02:17:52.035889+08:00",
+        "response_marker": "preserved-upstream-metadata",
+        **extra,
+    }
+
+
+def test_intraday_coverage_read_is_typed_bounded_and_preserves_metadata(monkeypatch):
+    calls = []
+    payload = _intraday_coverage_payload()
+
+    def get_response(self, path, **kwargs):
+        calls.append((path, kwargs))
+        return payload, {"x-twmd-version": "test"}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    read = twmd.TwmdClient({"timeout_sec": 8}).bars_coverage(
+        Symbol.parse("TWSE:2330"), "2026-10-08", "2026-10-09", timeout_sec=2.5,
+    )
+
+    assert calls == [("bars/coverage", {
+        "timeout_sec": 2.5, "retries": 0, "instrument_id": "TWSE:2330",
+        "start_date": "2026-10-08", "end_date": "2026-10-09", "session": "regular",
+    })]
+    assert read.instrument_id == "TWSE:2330" and read.schema_ready is True
+    assert [row.status for row in read.coverage] == ["available", "incomplete"]
+    assert read.coverage[1].calendar_status == "unknown"
+    assert read.coverage[1].raw["source_contract"] == "shioaji-1.7.7/KBar/regular"
+    assert read.raw["response_marker"] == "preserved-upstream-metadata"
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda payload: payload.update(instrument_id="TPEX:2330"),
+    lambda payload: payload["coverage"][0].update(instrument_id="TPEX:2330"),
+    lambda payload: payload.update(start_date="2026-10-07"),
+    lambda payload: payload["coverage"].append(payload["coverage"][0]),
+    lambda payload: payload["coverage"][0].update(calendar_status="guessed_weekday"),
+    lambda payload: payload["coverage"][0].update(observed_minutes=True),
+])
+def test_intraday_coverage_read_rejects_conflicting_or_unknown_evidence(monkeypatch, mutation):
+    from marketdata.errors import TwmdReadError
+
+    payload = _intraday_coverage_payload()
+    mutation(payload)
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", lambda *_args, **_kwargs: (payload, {}))
+
+    with pytest.raises(TwmdReadError) as error:
+        twmd.TwmdClient({}).bars_coverage(Symbol.parse("TWSE:2330"), "2026-10-08", "2026-10-09")
+    assert error.value.reason_code == "invalid_response"
+
+
+def test_intraday_coverage_read_rejects_ranges_longer_than_30_days():
+    with pytest.raises(ValueError, match="30 calendar days"):
+        twmd.TwmdClient({}).bars_coverage(
+            Symbol.parse("TWSE:2330"), "2026-09-10", "2026-10-10",
+        )

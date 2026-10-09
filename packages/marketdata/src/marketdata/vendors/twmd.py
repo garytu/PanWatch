@@ -39,6 +39,8 @@ from marketdata.types import (
     TwmdBenchmarkBarsRead,
     TwmdBenchmarkDefinition,
     TwmdDailyBarsRead,
+    TwmdIntradayCoverageObservation,
+    TwmdIntradayCoverageRead,
     TwmdCompanyProfile,
     TwmdCompanyProfileRead,
     TwmdCompanyProfileSnapshot,
@@ -913,6 +915,77 @@ def _validate_source_date(value, field_name: str) -> str:
     except ValueError as exc:
         raise ValueError(f"{field_name} must use YYYY-MM-DD") from exc
     return raw
+
+
+def _intraday_coverage_observation(value: object, instrument_id: str, start: date,
+                                   end: date) -> TwmdIntradayCoverageObservation:
+    if not isinstance(value, dict):
+        raise ValueError("intraday coverage entries must be objects")
+    if value.get("instrument_id") is not None and value["instrument_id"] != instrument_id:
+        raise ValueError("intraday coverage row identity does not match request")
+    if value.get("session") != "regular":
+        raise ValueError("intraday coverage session does not match request")
+    trade_date = date.fromisoformat(_validate_source_date(value.get("trade_date"), "trade_date"))
+    if not start <= trade_date <= end:
+        raise ValueError("intraday coverage date is outside the requested range")
+    status = _source_string(value.get("status"), "coverage.status", required=True) or ""
+    if status not in {"available", "incomplete", "missing", "empty_unverified", "closed", "failed"}:
+        raise ValueError("intraday coverage status is invalid")
+    calendar_status = _source_string(value.get("calendar_status"), "calendar_status", required=True) or ""
+    if calendar_status not in {"observed_open", "official_closed", "unknown"}:
+        raise ValueError("intraday calendar status is invalid")
+    counts: dict[str, int] = {}
+    for name in ("expected_minutes", "observed_minutes", "missing_minutes", "pending_minutes"):
+        count = _source_int(value.get(name), f"coverage.{name}")
+        if count is None or count < 0:
+            raise ValueError(f"coverage.{name} must be a non-negative integer")
+        counts[name] = count
+    return TwmdIntradayCoverageObservation(
+        trade_date=trade_date,
+        session="regular",
+        status=status,
+        calendar_status=calendar_status,
+        expected_minutes=counts["expected_minutes"],
+        observed_minutes=counts["observed_minutes"],
+        missing_minutes=counts["missing_minutes"],
+        pending_minutes=counts["pending_minutes"],
+        raw=copy.deepcopy(value),
+    )
+
+
+def _intraday_coverage_read(value: object, instrument_id: str, start: date,
+                            end: date) -> TwmdIntradayCoverageRead:
+    if not isinstance(value, dict):
+        raise ValueError("intraday coverage response must be an object")
+    if value.get("instrument_id") != instrument_id or value.get("session") != "regular":
+        raise ValueError("intraday coverage identity does not match request")
+    response_start = date.fromisoformat(_validate_source_date(value.get("start_date"), "start_date"))
+    response_end = date.fromisoformat(_validate_source_date(value.get("end_date"), "end_date"))
+    if (response_start, response_end) != (start, end):
+        raise ValueError("intraday coverage range does not match request")
+    schema_ready = value.get("schema_ready")
+    coverage_complete = value.get("coverage_complete")
+    if not isinstance(schema_ready, bool) or not isinstance(coverage_complete, bool):
+        raise ValueError("intraday coverage readiness flags must be booleans")
+    raw_coverage = value.get("coverage")
+    if not isinstance(raw_coverage, list):
+        raise ValueError("intraday coverage rows must be a list")
+    rows = tuple(_intraday_coverage_observation(row, instrument_id, start, end) for row in raw_coverage)
+    dates = [row.trade_date for row in rows]
+    if len(dates) != len(set(dates)):
+        raise ValueError("intraday coverage repeats a date")
+    served_at = _source_datetime(value.get("served_at"), "served_at")
+    return TwmdIntradayCoverageRead(
+        instrument_id=instrument_id,
+        session="regular",
+        start_date=start,
+        end_date=end,
+        schema_ready=schema_ready,
+        coverage_complete=coverage_complete,
+        coverage=rows,
+        served_at=served_at,
+        raw=copy.deepcopy(value),
+    )
 
 
 def _material_information_event(
@@ -2779,6 +2852,38 @@ class TwmdClient:
         payload = self.get("bars", instrument_id=self.resolve(symbol), timeframe=timeframe,
                            limit=limit, **params)
         return payload if isinstance(payload, dict) else {}
+
+    def bars_coverage(
+        self,
+        symbol: Symbol,
+        start_date: date | str,
+        end_date: date | str,
+        *,
+        timeout_sec: float | None = None,
+    ) -> TwmdIntradayCoverageRead:
+        """Read and validate a bounded, read-only intraday coverage window."""
+        instrument_id = self.resolve(symbol)
+        start, end = _date_value(start_date, "start_date"), _date_value(end_date, "end_date")
+        if start > end:
+            raise ValueError("start_date must not be after end_date")
+        if (end - start).days >= 30:
+            raise ValueError("intraday coverage is limited to 30 calendar days")
+        payload, _headers = self.get_response(
+            "bars/coverage",
+            timeout_sec=timeout_sec,
+            retries=0,
+            instrument_id=instrument_id,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+            session="regular",
+        )
+        try:
+            return _intraday_coverage_read(payload, instrument_id, start, end)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise TwmdReadError(
+                f"invalid twmd intraday coverage response: {exc}",
+                reason_code="invalid_response",
+            ) from exc
 
 
 class TwmdQuoteVendor(QuoteVendor):

@@ -346,6 +346,23 @@ def test_跨年下一交易日超出覆蓋範圍時保持未知():
     assert context["next_trading_day"] is None
 
 
+def test_上一交易日跳過週末連假及臨時休市並保留未知年份(monkeypatch):
+    tc._TW_TRADING_DATES = frozenset({date(2026, 10, 5), date(2026, 10, 12), date(2026, 10, 14)})
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+
+    assert tc.previous_trading_day("TW", date(2026, 10, 12)) == date(2026, 10, 5)
+    assert tc.previous_trading_day("TW", date(2026, 10, 14)) == date(2026, 10, 12)
+    assert tc.previous_trading_day("TW", date(2027, 1, 4)) is None
+
+
+def test_上一交易日將UTC時間先轉成台北日期(monkeypatch):
+    tc._TW_TRADING_DATES = frozenset({date(2026, 10, 8), date(2026, 10, 12)})
+    tc._TW_RANGE = (date(2026, 1, 1), date(2026, 12, 31))
+    shortly_after_utc_midnight = datetime(2026, 10, 9, 0, 30, tzinfo=ZoneInfo("UTC"))
+
+    assert tc.previous_trading_day("TW", shortly_after_utc_midnight) == date(2026, 10, 8)
+
+
 def test_台股日曆未載入時明示未知且不提供下一交易日():
     context = tc.market_calendar_context("TW", date(2026, 10, 9))
 
