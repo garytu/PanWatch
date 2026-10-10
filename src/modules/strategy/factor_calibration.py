@@ -16,7 +16,10 @@ from src.platform.marketdata.models import enabled_market_codes
 
 import logging
 
-from src.modules.strategy.factor_eval import evaluate_factor_ic
+from src.modules.strategy.calibration_gate import (
+    apply_calibration_plan,
+    plan_calibration_batch,
+)
 from src.modules.strategy.factor_weights import (
     CALIBRATABLE_FACTORS,
     PENALTY_FACTORS,
@@ -72,27 +75,35 @@ def calibrate_factor_weights(
     own = db is None
     db = db or SessionLocal()
     try:
-        ic_result = evaluate_factor_ic(
-            days=days, horizon=horizon, min_samples=min_samples, market=market, db=db
+        # Gate first: one sealed cohort/config snapshot is shared by the whole batch.
+        batch = plan_calibration_batch(
+            db, kind="factor", market=market, targets=list(CALIBRATABLE_FACTORS)
         )
-        factors = ic_result.get("factors", {})
-        get_factor_weights(market, db=db)  # 確保 5 個因子行存在
 
         lo, hi = float(clamp[0]), float(clamp[1])
         changed = 0
         rows_changed: list[dict] = []
+        statuses: dict[str, str] = {}
 
         for code in CALIBRATABLE_FACTORS:
+            plan = batch["plans"][code]
+            readiness = plan["readiness"]
+            stats = readiness["per_factor"].get(code, {})
+            ic = stats.get("ic")
+            ir = stats.get("ir")
+            n = int(readiness["training"]["units"])
+            old = plan["old_weight"]
+            if old is None:
+                statuses[code] = "TARGET_MISSING"
+                continue
             row = (
                 db.query(FactorWeight)
                 .filter(FactorWeight.factor_code == code, FactorWeight.market == market)
                 .first()
             )
-            old = float(row.weight)
-            stats = factors.get(code, {})
-            ic = stats.get("ic")
-            ir = stats.get("ir")
-            n = int(stats.get("sample_size", 0))
+            if row is None:
+                statuses[code] = "TARGET_MISSING"
+                continue
 
             # 記錄最近一次觀測(供 API 展示),無論是否調整。
             row.meta = {
@@ -101,34 +112,47 @@ def calibrate_factor_weights(
                 "last_calibrated_at": utc_now().isoformat(),
             }
 
-            if row.is_pinned or not row.auto_calibrate:
-                continue
-            if n < min_samples or ic is None:
-                continue
             target = compute_target(code, ic, ir, beta=beta)
             if target is None:
+                statuses[code] = "NO_PROPOSAL"
                 continue
-            new = round(blend(old, target, alpha=alpha, lo=lo, hi=hi), 4)
-            if abs(new - old) < 0.01:
+            new = round(blend(float(old), target, alpha=alpha, lo=lo, hi=hi), 4)
+            if abs(new - float(old)) < 0.01:
+                statuses[code] = "NO_CHANGE"
                 continue
 
-            row.weight = new
-            row.reason = f"auto(ic={ic}, ir={ir}, n={n})"
-            row.effective_from = utc_now()
-            row.updated_at = utc_now()
-            db.add(FactorWeightHistory(
-                factor_code=code, market=market, old_weight=old, new_weight=new,
-                ic=ic, ir=ir, sample_size=n, reason="auto",
-                meta={"target": round(target, 4), "alpha": alpha},
-            ))
+            result = apply_calibration_plan(
+                db,
+                plan=plan,
+                new_weight=new,
+                reason=f"auto(ic={ic}, ir={ir}, n={n})",
+                batch=batch,
+            )
+            statuses[code] = result["status"]
+            if result["status"] == "STALE_CONFIG":
+                break  # batch snapshot no longer valid: stop the whole batch
+            if result["status"] != "APPLIED":
+                continue
             changed += 1
-            rows_changed.append({
-                "factor_code": code, "old_weight": old, "new_weight": new, "sample_size": n,
-            })
+            rows_changed.append(
+                {
+                    "factor_code": code,
+                    "old_weight": float(old),
+                    "new_weight": new,
+                    "sample_size": n,
+                }
+            )
 
         db.commit()
-        return {"market": market, "checked": len(CALIBRATABLE_FACTORS),
-                "changed": changed, "rows": rows_changed}
+        first = batch["plans"][CALIBRATABLE_FACTORS[0]] if CALIBRATABLE_FACTORS else {}
+        return {
+            "market": market,
+            "checked": len(CALIBRATABLE_FACTORS),
+            "changed": changed,
+            "rows": rows_changed,
+            "mode": first.get("mode"),
+            "statuses": statuses,
+        }
     except Exception as e:  # pragma: no cover - 防禦性
         logger.warning(f"[因子標定] market={market} 失敗: {e}")
         db.rollback()

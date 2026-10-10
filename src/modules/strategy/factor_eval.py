@@ -161,3 +161,46 @@ def evaluate_factor_ic(
     finally:
         if own:
             db.close()
+
+
+def evaluate_factor_ic_v2(*, market: str, kind: str = "factor", db=None) -> dict:
+    """v2 IC/IR: read only the immutable cohort sealed by the calibration gate.
+
+    The legacy v1 selector above reads mutable UI projections; v2 never does.
+    ``days``/``horizon``/``min_samples`` no longer apply: floors come from the gate.
+    """
+    from src.modules.strategy.calibration_gate import (
+        cohort_fingerprint,
+        evaluate_readiness,
+        select_cohort,
+    )
+
+    own = db is None
+    db = db or SessionLocal()
+    try:
+        cohort = select_cohort(db, kind=kind, market=market)
+        readiness = evaluate_readiness(cohort, market=market, kind=kind)
+        factors = {
+            code: {
+                "ic": stats.get("ic"),
+                "ir": stats.get("ir"),
+                "sample_size": stats.get("sample_units"),
+                "ic_periods": stats.get("series"),
+            }
+            for code, stats in readiness["per_factor"].items()
+        }
+        return {
+            "market": market,
+            "kind": kind,
+            "factors": factors,
+            "ready": readiness["ready"],
+            "reasons": readiness["reasons"],
+            "counts": cohort["counts"],
+            "cohort_fingerprint": cohort_fingerprint(cohort, kind=kind, market=market),
+        }
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"[因子評估 v2] IC 計算失敗: {e}")
+        return {"market": market, "kind": kind, "factors": {}, "error": str(e)}
+    finally:
+        if own:
+            db.close()

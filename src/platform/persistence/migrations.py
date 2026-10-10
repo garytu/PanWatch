@@ -15,6 +15,9 @@ from sqlalchemy.engine import Connection, Engine
 
 logger = logging.getLogger(__name__)
 
+# Keep in sync with src/modules/strategy/calibration_gate.py (persistence cannot import modules).
+CALIBRATION_POLICY_VERSION = "calibration-policy-v1"
+
 
 @dataclass(frozen=True)
 class Migration:
@@ -1965,6 +1968,256 @@ def _m126_assistant_task_events(conn: Connection) -> None:
     )
 
 
+def _m127_calibration_integrity(conn: Connection) -> None:
+    """PR-0A 標定門控:persisted mode、immutable decision capture、application ledger.
+
+    Only builds structure and initializes FROZEN. Writes no weight, backfills no history.
+    """
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_modes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  mode TEXT NOT NULL DEFAULT 'FROZEN',
+  reason TEXT DEFAULT '',
+  policy_version TEXT DEFAULT '',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_mode_kind_market UNIQUE(kind, market)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_baselines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  baseline_name TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  target TEXT NOT NULL DEFAULT '',
+  weight REAL NOT NULL DEFAULT 1.0,
+  config_hash TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'unvalidated-baseline',
+  meta TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_baseline_key UNIQUE(baseline_name, kind, market, target)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_provenance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  target TEXT NOT NULL DEFAULT '',
+  calibration_policy_version TEXT NOT NULL DEFAULT '',
+  cohort_fingerprint TEXT NOT NULL DEFAULT '',
+  population TEXT DEFAULT '',
+  ranker_version TEXT DEFAULT '',
+  evaluation_version TEXT DEFAULT '',
+  primary_horizon_sessions INTEGER,
+  decision_snapshot_ids TEXT DEFAULT '[]',
+  outcome_revisions TEXT DEFAULT '[]',
+  policy_payload TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_provenance_target_cohort UNIQUE(kind, market, target, cohort_fingerprint)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  target TEXT NOT NULL DEFAULT '',
+  regime TEXT DEFAULT '',
+  calibration_policy_version TEXT NOT NULL DEFAULT '',
+  cohort_fingerprint TEXT NOT NULL DEFAULT '',
+  population TEXT DEFAULT '',
+  ranker_version TEXT DEFAULT '',
+  evaluation_version TEXT DEFAULT '',
+  primary_horizon_sessions INTEGER,
+  source_config_versions TEXT DEFAULT '{}',
+  expected_live_config_hash TEXT DEFAULT '',
+  output_config_hash TEXT DEFAULT '',
+  sample_units INTEGER DEFAULT 0,
+  decision_dates INTEGER DEFAULT 0,
+  valid_ic_periods INTEGER DEFAULT 0,
+  raw_rows INTEGER DEFAULT 0,
+  signal_ids INTEGER DEFAULT 0,
+  old_weight REAL,
+  target_weight REAL,
+  new_weight REAL,
+  mode TEXT DEFAULT '',
+  reason TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_application_key
+    UNIQUE(kind, market, target, calibration_policy_version, cohort_fingerprint)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS ranking_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  capture_id TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT 'CN',
+  session_date TEXT NOT NULL DEFAULT '',
+  decision_at_utc DATETIME,
+  captured_at_utc DATETIME,
+  source_pool TEXT DEFAULT '',
+  scan_run_id INTEGER,
+  candidate_ids TEXT DEFAULT '[]',
+  catalog_authority TEXT DEFAULT '{}',
+  universe_ids TEXT DEFAULT '[]',
+  universe_hash TEXT DEFAULT '',
+  item_count INTEGER DEFAULT 0,
+  eligibility_reasons TEXT DEFAULT '[]',
+  ranker_version TEXT DEFAULT '',
+  scoring_config_version TEXT DEFAULT '',
+  evaluation_version TEXT DEFAULT '',
+  calibration_policy_version TEXT DEFAULT '',
+  capture_hash TEXT DEFAULT '',
+  meta TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_ranking_snapshot_capture UNIQUE(capture_id)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS ranking_snapshot_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  decision_snapshot_id TEXT NOT NULL DEFAULT '',
+  ranking_snapshot_id INTEGER,
+  stock_symbol TEXT NOT NULL DEFAULT '',
+  instrument_id TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT 'CN',
+  strategy_code TEXT NOT NULL DEFAULT '',
+  regime TEXT DEFAULT 'default',
+  session_date TEXT NOT NULL DEFAULT '',
+  decision_at_utc DATETIME,
+  captured_at_utc DATETIME,
+  quote_source_time TEXT DEFAULT '',
+  bar_source_time TEXT DEFAULT '',
+  available_at_utc DATETIME,
+  receipt_at_utc DATETIME,
+  point_in_time_status TEXT DEFAULT 'UNVERIFIABLE',
+  outcome_population_id TEXT DEFAULT 'legacy-unlabelled',
+  evaluation_version TEXT DEFAULT '',
+  ranker_version TEXT DEFAULT '',
+  scoring_config_version TEXT DEFAULT '',
+  calibration_policy_version TEXT DEFAULT '',
+  alpha_score REAL DEFAULT 0.0,
+  catalyst_score REAL DEFAULT 0.0,
+  quality_score REAL DEFAULT 0.0,
+  risk_penalty REAL DEFAULT 0.0,
+  crowd_penalty REAL DEFAULT 0.0,
+  source_bonus REAL DEFAULT 0.0,
+  regime_multiplier REAL DEFAULT 1.0,
+  raw_factor_values TEXT DEFAULT '{}',
+  factor_versions TEXT DEFAULT '{}',
+  entry_price REAL,
+  stop_loss REAL,
+  target_price REAL,
+  eligibility TEXT DEFAULT '{}',
+  ranking_value REAL,
+  primary_horizon_sessions INTEGER,
+  exit_session_date TEXT DEFAULT '',
+  exit_session_complete INTEGER,
+  capture_hash TEXT DEFAULT '',
+  candidate_id INTEGER,
+  signal_run_id INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ranking_item_capture FOREIGN KEY (ranking_snapshot_id)
+    REFERENCES ranking_snapshots (ranking_snapshot_id) ON DELETE CASCADE,
+  CONSTRAINT uq_ranking_decision_snapshot_id UNIQUE(decision_snapshot_id)
+)
+"""
+        )
+    )
+
+    for index_name, sql in (
+        ("ix_calibration_mode_mode",
+         "CREATE INDEX ix_calibration_mode_mode ON calibration_modes(mode)"),
+        ("ix_calibration_baseline_name",
+         "CREATE INDEX ix_calibration_baseline_name ON calibration_baselines(baseline_name)"),
+        ("ix_calibration_baseline_created",
+         "CREATE INDEX ix_calibration_baseline_created ON calibration_baselines(created_at)"),
+        ("ix_calibration_application_time",
+         "CREATE INDEX ix_calibration_application_time ON calibration_applications(created_at)"),
+        ("ix_calibration_application_market_kind",
+         "CREATE INDEX ix_calibration_application_market_kind ON calibration_applications(market, kind)"),
+        ("ix_calibration_provenance_time",
+         "CREATE INDEX ix_calibration_provenance_time ON calibration_provenance(created_at)"),
+        ("ix_ranking_snapshot_market_date",
+         "CREATE INDEX ix_ranking_snapshot_market_date ON ranking_snapshots(stock_market, session_date)"),
+        ("ix_ranking_snapshot_created",
+         "CREATE INDEX ix_ranking_snapshot_created ON ranking_snapshots(created_at)"),
+        ("ix_ranking_item_market_date",
+         "CREATE INDEX ix_ranking_item_market_date ON ranking_snapshot_items(stock_market, session_date)"),
+        ("ix_ranking_item_strategy_market",
+         "CREATE INDEX ix_ranking_item_strategy_market ON ranking_snapshot_items(strategy_code, stock_market)"),
+        ("ix_ranking_item_instrument",
+         "CREATE INDEX ix_ranking_item_instrument ON ranking_snapshot_items(stock_market, instrument_id, session_date)"),
+    ):
+        _create_index_if_missing(conn, index_name, sql)
+
+    # StrategyWeight gains the same pin/auto-calibrate fields FactorWeight already has.
+    if _has_table(conn, "strategy_weights"):
+        for column, default in (("is_pinned", "0"), ("auto_calibrate", "1")):
+            if not _has_column(conn, "strategy_weights", column):
+                conn.execute(
+                    text(
+                        f"ALTER TABLE strategy_weights "
+                        f"ADD COLUMN {column} BOOLEAN NOT NULL DEFAULT {default}"
+                    )
+                )
+
+    # Persist FROZEN for every market already present plus ALL, before any versioned write.
+    markets: set[str] = {"ALL"}
+    for table, column in (
+        ("factor_weights", "market"),
+        ("strategy_weights", "market"),
+    ):
+        if not _has_table(conn, table):
+            continue
+        for row in conn.execute(text(f"SELECT DISTINCT {column} FROM {table}")):
+            value = str(row[0] or "").strip().upper()
+            if value:
+                markets.add(value)
+    for kind in ("factor", "strategy"):
+        for market in sorted(markets):
+            conn.execute(
+                text(
+                    """
+INSERT INTO calibration_modes
+  (kind, market, mode, reason, policy_version)
+VALUES(:kind, :market, 'FROZEN', 'pr-0a containment default', :policy)
+"""
+                ),
+                {
+                    "kind": kind,
+                    "market": market,
+                    "policy": CALIBRATION_POLICY_VERSION,
+                },
+            )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(101, "agent_config_kind_and_visibility", _m101_agent_config_kind),
     Migration(102, "backfill_agent_kind_data", _m102_backfill_agent_kind),
@@ -1992,6 +2245,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(124, "assistant_context_snapshots", _m124_assistant_context_snapshots),
     Migration(125, "assistant_task_protocol", _m125_assistant_task_protocol),
     Migration(126, "assistant_task_events", _m126_assistant_task_events),
+    Migration(127, "calibration_integrity", _m127_calibration_integrity),
 )
 
 

@@ -167,6 +167,29 @@ def get_strategy_profile_map() -> dict[str, dict]:
     return {x["code"]: x for x in rows}
 
 
+def get_primary_horizon_sessions() -> dict[str, int]:
+    """Catalog params.horizon_days 在 versioned decision 是 session count（explicit reinterpretation）.
+
+    Defaults differ per strategy, so this map is read as-is; no blanket reset.
+    """
+    ensure_strategy_catalog()
+    db = SessionLocal()
+    try:
+        out: dict[str, int] = {}
+        for row in db.query(StrategyCatalog).all():
+            params = row.params or {}
+            raw = params.get("horizon_days", params.get("horizon_sessions"))
+            try:
+                sessions = int(raw)
+            except (TypeError, ValueError):
+                sessions = 0
+            if sessions > 0:
+                out[row.code] = sessions
+        return out
+    finally:
+        db.close()
+
+
 def get_effective_weight_map(*, market: str = "ALL", regime: str = "default") -> dict[str, float]:
     ensure_strategy_catalog()
     mkt = (market or "ALL").strip().upper() or "ALL"

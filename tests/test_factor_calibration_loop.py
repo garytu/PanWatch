@@ -38,15 +38,15 @@ def test_calibrate_all_markets_closes_loop_into_scoring():
     from src.modules.strategy.factor_weights import get_factor_weights
     from src.modules.strategy.strategy_engine import _compute_factor_breakdown
     from src.platform.persistence.models import EntryCandidate
+    import test_calibration_integrity as ci
 
     db = _mem_db()
     try:
-        d = (date.today() - timedelta(days=30)).strftime("%Y-%m-%d")
-        for i in range(1, 7):  # CN:alpha 與 ret 完全正相關
-            _seed_pair(db, i, market="CN", snapshot_date=d, alpha=float(i), ret=float(i))
-        db.commit()
+        ci._seed_cohort(db, market="CN", dates=32, units=5)
+        ci.set_calibration_mode(db, kind="factor", market="CN", mode=ci.MODE_ACTIVE,
+                                reason="floors met")
 
-        res = calibrate_all_markets(db=db, min_samples=5)
+        res = calibrate_all_markets(db=db)
         assert set(res) == {"CN", "HK", "US", "TW"}
 
         w = get_factor_weights("CN", db=db)

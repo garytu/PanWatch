@@ -160,18 +160,18 @@ class ContextMaintenanceScheduler:
             snapshot_days=60,
             limit=1200,
         )
-        strategy_rebalance_task = asyncio.to_thread(
+        agent_stats, candidate_stats, strategy_eval_stats = await asyncio.gather(
+            agent_task,
+            candidate_task,
+            strategy_eval_task,
+        )
+        # Outcome transaction must complete before any cohort seal: rebalance runs after evaluation.
+        strategy_rebalance_stats = await asyncio.to_thread(
             rebalance_strategy_weights,
             window_days=45,
             min_samples=8,
             alpha=0.35,
             regime="default",
-        )
-        agent_stats, candidate_stats, strategy_eval_stats, strategy_rebalance_stats = await asyncio.gather(
-            agent_task,
-            candidate_task,
-            strategy_eval_task,
-            strategy_rebalance_task,
         )
         # 因子自校準:須在 outcome 評估之後(IC 才新鮮),不能並進上面的 gather。
         from src.modules.strategy.factor_calibration import calibrate_all_markets

@@ -754,6 +754,9 @@ class StrategyWeight(Base):
     market = Column(String, nullable=False, default="ALL")
     regime = Column(String, nullable=False, default="default")
     weight = Column(Float, nullable=False, default=1.0)
+    # (PR-0A) 手動鎖定,標定跳過 / 關掉則標定跳過
+    is_pinned = Column(Boolean, nullable=False, default=False)  # 手動鎖定,標定跳過
+    auto_calibrate = Column(Boolean, nullable=False, default=True)  # 關掉則標定跳過
     reason = Column(String, default="")
     meta = Column(JSON, default={})
     effective_from = Column(DateTime, server_default=func.now())
@@ -1330,3 +1333,226 @@ class MCPCallLog(Base):
     duration_ms = Column(Integer, default=0)
     client_ip = Column(String, nullable=True)
     called_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationModeState(Base):
+    """標定門（PR-0A）：按 kind(factor/strategy) x market 的 persisted mode。
+
+    mode: FROZEN 不改 weight / SHADOW 只產建議與 readiness report / ACTIVE 才能通過門檻後寫。
+    缺行時服務層讀為 FROZEN（fail-safe），never 依 live default 假設可寫。
+    """
+
+    __tablename__ = "calibration_modes"
+    __table_args__ = (
+        UniqueConstraint("kind", "market", name="uq_calibration_mode_kind_market"),
+        Index("ix_calibration_mode_mode", "mode"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String, nullable=False, default="factor")  # factor / strategy
+    market = Column(String, nullable=False, default="ALL")  # ALL / CN / HK / US / TW
+    mode = Column(String, nullable=False, default="FROZEN")  # FROZEN / SHADOW / ACTIVE
+    reason = Column(String, default="")
+    policy_version = Column(String, default="")
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationBaseline(Base):
+    """rollout 基線檔案：rollout 前每 weight/config 的讀取快照與 hash。
+
+    初始保留現 weight,標 unvalidated-baseline;不自動重設為 1.0 或 catalog default。
+    恢復時須選一份具名 versioned config,以獨立 audited restoration 操作完成。
+    """
+
+    __tablename__ = "calibration_baselines"
+    __table_args__ = (
+        UniqueConstraint(
+            "baseline_name", "kind", "market", "target", name="uq_calibration_baseline_key"
+        ),
+        Index("ix_calibration_baseline_name", "baseline_name"),
+        Index("ix_calibration_baseline_created", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    baseline_name = Column(String, nullable=False, default="")  # 具名 rollout baseline
+    kind = Column(String, nullable=False, default="factor")
+    market = Column(String, nullable=False, default="ALL")
+    target = Column(String, nullable=False, default="")  # factor code 或 strategy code|regime
+    weight = Column(Float, nullable=False, default=1.0)
+    config_hash = Column(String(64), nullable=False, default="")  # 該 baseline payload 的 hash
+    status = Column(String, nullable=False, default="unvalidated-baseline")
+    meta = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationApplication(Base):
+    """一次實際標定寫（審計 + 唯一性）。
+
+    unique key = (kind, market, target, calibration_policy_version, cohort_fingerprint)。
+    新 output scoring_config_version 不會解除這個唯一性。
+    """
+
+    __tablename__ = "calibration_applications"
+    __table_args__ = (
+        UniqueConstraint(
+            "kind",
+            "market",
+            "target",
+            "calibration_policy_version",
+            "cohort_fingerprint",
+            name="uq_calibration_application_key",
+        ),
+        Index("ix_calibration_application_time", "created_at"),
+        Index("ix_calibration_application_market_kind", "market", "kind"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String, nullable=False, default="factor")
+    market = Column(String, nullable=False, default="ALL")
+    target = Column(String, nullable=False, default="")
+    regime = Column(String, default="")
+    calibration_policy_version = Column(String, nullable=False, default="")
+    cohort_fingerprint = Column(String(64), nullable=False, default="")
+    population = Column(String, default="")
+    ranker_version = Column(String, default="")
+    evaluation_version = Column(String, default="")
+    primary_horizon_sessions = Column(Integer, nullable=True)
+    source_config_versions = Column(JSON, default={})
+    expected_live_config_hash = Column(String(64), default="")
+    output_config_hash = Column(String(64), default="")
+    sample_units = Column(Integer, default=0)
+    decision_dates = Column(Integer, default=0)
+    valid_ic_periods = Column(Integer, default=0)
+    raw_rows = Column(Integer, default=0)
+    signal_ids = Column(Integer, default=0)
+    old_weight = Column(Float, nullable=True)
+    target_weight = Column(Float, nullable=True)
+    new_weight = Column(Float, nullable=True)
+    mode = Column(String, default="")
+    reason = Column(String, default="")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationProvenance(Base):
+    """標定輸入的 provenance（與 research 的 _factor_provenance 不混）。"""
+
+    __tablename__ = "calibration_provenance"
+    __table_args__ = (
+        UniqueConstraint(
+            "kind", "market", "target", "cohort_fingerprint",
+            name="uq_calibration_provenance_target_cohort",
+        ),
+        Index("ix_calibration_provenance_time", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String, nullable=False, default="factor")
+    market = Column(String, nullable=False, default="ALL")
+    target = Column(String, nullable=False, default="")
+    calibration_policy_version = Column(String, nullable=False, default="")
+    cohort_fingerprint = Column(String(64), nullable=False, default="")
+    population = Column(String, default="")
+    ranker_version = Column(String, default="")
+    evaluation_version = Column(String, default="")
+    primary_horizon_sessions = Column(Integer, nullable=True)
+    decision_snapshot_ids = Column(JSON, default=[])
+    outcome_revisions = Column(JSON, default=[])
+    policy_payload = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class RankingSnapshot(Base):
+    """一次決策 capture（append-only；重試時新 capture,舊 item 永不 upsert）。"""
+
+    __tablename__ = "ranking_snapshots"
+    __table_args__ = (
+        UniqueConstraint("capture_id", name="uq_ranking_snapshot_capture"),
+        Index("ix_ranking_snapshot_market_date", "stock_market", "session_date"),
+        Index("ix_ranking_snapshot_created", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    capture_id = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="CN")
+    session_date = Column(String, nullable=False, default="")  # 市場當地 session YYYY-MM-DD
+    decision_at_utc = Column(DateTime, nullable=True)  # timezone-aware
+    captured_at_utc = Column(DateTime, nullable=True)  # timezone-aware
+    source_pool = Column(String, default="")
+    scan_run_id = Column(Integer, nullable=True)
+    candidate_ids = Column(JSON, default=[])
+    catalog_authority = Column(JSON, default={})
+    universe_ids = Column(JSON, default=[])
+    universe_hash = Column(String(64), default="")
+    item_count = Column(Integer, default=0)
+    eligibility_reasons = Column(JSON, default=[])
+    ranker_version = Column(String, default="")
+    scoring_config_version = Column(String, default="")
+    evaluation_version = Column(String, default="")
+    calibration_policy_version = Column(String, default="")
+    capture_hash = Column(String(64), default="")
+    meta = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class RankingSnapshotItem(Base):
+    """capture 中的 instrument x strategy 的 immutable decision（v2 calibration 只 join 這）。
+
+    signal_run_id 與 candidate_id 是軟引用:StrategySignalRun/EntryCandidate 的 UI projection
+    可被 refresh 或 delete,已封存 factor 與 outcome reference 不能 cascade 改變。
+    """
+
+    __tablename__ = "ranking_snapshot_items"
+    __table_args__ = (
+        UniqueConstraint("decision_snapshot_id", name="uq_ranking_decision_snapshot_id"),
+        Index("ix_ranking_item_market_date", "stock_market", "session_date"),
+        Index("ix_ranking_item_strategy_market", "strategy_code", "stock_market"),
+        Index("ix_ranking_item_instrument", "stock_market", "instrument_id", "session_date"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    decision_snapshot_id = Column(String, nullable=False, default="")
+    ranking_snapshot_id = Column(
+        Integer,
+        ForeignKey("ranking_snapshots.id", ondelete="CASCADE", name="fk_ranking_item_capture"),
+        nullable=True,
+    )
+    stock_symbol = Column(String, nullable=False, default="")
+    instrument_id = Column(String, nullable=False, default="")  # canonical instrument identity
+    stock_market = Column(String, nullable=False, default="CN")
+    strategy_code = Column(String, nullable=False, default="")
+    regime = Column(String, default="default")
+    session_date = Column(String, nullable=False, default="")
+    decision_at_utc = Column(DateTime, nullable=True)
+    captured_at_utc = Column(DateTime, nullable=True)
+    quote_source_time = Column(String, default="")  # quote/bar 的 source time
+    bar_source_time = Column(String, default="")
+    available_at_utc = Column(DateTime, nullable=True)  # 輸入的 available time
+    receipt_at_utc = Column(DateTime, nullable=True)  # receipt time（與 available 分開）
+    point_in_time_status = Column(String, default="UNVERIFIABLE")  # VERIFIED / UNVERIFIABLE
+    outcome_population_id = Column(String, default="legacy-unlabelled")
+    evaluation_version = Column(String, default="")
+    ranker_version = Column(String, default="")
+    scoring_config_version = Column(String, default="")
+    calibration_policy_version = Column(String, default="")
+    alpha_score = Column(Float, default=0.0)
+    catalyst_score = Column(Float, default=0.0)
+    quality_score = Column(Float, default=0.0)
+    risk_penalty = Column(Float, default=0.0)
+    crowd_penalty = Column(Float, default=0.0)
+    source_bonus = Column(Float, default=0.0)
+    regime_multiplier = Column(Float, default=1.0)
+    raw_factor_values = Column(JSON, default={})
+    factor_versions = Column(JSON, default={})
+    entry_price = Column(Float, nullable=True)
+    stop_loss = Column(Float, nullable=True)
+    target_price = Column(Float, nullable=True)
+    eligibility = Column(JSON, default={})
+    ranking_value = Column(Float, nullable=True)
+    primary_horizon_sessions = Column(Integer, nullable=True)
+    exit_session_date = Column(String, default="")
+    exit_session_complete = Column(Boolean, nullable=True)
+    capture_hash = Column(String(64), default="")
+    candidate_id = Column(Integer, nullable=True)  # 軟引用
+    signal_run_id = Column(Integer, nullable=True)  # 軟引用（no FK:projection delete 不 cascade）
+    created_at = Column(DateTime, server_default=func.now())

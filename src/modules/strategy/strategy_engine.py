@@ -18,6 +18,10 @@ from src.modules.strategy.strategy_catalog import (
     list_strategy_catalog,
 )
 from src.modules.strategy.factor_weights import get_factor_weights
+from src.modules.strategy.calibration_gate import (
+    apply_calibration_plan,
+    plan_calibration_batch,
+)
 from src.platform.scheduling.timezone import to_iso_with_tz, utc_now
 from src.platform.marketdata.models import MarketCode, enabled_market_codes
 from src.platform.persistence.database import SessionLocal
@@ -1799,107 +1803,74 @@ def rebalance_strategy_weights(
     db = SessionLocal()
     try:
         catalogs = list_strategy_catalog(enabled_only=True)
-        by_pair, by_all = _aggregate_recent_outcomes(db=db, days=window_days)
-
         changed = 0
         checked = 0
         skipped_low_sample = 0
         rows_changed: list[dict] = []
+        statuses: dict[str, str] = {}
+        modes: dict[str, str] = {}
 
-        targets: list[tuple[str, str, dict]] = []
-        for c in catalogs:
-            code = c["code"]
-            default_weight = float(c.get("default_weight", 1.0))
-            all_metrics = by_all.get(code, {"sample_size": 0, "wins": 0, "avg_return_pct": 0.0})
-            targets.append((code, "ALL", {"default_weight": default_weight, **all_metrics}))
-            for market in enabled_market_codes():
-                metrics = by_pair.get((code, market), {"sample_size": 0, "wins": 0, "avg_return_pct": 0.0})
-                targets.append((code, market, {"default_weight": default_weight, **metrics}))
+        for market in ("ALL", *enabled_market_codes()):
+            targets = [f"{c['code']}|{reg}" for c in catalogs]
+            batch = plan_calibration_batch(db, kind="strategy", market=market,
+                                          targets=targets, regime=reg)
+            for c in catalogs:
+                code = c["code"]
+                key = f"{code}|{reg}"
+                default_weight = float(c.get("default_weight", 1.0))
+                plan = batch["plans"][key]
+                readiness = plan["readiness"]
+                stats = readiness["per_factor"].get("net_return", {})
+                old = plan["old_weight"]
+                modes[market] = plan["mode"]
+                checked += 1
+                if old is None:
+                    statuses[key] = "TARGET_MISSING"
+                    continue
+                sample_size = int(readiness["training"]["units"])
+                if sample_size < min_samples:
+                    skipped_low_sample += 1
+                    continue
 
-        for code, market, metrics in targets:
-            checked += 1
-            sample_size = int(metrics.get("sample_size", 0))
-            wins = int(metrics.get("wins", 0))
-            avg_ret = float(metrics.get("avg_return_pct", 0.0))
-            default_weight = float(metrics.get("default_weight", 1.0))
+                win_rate = float(stats.get("win_rate") or 0.0)
+                avg_ret = float(stats.get("mean") or 0.0)
+                win_term = _clamp((win_rate - 50.0) / 50.0, -1.0, 1.0)
+                ret_term = _clamp(avg_ret / 8.0, -1.0, 1.0)
+                target = default_weight * (1.0 + 0.45 * win_term + 0.35 * ret_term)
+                target = _clamp(target, 0.45, 1.90)
+                new_weight = float(round(_clamp(old * (1.0 - alpha) + target * alpha, 0.45, 1.90), 4))
+                if abs(new_weight - old) < 0.01:
+                    statuses[key] = "NO_CHANGE"
+                    continue
 
-            row = (
-                db.query(StrategyWeight)
-                .filter(
-                    StrategyWeight.strategy_code == code,
-                    StrategyWeight.market == market,
-                    StrategyWeight.regime == reg,
+                result = apply_calibration_plan(
+                    db,
+                    plan=plan,
+                    new_weight=new_weight,
+                    reason=(
+                        f"auto_rebalance(win_rate={win_rate:.1f}%, avg_ret={avg_ret:.2f}%, "
+                        f"samples={sample_size}, alpha={alpha:.2f})"
+                    ),
+                    batch=batch,
                 )
-                .first()
-            )
-            old_weight = float(row.weight if row else default_weight)
-            if sample_size < min_samples:
-                skipped_low_sample += 1
-                continue
-
-            win_rate = (wins / sample_size * 100.0) if sample_size > 0 else 0.0
-            win_term = _clamp((win_rate - 50.0) / 50.0, -1.0, 1.0)
-            ret_term = _clamp(avg_ret / 8.0, -1.0, 1.0)
-            target = default_weight * (1.0 + 0.45 * win_term + 0.35 * ret_term)
-            target = _clamp(target, 0.45, 1.90)
-            new_weight = old_weight * (1.0 - alpha) + target * alpha
-            new_weight = float(round(_clamp(new_weight, 0.45, 1.90), 4))
-
-            if abs(new_weight - old_weight) < 0.01:
-                continue
-
-            reason = (
-                f"auto_rebalance(win_rate={win_rate:.1f}%, avg_ret={avg_ret:.2f}%, "
-                f"samples={sample_size}, alpha={alpha:.2f})"
-            )
-            if not row:
-                row = StrategyWeight(
-                    strategy_code=code,
-                    market=market,
-                    regime=reg,
-                    weight=new_weight,
-                    reason=reason,
-                    meta={"window_days": window_days, "sample_size": sample_size},
-                    effective_from=utc_now(),
+                statuses[key] = result["status"]
+                if result["status"] == "STALE_CONFIG":
+                    break  # stale batch snapshot: stop this market's batch
+                if result["status"] != "APPLIED":
+                    continue
+                changed += 1
+                rows_changed.append(
+                    {
+                        "strategy_code": code,
+                        "market": market,
+                        "old_weight": float(old),
+                        "new_weight": new_weight,
+                        "sample_size": sample_size,
+                    }
                 )
-                db.add(row)
-            else:
-                row.weight = new_weight
-                row.reason = reason
-                row.meta = {"window_days": window_days, "sample_size": sample_size}
-                row.effective_from = utc_now()
-                row.updated_at = utc_now()
-
-            db.add(
-                StrategyWeightHistory(
-                    strategy_code=code,
-                    market=market,
-                    regime=reg,
-                    old_weight=float(old_weight),
-                    new_weight=float(new_weight),
-                    reason=reason,
-                    window_days=window_days,
-                    sample_size=sample_size,
-                    meta={
-                        "wins": wins,
-                        "win_rate": round(win_rate, 3),
-                        "avg_return_pct": round(avg_ret, 4),
-                        "target": round(target, 4),
-                    },
-                )
-            )
-            changed += 1
-            rows_changed.append(
-                {
-                    "strategy_code": code,
-                    "market": market,
-                    "old_weight": round(old_weight, 4),
-                    "new_weight": round(new_weight, 4),
-                    "sample_size": sample_size,
-                }
-            )
 
         db.commit()
+        first_plan = next(iter(statuses.values()), None)
         return {
             "window_days": window_days,
             "min_samples": min_samples,
@@ -1908,6 +1879,9 @@ def rebalance_strategy_weights(
             "changed": changed,
             "skipped_low_sample": skipped_low_sample,
             "changes": rows_changed,
+            "statuses": statuses,
+            "modes": modes,
+            "mode": next(iter(modes.values()), None),
         }
     except Exception as e:
         db.rollback()
