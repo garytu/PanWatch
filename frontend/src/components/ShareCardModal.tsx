@@ -11,39 +11,39 @@ interface ShareCardModalProps {
 }
 
 /**
- * 五档评级 → 展示标签 + A股配色(红涨绿跌)。
- * 复用 technical-badge / suggestion-action 的归一化:买入/增持=红(看多)、卖出/减持=绿(看空)、持有=琥珀(中性)。
- * 这里用自包含的显式十六进制色,保证导出 PNG 在任何主题(亮/暗)下都正确。
+ * 五檔評級 → 展示標籤 + A股配色(紅漲綠跌)。
+ * 複用 technical-badge / suggestion-action 的歸一化:買入/增持=紅(看多)、賣出/減持=綠(看空)、持有=琥珀(中性)。
+ * 這裡用自包含的顯式十六進位制色,保證匯出 PNG 在任何主題(亮/暗)下都正確。
  */
 const RATING_VISUAL: Record<
   string,
   { label: string; color: string; soft: string; gradFrom: string; gradTo: string }
 > = {
-  // 看多(红)
-  buy: { label: '买入', color: '#e11d48', soft: '#fff1f2', gradFrom: '#fb7185', gradTo: '#e11d48' },
+  // 看多(紅)
+  buy: { label: '買入', color: '#e11d48', soft: '#fff1f2', gradFrom: '#fb7185', gradTo: '#e11d48' },
   add: { label: '增持', color: '#e11d48', soft: '#fff1f2', gradFrom: '#fda4af', gradTo: '#e11d48' },
   // 中性(琥珀)
   hold: { label: '持有', color: '#d97706', soft: '#fffbeb', gradFrom: '#fbbf24', gradTo: '#d97706' },
-  // 看空(绿)
-  reduce: { label: '减持', color: '#059669', soft: '#ecfdf5', gradFrom: '#34d399', gradTo: '#059669' },
-  sell: { label: '卖出', color: '#059669', soft: '#ecfdf5', gradFrom: '#6ee7b7', gradTo: '#059669' },
+  // 看空(綠)
+  reduce: { label: '減持', color: '#059669', soft: '#ecfdf5', gradFrom: '#34d399', gradTo: '#059669' },
+  sell: { label: '賣出', color: '#059669', soft: '#ecfdf5', gradFrom: '#6ee7b7', gradTo: '#059669' },
 }
 const RATING_FALLBACK = {
-  label: '观望',
+  label: '觀望',
   color: '#475569',
   soft: '#f8fafc',
   gradFrom: '#94a3b8',
   gradTo: '#475569',
 }
 const REVIEW_VISUAL = {
-  label: '待人工复核',
+  label: '待人工複核',
   color: '#c2410c',
   soft: '#fff7ed',
   gradFrom: '#fb923c',
   gradTo: '#c2410c',
 }
 
-/** 把后端可能存在的五档原值(overweight/underweight)映射到归一化器认得的词。 */
+/** 把後端可能存在的五檔原值(overweight/underweight)對映到歸一化器認得的詞。 */
 function mapRatingRaw(raw?: string): string | undefined {
   if (!raw) return undefined
   const r = raw.toLowerCase().trim()
@@ -53,20 +53,20 @@ function mapRatingRaw(raw?: string): string | undefined {
 }
 
 /**
- * 从标题解析股票名+代码:去掉开头的【深度】等方括号标记,去掉结尾的「:评级」。
- * 例:「【深度】广汽集团(601238):持有」→「广汽集团(601238)」
+ * 從標題解析股票名+程式碼:去掉開頭的【深度】等方括號標記,去掉結尾的「:評級」。
+ * 例:「【深度】廣汽集團(601238):持有」→「廣汽集團(601238)」
  */
 function parseStockName(title: string, symbol: string): string {
   let s = (title || '').trim()
-  s = s.replace(/^【[^】]*】\s*/, '') // 去掉开头第一个【...】标记
-  s = s.replace(/[:：]\s*[^:：]*$/, '') // 去掉结尾「:xxx」(评级)
+  s = s.replace(/^【[^】]*】\s*/, '') // 去掉開頭第一個【...】標記
+  s = s.replace(/[:：]\s*[^:：]*$/, '') // 去掉結尾「:xxx」(評級)
   s = s.trim()
   return s || symbol
 }
 
 /**
- * 清洗结论为单段:去 markdown 加粗 **,再去开头的「Action: x Reasoning:」前缀。
- * 多余空白压成单空格,便于 line-clamp 展示。
+ * 清洗結論為單段:去 markdown 加粗 **,再去開頭的「Action: x Reasoning:」字首。
+ * 多餘空白壓成單空格,便於 line-clamp 展示。
  */
 function cleanConclusion(text: string): string {
   let s = (text || '').replace(/\*\*/g, '')
@@ -77,7 +77,7 @@ function cleanConclusion(text: string): string {
 
 export default function ShareCardModal({ open, onClose, result, symbol, date }: ShareCardModalProps) {
   const sug = result.raw_data?.suggestion
-  // 评级来源:优先后端五档原值，否则用 action，再叠加中文 action_label 兜底。
+  // 評級來源:優先後端五檔原值，否則用 action，再疊加中文 action_label 兜底。
   const ratingRaw = mapRatingRaw(sug?.rating_raw)
   const normalized = normalizeSuggestionAction(ratingRaw || sug?.action, sug?.action_label)
   const reviewRequired = sug?.review_required === true || sug?.rating_raw === 'review'
@@ -91,7 +91,7 @@ export default function ShareCardModal({ open, onClose, result, symbol, date }: 
 
   return (
     <ShareCardDialog open={open} onClose={onClose} filename={`${stockName}-${date}-分析卡片`}>
-      {/* Header:股票名+代码 / 日期 */}
+      {/* Header:股票名+程式碼 / 日期 */}
       <div
         style={{
           display: 'flex',
@@ -106,7 +106,7 @@ export default function ShareCardModal({ open, onClose, result, symbol, date }: 
         <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 500, flexShrink: 0 }}>{date}</div>
       </div>
 
-      {/* Hero:大评级 + 置信度条 + 成本 */}
+      {/* Hero:大評級 + 置信度條 + 成本 */}
       <div
         style={{
           marginTop: 20,
@@ -127,7 +127,7 @@ export default function ShareCardModal({ open, onClose, result, symbol, date }: 
               flexShrink: 0,
             }}
           >
-            AI 投研结论
+            AI 投研結論
           </div>
           <div
             style={{
@@ -142,7 +142,7 @@ export default function ShareCardModal({ open, onClose, result, symbol, date }: 
           </div>
         </div>
 
-        {/* 置信度条 */}
+        {/* 置信度條 */}
         <div style={{ marginTop: 18 }}>
           <div
             style={{
@@ -181,7 +181,7 @@ export default function ShareCardModal({ open, onClose, result, symbol, date }: 
         </div>
       </div>
 
-      {/* 结论段落:最多约 5 行 */}
+      {/* 結論段落:最多約 5 行 */}
       {conclusion && (
         <div
           style={{
@@ -199,9 +199,9 @@ export default function ShareCardModal({ open, onClose, result, symbol, date }: 
         </div>
       )}
 
-      {/* TA 卡专属副标(9-Agent),置于外壳分割线/页脚之上 */}
+      {/* TA 卡專屬副標(9-Agent),置於外殼分割線/頁尾之上 */}
       <div style={{ marginTop: 22, fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
-        AI 投研团队(9-Agent)深度分析
+        AI 投研團隊(9-Agent)深度分析
       </div>
     </ShareCardDialog>
   )

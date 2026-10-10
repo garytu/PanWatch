@@ -34,7 +34,7 @@ describe('assistant task stream', () => {
     })
 
     const onDone = vi.fn()
-    await chatApi.sendAssistantMessageStream(1, '分析市场', { onDone })
+    await chatApi.sendAssistantMessageStream(1, '分析市場', { onDone })
 
     expect(calls).toEqual([
       {

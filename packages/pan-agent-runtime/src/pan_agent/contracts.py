@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import StrEnum
+import re
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictInt, field_validator
 
 
 class ToolRisk(StrEnum):
@@ -152,8 +153,19 @@ class RunLimits(BaseModel):
     max_steps: int = Field(default=6, ge=1, le=32)
     max_tool_calls: int = Field(default=8, ge=1, le=64)
     tool_timeout_seconds: int = Field(default=20, ge=1, le=120)
+    tool_timeout_overrides: dict[str, StrictInt] = Field(default_factory=dict)
     run_timeout_seconds: int = Field(default=90, ge=1, le=600)
     step_retry_count: int = Field(default=1, ge=0, le=3)
+
+    @field_validator("tool_timeout_overrides")
+    @classmethod
+    def validate_tool_timeout_overrides(cls, value: dict[str, int]) -> dict[str, int]:
+        for name, seconds in value.items():
+            if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", name):
+                raise ValueError("tool timeout override names must be tool identifiers")
+            if isinstance(seconds, bool) or not 1 <= seconds <= 120:
+                raise ValueError("tool timeout overrides must be between 1 and 120 seconds")
+        return value
 
 
 class ToolCall(BaseModel):

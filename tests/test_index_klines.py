@@ -1,10 +1,10 @@
-"""② 指数 K线 secid 映射:指数 secid 规则与个股不同,必须显式映射,否则相对强度永远取不到数。"""
+"""② 指數 K線 secid 對映:指數 secid 規則與個股不同,必須顯式對映,否則相對強度永遠取不到數。"""
 from src.platform.marketdata.models import MarketCode
 
 
 def test_get_index_klines_passes_correct_code_and_market(monkeypatch):
-    """沪深300/恒生等指数应把对应 index_code/market/days 原样透传给 marketdata 包的
-    index_klines(secid 映射规则已内聚进 marketdata 包,见
+    """滬深300/恒生等指數應把對應 index_code/market/days 原樣透傳給 marketdata 包的
+    index_klines(secid 對映規則已內聚進 marketdata 包,見
     packages/marketdata/src/marketdata/client.py + packages/marketdata/tests/test_index_methods.py)。
     """
     from src.platform.marketdata.collectors import kline_collector
@@ -24,14 +24,14 @@ def test_get_index_klines_passes_correct_code_and_market(monkeypatch):
 
 
 def test_get_index_klines_unknown_returns_empty():
-    """未映射的指数(如美股 .INX,东财K线不支持)→ 空列表,fail-soft 不抛。"""
+    """未對映的指數(如美股 .INX,東財K線不支援)→ 空列表,fail-soft 不拋。"""
     from src.platform.marketdata.collectors import kline_collector
 
     assert kline_collector.get_index_klines(".INX", MarketCode.US) == []
 
 
 def test_fetch_index_context_us_failsoft():
-    """美股指数无东财K线 → _fetch_index_context 返回 available False,不抛。"""
+    """美股指數無東財K線 → _fetch_index_context 返回 available False,不拋。"""
     from src.modules.research.context_builder import ContextBuilder
 
     ctx = ContextBuilder()._fetch_index_context(".INX", MarketCode.US)
@@ -39,7 +39,7 @@ def test_fetch_index_context_us_failsoft():
 
 
 def test_fetch_index_context_computes_returns(monkeypatch):
-    """有指数K线时,_fetch_index_context 用收盘价算 5日/20日收益。"""
+    """有指數K線時,_fetch_index_context 用收盤價算 5日/20日收益。"""
     from src.platform.marketdata.collectors import kline_collector
     from src.modules.research.context_builder import ContextBuilder
 
@@ -47,7 +47,7 @@ def test_fetch_index_context_computes_returns(monkeypatch):
         def __init__(self, c):
             self.close = c
 
-    # 25 根:从 100 等比每根 +1,最新 124;-6 根=119,-21 根=104
+    # 25 根:從 100 等比每根 +1,最新 124;-6 根=119,-21 根=104
     closes = [_K(100 + i) for i in range(25)]
     monkeypatch.setattr(kline_collector, "get_index_klines", lambda *a, **k: closes)
     ctx = ContextBuilder()._fetch_index_context("000300", MarketCode.CN)

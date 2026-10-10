@@ -32,7 +32,7 @@ def build_kline_history_context(
     if not klines:
         return {
             "available": False,
-            "error": "无K线数据",
+            "error": "無K線資料",
         }
 
     closes = [float(k.close) for k in klines if k.close is not None]
@@ -65,9 +65,9 @@ def build_kline_history_context(
     trend = str(summary.get("trend") or "未知")
     trend_state = (
         "bullish"
-        if "多头" in trend
+        if "多頭" in trend
         else "bearish"
-        if "空头" in trend
+        if "空頭" in trend
         else "neutral"
     )
 

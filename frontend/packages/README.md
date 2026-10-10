@@ -1,7 +1,7 @@
 # Frontend Workspace Packages
 
-- `@panwatch/api`: 统一的 HTTP 请求入口与领域 API（认证、版本、股票等）。
-- `@panwatch/base-ui`: 基础 UI 组件与样式工具（原 `src/components/ui/*` 已迁移）。
-- `@panwatch/biz-ui`: 业务组件与业务复用逻辑（原 `src/components/*` 业务组件已迁移）。
+- `@panwatch/api`: 統一的 HTTP 請求入口與領域 API（認證、版本、股票等）。
+- `@panwatch/base-ui`: 基礎 UI 元件與樣式工具（原 `src/components/ui/*` 已遷移）。
+- `@panwatch/biz-ui`: 業務元件與業務複用邏輯（原 `src/components/*` 業務元件已遷移）。
 
-当前前端页面已统一从 `@panwatch/api` 发起接口请求，避免在页面中直接调用 `fetch`。
+當前前端頁面已統一從 `@panwatch/api` 發起介面請求，避免在頁面中直接呼叫 `fetch`。

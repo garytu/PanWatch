@@ -23,7 +23,20 @@ export interface DashboardMarketIndex {
   change_pct: number | null
   change_amount: number | null
   prev_close: number | null
-  /** 近20日收盘价,用于首页指数走势 sparkline;取数失败/无映射(如美股指数)则为空数组 */
+  /** Official Taiwan index cards use persisted daily bars rather than live quotes. */
+  price_kind?: 'eod' | string
+  trade_date?: string | null
+  change_start_date?: string | null
+  change_end_date?: string | null
+  provider?: string | null
+  source_alias?: string | null
+  unit?: string | null
+  basis?: string | null
+  source_partial?: boolean | null
+  source_truncated?: boolean | null
+  availability?: string
+  spark_dates?: string[]
+  /** Recent observed daily closes; missing dates are not filled with synthetic points. */
   spark?: number[]
 }
 
@@ -35,6 +48,15 @@ export interface DashboardMarketStatus {
   is_trading: boolean
   sessions: string[]
   local_time: string
+  timezone?: string
+  calendar?: {
+    status: 'known' | 'unknown' | string
+    date?: string | null
+    is_trading_day?: boolean | null
+    source?: string | null
+    coverage_start?: string | null
+    coverage_end?: string | null
+  }
 }
 
 export interface DashboardPosition {
@@ -59,7 +81,7 @@ export interface DashboardAccountSummary {
   total_market_value: number
   total_pnl: number
   total_pnl_pct: number
-  /** 今日盈亏(账户内所有持仓 daily_pnl 汇总,元) */
+  /** 今日損益(帳戶內所有持倉 daily_pnl 彙總,元) */
   total_daily_pnl: number
   total_assets: number
   positions: DashboardPosition[]
@@ -72,14 +94,21 @@ export interface DashboardPortfolioSummary {
     total_cost: number
     total_pnl: number
     total_pnl_pct: number
-    /** 今日盈亏(全账户汇总,元) */
+    /** 今日損益(全帳戶彙總,元) */
     total_daily_pnl: number
     available_funds: number
     total_assets: number
   }
+  base_currency?: string
+  currency_symbol?: string
   exchange_rates?: {
-    HKD_CNY: number
+    HKD_CNY?: number
     USD_CNY?: number
+    TWD_CNY?: number
+    USD_TWD?: number
+    HKD_TWD?: number
+    CNY_TWD?: number
+    [key: string]: number | undefined
   }
 }
 
@@ -176,7 +205,7 @@ export interface DashboardRiskSignalItem extends StrategySignalItem {
 
 export interface DashboardOverviewResponse {
   generated_at: string
-  market: 'ALL' | 'CN' | 'HK' | 'US'
+  market: 'ALL' | 'CN' | 'HK' | 'US' | 'TW'
   snapshot_date: string
   data_freshness: {
     strategy_snapshot_date: string
@@ -259,7 +288,7 @@ export const dashboardApi = {
     ),
 
   overview: (params?: {
-    market?: 'ALL' | 'CN' | 'HK' | 'US'
+    market?: 'ALL' | 'CN' | 'HK' | 'US' | 'TW'
     action_limit?: number
     risk_limit?: number
     days?: number

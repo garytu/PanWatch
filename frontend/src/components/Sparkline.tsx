@@ -1,21 +1,21 @@
 import { useId } from 'react'
 
 interface SparklineProps {
-  /** 数值序列(如近20日收盘价/净值),自动 min-max 归一到画布高度 */
+  /** 數值序列(如近20日收盤價/淨值),自動 min-max 歸一到畫布高度 */
   data: number[]
   width?: number
   height?: number
-  /** 线条颜色,支持 currentColor 或任意 CSS 颜色(含 hsl(var(--xx))),亮暗主题都可读 */
+  /** 線條顏色,支援 currentColor 或任意 CSS 顏色(含 hsl(var(--xx))),亮暗主題都可讀 */
   stroke?: string
-  /** 传入则渲染渐变面积(顶部半透明 → 底部透明);不传则只画线 */
+  /** 傳入則渲染漸變面積(頂部半透明 → 底部透明);不傳則只畫線 */
   fill?: string
   className?: string
 }
 
 /**
- * 极简走势线,无第三方图表库依赖:SVG polyline + 可选渐变面积 + 尾端点圆。
- * 用 viewBox 精确匹配 width/height 并配合 preserveAspectRatio="none" + width="100%"
- * 让父容器控制实际渲染宽度;线宽用 vector-effect="non-scaling-stroke" 避免横向拉伸变形。
+ * 極簡走勢線,無第三方圖表庫依賴:SVG polyline + 可選漸變面積 + 尾端點圓。
+ * 用 viewBox 精確匹配 width/height 並配合 preserveAspectRatio="none" + width="100%"
+ * 讓父容器控制實際渲染寬度;線寬用 vector-effect="non-scaling-stroke" 避免橫向拉伸變形。
  */
 export default function Sparkline({
   data,

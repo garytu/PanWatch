@@ -34,7 +34,7 @@ function LocationProbe() {
 
 function BackButton() {
   const navigate = useNavigate()
-  return <button onClick={() => navigate(-1)}>后退</button>
+  return <button onClick={() => navigate(-1)}>後退</button>
 }
 
 function renderAssistant(initialEntry: string | { pathname: string; state?: unknown }) {
@@ -55,14 +55,14 @@ function renderAssistant(initialEntry: string | { pathname: string; state?: unkn
 const conversations = [
   {
     id: 1,
-    title: '第一会话',
+    title: '第一會話',
     stock_symbol: null,
     stock_market: null,
     created_at: '2026-09-12T00:00:00Z',
   },
   {
     id: 2,
-    title: '第二会话',
+    title: '第二會話',
     stock_symbol: null,
     stock_market: null,
     created_at: '2026-09-12T00:00:00Z',
@@ -77,7 +77,7 @@ beforeEach(() => {
     messages: [{
       id: id * 10,
       role: 'assistant',
-      content: `会话 ${id} 的消息`,
+      content: `會話 ${id} 的訊息`,
       created_at: '2026-09-12T00:00:00Z',
     }],
   }))
@@ -88,17 +88,17 @@ describe('assistant conversation routing', () => {
     const user = userEvent.setup()
     renderAssistant('/assistant')
 
-    await user.click(await screen.findByRole('button', { name: '第一会话', exact: true }))
+    await user.click(await screen.findByRole('button', { name: '第一會話', exact: true }))
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/assistant/1'))
 
-    await user.click(screen.getByRole('button', { name: '后退' }))
+    await user.click(screen.getByRole('button', { name: '後退' }))
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/assistant'))
   })
 
   it('rehydrates a conversation when the assistant page is opened with its URL', async () => {
     renderAssistant('/assistant/2')
 
-    expect(await screen.findByText('会话 2 的消息')).toBeTruthy()
+    expect(await screen.findByText('會話 2 的訊息')).toBeTruthy()
     expect(screen.getByTestId('location').textContent).toBe('/assistant/2')
   })
 
@@ -117,7 +117,7 @@ describe('assistant conversation routing', () => {
         assistantContext: {
           symbol: '600519',
           market: 'CN',
-          stockName: '贵州茅台',
+          stockName: '貴州茅臺',
           pageContext: '行情上下文',
         },
       },

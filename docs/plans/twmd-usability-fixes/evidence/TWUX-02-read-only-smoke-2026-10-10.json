@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-10",
+  "seconds": 12.538,
+  "requests": [
+    {
+      "instrument_id": "TWSE:2330",
+      "requested_blocks": [
+        "valuation",
+        "institutional_flows",
+        "company_profile"
+      ],
+      "blocks": {
+        "valuation": {
+          "status": "available",
+          "reason": "selected_record_present"
+        },
+        "institutional_flows": {
+          "status": "missing",
+          "reason": "coverage_missing"
+        },
+        "company_profile": {
+          "status": "available",
+          "reason": "selected_profile_present"
+        }
+      }
+    },
+    {
+      "instrument_id": "TWSE:2330",
+      "requested_blocks": [
+        "valuation",
+        "institutional_flows",
+        "company_profile"
+      ],
+      "blocks": {
+        "valuation": {
+          "status": "available",
+          "reason": "selected_record_present"
+        },
+        "institutional_flows": {
+          "status": "missing",
+          "reason": "coverage_missing"
+        },
+        "company_profile": {
+          "status": "available",
+          "reason": "selected_profile_present"
+        }
+      }
+    }
+  ],
+  "announcement": {
+    "status": "missing",
+    "reason": "no_retained_current_observation"
+  },
+  "logical_http_reads": {
+    "/api/v1/instruments": 1,
+    "/api/v1/valuations": 1,
+    "/api/v1/institutional-flows": 1,
+    "/api/v1/company-profiles": 1,
+    "/api/v1/material-information": 1
+  },
+  "max_http_active": 4,
+  "scheduler": {
+    "active": 0,
+    "queued": 0,
+    "in_flight": 0
+  },
+  "query_image_digest": "sha256:c6bfd31e9fc2d65f1abfa95dffab789e648e7a0a37d8292df3eeb99d77543795",
+  "selectors": {
+    "start_date": "2026-10-08",
+    "end_date": "2026-10-08"
+  },
+  "boundary": "Current checkout service used query-only against deployed twmd; no PanWatch deployment or control mutation. HTTP counts are logical market_get calls, not provider retries."
+}

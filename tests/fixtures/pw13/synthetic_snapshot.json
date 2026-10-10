@@ -1,0 +1,67 @@
+{
+  "schema_version": "panwatch.pw13.snapshot.v1",
+  "dataset_id": "synthetic-pw13-offline-evaluator-example",
+  "evidence_kind": "synthetic",
+  "scope": {
+    "universe_kind": "fixed_selectors",
+    "instrument_ids": ["TWSE:1234"],
+    "universe_basis": "synthetic single-issuer fixture",
+    "decision_window": {"start_date": "2026-01-01", "end_date": "2026-01-09"}
+  },
+  "conditions": {
+    "pe_max": "30",
+    "pb_max": "3",
+    "dividend_yield_min_pct": "2",
+    "revenue_yoy_min_pct": "10",
+    "institutional_net_min_shares": 0
+  },
+  "factor_observations": [
+    {"instrument_id": "TWSE:1234", "condition": "pe_max", "data_period": "2025-12-31", "value": "20.00", "unit": "ratio", "source_contract": "synthetic/valuation/v1", "source_dataset": "valuation", "local_snapshot_at_utc": "2026-01-01T06:00:00Z", "source_received_at_utc": "2026-01-01T06:05:00Z", "revision": 1, "capture_id": "synthetic-pe-1", "payload_sha256": "synthetic-hash-pe-1"},
+    {"instrument_id": "TWSE:1234", "condition": "pb_max", "data_period": "2025-12-31", "value": "2.00", "unit": "ratio", "source_contract": "synthetic/valuation/v1", "source_dataset": "valuation", "local_snapshot_at_utc": "2026-01-01T06:00:00Z", "source_received_at_utc": "2026-01-01T06:05:00Z", "revision": 1, "capture_id": "synthetic-pb-1", "payload_sha256": "synthetic-hash-pb-1"},
+    {"instrument_id": "TWSE:1234", "condition": "dividend_yield_min_pct", "data_period": "2025-12-31", "value": "3.50", "unit": "percent", "source_contract": "synthetic/valuation/v1", "source_dataset": "valuation", "local_snapshot_at_utc": "2026-01-01T06:00:00Z", "source_received_at_utc": "2026-01-01T06:05:00Z", "revision": 1, "capture_id": "synthetic-yield-1", "payload_sha256": "synthetic-hash-yield-1"},
+    {"instrument_id": "TWSE:1234", "condition": "revenue_yoy_min_pct", "data_period": "2025-11", "value": "18.25", "unit": "percent", "source_contract": "synthetic/revenue/v1", "source_dataset": "monthly_revenue", "local_snapshot_at_utc": "2026-01-01T06:00:00Z", "source_received_at_utc": "2026-01-01T06:05:00Z", "revision": 1, "capture_id": "synthetic-revenue-1", "payload_sha256": "synthetic-hash-revenue-1"},
+    {"instrument_id": "TWSE:1234", "condition": "institutional_net_min_shares", "data_period": "2025-12-31", "value": 15000, "unit": "shares", "source_contract": "synthetic/flows/v1", "source_dataset": "institutional_flows", "observation_time_semantics": "exact_content_version", "first_observed_at_utc": "2026-01-01T06:00:00Z", "source_received_at_utc": "2026-01-01T06:05:00Z", "revision": 1, "capture_id": "synthetic-flow-1", "payload_sha256": "synthetic-hash-flow-1"}
+  ],
+  "signals": [
+    {"instrument_id": "TWSE:1234", "decision_at_utc": "2026-01-01T08:00:00Z"},
+    {"instrument_id": "TWSE:1234", "decision_at_utc": "2026-01-03T08:00:00Z"}
+  ],
+  "stock_bars": [
+    {"instrument_id": "TWSE:1234", "venue": "TWSE", "trade_date": "2026-01-02", "unit": "TWD/share", "adjustment_mode": "raw", "close": "100.00", "dataset": "synthetic_stock_daily", "source_contract": "synthetic/stock/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-stock", "payload_sha256": "synthetic-stock-hash"},
+    {"instrument_id": "TWSE:1234", "venue": "TWSE", "trade_date": "2026-01-03", "unit": "TWD/share", "adjustment_mode": "raw", "close": "101.00", "dataset": "synthetic_stock_daily", "source_contract": "synthetic/stock/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-stock", "payload_sha256": "synthetic-stock-hash"},
+    {"instrument_id": "TWSE:1234", "venue": "TWSE", "trade_date": "2026-01-04", "unit": "TWD/share", "adjustment_mode": "raw", "close": "102.00", "dataset": "synthetic_stock_daily", "source_contract": "synthetic/stock/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-stock", "payload_sha256": "synthetic-stock-hash"},
+    {"instrument_id": "TWSE:1234", "venue": "TWSE", "trade_date": "2026-01-05", "unit": "TWD/share", "adjustment_mode": "raw", "close": "103.00", "dataset": "synthetic_stock_daily", "source_contract": "synthetic/stock/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-stock", "payload_sha256": "synthetic-stock-hash"},
+    {"instrument_id": "TWSE:1234", "venue": "TWSE", "trade_date": "2026-01-06", "unit": "TWD/share", "adjustment_mode": "raw", "close": "104.00", "dataset": "synthetic_stock_daily", "source_contract": "synthetic/stock/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-stock", "payload_sha256": "synthetic-stock-hash"},
+    {"instrument_id": "TWSE:1234", "venue": "TWSE", "trade_date": "2026-01-07", "unit": "TWD/share", "adjustment_mode": "raw", "close": "105.00", "dataset": "synthetic_stock_daily", "source_contract": "synthetic/stock/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-stock", "payload_sha256": "synthetic-stock-hash"}
+  ],
+  "benchmark_bars": [
+    {"venue": "TWSE", "benchmark_id": "TAIEX", "trade_date": "2026-01-02", "unit": "index_points", "basis": "raw_price_index", "close": "20000.00", "dataset": "synthetic_taiex", "source_contract": "synthetic/benchmark/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-benchmark", "payload_sha256": "synthetic-benchmark-hash"},
+    {"venue": "TWSE", "benchmark_id": "TAIEX", "trade_date": "2026-01-03", "unit": "index_points", "basis": "raw_price_index", "close": "20100.00", "dataset": "synthetic_taiex", "source_contract": "synthetic/benchmark/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-benchmark", "payload_sha256": "synthetic-benchmark-hash"},
+    {"venue": "TWSE", "benchmark_id": "TAIEX", "trade_date": "2026-01-04", "unit": "index_points", "basis": "raw_price_index", "close": "20200.00", "dataset": "synthetic_taiex", "source_contract": "synthetic/benchmark/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-benchmark", "payload_sha256": "synthetic-benchmark-hash"},
+    {"venue": "TWSE", "benchmark_id": "TAIEX", "trade_date": "2026-01-05", "unit": "index_points", "basis": "raw_price_index", "close": "20300.00", "dataset": "synthetic_taiex", "source_contract": "synthetic/benchmark/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-benchmark", "payload_sha256": "synthetic-benchmark-hash"},
+    {"venue": "TWSE", "benchmark_id": "TAIEX", "trade_date": "2026-01-06", "unit": "index_points", "basis": "raw_price_index", "close": "20400.00", "dataset": "synthetic_taiex", "source_contract": "synthetic/benchmark/v1", "local_snapshot_at_utc": "2026-01-08T06:00:00Z", "revision": 1, "capture_id": "synthetic-benchmark", "payload_sha256": "synthetic-benchmark-hash"}
+  ],
+  "evaluation_policy": {
+    "train_start_date": "2026-01-01",
+    "train_end_date": "2026-01-02",
+    "eval_start_date": "2026-01-03",
+    "eval_end_date": "2026-01-09",
+    "outcome_horizon_sessions": 2,
+    "minimum_train_samples": 1,
+    "minimum_eval_samples": 1,
+    "thresholds_preregistered": true,
+    "preregistered_at_utc": "2026-01-01T07:00:00Z",
+    "cost_policy": {
+      "unit": "basis_points_per_side",
+      "entry_cost_bps": "5",
+      "exit_cost_bps": "5",
+      "market_rules_supported": false,
+      "interpretation": "synthetic sensitivity assumption"
+    }
+  },
+  "quality": {
+    "point_in_time_universe_verified": true,
+    "exchange_calendar_verified": true,
+    "corporate_actions_complete": true
+  }
+}

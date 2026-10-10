@@ -1,7 +1,7 @@
-"""将结构化日志缓冲写入 SQLite 的可观测性适配器。
+"""將結構化日誌緩衝寫入 SQLite 的可觀測性介面卡。
 
-它维护写入节流与保留策略，但不理解日志关联的产品业务含义，因此归属
-``platform.observability`` 而非 HTTP 路由层。
+它維護寫入節流與保留策略，但不理解日誌關聯的產品業務含義，因此歸屬
+``platform.observability`` 而非 HTTP 路由層。
 """
 
 import logging

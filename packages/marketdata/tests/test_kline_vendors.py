@@ -26,7 +26,7 @@ def test_stooq_kline_parses(monkeypatch):
 
 
 def test_tencent_us_kline_resolves_exchange_suffix(monkeypatch):
-    """腾讯美股日K:裸符号只回退化数据(2根)→ 自动试 .OQ/.N 后缀并记忆命中,二次直达。"""
+    """騰訊美股日K:裸符號只回退化資料(2根)→ 自動試 .OQ/.N 字尾並記憶命中,二次直達。"""
     import json as _j
 
     kv._US_SUFFIX_CACHE.clear()
@@ -36,9 +36,9 @@ def test_tencent_us_kline_resolves_exchange_suffix(monkeypatch):
         param = k["params"]["param"]
         calls.append(param)
         tsym = param.split(",")[0]
-        if tsym == "usBABA.N":  # 纽交所后缀才是对的
+        if tsym == "usBABA.N":  # 紐交所字尾才是對的
             days = [[f"2026-07-{i:02d}", "1", "2", "3", "0.5", "10"] for i in range(1, 11)]
-        elif tsym in ("usBABA.OQ", "usBABA"):  # 错后缀/裸符号 → 退化 2 根
+        elif tsym in ("usBABA.OQ", "usBABA"):  # 錯字尾/裸符號 → 退化 2 根
             days = [["2011-06-02", "1", "2", "3", "0.5", "10"],
                     ["2026-07-31", "1", "2", "3", "0.5", "10"]]
         else:
@@ -49,10 +49,10 @@ def test_tencent_us_kline_resolves_exchange_suffix(monkeypatch):
     v = kv.TencentKlineVendor()
     out = v.fetch([Symbol.parse("BABA", market="US")], {"days": 30})
     assert len(out) == 10
-    assert calls[0].startswith("usBABA.OQ")  # 先试纳斯达克
+    assert calls[0].startswith("usBABA.OQ")  # 先試納斯達克
     assert kv._US_SUFFIX_CACHE.get("BABA") == ".N"
 
     calls.clear()
     out2 = v.fetch([Symbol.parse("BABA", market="US")], {"days": 30})
-    assert len(out2) == 10 and len(calls) == 1  # 记忆后缀后一次请求直达
+    assert len(out2) == 10 and len(calls) == 1  # 記憶字尾後一次請求直達
     kv._US_SUFFIX_CACHE.clear()

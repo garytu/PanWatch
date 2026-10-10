@@ -1,4 +1,4 @@
-"""应用升级检测模块（基于 Docker Hub tag）。"""
+"""應用升級檢測模組（基於 Docker Hub tag）。"""
 
 from __future__ import annotations
 
@@ -137,7 +137,7 @@ def _fetch_latest_docker_tag(repo: str, proxy: str | None = None) -> tuple[str |
     latest, release_url, err = _fetch_latest_from_hub(repo, proxy=proxy)
     if latest:
         return latest, release_url, None
-    # Hub 网络失败时，回退到 registry 链路（通常和 docker pull 一致，更稳定）
+    # Hub 網路失敗時，回退到 registry 鏈路（通常和 docker pull 一致，更穩定）
     if err in {"hub_timeout", "hub_unreachable", "hub_request_failed"} or str(err).startswith("hub_http_"):
         r_latest, r_url, r_err = _fetch_latest_from_registry(repo, proxy=proxy)
         if r_latest:
@@ -151,27 +151,27 @@ def _human_error(err: str | None) -> str | None:
     if not code:
         return None
     mapping = {
-        "disabled": "已禁用升级检测",
-        "invalid_repo": "升级检测配置无效",
-        "no_semver_tag": "未找到可用版本标签",
-        "hub_timeout": "连接 Docker Hub 超时",
-        "hub_unreachable": "网络不可达，无法连接 Docker Hub",
-        "hub_request_failed": "Docker Hub 请求失败",
-        "registry_timeout": "连接 Docker Registry 超时",
-        "registry_unreachable": "网络不可达，无法连接 Docker Registry",
-        "registry_request_failed": "Docker Registry 请求失败",
-        "registry_auth_no_token": "Docker Registry 鉴权失败（无 token）",
-        "registry_invalid_tags": "Docker Registry 返回数据格式异常",
+        "disabled": "已停用升級檢測",
+        "invalid_repo": "升級檢測配置無效",
+        "no_semver_tag": "未找到可用版本標籤",
+        "hub_timeout": "連線 Docker Hub 超時",
+        "hub_unreachable": "網路不可達，無法連線 Docker Hub",
+        "hub_request_failed": "Docker Hub 請求失敗",
+        "registry_timeout": "連線 Docker Registry 超時",
+        "registry_unreachable": "網路不可達，無法連線 Docker Registry",
+        "registry_request_failed": "Docker Registry 請求失敗",
+        "registry_auth_no_token": "Docker Registry 鑑權失敗（無 token）",
+        "registry_invalid_tags": "Docker Registry 返回資料格式異常",
     }
     if code.startswith("hub_http_"):
-        return f"Docker Hub 返回异常（HTTP {code.replace('hub_http_', '')}）"
+        return f"Docker Hub 返回異常（HTTP {code.replace('hub_http_', '')}）"
     if code.startswith("registry_auth_http_"):
-        return f"Docker Registry 鉴权异常（HTTP {code.replace('registry_auth_http_', '')}）"
+        return f"Docker Registry 鑑權異常（HTTP {code.replace('registry_auth_http_', '')}）"
     if code.startswith("registry_http_"):
-        return f"Docker Registry 返回异常（HTTP {code.replace('registry_http_', '')}）"
+        return f"Docker Registry 返回異常（HTTP {code.replace('registry_http_', '')}）"
     if code.startswith("http_"):
-        return f"Docker Hub 返回异常（{code.replace('http_', 'HTTP ')}）"
-    return mapping.get(code, "升级检测失败")
+        return f"Docker Hub 返回異常（{code.replace('http_', 'HTTP ')}）"
+    return mapping.get(code, "升級檢測失敗")
 
 
 def check_update(current_version: str, proxy: str | None = None) -> dict[str, object]:

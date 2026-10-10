@@ -7,11 +7,11 @@ export interface SelfCheckItem {
   status: 'ok' | 'slow' | 'fail'
   latency_ms: number
   error: string | null
-  /** 中文修复提示(仅 fail 时非空)。 */
+  /** 中文修復提示(僅 fail 時非空)。 */
   hint: string
-  /** 例如通知"仅校验配置未真发"。 */
+  /** 例如通知"僅校驗配置未真發"。 */
   note: string | null
-  /** 二级分组(AI 类目=服务商名);其余类目为 null。 */
+  /** 二級分組(AI 類目=服務商名);其餘類目為 null。 */
   group: string | null
 }
 
@@ -27,17 +27,17 @@ export interface SelfCheckResult {
 }
 
 export const healthApi = {
-  /** 系统自检(数据源/AI/通知连通性)。notifySend=true 会真实发送测试通知。 */
+  /** 系統自檢(資料來源/AI/通知連通性)。notifySend=true 會真實傳送測試通知。 */
   selfcheck: (notifySend = false) =>
     fetchAPI<SelfCheckResult>('/health/selfcheck?notify_send=' + notifySend, { timeoutMs: 60000 }),
 
-  /** 只取可自检项清单(不探测,秒回),用于先渲染再逐项检查。 */
+  /** 只取可自檢項清單(不探測,秒回),用於先渲染再逐項檢查。 */
   selfcheckList: () =>
     fetchAPI<{ items: Array<{ category: string; key: string; name: string; group: string | null }> }>(
       '/health/selfcheck?list=1',
     ),
 
-  /** 只探测指定 key 的若干项(用于逐项/小并发自检)。notifySend 仅影响 notify 类目。 */
+  /** 只探測指定 key 的若干項(用於逐項/小併發自檢)。notifySend 僅影響 notify 類目。 */
   selfcheckKeys: (keys: string[], notifySend = false) =>
     fetchAPI<SelfCheckResult>(
       '/health/selfcheck?keys=' +

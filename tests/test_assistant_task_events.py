@@ -55,7 +55,7 @@ def test_append_task_event_can_be_replayed_after_a_cursor():
         TaskEventType.STEP_PROGRESS,
         status=TaskStatus.RUNNING,
         step_index=1,
-        data={"summary": "正在查询"},
+        data={"summary": "正在查詢"},
     )
     repository.append_task_event(
         task.id,
@@ -68,7 +68,7 @@ def test_append_task_event_can_be_replayed_after_a_cursor():
     events = repository.list_task_events(task.id, after_sequence=2)
 
     assert [event.sequence for event in events] == [3, 4]
-    assert events[0].data == {"summary": "正在查询"}
+    assert events[0].data == {"summary": "正在查詢"}
     assert events[1].event_id
 
     session.close()
@@ -217,7 +217,7 @@ def test_retry_does_not_replay_completed_or_tool_side_effect_tasks():
         failed.id, status=TaskStatus.FAILED.value, final_message_id=None, error_code="x"
     )
     repository.record_tool_completed(
-        failed.id, call_id="call-1", tool_name="write_tool", summary="已执行"
+        failed.id, call_id="call-1", tool_name="write_tool", summary="已執行"
     )
     assert repository.retry_task(failed.id).status == TaskStatus.FAILED.value
 

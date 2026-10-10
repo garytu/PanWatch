@@ -4,7 +4,7 @@ import src.platform.marketdata.marketdata_client as mc
 
 
 def test_paper_trading_uses_md_quote_rows(monkeypatch):
-    """模拟盘 _fetch_quotes_map 应走 md_quote_rows(不再直接碰 orchestrator)。"""
+    """模擬交易 _fetch_quotes_map 應走 md_quote_rows(不再直接碰 orchestrator)。"""
     from src.modules.paper_trading.paper_trading_engine import PaperTradingEngine
 
     calls = []

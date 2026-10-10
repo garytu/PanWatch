@@ -1,29 +1,46 @@
-"""统一 HTTP 工具:走系统代理(trust_env=True)+ 按 host 节流 + 退避重试 + 来源标记。
+"""統一 HTTP 工具:走系統代理(trust_env=True)+ 按 host 節流 + 退避重試 + 來源標記。
 
-默认 trust_env=True —— 遵循进程 env 的 HTTP_PROXY/NO_PROXY(宿主按 UI 的 http_proxy 设置统一注入);
-没配代理时即直连。个别调用可用 proxy= 显式覆盖。
+預設 trust_env=True —— 遵循程式 env 的 HTTP_PROXY/NO_PROXY(宿主按 UI 的 http_proxy 設定統一注入);
+沒配代理時即直連。個別呼叫可用 proxy= 顯式覆蓋。
 """
 
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 import random
 import threading
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
+
+@dataclass(frozen=True)
+class MarketHttpResponse:
+    """Parsed response metadata available to strict typed-read clients."""
+
+    status_code: int
+    headers: dict[str, str]
+    data: Any
+
+
+class MarketHttpError(Exception):
+    """Transport failure after the shared HTTP retry policy is exhausted."""
+
+
 _FETCH_SOURCE: contextvars.ContextVar[str] = contextvars.ContextVar("fetch_source", default="")
 
 
 @contextmanager
 def fetch_source(name: str):
-    """标注取数来源,写入失败日志便于定位触发方。"""
+    """標註取數來源,寫入失敗日誌便於定位觸發方。"""
     token = _FETCH_SOURCE.set(name or "")
     try:
         yield
@@ -36,14 +53,14 @@ def source_suffix() -> str:
     return f" [src={src}]" if src else ""
 
 
-# 失败原因收集:默认 None = 不收集(生产热路径零开销)。数据源"测试"按钮用 capture_errors()
-# 包住取数调用,把 market_get / vendor 的真实失败原因收上来透到 UI,而不是只显示"无数据"。
+# 失敗原因收集:預設 None = 不收集(生產熱路徑零開銷)。資料來源"測試"按鈕用 capture_errors()
+# 包住取數呼叫,把 market_get / vendor 的真實失敗原因收上來透到 UI,而不是隻顯示"無資料"。
 _ERROR_SINK: contextvars.ContextVar[list | None] = contextvars.ContextVar("md_error_sink", default=None)
 
 
 @contextmanager
 def capture_errors():
-    """进入后,market_get / record_error 的失败原因会被收集到 yield 出的 list。"""
+    """進入後,market_get / record_error 的失敗原因會被收集到 yield 出的 list。"""
     errs: list[str] = []
     token = _ERROR_SINK.set(errs)
     try:
@@ -53,8 +70,8 @@ def capture_errors():
 
 
 def record_error(msg: str) -> None:
-    """把一条失败原因写入当前 capture_errors 上下文(无上下文则忽略)。
-    供 vendor 自己 catch 异常(如 yfinance 走库、不经 market_get)时也能上报真因。"""
+    """把一條失敗原因寫入當前 capture_errors 上下文(無上下文則忽略)。
+    供 vendor 自己 catch 異常(如 yfinance 走庫、不經 market_get)時也能上報真因。"""
     sink = _ERROR_SINK.get()
     if sink is not None and msg:
         sink.append(msg)
@@ -65,7 +82,7 @@ _last_call: dict[str, float] = {}
 
 
 def throttle(host_key: str, min_interval_s: float) -> None:
-    """保证对同一 host 的请求间隔 ≥ min_interval_s。"""
+    """保證對同一 host 的請求間隔 ≥ min_interval_s。"""
     if min_interval_s <= 0:
         return
     with _THROTTLE_LOCK:
@@ -86,7 +103,7 @@ def market_get(
     retries: int = 2,
     backoff: float = 0.4,
     jitter: float = 0.25,
-    parse: str = "text",   # "text" | "json" | "content"
+    parse: str = "text",   # "text" | "json" | "json_decimal" | "content"
     encoding: str | None = None,
     symbol: str = "",
     log_label: str = "",
@@ -95,10 +112,14 @@ def market_get(
     follow_redirects: bool = True,
     verify: bool = True,
     proxy: str | None = None,
+    include_response: bool = False,
+    raise_on_error: bool = False,
 ) -> Any | None:
-    """走系统代理(env)+ 按 host 节流 + 退避重试。成功返回解析结果,失败返回 None 并打带来源日志。
+    """走系統代理(env)+ 按 host 節流 + 退避重試。成功返回解析結果,失敗返回 None 並打帶來源日誌。
 
-    proxy: 显式代理,仅在给了值时传给 httpx.Client 覆盖 env 代理;不传则遵循 trust_env(env)。
+    proxy: 顯式代理,僅在給了值時傳給 httpx.Client 覆蓋 env 代理;不傳則遵循 trust_env(env)。
+    include_response: 返回包含狀態碼、headers 與解析結果的 MarketHttpResponse。
+    raise_on_error: 耗盡重試後拋出 MarketHttpError；預設仍返回 None。
     """
     effective_proxy = proxy
     last_err: Any = None
@@ -114,15 +135,41 @@ def market_get(
                 **({"proxy": effective_proxy} if effective_proxy else {}),
             ) as client:
                 resp = client.get(url, params=params)
+                if include_response and resp.status_code >= 500 and attempt < retries:
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {resp.status_code}", request=resp.request, response=resp
+                    )
                 if raise_for_status:
                     resp.raise_for_status()
                 if parse == "json":
-                    return resp.json()
-                if parse == "content":
-                    return resp.content
-                if encoding:
-                    return resp.content.decode(encoding, errors="ignore")
-                return resp.text
+                    try:
+                        result = resp.json()
+                    except ValueError:
+                        # A proxy can return an HTML error page. Preserve its
+                        # HTTP status instead of misclassifying it as bad JSON.
+                        if not include_response or 200 <= resp.status_code < 300:
+                            raise
+                        result = resp.text
+                elif parse == "json_decimal":
+                    try:
+                        result = json.loads(resp.text, parse_float=Decimal)
+                    except ValueError:
+                        if not include_response or 200 <= resp.status_code < 300:
+                            raise
+                        result = resp.text
+                elif parse == "content":
+                    result = resp.content
+                elif encoding:
+                    result = resp.content.decode(encoding, errors="ignore")
+                else:
+                    result = resp.text
+                if include_response:
+                    return MarketHttpResponse(
+                        status_code=resp.status_code,
+                        headers={str(k).lower(): str(v) for k, v in resp.headers.items()},
+                        data=result,
+                    )
+                return result
         except Exception as e:
             last_err = e
         if attempt < retries:
@@ -131,6 +178,8 @@ def market_get(
     if last_err is not None:
         label = log_label or host_key
         sym = f" symbol={symbol}" if symbol else ""
-        logger.warning(f"{label} 获取失败{sym}: {last_err}{source_suffix()}")
+        logger.warning(f"{label} 獲取失敗{sym}: {last_err}{source_suffix()}")
         record_error(f"{label}{sym}: {type(last_err).__name__}: {last_err}")
+        if raise_on_error:
+            raise MarketHttpError(f"{label} request failed: {type(last_err).__name__}") from last_err
     return None

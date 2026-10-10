@@ -1,7 +1,7 @@
-"""价格提醒规则的共享领域服务。
+"""價格提醒規則的共享領域服務。
 
-HTTP API 和 PanAgent 工具都通过这里读写提醒规则，避免两条入口各自维护
-校验、条件转换和触发计数重置逻辑。
+HTTP API 和 PanAgent 工具都透過這裡讀寫提醒規則，避免兩條入口各自維護
+校驗、條件轉換和觸發計數重置邏輯。
 """
 
 from __future__ import annotations
@@ -21,29 +21,29 @@ ALERT_CONDITION_OPERATORS = {">=", "<=", ">", "<", "==", "=", "!=", "<>", "betwe
 def validate_condition_group(group: dict[str, Any]) -> dict[str, Any]:
     """Validate and copy a condition group into a JSON-safe plain mapping."""
     if not isinstance(group, dict):
-        raise ValueError("condition_group 必须是对象")
+        raise ValueError("condition_group 必須是物件")
     op = str(group.get("op") or "and").lower()
     if op not in {"and", "or"}:
-        raise ValueError("condition_group.op 仅支持 and/or")
+        raise ValueError("condition_group.op 僅支援 and/or")
     items = group.get("items") or []
     if not isinstance(items, list) or not items:
-        raise ValueError("condition_group.items 不能为空")
+        raise ValueError("condition_group.items 不能為空")
 
     normalized_items: list[dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
-            raise ValueError("condition_group.items 必须是对象列表")
+            raise ValueError("condition_group.items 必須是物件列表")
         condition_type = str(item.get("type") or "").strip()
         operator = str(item.get("op") or "").strip()
         if condition_type not in ALERT_CONDITION_TYPES:
-            raise ValueError(f"不支持的条件类型: {condition_type}")
+            raise ValueError(f"不支援的條件型別: {condition_type}")
         if operator not in ALERT_CONDITION_OPERATORS:
-            raise ValueError(f"不支持的运算符: {operator}")
+            raise ValueError(f"不支援的運運算元: {operator}")
         value = item.get("value")
         if operator in {"between", "in"} and (
             not isinstance(value, list) or len(value) != 2
         ):
-            raise ValueError(f"{condition_type} 的 {operator} 需要两个值")
+            raise ValueError(f"{condition_type} 的 {operator} 需要兩個值")
         normalized_items.append(
             {"type": condition_type, "op": operator, "value": value}
         )
@@ -59,7 +59,7 @@ def parse_expire_at(value: str | datetime | None) -> datetime | None:
     try:
         return datetime.fromisoformat(str(value))
     except (TypeError, ValueError) as exc:
-        raise ValueError("expire_at 格式错误") from exc
+        raise ValueError("expire_at 格式錯誤") from exc
 
 
 def list_alert_rules(
@@ -107,11 +107,11 @@ def create_alert_rule(
         cooldown = int(cooldown_minutes)
         max_triggers = int(max_triggers_per_day)
     except (TypeError, ValueError) as exc:
-        raise ValueError("冷却时间和每日最大触发次数必须是整数") from exc
+        raise ValueError("冷卻時間和每日最大觸發次數必須是整數") from exc
     if cooldown < 0:
-        raise ValueError("冷却时间必须是非负整数")
+        raise ValueError("冷卻時間必須是非負整數")
     if max_triggers < 0:
-        raise ValueError("每日最大触发次数必须是非负整数")
+        raise ValueError("每日最大觸發次數必須是非負整數")
     market_hours = str(market_hours_mode or "trading_only").strip().lower()
     if market_hours not in {"always", "trading_only"}:
         raise ValueError("market_hours_mode 只能是 always 或 trading_only")
@@ -180,9 +180,9 @@ def update_alert_rule(
     """Apply assistant-friendly fields and reset the daily trigger window."""
     rule = get_alert_rule(db, rule_id)
     if rule is None:
-        raise LookupError("价格提醒不存在")
+        raise LookupError("價格提醒不存在")
     if not updates:
-        raise ValueError("至少提供一个要修改的字段")
+        raise ValueError("至少提供一個要修改的欄位")
 
     allowed = {
         "name",
@@ -199,12 +199,12 @@ def update_alert_rule(
     }
     unknown = set(updates) - allowed
     if unknown:
-        raise ValueError(f"不支持修改字段: {sorted(unknown)[0]}")
+        raise ValueError(f"不支援修改欄位: {sorted(unknown)[0]}")
 
     if "name" in updates:
         name = str(updates["name"] or "").strip()
         if not name:
-            raise ValueError("提醒名称不能为空")
+            raise ValueError("提醒名稱不能為空")
         rule.name = name
     if "enabled" in updates:
         rule.enabled = bool(updates["enabled"])
@@ -213,23 +213,23 @@ def update_alert_rule(
     if "notify_channel_ids" in updates:
         channel_ids = updates["notify_channel_ids"]
         if not isinstance(channel_ids, list):
-            raise ValueError("notify_channel_ids 必须是数组")
+            raise ValueError("notify_channel_ids 必須是陣列")
         rule.notify_channel_ids = list(channel_ids)
     if "cooldown_minutes" in updates:
         try:
             cooldown = int(updates["cooldown_minutes"])
         except (TypeError, ValueError) as exc:
-            raise ValueError("冷却时间必须是非负整数") from exc
+            raise ValueError("冷卻時間必須是非負整數") from exc
         if cooldown < 0:
-            raise ValueError("冷却时间必须是非负整数")
+            raise ValueError("冷卻時間必須是非負整數")
         rule.cooldown_minutes = cooldown
     if "max_triggers_per_day" in updates:
         try:
             max_triggers = int(updates["max_triggers_per_day"])
         except (TypeError, ValueError) as exc:
-            raise ValueError("每日最大触发次数必须是非负整数") from exc
+            raise ValueError("每日最大觸發次數必須是非負整數") from exc
         if max_triggers < 0:
-            raise ValueError("每日最大触发次数必须是非负整数")
+            raise ValueError("每日最大觸發次數必須是非負整數")
         rule.max_triggers_per_day = max_triggers
     if "repeat_mode" in updates:
         repeat_mode = str(updates["repeat_mode"] or "").strip().lower()
@@ -261,7 +261,7 @@ def update_alert_rule(
             try:
                 target_price = float(updates["target_price"])
             except (TypeError, ValueError) as exc:
-                raise ValueError("提醒价格必须是大于零的数字") from exc
+                raise ValueError("提醒價格必須是大於零的數字") from exc
         else:
             items = (rule.condition_group or {}).get("items") or []
             current = next(
@@ -271,9 +271,9 @@ def update_alert_rule(
             try:
                 target_price = float(current["value"]) if current else 0
             except (TypeError, ValueError, KeyError) as exc:
-                raise ValueError("修改方向时必须有现有价格条件") from exc
+                raise ValueError("修改方向時必須有現有價格條件") from exc
         if target_price <= 0:
-            raise ValueError("提醒价格必须大于零")
+            raise ValueError("提醒價格必須大於零")
 
         condition_group = dict(rule.condition_group or {})
         items = [dict(item) for item in condition_group.get("items") or [] if isinstance(item, dict)]
@@ -297,7 +297,7 @@ def delete_alert_rule(db: Session, rule_id: int) -> None:
     """Delete a rule and its hit history explicitly for SQLite compatibility."""
     rule = get_alert_rule(db, rule_id)
     if rule is None:
-        raise LookupError("价格提醒不存在")
+        raise LookupError("價格提醒不存在")
     db.query(PriceAlertHit).filter(PriceAlertHit.rule_id == rule_id).delete(
         synchronize_session=False
     )

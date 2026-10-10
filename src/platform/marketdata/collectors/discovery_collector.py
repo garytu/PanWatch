@@ -13,6 +13,14 @@ class HotStock:
     change_pct: float | None
     turnover: float | None
     volume: float | None
+    price_kind: str | None = None
+    trade_date: str | None = None
+    freshness: dict | None = None
+    provider: str | None = None
+    adjustment_mode: str | None = None
+    change_basis: str | None = None
+    units: dict | None = None
+    availability: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -25,14 +33,14 @@ class HotBoard:
 
 
 def get_market_data():
-    """惰性导入,避免模块加载时的循环依赖(便于测试 monkeypatch)。"""
+    """惰性匯入,避免模組載入時的迴圈依賴(便於測試 monkeypatch)。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
 
     return _g()
 
 
 class EastMoneyDiscoveryCollector:
-    """Discovery ranks (CN/HK/US),经 marketdata 包统一取数。"""
+    """Discovery ranks (CN/HK/US),經 marketdata 包統一取數。"""
 
     def __init__(self, *, proxy: str | None = None):
         self.proxy = proxy
@@ -62,6 +70,14 @@ class EastMoneyDiscoveryCollector:
                 change_pct=it.change_pct,
                 turnover=it.turnover,
                 volume=it.volume,
+                price_kind=getattr(it, "price_kind", None),
+                trade_date=getattr(it, "trade_date", None),
+                freshness=getattr(it, "freshness", None),
+                provider=getattr(it, "provider", None),
+                adjustment_mode=getattr(it, "adjustment_mode", None),
+                change_basis=getattr(it, "change_basis", None),
+                units=getattr(it, "units", None),
+                availability=getattr(it, "availability", None),
             )
             for it in pkg_items
         ]
@@ -118,6 +134,14 @@ class EastMoneyDiscoveryCollector:
                 change_pct=it.change_pct,
                 turnover=it.turnover,
                 volume=it.volume,
+                price_kind=getattr(it, "price_kind", None),
+                trade_date=getattr(it, "trade_date", None),
+                freshness=getattr(it, "freshness", None),
+                provider=getattr(it, "provider", None),
+                adjustment_mode=getattr(it, "adjustment_mode", None),
+                change_basis=getattr(it, "change_basis", None),
+                units=getattr(it, "units", None),
+                availability=getattr(it, "availability", None),
             )
             for it in pkg_items
         ]

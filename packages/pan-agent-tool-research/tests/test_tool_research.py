@@ -30,7 +30,7 @@ async def fake_executor(_request, _arguments):
     raise AssertionError("tool research must not execute tools")
 
 
-def request(content: str = "发现研究机会") -> RunRequest:
+def request(content: str = "發現研究機會") -> RunRequest:
     return RunRequest(
         run_id="research-run",
         messages=[{"role": "user", "content": content}],
@@ -64,8 +64,8 @@ def build_registry(executor=fake_executor) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="find_research_candidates",
-            title="发现研究候选",
-            description="筛选值得进一步研究的股票候选。",
+            title="發現研究候選",
+            description="篩選值得進一步研究的股票候選。",
             input_schema={"type": "object", "properties": {}},
         ),
         executor,
@@ -73,8 +73,8 @@ def build_registry(executor=fake_executor) -> ToolRegistry:
     registry.register(
         ToolSpec(
             name="create_price_alert",
-            title="创建价格提醒",
-            description="创建价格提醒。",
+            title="建立價格提醒",
+            description="建立價格提醒。",
             risk=ToolRisk.WRITE,
             confirmation_required=True,
             input_schema={"type": "object", "properties": {}},
@@ -88,15 +88,15 @@ def descriptors() -> list[ToolDescriptor]:
     return [
         descriptor(
             "find_research_candidates",
-            title="发现研究候选",
-            summary="从市场和持仓范围中筛选值得进一步研究的股票候选。",
-            keywords=["发现机会", "研究", "候选", "筛选"],
+            title="發現研究候選",
+            summary="從市場和持倉範圍中篩選值得進一步研究的股票候選。",
+            keywords=["發現機會", "研究", "候選", "篩選"],
         ),
         descriptor(
             "create_price_alert",
-            title="创建价格提醒",
-            summary="为股票创建价格触发提醒。",
-            keywords=["提醒", "价格", "创建"],
+            title="建立價格提醒",
+            summary="為股票建立價格觸發提醒。",
+            keywords=["提醒", "價格", "建立"],
             risk=ToolRisk.WRITE,
         ),
     ]
@@ -111,7 +111,7 @@ def test_tool_research_selects_relevant_tool_with_explainable_reason():
 
     result = asyncio.run(
         service.research(
-            ToolResearchRequest(query="帮我发现几个新的研究机会"),
+            ToolResearchRequest(query="幫我發現幾個新的研究機會"),
             policy=ReadOnlyToolPolicy(),
             runtime_request=request(),
         )
@@ -130,9 +130,9 @@ def test_tool_research_hard_filters_write_tools_and_denied_tools():
 
     result = asyncio.run(
         service.research(
-            ToolResearchRequest(query="创建价格提醒"),
+            ToolResearchRequest(query="建立價格提醒"),
             policy=ReadOnlyToolPolicy(),
-            runtime_request=request("创建价格提醒"),
+            runtime_request=request("建立價格提醒"),
         )
     )
 
@@ -145,9 +145,9 @@ def test_tool_research_returns_empty_result_for_no_match_without_inventing_tools
 
     result = asyncio.run(
         service.research(
-            ToolResearchRequest(query="写一封邮件"),
+            ToolResearchRequest(query="寫一封郵件"),
             policy=ReadOnlyToolPolicy(),
-            runtime_request=request("写一封邮件"),
+            runtime_request=request("寫一封郵件"),
         )
     )
 
@@ -174,14 +174,14 @@ def test_registry_rejects_unknown_or_duplicate_descriptors():
     registry.register(
         ToolSpec(
             name="lookup",
-            title="查询",
-            description="查询值。",
+            title="查詢",
+            description="查詢值。",
             input_schema={"type": "object", "properties": {}},
         ),
         fake_executor,
     )
     item = descriptor(
-        "lookup", title="查询", summary="查询值。", keywords=["查询"]
+        "lookup", title="查詢", summary="查詢值。", keywords=["查詢"]
     )
     with pytest.raises(DuplicateToolName):
         ToolResearchService(registry, descriptors=[item, item])
@@ -227,7 +227,7 @@ def test_active_plugin_search_returns_loaded_tool_references_without_executing_t
         call=ToolCall(
             id="search-1",
             name="tool_search",
-            arguments={"query": "发现研究机会"},
+            arguments={"query": "發現研究機會"},
         ),
         tool=search_spec,
         available_tools=(search_spec,),
@@ -256,7 +256,7 @@ def test_active_plugin_search_failure_falls_back_without_emptying_direct_tools()
         call=ToolCall(
             id="search-1",
             name="tool_search",
-            arguments={"query": "查询工具"},
+            arguments={"query": "查詢工具"},
         ),
         tool=search_spec,
         available_tools=(search_spec,),
@@ -275,7 +275,7 @@ def test_active_plugin_search_failure_falls_back_without_emptying_direct_tools()
 def test_active_plugin_completes_model_side_search_and_deferred_tool_loading():
     async def candidate_executor(_request, _arguments):
         return ToolResult.success(
-            summary="候选查询完成",
+            summary="候選查詢完成",
             data={"items": []},
             sources=[],
             observed_at=__import__("datetime").datetime.now(__import__("datetime").UTC),
@@ -300,7 +300,7 @@ def test_active_plugin_completes_model_side_search_and_deferred_tool_loading():
                         ToolCall(
                             id="search-1",
                             name="tool_search",
-                            arguments={"query": "发现研究机会"},
+                            arguments={"query": "發現研究機會"},
                         )
                     ]
                 )
@@ -327,7 +327,7 @@ def test_active_plugin_completes_model_side_search_and_deferred_tool_loading():
         ).run(
             RunRequest(
                 run_id="tool-search-run",
-                messages=[{"role": "user", "content": "发现几个研究机会"}],
+                messages=[{"role": "user", "content": "發現幾個研究機會"}],
                 limits=RunLimits(max_steps=4),
             ),
             _CollectingSink(),

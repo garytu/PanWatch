@@ -66,7 +66,7 @@ def export_template(
     include_internal: bool = Query(default=True),
     db: Session = Depends(get_db),
 ):
-    """导出当前配置为可导入的配置包 JSON"""
+    """匯出當前配置為可匯入的配置包 JSON"""
     settings_rows = (
         db.query(AppSettings).filter(AppSettings.key.in_(sorted(_SETTINGS_KEYS))).all()
     )
@@ -135,16 +135,16 @@ def export_template(
 def import_template(
     payload: TemplatePayload,
     mode: str = Query(
-        "merge", description="merge=合并更新, replace=替换(仅对 payload 涵盖的数据)"
+        "merge", description="merge=合併更新, replace=替換(僅對 payload 涵蓋的資料)"
     ),
     db: Session = Depends(get_db),
 ):
-    """导入配置包。默认 merge：仅更新/创建 payload 中包含的对象。"""
+    """匯入配置包。預設 merge：僅更新/建立 payload 中包含的物件。"""
 
     if payload.version != 1:
-        raise HTTPException(400, f"不支持的配置包版本: {payload.version}")
+        raise HTTPException(400, f"不支援的配置包版本: {payload.version}")
     if mode not in ("merge", "replace"):
-        raise HTTPException(400, "mode 仅支持 merge/replace")
+        raise HTTPException(400, "mode 僅支援 merge/replace")
 
     updated_settings = 0
     created_stocks = 0
@@ -255,7 +255,7 @@ def import_template(
 
     db.commit()
     logger.info(
-        f"导入配置包: settings={updated_settings} agents(+{created_agents}/~{updated_agents}) "
+        f"匯入配置包: settings={updated_settings} agents(+{created_agents}/~{updated_agents}) "
         f"stocks(+{created_stocks}/~{updated_stocks}) stock_agents(+{created_stock_agents}/~{updated_stock_agents})"
     )
 

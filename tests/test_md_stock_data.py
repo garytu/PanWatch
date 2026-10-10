@@ -1,11 +1,11 @@
-"""md_stock_data 兼容层测试:走 marketdata 包。"""
+"""md_stock_data 相容層測試:走 marketdata 包。"""
 
 import src.platform.marketdata.marketdata_client as mc
 from src.platform.marketdata.models import MarketCode, StockData
 
 
 def test_md_stock_data_uses_marketdata(monkeypatch):
-    """md_stock_data 应调用 get_market_data().quotes() 并转换为 StockData。"""
+    """md_stock_data 應呼叫 get_market_data().quotes() 並轉換為 StockData。"""
     from marketdata.types import Quote
 
     class _MD:

@@ -1,11 +1,11 @@
-"""验证中心 Agent 建议复盘 API。"""
+"""驗證中心 Agent 建議覆盤 API。"""
 
 from __future__ import annotations
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-import src.platform.persistence.models  # noqa: F401  注册 ORM 模型
+import src.platform.persistence.models  # noqa: F401  註冊 ORM 模型
 from src.platform.persistence.database import Base
 from src.platform.persistence.models import AgentPredictionOutcome
 
@@ -26,17 +26,17 @@ def _row(horizon: int) -> AgentPredictionOutcome:
         horizon_days=horizon,
         horizon_unit="trading_days",
         action="buy",
-        action_label="买入",
+        action_label="買入",
         trigger_price=10.0,
         outcome_price=11.0,
         outcome_return_pct=10.0,
         outcome_status="evaluated",
-        meta={"reason": "测试理由", "signal": "测试信号"},
+        meta={"reason": "測試理由", "signal": "測試訊號"},
     )
 
 
 def test_evaluations_router_is_mounted():
-    """验证中心仅暴露 Agent 建议复盘接口。"""
+    """驗證中心僅暴露 Agent 建議覆盤介面。"""
     from src.bootstrap.application import app
 
     paths = app.openapi()["paths"]
@@ -48,7 +48,7 @@ def test_evaluations_router_is_mounted():
 
 
 def test_list_agent_predictions_returns_one_group_with_policy():
-    """两条 horizon 原始记录被 API 组装为一条复盘建议。"""
+    """兩條 horizon 原始記錄被 API 組裝為一條覆盤建議。"""
     from src.modules.research.api import evaluations
 
     db = _mem_db()
@@ -72,7 +72,7 @@ def test_list_agent_predictions_returns_one_group_with_policy():
 
 
 def test_summary_only_counts_trading_day_records():
-    """旧自然日记录可浏览，但不进入默认命中率汇总。"""
+    """舊自然日記錄可瀏覽，但不進入預設命中率彙總。"""
     from src.modules.research.api import evaluations
 
     db = _mem_db()
@@ -87,7 +87,7 @@ def test_summary_only_counts_trading_day_records():
                 horizon_days=5,
                 horizon_unit="calendar_days_legacy",
                 action="buy",
-                action_label="买入",
+                action_label="買入",
                 outcome_return_pct=-8.0,
                 outcome_status="evaluated",
             )
@@ -103,7 +103,7 @@ def test_summary_only_counts_trading_day_records():
 
 
 def test_status_filter_keeps_all_horizons_for_matched_suggestion():
-    """按状态筛选命中一条 horizon 时，返回的建议仍保留完整 1/5 日结果。"""
+    """按狀態篩選命中一條 horizon 時，返回的建議仍保留完整 1/5 日結果。"""
     from src.modules.research.api import evaluations
 
     db = _mem_db()

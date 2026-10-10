@@ -1,8 +1,10 @@
 import logging
 import time
+import asyncio
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy.orm import Session
 
 from src.platform.runtime.config import Settings
@@ -68,7 +70,7 @@ def _pick_num(mapping: dict, keys: list[str]) -> float | None:
 
 def _normalize_market(market: str) -> str:
     m = (market or "CN").strip().upper()
-    return m if m in ("CN", "HK", "US") else "CN"
+    return m if m in ("CN", "HK", "US", "TW") else "CN"
 
 
 def _latest_snapshot_stocks(db: Session, market: str, limit: int = 120) -> list[dict]:
@@ -103,6 +105,14 @@ def _latest_snapshot_stocks(db: Session, market: str, limit: int = 120) -> list[
                 "change_pct": _pick_num(quote, ["change_pct", "pct_change", "chg_pct"]),
                 "turnover": _pick_num(quote, ["turnover", "amount", "turnover_value"]),
                 "volume": _pick_num(quote, ["volume", "vol"]),
+                "price_kind": quote.get("price_kind"),
+                "trade_date": quote.get("trade_date"),
+                "freshness": quote.get("freshness"),
+                "provider": quote.get("provider"),
+                "adjustment_mode": quote.get("adjustment_mode"),
+                "change_basis": quote.get("change_basis"),
+                "units": quote.get("units"),
+                "availability": quote.get("availability"),
             }
         )
     return out
@@ -128,6 +138,14 @@ async def _hot_stocks_live_or_snapshot(
                 "change_pct": it.change_pct,
                 "turnover": it.turnover,
                 "volume": it.volume,
+                "price_kind": getattr(it, "price_kind", None),
+                "trade_date": getattr(it, "trade_date", None),
+                "freshness": getattr(it, "freshness", None),
+                "provider": getattr(it, "provider", None),
+                "adjustment_mode": getattr(it, "adjustment_mode", None),
+                "change_basis": getattr(it, "change_basis", None),
+                "units": getattr(it, "units", None),
+                "availability": getattr(it, "availability", None),
             }
             for it in items
         ]
@@ -135,8 +153,23 @@ async def _hot_stocks_live_or_snapshot(
             return data
     except Exception as e:
         logger.warning(f"discovery stocks live failed ({mkt}/{mode}): {type(e).__name__}: {e!r}")
+    if mkt == "TW":
+        # Taiwan price discovery must stay on the configured TWMD source. A
+        # local strategy snapshot is not an eligible fallback for this route.
+        return []
     # Snapshot fallback: ensures UI is still usable when live source timeout/unavailable.
     return _latest_snapshot_stocks(db, mkt, limit=max(limit, 40))
+
+
+class TaiwanDiscoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pe_max: float | None = Field(default=None, gt=0, le=1000, strict=True)
+    pb_max: float | None = Field(default=None, gt=0, le=1000, strict=True)
+    dividend_yield_min_pct: float | None = Field(default=None, ge=0, le=1000, strict=True)
+    revenue_yoy_min_pct: float | None = Field(default=None, ge=-1000, le=100000, strict=True)
+    institutional_net_min_shares: StrictInt | None = Field(default=None, ge=-10_000_000_000, le=10_000_000_000)
+    limit: StrictInt = Field(default=20, ge=1, le=20)
 
 
 def _watchlist_symbols(db: Session, market: str) -> set[str]:
@@ -186,14 +219,29 @@ def _build_synthetic_boards(
             "change_pct": _avg([_to_number(x.get("change_pct")) for x in top]),
             "change_amount": None,
             "turnover": _sum([_to_number(x.get("turnover")) for x in top]),
+            "constituent_provenance": [
+                {
+                    "symbol": item.get("symbol"),
+                    "market": item.get("market"),
+                    "price_kind": item.get("price_kind"),
+                    "trade_date": item.get("trade_date"),
+                    "freshness": item.get("freshness"),
+                    "provider": item.get("provider"),
+                    "adjustment_mode": item.get("adjustment_mode"),
+                    "change_basis": item.get("change_basis"),
+                    "units": item.get("units"),
+                    "availability": item.get("availability"),
+                }
+                for item in top
+            ],
         }
 
-    market_name = {"CN": "A股", "HK": "港股", "US": "美股"}.get(mkt, mkt)
+    market_name = {"CN": "A股", "HK": "港股", "US": "美股", "TW": "台股"}.get(mkt, mkt)
     buckets = [
-        build_bucket("GAINERS", f"{market_name}涨幅领先", gainers),
-        build_bucket("TURNOVER", f"{market_name}成交额领先", turnover),
-        build_bucket("VOLATILITY", f"{market_name}波动活跃", volatility),
-        build_bucket("WATCHLIST", f"{market_name}自选关联", watch_related),
+        build_bucket("GAINERS", f"{market_name}漲幅領先", gainers),
+        build_bucket("TURNOVER", f"{market_name}成交額領先", turnover),
+        build_bucket("VOLATILITY", f"{market_name}波動活躍", volatility),
+        build_bucket("WATCHLIST", f"{market_name}自選關聯", watch_related),
     ]
     result = [x for x in buckets if x]
     return result[: max(1, min(int(limit), 20))]
@@ -239,7 +287,7 @@ async def get_hot_stocks(
     market = _normalize_market(market)
     mode = (mode or "turnover").lower()
     if mode not in ("turnover", "gainers"):
-        raise HTTPException(400, f"不支持的 mode: {mode}")
+        raise HTTPException(400, f"不支援的 mode: {mode}")
 
     key = f"stocks:{market}:{mode}:{int(limit)}"
     cached = _cache_get(key, ttl_s=45)
@@ -257,10 +305,31 @@ async def get_hot_stocks(
     )
     if not data:
         raise HTTPException(
-            503, "热门股票数据源不可用（实时源与本地快照均不可用）"
+            503, "熱門股票資料來源不可用（即時源與本地快照均不可用）"
         )
     _cache_set(key, data)
     return data
+
+
+@router.post("/stocks/screen")
+async def screen_taiwan_stocks(request: TaiwanDiscoveryRequest):
+    """Opt-in official Taiwan discovery over a bounded price-ranked candidate set."""
+    conditions = request.model_dump(exclude={"limit"}, exclude_none=True)
+    if not conditions:
+        raise HTTPException(400, "至少選擇一項官方資料條件")
+    try:
+        from src.modules.research.taiwan_discovery import TaiwanDiscoveryService
+
+        return await asyncio.to_thread(
+            TaiwanDiscoveryService().collect,
+            conditions,
+            limit=request.limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Taiwan official discovery failed")
+        raise HTTPException(503, "台股官方條件選股暫時不可用") from exc
 
 
 @router.get("/boards")
@@ -278,7 +347,7 @@ async def get_hot_boards(
     market = _normalize_market(market)
     mode = (mode or "gainers").lower()
     if mode not in ("gainers", "turnover", "hot"):
-        raise HTTPException(400, f"不支持的 mode: {mode}")
+        raise HTTPException(400, f"不支援的 mode: {mode}")
 
     key = f"boards:{market}:{mode}:{int(limit)}"
     cached = _cache_get(key, ttl_s=60)
@@ -323,7 +392,7 @@ async def get_hot_boards(
             limit=limit,
         )
     if not data:
-        raise HTTPException(503, "热门板块/主题数据源不可用")
+        raise HTTPException(503, "熱門板塊/主題資料來源不可用")
     _cache_set(key, data)
     return data
 
@@ -340,19 +409,19 @@ async def get_board_stocks(
 
     code = (board_code or "").strip()
     if not code:
-        raise HTTPException(400, "缺少板块代码")
+        raise HTTPException(400, "缺少板塊程式碼")
 
     mkt = _normalize_market(market)
     mode = (mode or "gainers").lower()
     if mode not in ("gainers", "turnover", "hot"):
-        raise HTTPException(400, f"不支持的 mode: {mode}")
+        raise HTTPException(400, f"不支援的 mode: {mode}")
 
     key = f"board_stocks:{mkt}:{code}:{mode}:{int(limit)}"
     cached = _cache_get(key, ttl_s=60)
     if cached is not None:
         return cached
 
-    if code.startswith(("CN_", "HK_", "US_")):
+    if code.startswith(("CN_", "HK_", "US_", "TW_")):
         proxy = _resolve_proxy() or None
         collector = EastMoneyDiscoveryCollector(proxy=proxy)
         market_from_code = code.split("_", 1)[0]
@@ -383,11 +452,11 @@ async def get_board_stocks(
     except (httpx.ConnectTimeout, httpx.ConnectError, httpx.ProxyError) as e:
         logger.warning(f"discovery board_stocks connect timeout: {e!r}")
         raise HTTPException(
-            503, "板块成分股数据源连接超时（可能需要配置代理 http_proxy）"
+            503, "板塊成分股資料來源連線超時（可能需要配置代理 http_proxy）"
         )
     except Exception as e:
         logger.warning(f"discovery board_stocks failed: {type(e).__name__}: {e!r}")
-        raise HTTPException(503, "板块成分股数据源不可用")
+        raise HTTPException(503, "板塊成分股資料來源不可用")
     data = [
         {
             "symbol": it.symbol,
@@ -397,6 +466,14 @@ async def get_board_stocks(
             "change_pct": it.change_pct,
             "turnover": it.turnover,
             "volume": it.volume,
+            "price_kind": getattr(it, "price_kind", None),
+            "trade_date": getattr(it, "trade_date", None),
+            "freshness": getattr(it, "freshness", None),
+            "provider": getattr(it, "provider", None),
+            "adjustment_mode": getattr(it, "adjustment_mode", None),
+            "change_basis": getattr(it, "change_basis", None),
+            "units": getattr(it, "units", None),
+            "availability": getattr(it, "availability", None),
         }
         for it in items
     ]

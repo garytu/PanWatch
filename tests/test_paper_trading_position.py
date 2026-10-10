@@ -1,11 +1,11 @@
-"""模拟盘仓位管理(Phase 1)单元测试 —— 纯函数,不触发 DB/网络。"""
+"""模擬交易倉位管理(Phase 1)單元測試 —— 純函式,不觸發 DB/網路。"""
 
 from src.modules.strategy.backtest.cost_model import CostModel
 from src.modules.paper_trading.paper_trading_engine import _compute_quantity, _position_weight
 
 
 def test_position_weight_tiers():
-    """信号强度越高,单笔资金占比越大(分档)。"""
+    """訊號強度越高,單筆資金佔比越大(分檔)。"""
     assert _position_weight(90) == 0.25
     assert _position_weight(80) == 0.18
     assert _position_weight(70) == 0.12
@@ -14,18 +14,18 @@ def test_position_weight_tiers():
 
 
 def test_compute_quantity_respects_budget():
-    """按市场预算 × 强度比例分配,买入 100 股整数倍且不超预算对应股数。"""
+    """按市場預算 × 強度比例分配,買入 100 股整數倍且不超預算對應股數。"""
     cm = CostModel()
     qty = _compute_quantity(
         rank_score=90, market_budget=1_000_000, price=10.0,
         available_cash=1_000_000, cost_model=cm,
     )
     assert qty > 0 and qty % 100 == 0
-    assert qty <= 25000  # 25% 预算 / 10 元
+    assert qty <= 25000  # 25% 預算 / 10 元
 
 
 def test_compute_quantity_respects_cash():
-    """可用现金不足时回退到买得起的手数,买入含费不超现金。"""
+    """可用現金不足時回退到買得起的手數,買入含費不超現金。"""
     cm = CostModel()
     qty = _compute_quantity(
         rank_score=90, market_budget=1_000_000, price=10.0,
@@ -38,7 +38,7 @@ def test_compute_quantity_respects_cash():
 
 
 def test_compute_quantity_insufficient_cash_returns_zero():
-    """现金连最小一手都买不起时返回 0(应跳过建仓)。"""
+    """現金連最小一手都買不起時返回 0(應跳過建倉)。"""
     cm = CostModel()
     qty = _compute_quantity(
         rank_score=90, market_budget=1_000_000, price=100.0,
@@ -48,7 +48,7 @@ def test_compute_quantity_insufficient_cash_returns_zero():
 
 
 def test_engine_imports_ok():
-    """改造后 paper_trading_engine 可正常导入(无语法/循环 import 错),关键符号在位。"""
+    """改造後 paper_trading_engine 可正常匯入(無語法/迴圈 import 錯),關鍵符號在位。"""
     import src.modules.paper_trading.paper_trading_engine as e
 
     assert hasattr(e, "ENGINE")

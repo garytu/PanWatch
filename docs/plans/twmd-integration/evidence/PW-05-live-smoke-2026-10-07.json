@@ -1,0 +1,1484 @@
+{
+  "audit_date_local": "2026-10-07",
+  "audit_started_at_utc": "2026-10-07T00:14:11.389338+00:00",
+  "query_service": {
+    "base": "http://127.0.0.1:8000",
+    "version": "0.1.0",
+    "health": {
+      "http_status": 200,
+      "latency_ms": 1.4,
+      "status": "ok"
+    },
+    "readiness": {
+      "http_status": 200,
+      "latency_ms": 1777.0,
+      "status": "ready",
+      "dataset_count": 2,
+      "ready_dataset_count": 0
+    },
+    "instruments": {
+      "http_status": "error",
+      "latency_ms": 278.8
+    },
+    "smoke": [
+      {
+        "product": "valuations",
+        "instrument_id": "TWSE:2330",
+        "selectors": "instrument_id=TWSE%3A2330&start=2026-10-02&end=2026-10-05",
+        "http_status": 200,
+        "latency_ms": 14.5,
+        "requested_at_utc": "2026-10-07T00:14:13.496605+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.511105+00:00",
+        "response_bytes_capped": null,
+        "row_count": 2,
+        "data_dates": [
+          "2026-10-02",
+          "2026-10-05"
+        ],
+        "rows": [
+          {
+            "instrument_id": "TWSE:2330",
+            "trade_date": "2026-10-02",
+            "financial_reference_year": 2026,
+            "financial_reference_quarter": 2
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "trade_date": "2026-10-05",
+            "financial_reference_year": 2026,
+            "financial_reference_quarter": 2
+          }
+        ]
+      },
+      {
+        "product": "institutional-flows",
+        "instrument_id": "TWSE:2330",
+        "selectors": "instrument_id=TWSE%3A2330&start_date=2026-10-02&end_date=2026-10-05",
+        "http_status": 200,
+        "latency_ms": 38.2,
+        "requested_at_utc": "2026-10-07T00:14:13.496743+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.534994+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "data",
+          "instrument_id",
+          "native_unit",
+          "schema_ready",
+          "source_contract"
+        ],
+        "summary": {
+          "instrument_id": "TWSE:2330",
+          "source_contract": "twse_t86_v1",
+          "schema_ready": true,
+          "coverage": [
+            {
+              "trade_date": "2026-10-02",
+              "status": "AVAILABLE",
+              "record_count": 18610,
+              "acquired_at": "2026-10-04T13:09:26.439985Z"
+            },
+            {
+              "trade_date": "2026-10-03",
+              "status": "MISSING",
+              "record_count": 0,
+              "acquired_at": null
+            },
+            {
+              "trade_date": "2026-10-04",
+              "status": "MISSING",
+              "record_count": 0,
+              "acquired_at": null
+            },
+            {
+              "trade_date": "2026-10-05",
+              "status": "MISSING",
+              "record_count": 0,
+              "acquired_at": null
+            }
+          ],
+          "data": [
+            {
+              "instrument_id": "TWSE:2330",
+              "trade_date": "2026-10-02",
+              "first_observed_at": "2026-10-04T13:09:26.439985Z"
+            }
+          ]
+        },
+        "coverage_count": 4,
+        "data_count": 1
+      },
+      {
+        "product": "company-profiles",
+        "instrument_id": "TWSE:2330",
+        "selectors": "instrument_id=TWSE%3A2330",
+        "http_status": 200,
+        "latency_ms": 13626.8,
+        "requested_at_utc": "2026-10-07T00:14:13.496872+00:00",
+        "completed_at_utc": "2026-10-07T00:14:27.123794+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage_status",
+          "instrument_id",
+          "latest_snapshot",
+          "latest_snapshot_presence",
+          "profile",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "source_contract",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TWSE:2330",
+          "source_contract": "twse_openapi_t187ap03_L/v1",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "latest_snapshot_presence": "present",
+          "qualification": "qualified_issuer",
+          "latest_snapshot": {
+            "capture_id": "862dded4514be003e28d472200cc8ef89966144b796961c3309ee346f16a6078",
+            "report_date": "2026-10-03",
+            "received_at_utc": "2026-10-04T13:07:03.960501Z",
+            "source_contract": "twse_openapi_t187ap03_L/v1",
+            "coverage_status": "AVAILABLE"
+          },
+          "profile": {
+            "instrument_id": "TWSE:2330",
+            "report_date": "2026-10-03",
+            "original_received_at_utc": "2026-10-04T13:07:03.960501Z",
+            "source_contract": "twse_openapi_t187ap03_L/v1",
+            "revision": 1,
+            "qualification": "qualified_issuer",
+            "latest_snapshot_received_at_utc": "2026-10-04T13:07:03.960501Z",
+            "latest_snapshot_presence": "present"
+          }
+        }
+      },
+      {
+        "product": "monthly-revenues",
+        "instrument_id": "TWSE:2330",
+        "selectors": "instrument_id=TWSE%3A2330&start_month=2026-07&end_month=2026-08",
+        "http_status": 200,
+        "latency_ms": 62.1,
+        "requested_at_utc": "2026-10-07T00:14:13.497082+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.559225+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "coverage_status",
+          "current_catalog_evidence",
+          "dataset",
+          "end_month",
+          "instrument_id",
+          "months",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "served_at",
+          "start_month",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TWSE:2330",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "qualification": "qualified_historical_filing",
+          "coverage": [
+            {
+              "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+              "source": "mops",
+              "data_month": "2026-08-01",
+              "source_contract": "mops_t21_sii_monthly_revenue/v1",
+              "received_at_utc": "2026-10-04T13:09:22.189587Z",
+              "report_date": "2026-10-04",
+              "selected_issuer_present": true
+            },
+            {
+              "capture_id": "14013051676483a1334817837984e41031d83e6e63c309de8bae871d78fd80f0",
+              "source": "twse",
+              "data_month": "2026-08-01",
+              "source_contract": "twse_openapi_t187ap05_L/v1",
+              "received_at_utc": "2026-10-04T13:09:16.019874Z",
+              "report_date": "2026-09-17",
+              "selected_issuer_present": true
+            }
+          ],
+          "months": [
+            {
+              "data_month": "2026-07-01"
+            },
+            {
+              "data_month": "2026-08-01"
+            }
+          ]
+        },
+        "coverage_count": 2,
+        "months_count": 2
+      },
+      {
+        "product": "valuations",
+        "instrument_id": "TPEX:5347",
+        "selectors": "instrument_id=TPEX%3A5347&start=2026-10-02&end=2026-10-05",
+        "http_status": 200,
+        "latency_ms": 41.8,
+        "requested_at_utc": "2026-10-07T00:14:13.511170+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.553021+00:00",
+        "x_twmd_coverage": "available=1;missing=3;selected=present",
+        "x_twmd_schema_ready": "true",
+        "response_bytes_capped": null,
+        "row_count": 1,
+        "data_dates": [
+          "2026-10-02"
+        ],
+        "rows": [
+          {
+            "instrument_id": "TPEX:5347",
+            "trade_date": "2026-10-02",
+            "financial_reference_year": 2026,
+            "financial_reference_quarter": 2,
+            "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+            "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+            "received_at_utc": "2026-10-04T13:09:33.499001Z",
+            "revision": 1
+          }
+        ]
+      },
+      {
+        "product": "institutional-flows",
+        "instrument_id": "TPEX:5347",
+        "selectors": "instrument_id=TPEX%3A5347&start_date=2026-10-02&end_date=2026-10-05",
+        "http_status": 200,
+        "latency_ms": 70.9,
+        "requested_at_utc": "2026-10-07T00:14:13.535063+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.605935+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "data",
+          "instrument_id",
+          "native_unit",
+          "request_scope",
+          "schema_ready",
+          "source_contract"
+        ],
+        "summary": {
+          "instrument_id": "TPEX:5347",
+          "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+          "schema_ready": true,
+          "coverage": [
+            {
+              "trade_date": "2026-10-02",
+              "status": "AVAILABLE",
+              "record_count": 910,
+              "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+              "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+              "received_at_utc": "2026-10-04T13:09:28.555661Z"
+            },
+            {
+              "trade_date": "2026-10-03",
+              "status": "MISSING",
+              "record_count": 0,
+              "capture_id": null,
+              "source_contract": null,
+              "received_at_utc": null
+            },
+            {
+              "trade_date": "2026-10-04",
+              "status": "MISSING",
+              "record_count": 0,
+              "capture_id": null,
+              "source_contract": null,
+              "received_at_utc": null
+            },
+            {
+              "trade_date": "2026-10-05",
+              "status": "MISSING",
+              "record_count": 0,
+              "capture_id": null,
+              "source_contract": null,
+              "received_at_utc": null
+            }
+          ],
+          "data": [
+            {
+              "instrument_id": "TPEX:5347",
+              "trade_date": "2026-10-02",
+              "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+              "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+              "received_at_utc": "2026-10-04T13:09:28.555661Z",
+              "revision": 1
+            }
+          ]
+        },
+        "coverage_count": 4,
+        "data_count": 1
+      },
+      {
+        "product": "company-profiles",
+        "instrument_id": "TPEX:5347",
+        "selectors": "instrument_id=TPEX%3A5347",
+        "http_status": 200,
+        "latency_ms": 13560.8,
+        "requested_at_utc": "2026-10-07T00:14:13.553070+00:00",
+        "completed_at_utc": "2026-10-07T00:14:27.113962+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage_status",
+          "instrument_id",
+          "latest_snapshot",
+          "latest_snapshot_presence",
+          "profile",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "source_contract",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TPEX:5347",
+          "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "latest_snapshot_presence": "present",
+          "qualification": "qualified_issuer",
+          "latest_snapshot": {
+            "capture_id": "3057d4f21e79db87403faf14bc59e075f87b6704eb813648c09944afa9b5d90c",
+            "report_date": "2026-10-04",
+            "received_at_utc": "2026-10-04T13:07:07.049244Z",
+            "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+            "coverage_status": "AVAILABLE"
+          },
+          "profile": {
+            "instrument_id": "TPEX:5347",
+            "report_date": "2026-10-04",
+            "original_received_at_utc": "2026-10-04T13:07:07.049244Z",
+            "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+            "revision": 1,
+            "qualification": "qualified_issuer",
+            "latest_snapshot_received_at_utc": "2026-10-04T13:07:07.049244Z",
+            "latest_snapshot_presence": "present"
+          }
+        }
+      },
+      {
+        "product": "monthly-revenues",
+        "instrument_id": "TPEX:5347",
+        "selectors": "instrument_id=TPEX%3A5347&start_month=2026-07&end_month=2026-08",
+        "http_status": 200,
+        "latency_ms": 50.8,
+        "requested_at_utc": "2026-10-07T00:14:13.559273+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.610040+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "coverage_status",
+          "current_catalog_evidence",
+          "dataset",
+          "end_month",
+          "instrument_id",
+          "months",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "served_at",
+          "start_month",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TPEX:5347",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "qualification": "qualified_issuer",
+          "coverage": [
+            {
+              "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+              "source": "tpex",
+              "data_month": "2026-08-01",
+              "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+              "received_at_utc": "2026-10-04T13:09:19.479749Z",
+              "report_date": "2026-09-17",
+              "selected_issuer_present": true
+            }
+          ],
+          "months": [
+            {
+              "data_month": "2026-07-01"
+            },
+            {
+              "data_month": "2026-08-01"
+            }
+          ]
+        },
+        "coverage_count": 1,
+        "months_count": 2
+      },
+      {
+        "product": "valuations",
+        "instrument_id": "TWSE:00878",
+        "selectors": "instrument_id=TWSE%3A00878&start=2026-10-02&end=2026-10-05",
+        "http_status": 200,
+        "latency_ms": 4.3,
+        "requested_at_utc": "2026-10-07T00:14:13.606074+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.610416+00:00",
+        "response_bytes_capped": null,
+        "row_count": 0,
+        "data_dates": [],
+        "rows": []
+      },
+      {
+        "product": "institutional-flows",
+        "instrument_id": "TWSE:00878",
+        "selectors": "instrument_id=TWSE%3A00878&start_date=2026-10-02&end_date=2026-10-05",
+        "http_status": 200,
+        "latency_ms": 6.8,
+        "requested_at_utc": "2026-10-07T00:14:13.610112+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.616889+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "data",
+          "instrument_id",
+          "native_unit",
+          "schema_ready",
+          "source_contract"
+        ],
+        "summary": {
+          "instrument_id": "TWSE:00878",
+          "source_contract": "twse_t86_v1",
+          "schema_ready": true,
+          "coverage": [
+            {
+              "trade_date": "2026-10-02",
+              "status": "AVAILABLE",
+              "record_count": 18610,
+              "acquired_at": "2026-10-04T13:09:26.439985Z"
+            },
+            {
+              "trade_date": "2026-10-03",
+              "status": "MISSING",
+              "record_count": 0,
+              "acquired_at": null
+            },
+            {
+              "trade_date": "2026-10-04",
+              "status": "MISSING",
+              "record_count": 0,
+              "acquired_at": null
+            },
+            {
+              "trade_date": "2026-10-05",
+              "status": "MISSING",
+              "record_count": 0,
+              "acquired_at": null
+            }
+          ],
+          "data": [
+            {
+              "instrument_id": "TWSE:00878",
+              "trade_date": "2026-10-02",
+              "first_observed_at": "2026-10-04T13:09:26.439985Z"
+            }
+          ]
+        },
+        "coverage_count": 4,
+        "data_count": 1
+      },
+      {
+        "product": "company-profiles",
+        "instrument_id": "TWSE:00878",
+        "selectors": "instrument_id=TWSE%3A00878",
+        "http_status": 200,
+        "latency_ms": 13532.3,
+        "requested_at_utc": "2026-10-07T00:14:13.610454+00:00",
+        "completed_at_utc": "2026-10-07T00:14:27.142826+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage_status",
+          "instrument_id",
+          "latest_snapshot",
+          "latest_snapshot_presence",
+          "profile",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "source_contract",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TWSE:00878",
+          "source_contract": "twse_openapi_t187ap03_L/v1",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "latest_snapshot_presence": "absent",
+          "qualification": "unsupported_etf",
+          "latest_snapshot": {
+            "capture_id": "862dded4514be003e28d472200cc8ef89966144b796961c3309ee346f16a6078",
+            "report_date": "2026-10-03",
+            "received_at_utc": "2026-10-04T13:07:03.960501Z",
+            "source_contract": "twse_openapi_t187ap03_L/v1",
+            "coverage_status": "AVAILABLE"
+          },
+          "profile": null
+        }
+      },
+      {
+        "product": "monthly-revenues",
+        "instrument_id": "TWSE:00878",
+        "selectors": "instrument_id=TWSE%3A00878&start_month=2026-07&end_month=2026-08",
+        "http_status": 200,
+        "latency_ms": 8.5,
+        "requested_at_utc": "2026-10-07T00:14:13.617041+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.625595+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "coverage_status",
+          "current_catalog_evidence",
+          "dataset",
+          "end_month",
+          "instrument_id",
+          "months",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "served_at",
+          "start_month",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TWSE:00878",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "qualification": "unsupported_etf",
+          "coverage": [
+            {
+              "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+              "source": "mops",
+              "data_month": "2026-08-01",
+              "source_contract": "mops_t21_sii_monthly_revenue/v1",
+              "received_at_utc": "2026-10-04T13:09:22.189587Z",
+              "report_date": "2026-10-04",
+              "selected_issuer_present": false
+            },
+            {
+              "capture_id": "14013051676483a1334817837984e41031d83e6e63c309de8bae871d78fd80f0",
+              "source": "twse",
+              "data_month": "2026-08-01",
+              "source_contract": "twse_openapi_t187ap05_L/v1",
+              "received_at_utc": "2026-10-04T13:09:16.019874Z",
+              "report_date": "2026-09-17",
+              "selected_issuer_present": false
+            }
+          ],
+          "months": [
+            {
+              "data_month": "2026-07-01"
+            },
+            {
+              "data_month": "2026-08-01"
+            }
+          ]
+        },
+        "coverage_count": 2,
+        "months_count": 2
+      },
+      {
+        "product": "valuations",
+        "instrument_id": "TPEX:006201",
+        "selectors": "instrument_id=TPEX%3A006201&start=2026-10-02&end=2026-10-05",
+        "http_status": 400,
+        "latency_ms": 1.4,
+        "requested_at_utc": "2026-10-07T00:14:13.625728+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.627109+00:00",
+        "response_body_omitted": true
+      },
+      {
+        "product": "institutional-flows",
+        "instrument_id": "TPEX:006201",
+        "selectors": "instrument_id=TPEX%3A006201&start_date=2026-10-02&end_date=2026-10-05",
+        "http_status": 200,
+        "latency_ms": 52.7,
+        "requested_at_utc": "2026-10-07T00:14:13.627174+00:00",
+        "completed_at_utc": "2026-10-07T00:14:13.679902+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "data",
+          "instrument_id",
+          "native_unit",
+          "request_scope",
+          "schema_ready",
+          "source_contract"
+        ],
+        "summary": {
+          "instrument_id": "TPEX:006201",
+          "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+          "schema_ready": true,
+          "coverage": [
+            {
+              "trade_date": "2026-10-02",
+              "status": "AVAILABLE",
+              "record_count": 910,
+              "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+              "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+              "received_at_utc": "2026-10-04T13:09:28.555661Z"
+            },
+            {
+              "trade_date": "2026-10-03",
+              "status": "MISSING",
+              "record_count": 0,
+              "capture_id": null,
+              "source_contract": null,
+              "received_at_utc": null
+            },
+            {
+              "trade_date": "2026-10-04",
+              "status": "MISSING",
+              "record_count": 0,
+              "capture_id": null,
+              "source_contract": null,
+              "received_at_utc": null
+            },
+            {
+              "trade_date": "2026-10-05",
+              "status": "MISSING",
+              "record_count": 0,
+              "capture_id": null,
+              "source_contract": null,
+              "received_at_utc": null
+            }
+          ],
+          "data": [
+            {
+              "instrument_id": "TPEX:006201",
+              "trade_date": "2026-10-02",
+              "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+              "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+              "received_at_utc": "2026-10-04T13:09:28.555661Z",
+              "revision": 1
+            }
+          ]
+        },
+        "coverage_count": 4,
+        "data_count": 1
+      },
+      {
+        "product": "company-profiles",
+        "instrument_id": "TPEX:006201",
+        "selectors": "instrument_id=TPEX%3A006201",
+        "http_status": 200,
+        "latency_ms": 13389.8,
+        "requested_at_utc": "2026-10-07T00:14:13.680010+00:00",
+        "completed_at_utc": "2026-10-07T00:14:27.069933+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage_status",
+          "instrument_id",
+          "latest_snapshot",
+          "latest_snapshot_presence",
+          "profile",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "source_contract",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TPEX:006201",
+          "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "latest_snapshot_presence": "absent",
+          "qualification": "unsupported_etf",
+          "latest_snapshot": {
+            "capture_id": "3057d4f21e79db87403faf14bc59e075f87b6704eb813648c09944afa9b5d90c",
+            "report_date": "2026-10-04",
+            "received_at_utc": "2026-10-04T13:07:07.049244Z",
+            "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+            "coverage_status": "AVAILABLE"
+          },
+          "profile": null
+        }
+      },
+      {
+        "product": "monthly-revenues",
+        "instrument_id": "TPEX:006201",
+        "selectors": "instrument_id=TPEX%3A006201&start_month=2026-07&end_month=2026-08",
+        "http_status": 200,
+        "latency_ms": 54.2,
+        "requested_at_utc": "2026-10-07T00:14:27.070064+00:00",
+        "completed_at_utc": "2026-10-07T00:14:27.124238+00:00",
+        "response_bytes_capped": null,
+        "keys": [
+          "coverage",
+          "coverage_status",
+          "current_catalog_evidence",
+          "dataset",
+          "end_month",
+          "instrument_id",
+          "months",
+          "qualification",
+          "qualification_reason",
+          "schema_ready",
+          "served_at",
+          "start_month",
+          "units"
+        ],
+        "summary": {
+          "instrument_id": "TPEX:006201",
+          "schema_ready": true,
+          "coverage_status": "AVAILABLE",
+          "qualification": "unsupported_etf",
+          "coverage": [
+            {
+              "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+              "source": "tpex",
+              "data_month": "2026-08-01",
+              "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+              "received_at_utc": "2026-10-04T13:09:19.479749Z",
+              "report_date": "2026-09-17",
+              "selected_issuer_present": false
+            }
+          ],
+          "months": [
+            {
+              "data_month": "2026-07-01"
+            },
+            {
+              "data_month": "2026-08-01"
+            }
+          ]
+        },
+        "coverage_count": 1,
+        "months_count": 2
+      }
+    ],
+    "openapi": {
+      "http_status": 200,
+      "latency_ms": 6.5,
+      "title": "Taiwan Market Data Query API",
+      "version": "0.1.0"
+    }
+  },
+  "control_service": {
+    "base": "http://127.0.0.1:9200",
+    "auth_configured": true,
+    "health": {
+      "http_status": 200,
+      "latency_ms": 16.5,
+      "status": "ok",
+      "schema_version": 2
+    },
+    "capabilities": {
+      "http_status": 200,
+      "latency_ms": 1.3,
+      "api_version": "v1",
+      "market_data": {
+        "quote_subscriptions": true,
+        "quote_subscription_limit": 200,
+        "bar_backfill_requests": true,
+        "bar_backfill_max_days": 30,
+        "bar_backfill_session": "regular",
+        "bar_backfill_execution": "after_hours_worker"
+      },
+      "limits": {
+        "page_size": 200,
+        "defer_seconds": {
+          "min": 1,
+          "max": 900
+        },
+        "defer_count": 3
+      }
+    },
+    "jobs": {
+      "http_status": 200,
+      "latency_ms": 6.8,
+      "count": 24,
+      "items": [
+        {
+          "id": "capital-broker-branch",
+          "adapter_key": "capital_broker_branch",
+          "name": "Capital broker branch",
+          "enabled": true
+        },
+        {
+          "id": "mops-financial-statements",
+          "adapter_key": "mops_financial_statements",
+          "name": "MOPS financial statements",
+          "enabled": true
+        },
+        {
+          "id": "mops-material-information-history",
+          "adapter_key": "mops_material_information_history",
+          "name": "MOPS material-information history",
+          "enabled": true
+        },
+        {
+          "id": "mops-monthly-revenue",
+          "adapter_key": "mops_monthly_revenue",
+          "name": "MOPS monthly revenue",
+          "enabled": true
+        },
+        {
+          "id": "twse-benchmark-daily",
+          "adapter_key": "twse_benchmark_daily",
+          "name": "TAIEX benchmark daily",
+          "enabled": true
+        },
+        {
+          "id": "tpex-benchmark-latest",
+          "adapter_key": "tpex_benchmark_latest",
+          "name": "TPEx benchmark latest",
+          "enabled": true
+        },
+        {
+          "id": "tpex-company-profile",
+          "adapter_key": "tpex_company_profile",
+          "name": "TPEx company profile",
+          "enabled": true
+        },
+        {
+          "id": "tpex-daily-price",
+          "adapter_key": "tpex_daily_price",
+          "name": "TPEx daily prices",
+          "enabled": true
+        },
+        {
+          "id": "tpex-institutional-flow",
+          "adapter_key": "tpex_institutional_flow",
+          "name": "TPEx institutional flow",
+          "enabled": true
+        },
+        {
+          "id": "tpex-instruments",
+          "adapter_key": "tpex_instruments",
+          "name": "TPEx instrument directory",
+          "enabled": true
+        },
+        {
+          "id": "tpex-monthly-revenue-latest",
+          "adapter_key": "tpex_monthly_revenue_latest",
+          "name": "TPEx latest monthly revenue",
+          "enabled": true
+        },
+        {
+          "id": "tpex-margin-short-sale",
+          "adapter_key": "tpex_margin_short_sale",
+          "name": "TPEx margin and short sale",
+          "enabled": true
+        },
+        {
+          "id": "tpex-valuation",
+          "adapter_key": "tpex_valuation",
+          "name": "TPEx valuation",
+          "enabled": true
+        },
+        {
+          "id": "twse-bsr",
+          "adapter_key": "twse_bsr",
+          "name": "TWSE broker security report",
+          "enabled": true
+        },
+        {
+          "id": "twse-capital-reduction",
+          "adapter_key": "twse_capital_reduction_results",
+          "name": "TWSE capital-reduction results",
+          "enabled": true
+        },
+        {
+          "id": "twse-company-profile",
+          "adapter_key": "twse_company_profile",
+          "name": "TWSE company profile",
+          "enabled": true
+        },
+        {
+          "id": "twse-daily-price",
+          "adapter_key": "twse_daily_price",
+          "name": "TWSE daily prices",
+          "enabled": true
+        },
+        {
+          "id": "twse-institutional-flow",
+          "adapter_key": "twse_institutional_flow",
+          "name": "TWSE institutional flow",
+          "enabled": true
+        },
+        {
+          "id": "twse-instruments",
+          "adapter_key": "twse_instruments",
+          "name": "TWSE instruments",
+          "enabled": true
+        },
+        {
+          "id": "twse-monthly-revenue-latest",
+          "adapter_key": "twse_monthly_revenue_latest",
+          "name": "TWSE latest monthly revenue",
+          "enabled": true
+        },
+        {
+          "id": "twse-margin-short-sale",
+          "adapter_key": "twse_margin_short_sale",
+          "name": "TWSE margin and short sale",
+          "enabled": true
+        },
+        {
+          "id": "twse-material-information",
+          "adapter_key": "twse_material_information",
+          "name": "TWSE material information",
+          "enabled": true
+        },
+        {
+          "id": "twse-sbl-repayments",
+          "adapter_key": "twse_sbl_repayments",
+          "name": "TWSE securities-lending repayments",
+          "enabled": true
+        },
+        {
+          "id": "twse-valuation",
+          "adapter_key": "twse_valuation",
+          "name": "TWSE valuation",
+          "enabled": true
+        }
+      ],
+      "next_cursor_present": false
+    },
+    "schedules": {
+      "http_status": 200,
+      "latency_ms": 2.1,
+      "count": 11,
+      "items": [
+        {
+          "id": "twse-benchmark-daily",
+          "job_id": "twse-benchmark-daily",
+          "cron_expression": "35 14 * * *",
+          "interval_seconds": null,
+          "enabled": false,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": null
+        },
+        {
+          "id": "tpex-instruments-daily",
+          "job_id": "tpex-instruments",
+          "cron_expression": "15 14 * * *",
+          "interval_seconds": null,
+          "enabled": false,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": null
+        },
+        {
+          "id": "tpex-benchmark-latest",
+          "job_id": "tpex-benchmark-latest",
+          "cron_expression": "35 18 * * *",
+          "interval_seconds": null,
+          "enabled": false,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": null
+        },
+        {
+          "id": "twse-capital-reduction-daily",
+          "job_id": "twse-capital-reduction",
+          "cron_expression": "30 0 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T16:30:00+00:00"
+        },
+        {
+          "id": "twse-valuation-daily",
+          "job_id": "twse-valuation",
+          "cron_expression": "30 18 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T10:30:00+00:00"
+        },
+        {
+          "id": "twse-margin-short-sale-daily",
+          "job_id": "twse-margin-short-sale",
+          "cron_expression": "15 21 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T13:15:00+00:00"
+        },
+        {
+          "id": "twse-instruments-daily",
+          "job_id": "twse-instruments",
+          "cron_expression": "0 14 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T06:00:00+00:00"
+        },
+        {
+          "id": "twse-daily-price-daily",
+          "job_id": "twse-daily-price",
+          "cron_expression": "30 14 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T06:30:00+00:00"
+        },
+        {
+          "id": "twse-bsr-daily",
+          "job_id": "twse-bsr",
+          "cron_expression": "30 21 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T13:30:00+00:00"
+        },
+        {
+          "id": "tpex-margin-short-sale-daily",
+          "job_id": "tpex-margin-short-sale",
+          "cron_expression": "15 21 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T13:15:00+00:00"
+        },
+        {
+          "id": "tpex-daily-price-daily",
+          "job_id": "tpex-daily-price",
+          "cron_expression": "30 18 * * *",
+          "interval_seconds": null,
+          "enabled": true,
+          "timezone": "Asia/Taipei",
+          "next_fire_at": "2026-10-07T10:30:00+00:00"
+        }
+      ],
+      "next_cursor_present": false
+    },
+    "runs": {
+      "http_status": 200,
+      "latency_ms": 13.8,
+      "count": 50,
+      "items": [
+        {
+          "id": "run_386835fecccc4e93",
+          "job_id": "twse-capital-reduction",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T16:30:00.215201+00:00",
+          "started_at": "2026-10-06T16:30:00.227591+00:00",
+          "finished_at": "2026-10-06T16:30:00.805034+00:00"
+        },
+        {
+          "id": "run_ab65e2114d1c4fb0",
+          "job_id": "twse-bsr",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T13:30:00.117319+00:00",
+          "started_at": "2026-10-06T15:33:51.704264+00:00",
+          "finished_at": "2026-10-06T15:34:55.830524+00:00"
+        },
+        {
+          "id": "run_ce6edb5495e84bd9",
+          "job_id": "tpex-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T13:15:00.204317+00:00",
+          "started_at": "2026-10-06T13:15:01.705880+00:00",
+          "finished_at": "2026-10-06T13:15:05.100607+00:00"
+        },
+        {
+          "id": "run_da87cb646d424d06",
+          "job_id": "twse-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T13:15:00.191939+00:00",
+          "started_at": "2026-10-06T13:15:00.216978+00:00",
+          "finished_at": "2026-10-06T13:15:01.694172+00:00"
+        },
+        {
+          "id": "run_68f8b26d446642e6",
+          "job_id": "tpex-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T10:30:00.313854+00:00",
+          "started_at": "2026-10-06T10:30:00.343000+00:00",
+          "finished_at": "2026-10-06T10:30:10.967003+00:00"
+        },
+        {
+          "id": "run_85f83c48db214592",
+          "job_id": "twse-valuation",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T10:30:00.302216+00:00",
+          "started_at": "2026-10-06T10:30:10.991730+00:00",
+          "finished_at": "2026-10-06T10:30:13.738159+00:00"
+        },
+        {
+          "id": "run_e79856c865734c6e",
+          "job_id": "twse-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T06:30:00.213254+00:00",
+          "started_at": "2026-10-06T06:30:00.221656+00:00",
+          "finished_at": "2026-10-06T06:30:01.720592+00:00"
+        },
+        {
+          "id": "run_3a43b792e53441c1",
+          "job_id": "twse-instruments",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-06T06:00:00.139518+00:00",
+          "started_at": "2026-10-06T06:00:00.171023+00:00",
+          "finished_at": "2026-10-06T06:00:33.496404+00:00"
+        },
+        {
+          "id": "run_d15cfa609d56406b",
+          "job_id": "twse-bsr",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T23:01:12.990501+00:00",
+          "started_at": "2026-10-05T23:01:13.315359+00:00",
+          "finished_at": "2026-10-05T23:01:14.208784+00:00"
+        },
+        {
+          "id": "run_8e71613e23f34858",
+          "job_id": "twse-capital-reduction",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T16:30:00.112850+00:00",
+          "started_at": "2026-10-05T16:30:00.310574+00:00",
+          "finished_at": "2026-10-05T16:30:00.917500+00:00"
+        },
+        {
+          "id": "run_9c4a124698e4431a",
+          "job_id": "twse-bsr",
+          "status": "BLOCKED",
+          "created_at": "2026-10-05T13:30:00.045657+00:00",
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "run_2cb3d9c87b1b4876",
+          "job_id": "tpex-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T13:15:00.360254+00:00",
+          "started_at": "2026-10-05T13:15:02.517653+00:00",
+          "finished_at": "2026-10-05T13:15:06.449960+00:00"
+        },
+        {
+          "id": "run_eeba0186af354ee6",
+          "job_id": "twse-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T13:15:00.341812+00:00",
+          "started_at": "2026-10-05T13:15:00.452906+00:00",
+          "finished_at": "2026-10-05T13:15:02.495728+00:00"
+        },
+        {
+          "id": "run_690b0e3efcc947e8",
+          "job_id": "tpex-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T10:30:00.261336+00:00",
+          "started_at": "2026-10-05T10:30:00.268502+00:00",
+          "finished_at": "2026-10-05T10:31:08.729861+00:00"
+        },
+        {
+          "id": "run_af5c24c8fb7d406d",
+          "job_id": "twse-valuation",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T10:30:00.250012+00:00",
+          "started_at": "2026-10-05T10:31:08.736835+00:00",
+          "finished_at": "2026-10-05T10:31:12.999097+00:00"
+        },
+        {
+          "id": "run_468e7e2c476a4d37",
+          "job_id": "twse-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T06:30:00.182767+00:00",
+          "started_at": "2026-10-05T06:30:00.193092+00:00",
+          "finished_at": "2026-10-05T06:30:01.368205+00:00"
+        },
+        {
+          "id": "run_62276925e6ed46c0",
+          "job_id": "twse-instruments",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-05T06:00:00.283615+00:00",
+          "started_at": "2026-10-05T06:00:00.377900+00:00",
+          "finished_at": "2026-10-05T06:01:49.932629+00:00"
+        },
+        {
+          "id": "run_94861998349c400c",
+          "job_id": "twse-capital-reduction",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T16:30:00.047517+00:00",
+          "started_at": "2026-10-04T16:30:00.060589+00:00",
+          "finished_at": "2026-10-04T16:30:00.647623+00:00"
+        },
+        {
+          "id": "run_6f0d12161f2f41ce",
+          "job_id": "twse-bsr",
+          "status": "CANCELED",
+          "created_at": "2026-10-04T13:30:00.156273+00:00",
+          "started_at": null,
+          "finished_at": "2026-10-04T13:30:00.156745+00:00"
+        },
+        {
+          "id": "run_fc2c1f3bc40843cc",
+          "job_id": "tpex-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:15:00.187821+00:00",
+          "started_at": "2026-10-04T13:15:00.785165+00:00",
+          "finished_at": "2026-10-04T13:15:01.360088+00:00"
+        },
+        {
+          "id": "run_2f058ec1a06e4f78",
+          "job_id": "twse-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:15:00.180216+00:00",
+          "started_at": "2026-10-04T13:15:00.195134+00:00",
+          "finished_at": "2026-10-04T13:15:00.777401+00:00"
+        },
+        {
+          "id": "run_13f0f90e925a4dfd",
+          "job_id": "twse-valuation",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:36.840821+00:00",
+          "started_at": "2026-10-04T13:09:36.956267+00:00",
+          "finished_at": "2026-10-04T13:09:37.843014+00:00"
+        },
+        {
+          "id": "run_e665fefc0b9d4fc4",
+          "job_id": "twse-sbl-repayments",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:33.813887+00:00",
+          "started_at": "2026-10-04T13:09:33.893621+00:00",
+          "finished_at": "2026-10-04T13:09:34.793323+00:00"
+        },
+        {
+          "id": "run_1d347b3fb7c445ef",
+          "job_id": "tpex-valuation",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:30.778819+00:00",
+          "started_at": "2026-10-04T13:09:30.880668+00:00",
+          "finished_at": "2026-10-04T13:09:33.607912+00:00"
+        },
+        {
+          "id": "run_5dbb6de9c7ab42c2",
+          "job_id": "tpex-institutional-flow",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:27.747996+00:00",
+          "started_at": "2026-10-04T13:09:27.807144+00:00",
+          "finished_at": "2026-10-04T13:09:28.697354+00:00"
+        },
+        {
+          "id": "run_4fb8fa245eda4680",
+          "job_id": "twse-institutional-flow",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:24.718709+00:00",
+          "started_at": "2026-10-04T13:09:24.746204+00:00",
+          "finished_at": "2026-10-04T13:09:26.888042+00:00"
+        },
+        {
+          "id": "run_a5da7f0228e04061",
+          "job_id": "mops-monthly-revenue",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:21.684193+00:00",
+          "started_at": "2026-10-04T13:09:21.718169+00:00",
+          "finished_at": "2026-10-04T13:09:22.586518+00:00"
+        },
+        {
+          "id": "run_7f76135e416a4ede",
+          "job_id": "tpex-monthly-revenue-latest",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:18.649271+00:00",
+          "started_at": "2026-10-04T13:09:18.959373+00:00",
+          "finished_at": "2026-10-04T13:09:19.847138+00:00"
+        },
+        {
+          "id": "run_d24abebca6814deb",
+          "job_id": "twse-monthly-revenue-latest",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:15.607651+00:00",
+          "started_at": "2026-10-04T13:09:15.616186+00:00",
+          "finished_at": "2026-10-04T13:09:16.190601+00:00"
+        },
+        {
+          "id": "run_63ac0f6a5cf74ccf",
+          "job_id": "twse-material-information",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:09:12.574541+00:00",
+          "started_at": "2026-10-04T13:09:12.873027+00:00",
+          "finished_at": "2026-10-04T13:09:13.471092+00:00"
+        },
+        {
+          "id": "run_357ef25df0804c4b",
+          "job_id": "mops-material-information-history",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:08:15.346363+00:00",
+          "started_at": "2026-10-04T13:08:15.497512+00:00",
+          "finished_at": "2026-10-04T13:09:10.997012+00:00"
+        },
+        {
+          "id": "run_ef1a5d00d9064284",
+          "job_id": "mops-financial-statements",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:07:09.195116+00:00",
+          "started_at": "2026-10-04T13:07:09.210021+00:00",
+          "finished_at": "2026-10-04T13:08:13.981939+00:00"
+        },
+        {
+          "id": "run_cc82cdca496e4f63",
+          "job_id": "tpex-company-profile",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:07:06.159752+00:00",
+          "started_at": "2026-10-04T13:07:06.462178+00:00",
+          "finished_at": "2026-10-04T13:07:07.369957+00:00"
+        },
+        {
+          "id": "run_6d7f9dd2b57748f5",
+          "job_id": "twse-company-profile",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:07:03.126636+00:00",
+          "started_at": "2026-10-04T13:07:03.162014+00:00",
+          "finished_at": "2026-10-04T13:07:04.326462+00:00"
+        },
+        {
+          "id": "run_392bf06a86f148d7",
+          "job_id": "tpex-instruments",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T13:06:57.085177+00:00",
+          "started_at": "2026-10-04T13:06:57.454308+00:00",
+          "finished_at": "2026-10-04T13:07:01.024858+00:00"
+        },
+        {
+          "id": "run_d60d17a4eada4805",
+          "job_id": "tpex-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T10:30:00.217076+00:00",
+          "started_at": "2026-10-04T10:30:00.223247+00:00",
+          "finished_at": "2026-10-04T10:30:00.808065+00:00"
+        },
+        {
+          "id": "run_64a2a7ebd7c547a9",
+          "job_id": "twse-valuation",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T10:30:00.209268+00:00",
+          "started_at": "2026-10-04T10:30:00.821588+00:00",
+          "finished_at": "2026-10-04T10:30:01.123107+00:00"
+        },
+        {
+          "id": "run_0e8636f5c8e2486d",
+          "job_id": "twse-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T06:30:00.267179+00:00",
+          "started_at": "2026-10-04T06:30:00.296606+00:00",
+          "finished_at": "2026-10-04T06:30:00.595477+00:00"
+        },
+        {
+          "id": "run_eb54fcae223d4414",
+          "job_id": "twse-instruments",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-04T06:00:00.185671+00:00",
+          "started_at": "2026-10-04T06:00:00.192720+00:00",
+          "finished_at": "2026-10-04T06:00:11.384947+00:00"
+        },
+        {
+          "id": "run_c7e99b7b0c744475",
+          "job_id": "twse-capital-reduction",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-03T16:30:00.318633+00:00",
+          "started_at": "2026-10-03T16:30:00.327346+00:00",
+          "finished_at": "2026-10-03T16:30:00.922007+00:00"
+        },
+        {
+          "id": "run_ed5387fa01874b43",
+          "job_id": "twse-bsr",
+          "status": "CANCELED",
+          "created_at": "2026-10-03T13:30:00.403430+00:00",
+          "started_at": null,
+          "finished_at": "2026-10-03T13:30:00.403752+00:00"
+        },
+        {
+          "id": "run_1429220f1b0b4c2f",
+          "job_id": "tpex-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-03T13:15:00.041345+00:00",
+          "started_at": "2026-10-03T13:15:00.345234+00:00",
+          "finished_at": "2026-10-03T13:15:00.931791+00:00"
+        },
+        {
+          "id": "run_85fd984ace774af9",
+          "job_id": "twse-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-03T13:15:00.027726+00:00",
+          "started_at": "2026-10-03T13:15:00.047783+00:00",
+          "finished_at": "2026-10-03T13:15:00.339854+00:00"
+        },
+        {
+          "id": "run_22c4b9626e7f43a5",
+          "job_id": "tpex-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-03T10:30:00.071175+00:00",
+          "started_at": "2026-10-03T10:30:00.076595+00:00",
+          "finished_at": "2026-10-03T10:30:00.672916+00:00"
+        },
+        {
+          "id": "run_f40d375940c045f1",
+          "job_id": "twse-valuation",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-03T10:30:00.057000+00:00",
+          "started_at": "2026-10-03T10:30:00.684772+00:00",
+          "finished_at": "2026-10-03T10:30:00.973828+00:00"
+        },
+        {
+          "id": "run_821863e1ffc541cc",
+          "job_id": "twse-daily-price",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-03T06:30:00.136439+00:00",
+          "started_at": "2026-10-03T06:30:00.148718+00:00",
+          "finished_at": "2026-10-03T06:30:00.441285+00:00"
+        },
+        {
+          "id": "run_fcf62c1f425544b1",
+          "job_id": "twse-instruments",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-03T06:00:00.237499+00:00",
+          "started_at": "2026-10-03T06:00:00.247241+00:00",
+          "finished_at": "2026-10-03T06:00:14.813353+00:00"
+        },
+        {
+          "id": "run_154ca1af599448b9",
+          "job_id": "twse-capital-reduction",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-02T16:30:00.227633+00:00",
+          "started_at": "2026-10-02T16:30:00.238841+00:00",
+          "finished_at": "2026-10-02T16:30:00.819948+00:00"
+        },
+        {
+          "id": "run_1908b411108e45dc",
+          "job_id": "twse-bsr",
+          "status": "BLOCKED",
+          "created_at": "2026-10-02T13:30:00.346451+00:00",
+          "started_at": null,
+          "finished_at": null
+        },
+        {
+          "id": "run_63331773623b48ef",
+          "job_id": "tpex-margin-short-sale",
+          "status": "SUCCEEDED",
+          "created_at": "2026-10-02T13:15:00.052251+00:00",
+          "started_at": "2026-10-02T13:15:01.250152+00:00",
+          "finished_at": "2026-10-02T13:15:02.135699+00:00"
+        }
+      ],
+      "next_cursor_present": true
+    }
+  },
+  "selectors": {
+    "instruments": [
+      "TWSE:2330",
+      "TPEX:5347",
+      "TWSE:00878",
+      "TPEX:006201"
+    ],
+    "trading_date_range": [
+      "2026-10-02",
+      "2026-10-05"
+    ],
+    "revenue_month_range": [
+      "2026-07",
+      "2026-08"
+    ]
+  },
+  "boundaries": [
+    "GET only",
+    "No ingest, writes, direct SQLite reads, publisher requests, or schedule/subscription changes.",
+    "Sensitive payload fields, source URLs, DB paths, credentials, and raw configs omitted."
+  ],
+  "audit_completed_at_utc": "2026-10-07T00:14:27.143319+00:00"
+}

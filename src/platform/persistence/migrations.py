@@ -178,9 +178,9 @@ WHERE name IN ('premarket_outlook', 'intraday_monitor', 'daily_report')
         text(
             """
 UPDATE agent_configs
-SET display_name = '收盘复盘'
+SET display_name = '收盤覆盤'
 WHERE name = 'daily_report'
-  AND (display_name IS NULL OR TRIM(display_name) = '' OR display_name = '盘后日报')
+  AND (display_name IS NULL OR TRIM(display_name) = '' OR display_name = '盤後日報')
 """
         )
     )
@@ -369,7 +369,7 @@ def _m107_suggestion_market_dimension(conn: Connection) -> None:
     if not _has_table(conn, "stock_suggestions"):
         return
 
-    # 历史数据平滑回填：优先从 stocks 里推断 market，否则回退 CN。
+    # 歷史資料平滑回填：優先從 stocks 裡推斷 market，否則回退 CN。
     conn.execute(
         text(
             """
@@ -414,7 +414,7 @@ CREATE TABLE IF NOT EXISTS entry_candidates (
   score REAL NOT NULL DEFAULT 0,
   confidence REAL,
   action TEXT NOT NULL DEFAULT 'watch',
-  action_label TEXT NOT NULL DEFAULT '观望',
+  action_label TEXT NOT NULL DEFAULT '觀望',
   signal TEXT DEFAULT '',
   reason TEXT DEFAULT '',
   entry_low REAL,
@@ -446,7 +446,7 @@ CREATE TABLE IF NOT EXISTS entry_candidates (
         "CREATE INDEX ix_entry_candidate_status_updated ON entry_candidates(status, updated_at)",
     )
 
-    # 历史平滑迁移：将每个市场/股票最新建议回填为“今日候选”基线记录。
+    # 歷史平滑遷移：將每個市場/股票最新建議回填為“今日候選”基線記錄。
     today = date.today().strftime("%Y-%m-%d")
     conn.execute(
         text(
@@ -473,7 +473,7 @@ SELECT
     ELSE 30
   END AS score,
   COALESCE(s.action, 'watch'),
-  COALESCE(s.action_label, '观望'),
+  COALESCE(s.action_label, '觀望'),
   COALESCE(s.signal, ''),
   COALESCE(s.reason, ''),
   COALESCE(s.agent_name, ''),
@@ -650,7 +650,7 @@ CREATE TABLE IF NOT EXISTS strategy_signal_runs (
   confidence REAL,
   status TEXT DEFAULT 'active',
   action TEXT DEFAULT 'watch',
-  action_label TEXT DEFAULT '观望',
+  action_label TEXT DEFAULT '觀望',
   signal TEXT DEFAULT '',
   reason TEXT DEFAULT '',
   evidence TEXT DEFAULT '[]',
@@ -803,8 +803,8 @@ VALUES(
     seed_rows = [
         {
             "code": "trend_follow",
-            "name": "趋势延续",
-            "description": "顺势跟随，优先均线多头且动量延续",
+            "name": "趨勢延續",
+            "description": "順勢跟隨，優先均線多頭且動量延續",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -815,7 +815,7 @@ VALUES(
         {
             "code": "macd_golden",
             "name": "MACD金叉",
-            "description": "MACD 金叉确认，偏中短线",
+            "description": "MACD 金叉確認，偏中短線",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -826,7 +826,7 @@ VALUES(
         {
             "code": "volume_breakout",
             "name": "放量突破",
-            "description": "放量突破关键位，偏进攻",
+            "description": "放量突破關鍵位，偏進攻",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -836,8 +836,8 @@ VALUES(
         },
         {
             "code": "pullback",
-            "name": "回踩确认",
-            "description": "回踩支撑后二次启动",
+            "name": "回踩確認",
+            "description": "回踩支撐後二次啟動",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -847,8 +847,8 @@ VALUES(
         },
         {
             "code": "rebound",
-            "name": "超跌反弹",
-            "description": "超跌后的反弹交易",
+            "name": "超跌反彈",
+            "description": "超跌後的反彈交易",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -858,8 +858,8 @@ VALUES(
         },
         {
             "code": "watchlist_agent",
-            "name": "Agent建议",
-            "description": "来自既有 Agent 的综合建议映射",
+            "name": "Agent建議",
+            "description": "來自既有 Agent 的綜合建議對映",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -869,8 +869,8 @@ VALUES(
         },
         {
             "code": "market_scan",
-            "name": "市场扫描",
-            "description": "市场池扫描策略（热门与活跃）",
+            "name": "市場掃描",
+            "description": "市場池掃描策略（熱門與活躍）",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -910,13 +910,13 @@ SELECT
     ELSE 'watchlist_agent'
   END AS strategy_code,
   CASE
-    WHEN ec.strategy_tags LIKE '%trend_follow%' THEN '趋势延续'
+    WHEN ec.strategy_tags LIKE '%trend_follow%' THEN '趨勢延續'
     WHEN ec.strategy_tags LIKE '%macd_golden%' THEN 'MACD金叉'
     WHEN ec.strategy_tags LIKE '%volume_breakout%' THEN '放量突破'
-    WHEN ec.strategy_tags LIKE '%pullback%' THEN '回踩确认'
-    WHEN ec.strategy_tags LIKE '%rebound%' THEN '超跌反弹'
-    WHEN ec.candidate_source = 'market_scan' THEN '市场扫描'
-    ELSE 'Agent建议'
+    WHEN ec.strategy_tags LIKE '%pullback%' THEN '回踩確認'
+    WHEN ec.strategy_tags LIKE '%rebound%' THEN '超跌反彈'
+    WHEN ec.candidate_source = 'market_scan' THEN '市場掃描'
+    ELSE 'Agent建議'
   END AS strategy_name,
   'v1' AS strategy_version,
   CASE
@@ -1394,7 +1394,7 @@ WHERE source_pool = 'market_scan'
 
 
 def _m114_paper_trading_tables(conn: Connection) -> None:
-    """创建模拟盘三张表。"""
+    """建立模擬交易三張表。"""
     if not _has_table(conn, "paper_trading_account"):
         conn.execute(
             text(
@@ -1475,7 +1475,7 @@ CREATE TABLE paper_trading_trades (
 
 
 def _m115_paper_trading_excluded_markets(conn: Connection) -> None:
-    """模拟盘账户新增 excluded_markets 字段。"""
+    """模擬交易帳戶新增 excluded_markets 欄位。"""
     _add_column_if_missing(
         conn,
         "paper_trading_account",
@@ -1485,7 +1485,7 @@ def _m115_paper_trading_excluded_markets(conn: Connection) -> None:
 
 
 def _m116_chat_tables(conn: Connection) -> None:
-    """AI 对话表。"""
+    """AI 對話表。"""
     conn.execute(
         text("""
         CREATE TABLE IF NOT EXISTS chat_conversations (
@@ -1533,7 +1533,7 @@ def _m117_chat_initial_context(conn: Connection) -> None:
 
 
 def _m118_paper_trading_market_allocations(conn: Connection) -> None:
-    """模拟盘账户新增 market_allocations（各市场投资比例），并由 excluded_markets 回填。"""
+    """模擬交易帳戶新增 market_allocations（各市場投資比例），並由 excluded_markets 回填。"""
     _add_column_if_missing(
         conn,
         "paper_trading_account",
@@ -1543,7 +1543,7 @@ def _m118_paper_trading_market_allocations(conn: Connection) -> None:
     if not _has_table(conn, "paper_trading_account"):
         return
 
-    # 迁移必须自包含，不能依赖业务模块的运行时代码。
+    # 遷移必須自包含，不能依賴業務模組的執行時程式碼。
     def allocations_from_excluded(excluded: list[str]) -> dict[str, float]:
         markets = ("CN", "HK", "US")
         defaults = {"CN": 0.5, "HK": 0.3, "US": 0.2}
@@ -1560,7 +1560,7 @@ def _m118_paper_trading_market_allocations(conn: Connection) -> None:
     for r in rows:
         row_id = r[0]
 
-        # 已有非空比例则跳过，避免覆盖用户配置
+        # 已有非空比例則跳過，避免覆蓋使用者配置
         raw_alloc = r[2]
         has_alloc = False
         if isinstance(raw_alloc, str) and raw_alloc.strip() and raw_alloc.strip() not in ("{}", "null"):
@@ -1593,7 +1593,7 @@ def _m118_paper_trading_market_allocations(conn: Connection) -> None:
 
 
 def _m119_pat_and_mcp_tables(conn: Connection) -> None:
-    """PAT 令牌表 + MCP 调用日志表(MCP Server 鉴权与审计)。"""
+    """PAT 令牌表 + MCP 呼叫日誌表(MCP Server 鑑權與審計)。"""
     conn.execute(
         text(
             """
@@ -1612,7 +1612,7 @@ def _m119_pat_and_mcp_tables(conn: Connection) -> None:
         """
         )
     )
-    # 与 ORM 模型的自动唯一索引同名(token_hash unique+index),便于 create_all 复核
+    # 與 ORM 模型的自動唯一索引同名(token_hash unique+index),便於 create_all 複核
     _create_index_if_missing(
         conn,
         "ix_personal_access_tokens_token_hash",
@@ -1655,10 +1655,10 @@ def _m119_pat_and_mcp_tables(conn: Connection) -> None:
 
 
 def _m120_agent_prediction_evaluation(conn: Connection) -> None:
-    """建议后验分组与交易日口径。
+    """建議後驗分組與交易日口徑。
 
-    已存在记录保留旧自然日口径，避免升级时把历史结果悄悄改写；新记录由 ORM
-    默认写入 trading_days。
+    已存在記錄保留舊自然日口徑，避免升級時把歷史結果悄悄改寫；新記錄由 ORM
+    預設寫入 trading_days。
     """
     _add_column_if_missing(
         conn,
@@ -1682,7 +1682,7 @@ def _m120_agent_prediction_evaluation(conn: Connection) -> None:
 
 
 def _m121_backtest_runs(conn: Connection) -> None:
-    """可持久化的策略回测运行记录。"""
+    """可持久化的策略回測執行記錄。"""
     conn.execute(
         text(
             """

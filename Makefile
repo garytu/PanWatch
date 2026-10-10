@@ -1,7 +1,8 @@
 .PHONY: help setup-backend dev-api dev-web build test test-notify eval doctor install-hooks clean-venv
 
 # 端口约定：
-#   - 后端：:8000（Docker / 本地 dev 统一，避免存量用户升级困惑）
+#   - 后端：預設 :8000；twmd 佔用此埠時可設 PANWATCH_PORT=8001
+#     前端開發代理搭配 PANWATCH_API_TARGET=http://127.0.0.1:8001
 #   - 前端：:5183（与 BeeCount-Cloud 的 :5173 错开避免冲突）
 
 ifneq ($(filter Windows_NT,$(OS)),)
@@ -47,7 +48,7 @@ else
 	@if [ ! -f .env ] && [ -f .env.example ]; then cp .env.example .env; fi
 endif
 
-# server.py 内部已经用 uvicorn.run(host=0.0.0.0, port=8000, reload=True) 启动。
+# server.py 依 PANWATCH_PORT / .env 啟動，預設使用 8000。
 dev-api: setup-backend
 ifeq ($(WINDOWS),1)
 	@set "DEV_RELOAD=1" && $(VENV_PYTHON) server.py

@@ -1,0 +1,50 @@
+{
+  "task": "PW-11",
+  "observed_date_taipei": "2026-10-08",
+  "method": "Local actual React components and project CSS; final real shared-service payload; headless Chrome. No deployed PanWatch acceptance.",
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "checks": [
+    {
+      "venue": "TWSE",
+      "viewport": "desktop",
+      "horizontal_overflow": false,
+      "page_errors": [],
+      "daily_receipt_visible": true,
+      "comparison_text": "個股相對大盤\n可用\n\n比較個股與 TAIEX 的原始價格報酬 · 不含股利 · 非即時行情\n\n共同觀察日 2026-09-01 至 2026-10-06 · 24 日\n個股原始價格報酬\n+5.94%\nTAIEX 指數報酬\n+6.12%\n個股相對報酬\n-0.18 個百分點\n個股日線：TWSE · 669 筆 · 來源回傳部分資料 · 依所選日期篩選近期回傳資料\n大盤日線：TWSE · 24 筆 · 來源回傳部分資料\n只比較兩邊都有資料的共"
+    },
+    {
+      "venue": "TWSE",
+      "viewport": "mobile",
+      "horizontal_overflow": false,
+      "page_errors": [],
+      "daily_receipt_visible": true,
+      "comparison_text": "個股相對大盤\n可用\n\n比較個股與 TAIEX 的原始價格報酬 · 不含股利 · 非即時行情\n\n共同觀察日 2026-09-01 至 2026-10-06 · 24 日\n個股原始價格報酬\n+5.94%\nTAIEX 指數報酬\n+6.12%\n個股相對報酬\n-0.18 個百分點\n個股日線：TWSE · 669 筆 · 來源回傳部分資料 · 依所選日期篩選近期回傳資料\n大盤日線：TWSE · 24 筆 · 來源回傳部分資料\n只比較兩邊都有資料的共"
+    },
+    {
+      "venue": "TPEX",
+      "viewport": "desktop",
+      "horizontal_overflow": false,
+      "page_errors": [],
+      "daily_receipt_visible": true,
+      "comparison_text": "個股相對大盤\n可用\n\n比較個股與 TPEX 的原始價格報酬 · 不含股利 · 非即時行情\n\n共同觀察日 2026-10-01 至 2026-10-06 · 4 日\n個股原始價格報酬\n+3.52%\nTPEX 指數報酬\n+2.87%\n個股相對報酬\n+0.65 個百分點\n個股日線：TPEX · 668 筆 · 來源回傳部分資料 · 依所選日期篩選近期回傳資料\n大盤日線：TPEx · 4 筆 · 來源回傳部分資料\n只比較兩邊都有資料的共同觀察日"
+    },
+    {
+      "venue": "TPEX",
+      "viewport": "mobile",
+      "horizontal_overflow": false,
+      "page_errors": [],
+      "daily_receipt_visible": true,
+      "comparison_text": "個股相對大盤\n可用\n\n比較個股與 TPEX 的原始價格報酬 · 不含股利 · 非即時行情\n\n共同觀察日 2026-10-01 至 2026-10-06 · 4 日\n個股原始價格報酬\n+3.52%\nTPEX 指數報酬\n+2.87%\n個股相對報酬\n+0.65 個百分點\n個股日線：TPEX · 668 筆 · 來源回傳部分資料 · 依所選日期篩選近期回傳資料\n大盤日線：TPEx · 4 筆 · 來源回傳部分資料\n只比較兩邊都有資料的共同觀察日"
+    }
+  ],
+  "inspection": "Home, comparison, and expanded receipt screenshots visually inspected; exact strings retained and wrapped."
+}

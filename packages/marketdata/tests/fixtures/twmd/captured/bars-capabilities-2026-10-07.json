@@ -1,0 +1,15 @@
+{
+  "fixture_kind": "captured_http_projection",
+  "captured_at_taipei": "2026-10-07T00:10:54.026343+08:00",
+  "method": "GET",
+  "url": "http://127.0.0.1:8000/api/v1/bars/capabilities",
+  "http_status": 200,
+  "latency_ms": 16.522,
+  "response_bytes": 1797,
+  "response": {
+    "live_collection": false,
+    "live_collection_supported": true,
+    "live_collection_configured": false
+  },
+  "projection": "Only timeframe/adjustment/live collection capability fields retained; private settings and health details excluded."
+}

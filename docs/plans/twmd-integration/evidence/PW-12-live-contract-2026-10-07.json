@@ -1,0 +1,73 @@
+{
+  "task": "PW-12",
+  "observed_at": "2026-10-07T14:34:21.405221+00:00",
+  "source_checkout": "78e6e5b103886456434b6ee3032cdd31ce16943b",
+  "deployed_commit": null,
+  "scope": "bounded GET query-only; no acquisition or completeness assertion",
+  "observations": [
+    {
+      "endpoint": "/api/v1/ex-right-dividend-results",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-01-01",
+        "end": "2026-10-06"
+      },
+      "observed_at": "2026-10-07T14:34:21.416395+00:00",
+      "http_status": 200,
+      "count": 0,
+      "rows": [],
+      "coverage": "unknown: endpoint does not expose acquisition or date coverage",
+      "latency_ms": 12.059
+    },
+    {
+      "endpoint": "/api/v1/capital-reduction-results",
+      "selectors": {
+        "instrument_id": "TWSE:1418",
+        "start": "2024-01-01",
+        "end": "2024-12-31"
+      },
+      "observed_at": "2026-10-07T14:34:21.428459+00:00",
+      "http_status": 200,
+      "count": 0,
+      "rows": [],
+      "coverage": "unknown: endpoint does not expose acquisition or date coverage",
+      "latency_ms": 7.278
+    },
+    {
+      "endpoint": "/api/v1/ex-right-dividend-results",
+      "selectors": {
+        "instrument_id": "TWSE:00878",
+        "start": "2026-01-01",
+        "end": "2026-10-06"
+      },
+      "observed_at": "2026-10-07T14:34:21.435739+00:00",
+      "http_status": 200,
+      "count": 0,
+      "rows": [],
+      "coverage": "unknown: endpoint does not expose acquisition or date coverage",
+      "latency_ms": 7.252
+    },
+    {
+      "endpoint": "/api/v1/capital-reduction-results",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-01-01",
+        "end": "2026-10-06"
+      },
+      "observed_at": "2026-10-07T14:34:21.442993+00:00",
+      "http_status": 200,
+      "count": 0,
+      "rows": [],
+      "coverage": "unknown: endpoint does not expose acquisition or date coverage",
+      "latency_ms": 6.23
+    }
+  ],
+  "service": "http://127.0.0.1:8000",
+  "observed_at_taipei": "2026-10-07T22:34:21+08:00",
+  "limitations": [
+    "Only four fixed retained query windows were observed.",
+    "All four HTTP 200 payloads were empty lists.",
+    "List APIs do not expose selected-window acquisition or coverage; empty results do not establish absence of actions.",
+    "No positive live event, deployed build identity, publisher SLA, receipt, revision, payment time or historical as-of evidence was established."
+  ]
+}

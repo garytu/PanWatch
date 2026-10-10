@@ -1,9 +1,26 @@
-"""marketdata 异常类型。"""
+"""marketdata 異常型別。"""
 
 
 class MarketDataError(Exception):
-    """本包所有异常的基类。"""
+    """本包所有異常的基類。"""
 
 
 class VendorError(MarketDataError):
-    """单个 vendor 抓取失败(Engine 捕获后转移到下一个源)。"""
+    """單個 vendor 抓取失敗(Engine 捕獲後轉移到下一個源)。"""
+
+
+class TwmdReadError(VendorError):
+    """A failed twmd query read; HTTP failures remain distinct from empty data."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        reason_code: str | None = None,
+        detail_code: str | None = None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.reason_code = reason_code
+        self.detail_code = detail_code

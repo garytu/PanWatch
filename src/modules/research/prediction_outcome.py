@@ -57,7 +57,7 @@ def _pick_close_on_or_before(klines: list, target: date) -> float | None:
 
 
 def _latest_kline_day_on_or_before(klines: list, target: date) -> date | None:
-    """找建议日可见的最后一个实际交易日，用作交易日计数起点。"""
+    """找建議日可見的最後一個實際交易日，用作交易日計數起點。"""
     found = None
     for k in klines or []:
         day = _parse_day(getattr(k, "date", None))
@@ -71,9 +71,9 @@ def _find_close_after_n_trading_days(
     base_day: date,
     horizon: int,
 ) -> float | None:
-    """从基准交易日严格往后数 N 条实际 K 线，返回对应收盘价。
+    """從基準交易日嚴格往後數 N 條實際 K 線，返回對應收盤價。
 
-    K 线序列本身就是交易日历：停牌、周末、节假日不会占用 horizon。
+    K 線序列本身就是交易日曆：停牌、週末、節假日不會佔用 horizon。
     """
     rows: list[tuple[date, float]] = []
     for k in klines or []:
@@ -134,7 +134,7 @@ def evaluate_pending_prediction_outcomes(
                 )
             except Exception as e:
                 logger.warning(
-                    "评估建议获取K线失败: %s %s - %s",
+                    "評估建議獲取K線失敗: %s %s - %s",
                     rec.stock_symbol,
                     market.value,
                     e,

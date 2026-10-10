@@ -8,36 +8,58 @@ class MarketCode(str, Enum):
     CN = "CN"  # A股
     HK = "HK"  # 港股
     US = "US"  # 美股
+    TW = "TW"  # 台股
+
+
+
+# 暫時僅啟用台股；保留其他市場定義與歷史資料。
+# 恢復其他市場時同步更新 frontend/src/lib/markets.ts。
+ENABLED_MARKETS = (
+    # MarketCode.CN,
+    # MarketCode.HK,
+    # MarketCode.US,
+    MarketCode.TW,
+)
+
+
+def enabled_market_codes() -> tuple[str, ...]:
+    return tuple(m.value for m in ENABLED_MARKETS)
+
+
+def is_market_enabled(market: str | MarketCode) -> bool:
+    return market in ENABLED_MARKETS
 
 
 @dataclass
 class TradingSession:
-    """一个交易时段"""
+    """一個交易時段"""
     start: time
     end: time
 
 
 @dataclass
 class MarketDef:
-    """市场定义"""
+    """市場定義"""
     code: MarketCode
     name: str
     timezone: str
     sessions: list[TradingSession]
-    symbol_pattern: str  # 正则，用于校验股票代码格式
+    symbol_pattern: str  # 正則，用於校驗股票程式碼格式
 
     def get_tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)
 
     def is_trading_time(self, dt: datetime | None = None) -> bool:
-        """判断给定时间是否在交易时段内"""
+        """判斷給定時間是否在交易時段內"""
+        if not is_market_enabled(self.code):
+            return False
         if dt is None:
             dt = datetime.now(self.get_tz())
         else:
             dt = dt.astimezone(self.get_tz())
 
-        # 非交易日(周末 / A股法定节假日)一律不交易。
-        # 延迟导入:trading_calendar 依赖本模块的 MarketCode/MARKETS。
+        # 非交易日(週末 / A股法定節假日)一律不交易。
+        # 延遲匯入:trading_calendar 依賴本模組的 MarketCode/MARKETS。
         from src.platform.scheduling.trading_calendar import is_trading_day
 
         if not is_trading_day(self.code, dt.date()):
@@ -50,7 +72,7 @@ class MarketDef:
         )
 
 
-# 预定义市场
+# 預定義市場
 MARKETS: dict[MarketCode, MarketDef] = {
     MarketCode.CN: MarketDef(
         code=MarketCode.CN,
@@ -81,30 +103,54 @@ MARKETS: dict[MarketCode, MarketDef] = {
         ],
         symbol_pattern=r"^[A-Z]{1,5}$",
     ),
+    MarketCode.TW: MarketDef(
+        code=MarketCode.TW,
+        name="台股",
+        timezone="Asia/Taipei",
+        sessions=[
+            TradingSession(time(9, 0), time(13, 30)),
+        ],
+        symbol_pattern=r"^(?:(?:TWSE|TPEX):)?\d{4,6}[A-Z]?$",
+    ),
 }
 
 
 @dataclass
 class StockData:
-    """标准化行情数据"""
+    """標準化行情資料"""
     symbol: str
     name: str
     market: MarketCode
-    current_price: float
-    change_pct: float       # 涨跌幅 %
-    change_amount: float    # 涨跌额
-    volume: float           # 成交量（手）
-    turnover: float         # 成交额（元）
-    open_price: float
-    high_price: float
-    low_price: float
-    prev_close: float
-    timestamp: datetime = field(default_factory=datetime.now)
+    current_price: float | None
+    change_pct: float | None
+    change_amount: float | None
+    volume: float | None  # 單位見 units，TW 為股
+    turnover: float | None
+    open_price: float | None
+    high_price: float | None
+    low_price: float | None
+    prev_close: float | None
+    timestamp: datetime | None = field(default_factory=datetime.now)
+    instrument_id: str | None = None
+    venue: str | None = None
+    price_kind: str | None = None
+    provider: str | None = None
+    trade_date: str | None = None
+    reference_price: float | None = None
+    change_basis: str | None = None
+    adjustment_mode: str | None = None
+    availability: str | None = None
+    freshness: dict = field(default_factory=dict)
+    collection_health: dict = field(default_factory=dict)
+    usable_for_trading: bool | None = None
+    units: dict = field(default_factory=dict)
+    volume_semantics: str | None = None
+    eod_fallback: dict | None = None
 
 
 @dataclass
 class IndexData:
-    """大盘指数数据"""
+    """大盤指數資料"""
     symbol: str
     name: str
     market: MarketCode

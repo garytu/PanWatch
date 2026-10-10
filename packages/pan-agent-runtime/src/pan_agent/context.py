@@ -203,11 +203,11 @@ class ExtractiveContextSummarizer:
         current = (assistant_messages or user_messages or [""])[-1][:400]
         return ContextSummary(
             goal=user_messages[:2],
-            constraints=matching(("必须", "不要", "限制", "只能"), user_messages + assistant_messages),
-            decisions=matching(("决定", "选择", "采用", "改为"), assistant_messages + user_messages),
+            constraints=matching(("必須", "不要", "限制", "只能"), user_messages + assistant_messages),
+            decisions=matching(("決定", "選擇", "採用", "改為"), assistant_messages + user_messages),
             facts=[value[:240] for value in (user_messages + assistant_messages)[:4]],
             current_state=current,
-            open_items=matching(("待", "还需", "需要", "未完成", "下一步"), assistant_messages + user_messages),
+            open_items=matching(("待", "還需", "需要", "未完成", "下一步"), assistant_messages + user_messages),
             tool_findings=[value[:240] for value in tool_messages[-4:]],
         )
 
@@ -275,9 +275,9 @@ class ContextEngine:
         for message in messages:
             if message.role != "system":
                 continue
-            if message.content.startswith("以下是较早对话的结构化摘要"):
+            if message.content.startswith("以下是較早對話的結構化摘要"):
                 embedded_summary_tokens += add_message(message)
-            elif message.content.startswith("页面上下文:"):
+            elif message.content.startswith("頁面上下文:"):
                 embedded_page_tokens += add_message(message)
             else:
                 system_tokens += add_message(message)
@@ -365,12 +365,12 @@ class ContextEngine:
         ) -> list[ModelMessage]:
             result = [message.model_copy(deep=True) for message in system_messages]
             if page_context:
-                result.append(ModelMessage(role="system", content=f"页面上下文:\n{page_context}"))
+                result.append(ModelMessage(role="system", content=f"頁面上下文:\n{page_context}"))
             if summary:
                 result.append(
                     ModelMessage(
                         role="system",
-                        content="以下是较早对话的结构化摘要，仅在与当前问题相关时使用:\n"
+                        content="以下是較早對話的結構化摘要，僅在與當前問題相關時使用:\n"
                         + summary.model_dump_json(ensure_ascii=False),
                     )
                 )

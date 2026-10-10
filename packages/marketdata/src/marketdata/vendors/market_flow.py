@@ -1,13 +1,13 @@
-"""市场/资金面 vendor:龙虎榜 / 融资融券 / 股东户数 / 分红,均走东财 datacenter 同构接口
+"""市場/資金面 vendor:龍虎榜 / 融資融券 / 股東戶數 / 分紅,均走東財 datacenter 同構介面
 (datacenter-web.eastmoney.com/api/data/v1/get,reportName + filter + columns=ALL)。
 
-字段索引按任务方给出的列名(源自 a-stock SKILL.md)+ 现有 fundamentals.py 取数骨架校准,
-未在沙箱内实抓验证——标"待实抓校准"的字段上线前需用真实响应复核。拿不到的字段一律 None,
-不伪造、不用无参 now()/random 填充数值。
+欄位索引按任務方給出的列名(源自 a-stock SKILL.md)+ 現有 fundamentals.py 取數骨架校準,
+未在沙箱內實抓驗證——標"待實抓校準"的欄位上線前需用真實回應複核。拿不到的欄位一律 None,
+不偽造、不用無參 now()/random 填充數值。
 
-- 龙虎榜(dragon_tiger):**市场级**,不按 symbol,按 date 过滤当日全部上榜明细。
-- 融资融券(margin)/股东户数(shareholders)/分红(dividend):**按 symbol**,逐只请求
-  (datacenter 该几个 report 均只支持单代码 filter,无法一次性批量多只)。
+- 龍虎榜(dragon_tiger):**市場級**,不按 symbol,按 date 過濾當日全部上榜明細。
+- 融資融券(margin)/股東戶數(shareholders)/分紅(dividend):**按 symbol**,逐只請求
+  (datacenter 該幾個 report 均只支援單程式碼 filter,無法一次性批次多隻)。
 """
 
 from __future__ import annotations
@@ -49,9 +49,9 @@ def _to_int(value) -> int | None:
 
 
 def _datacenter_get(report: str, filter_str: str, sort_col: str, page_size: int = 50) -> list[dict]:
-    """东财 datacenter 统一请求 helper:GET datacenter-web.eastmoney.com/api/data/v1/get。
+    """東財 datacenter 統一請求 helper:GET datacenter-web.eastmoney.com/api/data/v1/get。
 
-    防御:请求失败或响应结构不含 result.data 一律返回 []。
+    防禦:請求失敗或回應結構不含 result.data 一律返回 []。
     """
     resp = market_get(
         _DATACENTER_URL,
@@ -70,7 +70,7 @@ def _datacenter_get(report: str, filter_str: str, sort_col: str, page_size: int 
         parse="json",
         retries=2,
         timeout=10,
-        log_label=f"东财市场资金面/{report}",
+        log_label=f"東財市場資金面/{report}",
     )
     if not resp or not isinstance(resp, dict):
         return []
@@ -81,15 +81,15 @@ def _datacenter_get(report: str, filter_str: str, sort_col: str, page_size: int 
     return data if isinstance(data, list) else []
 
 
-# ============================== 龙虎榜(市场级) ==============================
+# ============================== 龍虎榜(市場級) ==============================
 
 _REPORT_DRAGON_TIGER = "RPT_DAILYBILLBOARD_DETAILSNEW"
 
 
 class EastmoneyDragonTigerVendor(DragonTigerVendor):
-    """龙虎榜:市场级,fetch 忽略 symbols,按 config["date"](YYYY-MM-DD)过滤当日明细。
+    """龍虎榜:市場級,fetch 忽略 symbols,按 config["date"](YYYY-MM-DD)過濾當日明細。
 
-    不猜测"今天"——调用方未显式给 date 时直接返回 [],避免包内出现无参 now()。
+    不猜測"今天"——呼叫方未顯式給 date 時直接返回 [],避免包內出現無參 now()。
     """
 
     name = "eastmoney"
@@ -120,18 +120,18 @@ class EastmoneyDragonTigerVendor(DragonTigerVendor):
                     )
                 )
             except Exception as e:
-                logger.debug(f"解析龙虎榜行失败: {e}")
+                logger.debug(f"解析龍虎榜行失敗: {e}")
                 continue
         return out
 
 
-# ============================== 融资融券(按 symbol) ==============================
+# ============================== 融資融券(按 symbol) ==============================
 
 _REPORT_MARGIN = "RPTA_WEB_RZRQ_GGMX"
 
 
 class EastmoneyMarginVendor(MarginVendor):
-    """融资融券:按 symbol 逐只请求近期明细,取最新一条(sortTypes=-1 已降序 → data[0])。"""
+    """融資融券:按 symbol 逐只請求近期明細,取最新一條(sortTypes=-1 已降序 → data[0])。"""
 
     name = "eastmoney"
     supports_markets = {"CN"}
@@ -161,18 +161,18 @@ class EastmoneyMarginVendor(MarginVendor):
                     )
                 )
             except Exception as e:
-                logger.debug(f"东财融资融券取数异常 symbol={sym.code}: {e}")
+                logger.debug(f"東財融資融券取數異常 symbol={sym.code}: {e}")
                 continue
         return out
 
 
-# ============================== 股东户数(按 symbol) ==============================
+# ============================== 股東戶數(按 symbol) ==============================
 
 _REPORT_SHAREHOLDERS = "RPT_HOLDERNUMLATEST"
 
 
 class EastmoneyShareholdersVendor(ShareholdersVendor):
-    """股东户数:按 symbol 逐只请求,取最新一期。"""
+    """股東戶數:按 symbol 逐只請求,取最新一期。"""
 
     name = "eastmoney"
     supports_markets = {"CN"}
@@ -199,18 +199,18 @@ class EastmoneyShareholdersVendor(ShareholdersVendor):
                     )
                 )
             except Exception as e:
-                logger.debug(f"东财股东户数取数异常 symbol={sym.code}: {e}")
+                logger.debug(f"東財股東戶數取數異常 symbol={sym.code}: {e}")
                 continue
         return out
 
 
-# ============================== 分红(按 symbol) ==============================
+# ============================== 分紅(按 symbol) ==============================
 
 _REPORT_DIVIDEND = "RPT_SHAREBONUS_DET"
 
 
 class EastmoneyDividendVendor(DividendVendor):
-    """分红:按 symbol 逐只请求,返回该只全部分红历史(可能多条)。"""
+    """分紅:按 symbol 逐只請求,返回該只全部分紅歷史(可能多條)。"""
 
     name = "eastmoney"
     supports_markets = {"CN"}
@@ -236,9 +236,9 @@ class EastmoneyDividendVendor(DividendVendor):
                             )
                         )
                     except Exception as e:
-                        logger.debug(f"解析分红行失败 symbol={sym.code}: {e}")
+                        logger.debug(f"解析分紅行失敗 symbol={sym.code}: {e}")
                         continue
             except Exception as e:
-                logger.debug(f"东财分红取数异常 symbol={sym.code}: {e}")
+                logger.debug(f"東財分紅取數異常 symbol={sym.code}: {e}")
                 continue
         return out

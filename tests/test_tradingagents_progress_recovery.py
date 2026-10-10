@@ -1,4 +1,4 @@
-"""TradingAgents 运行生命周期与采集阶段回归测试。"""
+"""TradingAgents 執行生命週期與採集階段迴歸測試。"""
 
 from __future__ import annotations
 
@@ -182,7 +182,7 @@ def test_data_collection_source_error_is_visible_in_progress_snapshot():
 
 
 def test_progress_exposes_active_llm_tool_operation():
-    """LLM/工具未结束时，快照要告诉前端具体卡在哪个操作。"""
+    """LLM/工具未結束時，快照要告訴前端具體卡在哪個操作。"""
     from src.modules.automation.tradingagents.observability import aggregate_progress
 
     result = aggregate_progress([
@@ -227,7 +227,7 @@ def test_progress_active_operation_includes_agent_when_callback_provides_it():
 
 
 def test_progress_keeps_other_parallel_tool_active_after_one_finishes():
-    """并行工具中一个完成时，另一个长请求仍要显示为当前活动操作。"""
+    """並行工具中一個完成時，另一個長請求仍要顯示為當前活動操作。"""
     from src.modules.automation.tradingagents.observability import aggregate_progress
 
     result = aggregate_progress([
@@ -249,7 +249,7 @@ def test_progress_keeps_other_parallel_tool_active_after_one_finishes():
 
 
 def test_progress_handler_uses_run_id_to_close_the_same_langgraph_node():
-    """LangChain 1.x 的 on_chain_end 不再稳定提供 name，必须按 run_id 关联。"""
+    """LangChain 1.x 的 on_chain_end 不再穩定提供 name，必須按 run_id 關聯。"""
     from src.modules.automation.tradingagents.observability import PanWatchProgressHandler
 
     handler = PanWatchProgressHandler(trace_id="trace-1")
@@ -263,7 +263,7 @@ def test_progress_handler_uses_run_id_to_close_the_same_langgraph_node():
         run_id="node-1",
         metadata={"langgraph_node": "Market Analyst"},
     )
-    # 真实 LangChain 1.x 回调这里只有 run_id/parent_run_id，没有 name。
+    # 真實 LangChain 1.x 回撥這裡只有 run_id/parent_run_id，沒有 name。
     handler.on_chain_end({}, run_id="node-1", parent_run_id="root-1")
 
     assert [(stage, action) for stage, action, _ in emitted] == [
@@ -275,7 +275,7 @@ def test_progress_handler_uses_run_id_to_close_the_same_langgraph_node():
 
 
 def test_progress_handler_drops_empty_node_name_instead_of_data_collection():
-    """空名称不能命中 `n in stage`，否则所有未知结束事件都会变成数据采集完成。"""
+    """空名稱不能命中 `n in stage`，否則所有未知結束事件都會變成資料採集完成。"""
     from src.modules.automation.tradingagents.observability import PanWatchProgressHandler
 
     handler = PanWatchProgressHandler(trace_id="trace-2")
@@ -288,7 +288,7 @@ def test_progress_handler_drops_empty_node_name_instead_of_data_collection():
 
 
 def test_progress_handler_exposes_agent_for_llm_and_tool_operations():
-    """活动操作必须能解释是哪个子 Agent 发起的，避免 UI 只显示一个泛化工具名。"""
+    """活動操作必須能解釋是哪個子 Agent 發起的，避免 UI 只顯示一個泛化工具名。"""
     from src.modules.automation.tradingagents.observability import PanWatchProgressHandler
 
     handler = PanWatchProgressHandler(trace_id="trace-3")
@@ -364,7 +364,7 @@ def test_one_market_source_failure_does_not_zero_other_sources():
 
 
 def test_empty_required_market_source_is_visible_as_error(monkeypatch):
-    """行情源返回空列表时，进度不能伪装成 source_end。"""
+    """行情源返回空列表時，進度不能偽裝成 source_end。"""
     import asyncio
 
     from src.modules.automation.tradingagents import agent as agent_module
@@ -382,7 +382,7 @@ def test_empty_required_market_source_is_visible_as_error(monkeypatch):
 
     async def _run():
         agent = TradingAgentsAgent(collection_timeout_seconds=5)
-        stock = MagicMock(symbol="300624", name="万兴科技")
+        stock = MagicMock(symbol="300624", name="萬興科技")
         stock.market.value = "CN"
         context = MagicMock()
         context.watchlist = [stock]
@@ -406,5 +406,63 @@ def test_empty_required_market_source_is_visible_as_error(monkeypatch):
             action == "source_error" and extra.get("source") == "klines"
             for _, action, extra in events
         )
+
+    asyncio.run(_run())
+
+
+def test_taiwan_research_source_timeout_exceeds_service_deadline(monkeypatch):
+    """The research aggregate must return partial timeout blocks before TA cancels it."""
+    import asyncio
+    from contextlib import nullcontext
+
+    from src.modules.automation.tradingagents import agent as agent_module
+    from src.modules.automation.tradingagents.agent import TradingAgentsAgent
+
+    async def _run():
+        agent = TradingAgentsAgent(collection_timeout_seconds=5)
+        stock = MagicMock(symbol="TWSE:2330", name="台積電")
+        stock.market.value = "TW"
+        context = MagicMock()
+        context.watchlist = [stock]
+        context._trace_id = "man-tradingagents-TWSE-2330-timeout"
+
+        market_data = MagicMock()
+        market_data.quotes.return_value = []
+        market_data.klines.return_value = []
+        market_data.capital_flow.return_value = None
+        market_data.events.return_value = []
+        timeouts = []
+        real_wait_for = asyncio.wait_for
+
+        async def capture_timeout(awaitable, *, timeout):
+            timeouts.append(timeout)
+            return await real_wait_for(awaitable, timeout=timeout)
+
+        monkeypatch.setattr(agent_module.asyncio, "wait_for", capture_timeout)
+        monkeypatch.setattr(agent_module, "get_market_data", lambda: market_data)
+        monkeypatch.setattr(
+            "src.platform.marketdata.collectors.kline_collector.kline_source",
+            lambda _source: nullcontext(),
+        )
+        monkeypatch.setattr(
+            "src.platform.marketdata.collectors.kline_collector.KlineCollector.get_technical_indicators",
+            lambda self, symbol, klines=None: {},
+        )
+        monkeypatch.setattr(
+            "src.platform.marketdata.models.is_market_enabled", lambda market: True
+        )
+
+        class FakeResearchService:
+            def collect(self, instrument_id):
+                return {"instrument_id": instrument_id, "blocks": {}}
+
+        monkeypatch.setattr(
+            "src.modules.research.taiwan_research.TaiwanResearchService",
+            FakeResearchService,
+        )
+        result = await agent.collect(context)
+        assert result["taiwan_research"]["instrument_id"] == "TWSE:2330"
+        assert agent_module._TAIWAN_RESEARCH_SOURCE_TIMEOUT_SECONDS in timeouts
+        assert agent_module._TAIWAN_RESEARCH_SOURCE_TIMEOUT_SECONDS > 25
 
     asyncio.run(_run())

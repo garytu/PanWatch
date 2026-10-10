@@ -29,6 +29,6 @@ def test_yfinance_parses(monkeypatch):
 
 
 def test_yfinance_missing_lib_raises(monkeypatch):
-    monkeypatch.setitem(sys.modules, "yfinance", None)  # import 触发 ImportError
+    monkeypatch.setitem(sys.modules, "yfinance", None)  # import 觸發 ImportError
     with pytest.raises(VendorError):
         yv.YFinanceQuoteVendor().fetch([Symbol.parse("AAPL")], {})

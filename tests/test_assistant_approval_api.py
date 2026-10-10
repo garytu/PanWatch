@@ -41,7 +41,7 @@ class _WaitingRuntime:
             },
         )
         checkpoint = AgentCheckpoint(
-            messages=[ModelMessage(role="user", content="创建提醒")],
+            messages=[ModelMessage(role="user", content="建立提醒")],
             step_index=1,
             tool_calls_used=1,
             pending_approvals=[pending],
@@ -62,10 +62,10 @@ class _ResumedRuntime:
         self.resume_calls.append((request, checkpoint, decisions))
         await sink.publish(
             RuntimeEvent(
-                type=EventType.ANSWER_TOKEN, run_id="12", data={"token": "已恢复"}
+                type=EventType.ANSWER_TOKEN, run_id="12", data={"token": "已恢復"}
             )
         )
-        return RunResult(run_id="12", status=RunStatus.COMPLETED, answer="已恢复")
+        return RunResult(run_id="12", status=RunStatus.COMPLETED, answer="已恢復")
 
 
 class _PartiallyResumedRuntime:
@@ -102,7 +102,7 @@ class _ApprovalService:
 
     def get_conversation(self, _conversation_id):
         return SimpleNamespace(
-            messages=[SimpleNamespace(role="user", content="创建提醒")]
+            messages=[SimpleNamespace(role="user", content="建立提醒")]
         )
 
     def pause_task(self, task_id, result):
@@ -120,8 +120,8 @@ class _ApprovalService:
                     "target_price": 1800,
                 },
                 presentation={
-                    "tool_title": "创建价格提醒",
-                    "summary": "为 CN:600519 创建价格 ≥ 1800 的盘中提醒，冷却 30 分钟。",
+                    "tool_title": "建立價格提醒",
+                    "summary": "為 CN:600519 建立價格 ≥ 1800 的盤中提醒，冷卻 30 分鐘。",
                 },
                 expires_at=datetime.now(UTC) + timedelta(minutes=10),
             )
@@ -164,7 +164,7 @@ def test_waiting_runtime_persists_then_streams_an_approval_and_pause():
     async def run():
         response = await assistant_api.stream_assistant_message(
             1,
-            assistant_api.SendAssistantMessageCommand(content="创建提醒"),
+            assistant_api.SendAssistantMessageCommand(content="建立提醒"),
             service,
         )
         return await _read_events(response)
@@ -174,8 +174,8 @@ def test_waiting_runtime_persists_then_streams_an_approval_and_pause():
     assert events[-2][0] == "approval_required"
     assert events[-2][1]["approval_id"] == "approval-1"
     assert events[-2][1]["presentation"] == {
-        "tool_title": "创建价格提醒",
-        "summary": "为 CN:600519 创建价格 ≥ 1800 的盘中提醒，冷却 30 分钟。",
+        "tool_title": "建立價格提醒",
+        "summary": "為 CN:600519 建立價格 ≥ 1800 的盤中提醒，冷卻 30 分鐘。",
     }
     assert events[-2][1]["calls"] == [
         {
@@ -200,7 +200,7 @@ def test_approved_decision_resumes_with_checkpoint_decision_and_streams_done():
     runtime = _ResumedRuntime()
     service = _ApprovalService(runtime)
     checkpoint = AgentCheckpoint(
-        messages=[ModelMessage(role="user", content="创建提醒")],
+        messages=[ModelMessage(role="user", content="建立提醒")],
         step_index=1,
         tool_calls_used=1,
         pending_approvals=[
@@ -227,13 +227,13 @@ def test_approved_decision_resumes_with_checkpoint_decision_and_streams_done():
 
     assert runtime.resume_calls[0][2] == {"call-1": ApprovalDecision.APPROVED}
     assert events[-1][0] == "done"
-    assert events[-1][1]["content"] == "已恢复"
+    assert events[-1][1]["content"] == "已恢復"
 
 
 def test_partial_approval_resume_streams_resolved_card_status_and_remaining_pause():
     service = _ApprovalService(_PartiallyResumedRuntime())
     checkpoint = AgentCheckpoint(
-        messages=[ModelMessage(role="user", content="创建两个提醒")],
+        messages=[ModelMessage(role="user", content="建立兩個提醒")],
         step_index=1,
         tool_calls_used=2,
         pending_approvals=[

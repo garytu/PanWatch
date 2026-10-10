@@ -1,14 +1,16 @@
-"""数据源主备调度器:按 ConfigProvider 的优先级链取数,首个非空即返回。
+"""資料來源主備排程器:按 ConfigProvider 的優先順序鏈取數,首個非空即返回。
 
-- 缓存(唯一一层,vendor 内不再各自缓存)。
-- 每次取数经 MetricsSink 记录 (vendor, ok, latency, error)。
-- 通过 ConfigProvider 拿源、通过注入 vendors 取实例:不依赖 web/DB。
+- 快取(唯一一層,vendor 內不再各自快取)。
+- 每次取數經 MetricsSink 記錄 (vendor, ok, latency, error)。
+- 透過 ConfigProvider 拿源、透過注入 vendors 取例項:不依賴 web/DB。
 """
 
 from __future__ import annotations
 
 import logging
 import time
+import hashlib
+import json
 
 from marketdata.cache import TTLCache
 from marketdata.http import record_error
@@ -32,14 +34,20 @@ class Engine:
         self.default_ttl = default_ttl
 
     def fetch(self, req: Request, *, cache_ttl_sec: float | None = None, min_count: int = 1) -> Response:
-        key = req.cache_key(self.datatype)
+        market = req.market
+        sources = sorted(self.config.sources_for(self.datatype, market), key=lambda s: s.priority)
+        # A provider switch must not return a cached answer from the previous
+        # provider. The request key already carries canonical IDs and ranges.
+        provider_key = hashlib.sha256(json.dumps(
+            [(src.vendor, src.priority, src.config) for src in sources if src.enabled],
+            sort_keys=True, default=str,
+        ).encode()).hexdigest()
+        key = f"{req.cache_key(self.datatype)}|providers={provider_key}"
         cached = self.cache.get(key)
         if cached is not None:
             return cached
 
-        market = req.market
-        syms = [Symbol(Market(market), c) for c in req.symbols]
-        sources = sorted(self.config.sources_for(self.datatype, market), key=lambda s: s.priority)
+        syms = [Symbol.parse(c, market) for c in req.symbols]
 
         last_err = ""
         best: Response | None = None
@@ -74,7 +82,7 @@ class Engine:
                     ttl = cache_ttl_sec if cache_ttl_sec is not None else self.default_ttl
                     self.cache.set(key, resp, ttl_sec=ttl)
                     return resp
-                # 非空但不足:记为候选,继续试更优
+                # 非空但不足:記為候選,繼續試更優
                 if best is None or len(data) > len(best.data):
                     best = resp
             else:

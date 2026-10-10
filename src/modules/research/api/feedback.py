@@ -27,7 +27,7 @@ def submit_feedback(payload: FeedbackIn, db: Session = Depends(get_db)):
         .first()
     )
     if not sug:
-        raise HTTPException(404, "建议不存在")
+        raise HTTPException(404, "建議不存在")
 
     fb = SuggestionFeedback(suggestion_id=payload.suggestion_id, useful=payload.useful)
     db.add(fb)
@@ -41,7 +41,7 @@ def feedback_stats(
     days: int = Query(14, ge=1, le=365),
     db: Session = Depends(get_db),
 ):
-    """反馈统计（基础版）"""
+    """回饋統計（基礎版）"""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     # SQLite: date(created_at) yields YYYY-MM-DD
     day_col = func.date(SuggestionFeedback.created_at)

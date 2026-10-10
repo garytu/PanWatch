@@ -1,0 +1,3892 @@
+{
+  "task": "PW-11",
+  "observed_at": "2026-10-07T15:58:06.376208+00:00",
+  "service": "http://127.0.0.1:8000",
+  "source_checkout": "78e6e5b103886456434b6ee3032cdd31ce16943b",
+  "deployed_commit": null,
+  "phase": "after",
+  "scope": "five bounded query-only GETs; no acquisition triggered by reads",
+  "observations": [
+    {
+      "endpoint": "/api/v1/benchmarks",
+      "selectors": {},
+      "observed_at": "2026-10-07T15:58:06.394679+00:00",
+      "http_status": 200,
+      "body": {
+        "benchmarks": [
+          {
+            "benchmark_id": "TAIEX",
+            "venue": "TWSE",
+            "name": "Taiwan Capitalization Weighted Stock Index",
+            "name_zh": "發行量加權股價指數",
+            "provider": "TWSE",
+            "source_alias": "MI_5MINS_HIST",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST",
+            "price_kind": "benchmark_index",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "stock_venue_default": "TAIEX"
+          },
+          {
+            "benchmark_id": "TPEX",
+            "venue": "TPEX",
+            "name": "TPEx Index",
+            "name_zh": "櫃買指數",
+            "provider": "TPEx",
+            "source_alias": "tpex_index",
+            "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+            "price_kind": "benchmark_index",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "stock_venue_default": "TPEX"
+          }
+        ]
+      },
+      "latency_ms": 4.22
+    },
+    {
+      "endpoint": "/api/v1/benchmarks/TAIEX/bars",
+      "selectors": {
+        "start_date": "2026-09-01",
+        "end_date": "2026-10-06",
+        "limit": 366
+      },
+      "observed_at": "2026-10-07T15:58:06.398906+00:00",
+      "http_status": 200,
+      "body": {
+        "benchmark_id": "TAIEX",
+        "name": "Taiwan Capitalization Weighted Stock Index",
+        "name_zh": "發行量加權股價指數",
+        "venue": "TWSE",
+        "provider": "TWSE",
+        "source_alias": "MI_5MINS_HIST",
+        "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+        "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST",
+        "timeframe": "day",
+        "price_kind": "benchmark_index",
+        "adjustment_mode": "raw_price_index",
+        "unit": "index_points",
+        "basis": "raw_price_index",
+        "limit": 366,
+        "returned_count": 24,
+        "total_count": 24,
+        "partial": true,
+        "truncated": false,
+        "requested_range": {
+          "start_date": "2026-09-01",
+          "end_date": "2026-10-06",
+          "inclusive": true
+        },
+        "coverage_window": {
+          "start_date": "2026-09-01",
+          "end_date": "2026-10-06",
+          "complete": false,
+          "schema_ready": true,
+          "evidence_truncated": false,
+          "available_count": 24,
+          "missing_count": 12
+        },
+        "coverage": [
+          {
+            "trade_date": "2026-09-01",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-02",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-03",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-04",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-07",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-08",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-09",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-10",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-11",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-14",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-15",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-16",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-17",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-18",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-21",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-22",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-23",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-24",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-29",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-09-30",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-01",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-02",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-10-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-10-05",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-06",
+            "status": "AVAILABLE"
+          }
+        ],
+        "gaps": [
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-12",
+          "2026-09-13",
+          "2026-09-19",
+          "2026-09-20",
+          "2026-09-25",
+          "2026-09-26",
+          "2026-09-27",
+          "2026-09-28",
+          "2026-10-03",
+          "2026-10-04"
+        ],
+        "bars": [
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-01",
+            "open": "46177.11",
+            "high": "46948.72",
+            "low": "46081.11",
+            "close": "46948.72",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-02",
+            "open": "46901.32",
+            "high": "46946.60",
+            "low": "46164.72",
+            "close": "46164.72",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-03",
+            "open": "46325.48",
+            "high": "46517.45",
+            "low": "45839.36",
+            "close": "45857.66",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-04",
+            "open": "45991.28",
+            "high": "46620.96",
+            "low": "45966.86",
+            "close": "46551.13",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-07",
+            "open": "46724.00",
+            "high": "47429.58",
+            "low": "46724.00",
+            "close": "47326.27",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-08",
+            "open": "47335.24",
+            "high": "47578.24",
+            "low": "47023.73",
+            "close": "47105.78",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-09",
+            "open": "47142.74",
+            "high": "47548.26",
+            "low": "47060.78",
+            "close": "47183.36",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-10",
+            "open": "47130.96",
+            "high": "47130.96",
+            "low": "46573.47",
+            "close": "46940.49",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-11",
+            "open": "46651.21",
+            "high": "46651.21",
+            "low": "45942.44",
+            "close": "46184.85",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-14",
+            "open": "46010.74",
+            "high": "46050.24",
+            "low": "45398.43",
+            "close": "45862.52",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-15",
+            "open": "45847.27",
+            "high": "46009.85",
+            "low": "45491.97",
+            "close": "45511.49",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-16",
+            "open": "45546.56",
+            "high": "46077.82",
+            "low": "45546.56",
+            "close": "45848.90",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-17",
+            "open": "45936.11",
+            "high": "46874.84",
+            "low": "45936.11",
+            "close": "46288.00",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-18",
+            "open": "46449.56",
+            "high": "47180.75",
+            "low": "46449.56",
+            "close": "47180.75",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-21",
+            "open": "47207.30",
+            "high": "47750.98",
+            "low": "47207.30",
+            "close": "47718.84",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-22",
+            "open": "47981.04",
+            "high": "48601.53",
+            "low": "47800.17",
+            "close": "47800.17",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-23",
+            "open": "47894.77",
+            "high": "48341.56",
+            "low": "47894.77",
+            "close": "48157.29",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-24",
+            "open": "48075.39",
+            "high": "48117.54",
+            "low": "47754.72",
+            "close": "48024.60",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-29",
+            "open": "47873.89",
+            "high": "48045.13",
+            "low": "47573.09",
+            "close": "47631.96",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-09-30",
+            "open": "47767.49",
+            "high": "48379.71",
+            "low": "47767.49",
+            "close": "47940.13",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-10-01",
+            "open": "47961.98",
+            "high": "48353.49",
+            "low": "47893.42",
+            "close": "48353.49",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "10a4e078638d581491a98adde22c78a6c2e4281152a51bb4f3a5a4699f6e186b",
+            "captured_at": "2026-10-07T15:57:26.899093Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20261001&response=json",
+            "request_scope": "2026-10",
+            "payload_sha256": "3c9795c379f32ee44d7239c63b058fcdc51b60a1da42106f1bda306f0e41b6b1"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-10-02",
+            "open": "48390.65",
+            "high": "48491.62",
+            "low": "48205.81",
+            "close": "48475.74",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "10a4e078638d581491a98adde22c78a6c2e4281152a51bb4f3a5a4699f6e186b",
+            "captured_at": "2026-10-07T15:57:26.899093Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20261001&response=json",
+            "request_scope": "2026-10",
+            "payload_sha256": "3c9795c379f32ee44d7239c63b058fcdc51b60a1da42106f1bda306f0e41b6b1"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-10-05",
+            "open": "48574.95",
+            "high": "49770.66",
+            "low": "48574.95",
+            "close": "49712.04",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "10a4e078638d581491a98adde22c78a6c2e4281152a51bb4f3a5a4699f6e186b",
+            "captured_at": "2026-10-07T15:57:26.899093Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20261001&response=json",
+            "request_scope": "2026-10",
+            "payload_sha256": "3c9795c379f32ee44d7239c63b058fcdc51b60a1da42106f1bda306f0e41b6b1"
+          },
+          {
+            "benchmark_id": "TAIEX",
+            "trade_date": "2026-10-06",
+            "open": "49736.37",
+            "high": "49968.92",
+            "low": "49479.69",
+            "close": "49822.55",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "10a4e078638d581491a98adde22c78a6c2e4281152a51bb4f3a5a4699f6e186b",
+            "captured_at": "2026-10-07T15:57:26.899093Z",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20261001&response=json",
+            "request_scope": "2026-10",
+            "payload_sha256": "3c9795c379f32ee44d7239c63b058fcdc51b60a1da42106f1bda306f0e41b6b1"
+          }
+        ],
+        "provenance": [
+          {
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "benchmark_id": "TAIEX",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "acquisition_date": "2026-10-07",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20260901&response=json",
+            "request_scope": "2026-09",
+            "publication_start": "2026-09-01",
+            "publication_end": "2026-09-30",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404",
+            "record_count": 20
+          },
+          {
+            "capture_id": "10a4e078638d581491a98adde22c78a6c2e4281152a51bb4f3a5a4699f6e186b",
+            "benchmark_id": "TAIEX",
+            "captured_at": "2026-10-07T15:57:26.899093Z",
+            "acquisition_date": "2026-10-07",
+            "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+            "source_alias": "MI_5MINS_HIST",
+            "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST?date=20261001&response=json",
+            "request_scope": "2026-10",
+            "publication_start": "2026-10-01",
+            "publication_end": "2026-10-06",
+            "payload_sha256": "3c9795c379f32ee44d7239c63b058fcdc51b60a1da42106f1bda306f0e41b6b1",
+            "record_count": 4
+          }
+        ],
+        "provenance_total_count": 2,
+        "provenance_truncated": false,
+        "served_at": "2026-10-07T23:58:06.399627+08:00"
+      },
+      "latency_ms": 8.164
+    },
+    {
+      "endpoint": "/api/v1/benchmarks/TPEX/bars",
+      "selectors": {
+        "limit": 20
+      },
+      "observed_at": "2026-10-07T15:58:06.407076+00:00",
+      "http_status": 200,
+      "body": {
+        "benchmark_id": "TPEX",
+        "name": "TPEx Index",
+        "name_zh": "櫃買指數",
+        "venue": "TPEX",
+        "provider": "TPEx",
+        "source_alias": "tpex_index",
+        "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+        "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+        "timeframe": "day",
+        "price_kind": "benchmark_index",
+        "adjustment_mode": "raw_price_index",
+        "unit": "index_points",
+        "basis": "raw_price_index",
+        "limit": 20,
+        "returned_count": 5,
+        "total_count": 5,
+        "partial": true,
+        "truncated": false,
+        "requested_range": {
+          "start_date": null,
+          "end_date": null,
+          "inclusive": true
+        },
+        "coverage_window": {
+          "start_date": "2025-10-07",
+          "end_date": "2026-10-07",
+          "complete": false,
+          "schema_ready": true,
+          "evidence_truncated": false,
+          "available_count": 5,
+          "missing_count": 361
+        },
+        "coverage": [
+          {
+            "trade_date": "2025-10-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-10-31",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-11-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2025-12-31",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-01-31",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-02-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-03-31",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-04-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-05-31",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-06-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-07-31",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-08-31",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-01",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-02",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-05",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-06",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-07",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-08",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-09",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-10",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-11",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-12",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-13",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-14",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-15",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-16",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-17",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-18",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-19",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-20",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-21",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-22",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-23",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-24",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-25",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-26",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-27",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-28",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-29",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-09-30",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-10-01",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-02",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-03",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-10-04",
+            "status": "MISSING"
+          },
+          {
+            "trade_date": "2026-10-05",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-06",
+            "status": "AVAILABLE"
+          },
+          {
+            "trade_date": "2026-10-07",
+            "status": "AVAILABLE"
+          }
+        ],
+        "gaps": [
+          "2025-10-07",
+          "2025-10-08",
+          "2025-10-09",
+          "2025-10-10",
+          "2025-10-11",
+          "2025-10-12",
+          "2025-10-13",
+          "2025-10-14",
+          "2025-10-15",
+          "2025-10-16",
+          "2025-10-17",
+          "2025-10-18",
+          "2025-10-19",
+          "2025-10-20",
+          "2025-10-21",
+          "2025-10-22",
+          "2025-10-23",
+          "2025-10-24",
+          "2025-10-25",
+          "2025-10-26",
+          "2025-10-27",
+          "2025-10-28",
+          "2025-10-29",
+          "2025-10-30",
+          "2025-10-31",
+          "2025-11-01",
+          "2025-11-02",
+          "2025-11-03",
+          "2025-11-04",
+          "2025-11-05",
+          "2025-11-06",
+          "2025-11-07",
+          "2025-11-08",
+          "2025-11-09",
+          "2025-11-10",
+          "2025-11-11",
+          "2025-11-12",
+          "2025-11-13",
+          "2025-11-14",
+          "2025-11-15",
+          "2025-11-16",
+          "2025-11-17",
+          "2025-11-18",
+          "2025-11-19",
+          "2025-11-20",
+          "2025-11-21",
+          "2025-11-22",
+          "2025-11-23",
+          "2025-11-24",
+          "2025-11-25",
+          "2025-11-26",
+          "2025-11-27",
+          "2025-11-28",
+          "2025-11-29",
+          "2025-11-30",
+          "2025-12-01",
+          "2025-12-02",
+          "2025-12-03",
+          "2025-12-04",
+          "2025-12-05",
+          "2025-12-06",
+          "2025-12-07",
+          "2025-12-08",
+          "2025-12-09",
+          "2025-12-10",
+          "2025-12-11",
+          "2025-12-12",
+          "2025-12-13",
+          "2025-12-14",
+          "2025-12-15",
+          "2025-12-16",
+          "2025-12-17",
+          "2025-12-18",
+          "2025-12-19",
+          "2025-12-20",
+          "2025-12-21",
+          "2025-12-22",
+          "2025-12-23",
+          "2025-12-24",
+          "2025-12-25",
+          "2025-12-26",
+          "2025-12-27",
+          "2025-12-28",
+          "2025-12-29",
+          "2025-12-30",
+          "2025-12-31",
+          "2026-01-01",
+          "2026-01-02",
+          "2026-01-03",
+          "2026-01-04",
+          "2026-01-05",
+          "2026-01-06",
+          "2026-01-07",
+          "2026-01-08",
+          "2026-01-09",
+          "2026-01-10",
+          "2026-01-11",
+          "2026-01-12",
+          "2026-01-13",
+          "2026-01-14",
+          "2026-01-15",
+          "2026-01-16",
+          "2026-01-17",
+          "2026-01-18",
+          "2026-01-19",
+          "2026-01-20",
+          "2026-01-21",
+          "2026-01-22",
+          "2026-01-23",
+          "2026-01-24",
+          "2026-01-25",
+          "2026-01-26",
+          "2026-01-27",
+          "2026-01-28",
+          "2026-01-29",
+          "2026-01-30",
+          "2026-01-31",
+          "2026-02-01",
+          "2026-02-02",
+          "2026-02-03",
+          "2026-02-04",
+          "2026-02-05",
+          "2026-02-06",
+          "2026-02-07",
+          "2026-02-08",
+          "2026-02-09",
+          "2026-02-10",
+          "2026-02-11",
+          "2026-02-12",
+          "2026-02-13",
+          "2026-02-14",
+          "2026-02-15",
+          "2026-02-16",
+          "2026-02-17",
+          "2026-02-18",
+          "2026-02-19",
+          "2026-02-20",
+          "2026-02-21",
+          "2026-02-22",
+          "2026-02-23",
+          "2026-02-24",
+          "2026-02-25",
+          "2026-02-26",
+          "2026-02-27",
+          "2026-02-28",
+          "2026-03-01",
+          "2026-03-02",
+          "2026-03-03",
+          "2026-03-04",
+          "2026-03-05",
+          "2026-03-06",
+          "2026-03-07",
+          "2026-03-08",
+          "2026-03-09",
+          "2026-03-10",
+          "2026-03-11",
+          "2026-03-12",
+          "2026-03-13",
+          "2026-03-14",
+          "2026-03-15",
+          "2026-03-16",
+          "2026-03-17",
+          "2026-03-18",
+          "2026-03-19",
+          "2026-03-20",
+          "2026-03-21",
+          "2026-03-22",
+          "2026-03-23",
+          "2026-03-24",
+          "2026-03-25",
+          "2026-03-26",
+          "2026-03-27",
+          "2026-03-28",
+          "2026-03-29",
+          "2026-03-30",
+          "2026-03-31",
+          "2026-04-01",
+          "2026-04-02",
+          "2026-04-03",
+          "2026-04-04",
+          "2026-04-05",
+          "2026-04-06",
+          "2026-04-07",
+          "2026-04-08",
+          "2026-04-09",
+          "2026-04-10",
+          "2026-04-11",
+          "2026-04-12",
+          "2026-04-13",
+          "2026-04-14",
+          "2026-04-15",
+          "2026-04-16",
+          "2026-04-17",
+          "2026-04-18",
+          "2026-04-19",
+          "2026-04-20",
+          "2026-04-21",
+          "2026-04-22",
+          "2026-04-23",
+          "2026-04-24",
+          "2026-04-25",
+          "2026-04-26",
+          "2026-04-27",
+          "2026-04-28",
+          "2026-04-29",
+          "2026-04-30",
+          "2026-05-01",
+          "2026-05-02",
+          "2026-05-03",
+          "2026-05-04",
+          "2026-05-05",
+          "2026-05-06",
+          "2026-05-07",
+          "2026-05-08",
+          "2026-05-09",
+          "2026-05-10",
+          "2026-05-11",
+          "2026-05-12",
+          "2026-05-13",
+          "2026-05-14",
+          "2026-05-15",
+          "2026-05-16",
+          "2026-05-17",
+          "2026-05-18",
+          "2026-05-19",
+          "2026-05-20",
+          "2026-05-21",
+          "2026-05-22",
+          "2026-05-23",
+          "2026-05-24",
+          "2026-05-25",
+          "2026-05-26",
+          "2026-05-27",
+          "2026-05-28",
+          "2026-05-29",
+          "2026-05-30",
+          "2026-05-31",
+          "2026-06-01",
+          "2026-06-02",
+          "2026-06-03",
+          "2026-06-04",
+          "2026-06-05",
+          "2026-06-06",
+          "2026-06-07",
+          "2026-06-08",
+          "2026-06-09",
+          "2026-06-10",
+          "2026-06-11",
+          "2026-06-12",
+          "2026-06-13",
+          "2026-06-14",
+          "2026-06-15",
+          "2026-06-16",
+          "2026-06-17",
+          "2026-06-18",
+          "2026-06-19",
+          "2026-06-20",
+          "2026-06-21",
+          "2026-06-22",
+          "2026-06-23",
+          "2026-06-24",
+          "2026-06-25",
+          "2026-06-26",
+          "2026-06-27",
+          "2026-06-28",
+          "2026-06-29",
+          "2026-06-30",
+          "2026-07-01",
+          "2026-07-02",
+          "2026-07-03",
+          "2026-07-04",
+          "2026-07-05",
+          "2026-07-06",
+          "2026-07-07",
+          "2026-07-08",
+          "2026-07-09",
+          "2026-07-10",
+          "2026-07-11",
+          "2026-07-12",
+          "2026-07-13",
+          "2026-07-14",
+          "2026-07-15",
+          "2026-07-16",
+          "2026-07-17",
+          "2026-07-18",
+          "2026-07-19",
+          "2026-07-20",
+          "2026-07-21",
+          "2026-07-22",
+          "2026-07-23",
+          "2026-07-24",
+          "2026-07-25",
+          "2026-07-26",
+          "2026-07-27",
+          "2026-07-28",
+          "2026-07-29",
+          "2026-07-30",
+          "2026-07-31",
+          "2026-08-01",
+          "2026-08-02",
+          "2026-08-03",
+          "2026-08-04",
+          "2026-08-05",
+          "2026-08-06",
+          "2026-08-07",
+          "2026-08-08",
+          "2026-08-09",
+          "2026-08-10",
+          "2026-08-11",
+          "2026-08-12",
+          "2026-08-13",
+          "2026-08-14",
+          "2026-08-15",
+          "2026-08-16",
+          "2026-08-17",
+          "2026-08-18",
+          "2026-08-19",
+          "2026-08-20",
+          "2026-08-21",
+          "2026-08-22",
+          "2026-08-23",
+          "2026-08-24",
+          "2026-08-25",
+          "2026-08-26",
+          "2026-08-27",
+          "2026-08-28",
+          "2026-08-29",
+          "2026-08-30",
+          "2026-08-31",
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-12",
+          "2026-09-13",
+          "2026-09-14",
+          "2026-09-15",
+          "2026-09-16",
+          "2026-09-17",
+          "2026-09-18",
+          "2026-09-19",
+          "2026-09-20",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-25",
+          "2026-09-26",
+          "2026-09-27",
+          "2026-09-28",
+          "2026-09-29",
+          "2026-09-30",
+          "2026-10-03",
+          "2026-10-04"
+        ],
+        "bars": [
+          {
+            "benchmark_id": "TPEX",
+            "trade_date": "2026-10-01",
+            "open": "417.48",
+            "high": "421.21",
+            "low": "417.09",
+            "close": "418.82",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "e796e77f1e5e174a65c23e6ee272e8b3421a98d8f539e773d67544ef82b123de",
+            "captured_at": "2026-10-07T15:57:27.392311Z",
+            "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+            "source_alias": "tpex_index",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+            "request_scope": "latest",
+            "payload_sha256": "06ac3a76e5cb00f8246d47b2dbd7562a0ee9cac96f7f0de20cb24a6298b0c0a2"
+          },
+          {
+            "benchmark_id": "TPEX",
+            "trade_date": "2026-10-02",
+            "open": "419.94",
+            "high": "426.93",
+            "low": "419.94",
+            "close": "426.93",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "e796e77f1e5e174a65c23e6ee272e8b3421a98d8f539e773d67544ef82b123de",
+            "captured_at": "2026-10-07T15:57:27.392311Z",
+            "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+            "source_alias": "tpex_index",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+            "request_scope": "latest",
+            "payload_sha256": "06ac3a76e5cb00f8246d47b2dbd7562a0ee9cac96f7f0de20cb24a6298b0c0a2"
+          },
+          {
+            "benchmark_id": "TPEX",
+            "trade_date": "2026-10-05",
+            "open": "429.02",
+            "high": "434.17",
+            "low": "429.02",
+            "close": "432.48",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "e796e77f1e5e174a65c23e6ee272e8b3421a98d8f539e773d67544ef82b123de",
+            "captured_at": "2026-10-07T15:57:27.392311Z",
+            "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+            "source_alias": "tpex_index",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+            "request_scope": "latest",
+            "payload_sha256": "06ac3a76e5cb00f8246d47b2dbd7562a0ee9cac96f7f0de20cb24a6298b0c0a2"
+          },
+          {
+            "benchmark_id": "TPEX",
+            "trade_date": "2026-10-06",
+            "open": "433.06",
+            "high": "434.30",
+            "low": "428.48",
+            "close": "430.86",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "e796e77f1e5e174a65c23e6ee272e8b3421a98d8f539e773d67544ef82b123de",
+            "captured_at": "2026-10-07T15:57:27.392311Z",
+            "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+            "source_alias": "tpex_index",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+            "request_scope": "latest",
+            "payload_sha256": "06ac3a76e5cb00f8246d47b2dbd7562a0ee9cac96f7f0de20cb24a6298b0c0a2"
+          },
+          {
+            "benchmark_id": "TPEX",
+            "trade_date": "2026-10-07",
+            "open": "431.38",
+            "high": "435.72",
+            "low": "429.72",
+            "close": "430.46",
+            "unit": "index_points",
+            "basis": "raw_price_index",
+            "revision": 1,
+            "capture_id": "e796e77f1e5e174a65c23e6ee272e8b3421a98d8f539e773d67544ef82b123de",
+            "captured_at": "2026-10-07T15:57:27.392311Z",
+            "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+            "source_alias": "tpex_index",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+            "request_scope": "latest",
+            "payload_sha256": "06ac3a76e5cb00f8246d47b2dbd7562a0ee9cac96f7f0de20cb24a6298b0c0a2"
+          }
+        ],
+        "provenance": [
+          {
+            "capture_id": "e796e77f1e5e174a65c23e6ee272e8b3421a98d8f539e773d67544ef82b123de",
+            "benchmark_id": "TPEX",
+            "captured_at": "2026-10-07T15:57:27.392311Z",
+            "acquisition_date": "2026-10-07",
+            "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+            "source_alias": "tpex_index",
+            "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+            "request_scope": "latest",
+            "publication_start": null,
+            "publication_end": null,
+            "payload_sha256": "06ac3a76e5cb00f8246d47b2dbd7562a0ee9cac96f7f0de20cb24a6298b0c0a2",
+            "record_count": 5
+          }
+        ],
+        "provenance_total_count": 1,
+        "provenance_truncated": false,
+        "served_at": "2026-10-07T23:58:06.406868+08:00"
+      },
+      "latency_ms": 6.017
+    },
+    {
+      "endpoint": "/api/v1/bars",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "timeframe": "day",
+        "limit": 1000
+      },
+      "observed_at": "2026-10-07T15:58:06.413095+00:00",
+      "http_status": 200,
+      "body": {
+        "instrument_id": "TWSE:2330",
+        "symbol": "2330",
+        "venue": "TWSE",
+        "name": "台積電",
+        "timeframe": "day",
+        "price_kind": "eod",
+        "adjustment_mode": "raw",
+        "provider": "TWSE",
+        "units": {
+          "currency": "TWD",
+          "price": "TWD",
+          "volume": "shares",
+          "value": "TWD",
+          "transactions": "trades"
+        },
+        "limit": 1000,
+        "returned_count": 669,
+        "partial": true,
+        "bars": [
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-01",
+            "open": "2395.00",
+            "high": "2440.00",
+            "low": "2390.00",
+            "close": "2440.00",
+            "volume": 31855287,
+            "value": 77463413685,
+            "transactions": 65271,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-01",
+              "status": "AVAILABLE",
+              "record_count": 1377,
+              "acquired_at": "2026-10-05T19:00:35+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-02",
+            "open": "2415.00",
+            "high": "2420.00",
+            "low": "2385.00",
+            "close": "2385.00",
+            "volume": 25151394,
+            "value": 60261105308,
+            "transactions": 198779,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-02",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:36+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-03",
+            "open": "2385.00",
+            "high": "2400.00",
+            "low": "2380.00",
+            "close": "2390.00",
+            "volume": 14252351,
+            "value": 34060580249,
+            "transactions": 54232,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-03",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:36+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-04",
+            "open": "2415.00",
+            "high": "2415.00",
+            "low": "2390.00",
+            "close": "2410.00",
+            "volume": 14102018,
+            "value": 33917316870,
+            "transactions": 43438,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-04",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:37+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-07",
+            "open": "2435.00",
+            "high": "2460.00",
+            "low": "2430.00",
+            "close": "2460.00",
+            "volume": 26898329,
+            "value": 65839464484,
+            "transactions": 123981,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-07",
+              "status": "AVAILABLE",
+              "record_count": 1382,
+              "acquired_at": "2026-10-05T19:00:41+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-08",
+            "open": "2465.00",
+            "high": "2505.00",
+            "low": "2460.00",
+            "close": "2470.00",
+            "volume": 25745000,
+            "value": 63872445000,
+            "transactions": 14462,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-08",
+              "status": "AVAILABLE",
+              "record_count": 1382,
+              "acquired_at": "2026-10-05T19:00:42+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-09",
+            "open": "2480.00",
+            "high": "2490.00",
+            "low": "2460.00",
+            "close": "2465.00",
+            "volume": 15553000,
+            "value": 38476750000,
+            "transactions": 7875,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-09",
+              "status": "AVAILABLE",
+              "record_count": 1382,
+              "acquired_at": "2026-10-05T19:00:42+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-10",
+            "open": "2445.00",
+            "high": "2455.00",
+            "low": "2435.00",
+            "close": "2450.00",
+            "volume": 17408000,
+            "value": 42579165000,
+            "transactions": 9289,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-10",
+              "status": "AVAILABLE",
+              "record_count": 1379,
+              "acquired_at": "2026-10-05T19:00:43+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-11",
+            "open": "2430.00",
+            "high": "2430.00",
+            "low": "2405.00",
+            "close": "2410.00",
+            "volume": 18053000,
+            "value": 43610455000,
+            "transactions": 10252,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-11",
+              "status": "AVAILABLE",
+              "record_count": 1379,
+              "acquired_at": "2026-10-05T19:00:43+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-14",
+            "open": "2385.00",
+            "high": "2395.00",
+            "low": "2380.00",
+            "close": "2380.00",
+            "volume": 18172000,
+            "value": 43346915000,
+            "transactions": 12905,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-14",
+              "status": "AVAILABLE",
+              "record_count": 1379,
+              "acquired_at": "2026-10-05T19:00:44+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-15",
+            "open": "2405.00",
+            "high": "2405.00",
+            "low": "2380.00",
+            "close": "2385.00",
+            "volume": 13469000,
+            "value": 32200190000,
+            "transactions": 7205,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-15",
+              "status": "AVAILABLE",
+              "record_count": 1379,
+              "acquired_at": "2026-10-05T19:00:45+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-16",
+            "open": "2375.00",
+            "high": "2395.00",
+            "low": "2375.00",
+            "close": "2380.00",
+            "volume": 17954000,
+            "value": 42747280000,
+            "transactions": 10351,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-16",
+              "status": "AVAILABLE",
+              "record_count": 1379,
+              "acquired_at": "2026-10-05T19:00:45+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-17",
+            "open": "2405.00",
+            "high": "2445.00",
+            "low": "2400.00",
+            "close": "2425.00",
+            "volume": 15951000,
+            "value": 38680655000,
+            "transactions": 9419,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-17",
+              "status": "AVAILABLE",
+              "record_count": 1377,
+              "acquired_at": "2026-10-05T19:00:46+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-18",
+            "open": "2460.00",
+            "high": "2460.00",
+            "low": "2435.00",
+            "close": "2460.00",
+            "volume": 35250000,
+            "value": 86542720000,
+            "transactions": 10816,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-18",
+              "status": "AVAILABLE",
+              "record_count": 1377,
+              "acquired_at": "2026-10-05T19:00:47+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-21",
+            "open": "2445.00",
+            "high": "2485.00",
+            "low": "2445.00",
+            "close": "2480.00",
+            "volume": 14472000,
+            "value": 35776055000,
+            "transactions": 8183,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-21",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:48+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-22",
+            "open": "2505.00",
+            "high": "2510.00",
+            "low": "2460.00",
+            "close": "2460.00",
+            "volume": 22009927,
+            "value": 54678491997,
+            "transactions": 107604,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-22",
+              "status": "AVAILABLE",
+              "record_count": 1381,
+              "acquired_at": "2026-10-05T19:00:49+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-23",
+            "open": "2475.00",
+            "high": "2505.00",
+            "low": "2475.00",
+            "close": "2500.00",
+            "volume": 22817873,
+            "value": 56893530280,
+            "transactions": 65303,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-23",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:50+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-24",
+            "open": "2480.00",
+            "high": "2490.00",
+            "low": "2470.00",
+            "close": "2475.00",
+            "volume": 14557662,
+            "value": 36107476243,
+            "transactions": 75382,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-24",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:51+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-29",
+            "open": "2475.00",
+            "high": "2495.00",
+            "low": "2475.00",
+            "close": "2475.00",
+            "volume": 24536000,
+            "value": 60813150000,
+            "transactions": 10364,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-29",
+              "status": "AVAILABLE",
+              "record_count": 1382,
+              "acquired_at": "2026-10-05T19:00:51+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-09-30",
+            "open": "2495.00",
+            "high": "2510.00",
+            "low": "2480.00",
+            "close": "2480.00",
+            "volume": 30440000,
+            "value": 75813445000,
+            "transactions": 12070,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-09-30",
+              "status": "AVAILABLE",
+              "record_count": 1382,
+              "acquired_at": "2026-10-05T19:00:52+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-10-01",
+            "open": "2490.00",
+            "high": "2510.00",
+            "low": "2485.00",
+            "close": "2510.00",
+            "volume": 18496000,
+            "value": 46266160000,
+            "transactions": 10242,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-10-01",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:53+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-10-02",
+            "open": "2505.00",
+            "high": "2515.00",
+            "low": "2495.00",
+            "close": "2500.00",
+            "volume": 13869000,
+            "value": 34696365000,
+            "transactions": 7415,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-10-02",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-05T19:00:54+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-10-05",
+            "open": "2550.00",
+            "high": "2580.00",
+            "low": "2545.00",
+            "close": "2575.00",
+            "volume": 23926000,
+            "value": 61419555000,
+            "transactions": 15233,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-10-05",
+              "status": "AVAILABLE",
+              "record_count": 1381,
+              "acquired_at": "2026-10-05T19:00:55+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-10-06",
+            "open": "2575.00",
+            "high": "2590.00",
+            "low": "2565.00",
+            "close": "2585.00",
+            "volume": 18343000,
+            "value": 47300030000,
+            "transactions": 9867,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-10-06",
+              "status": "AVAILABLE",
+              "record_count": 1381,
+              "acquired_at": "2026-10-06T06:30:01+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TWSE:2330",
+            "symbol": "2330",
+            "trade_date": "2026-10-07",
+            "open": "2565.00",
+            "high": "2585.00",
+            "low": "2560.00",
+            "close": "2585.00",
+            "volume": 14381000,
+            "value": 37035635000,
+            "transactions": 7433,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "twse_daily_price",
+              "partition_key": "2026-10-07",
+              "status": "AVAILABLE",
+              "record_count": 1380,
+              "acquired_at": "2026-10-07T06:30:01+00:00",
+              "checksum": null
+            }
+          }
+        ],
+        "availability": {
+          "status": "available",
+          "latest_observation_date": "2026-10-07",
+          "latest_observation_status": "traded",
+          "latest_observation_coverage": {
+            "dataset": "twse_daily_price",
+            "partition_key": "2026-10-07",
+            "status": "AVAILABLE",
+            "record_count": 1380,
+            "acquired_at": "2026-10-07T06:30:01+00:00",
+            "checksum": null
+          },
+          "observation_coverage": {
+            "dataset": "twse_daily_price",
+            "partition_key": "2026-10-07",
+            "status": "AVAILABLE",
+            "record_count": 1380,
+            "acquired_at": "2026-10-07T06:30:01+00:00",
+            "checksum": null
+          },
+          "latest_dataset_trade_date": "2026-10-07",
+          "assessed_date_coverage": {
+            "dataset": "twse_daily_price",
+            "partition_key": "2026-10-07",
+            "status": "AVAILABLE",
+            "record_count": 1380,
+            "acquired_at": "2026-10-07T06:30:01+00:00",
+            "checksum": null
+          },
+          "freshness": {
+            "status": "current",
+            "reason": "covered_through_completed_date",
+            "assessed_through": "2026-10-07",
+            "evidence_start": "2025-10-07",
+            "evidence_truncated": false,
+            "calendar_days_old": 0,
+            "known_sessions_behind": 0,
+            "trading_days_behind": 0,
+            "missing_partition_count": 0
+          }
+        },
+        "captured_bar_selection_note": "Full response returned_count kept; evidence retains only rows Sep1-Oct7 for scoped acceptance, not the complete latest1000 response.",
+        "captured_bar_count": 25
+      },
+      "latency_ms": 243.018
+    },
+    {
+      "endpoint": "/api/v1/bars",
+      "selectors": {
+        "instrument_id": "TPEX:5347",
+        "timeframe": "day",
+        "limit": 1000
+      },
+      "observed_at": "2026-10-07T15:58:06.656122+00:00",
+      "http_status": 200,
+      "body": {
+        "instrument_id": "TPEX:5347",
+        "symbol": "5347",
+        "venue": "TPEX",
+        "name": "世界",
+        "timeframe": "day",
+        "price_kind": "eod",
+        "adjustment_mode": "raw",
+        "provider": "TPEX",
+        "units": {
+          "currency": "TWD",
+          "price": "TWD",
+          "volume": "shares",
+          "value": "TWD",
+          "transactions": "trades"
+        },
+        "limit": 1000,
+        "returned_count": 668,
+        "partial": true,
+        "bars": [
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-01",
+            "open": "152.50",
+            "high": "156.50",
+            "low": "152.00",
+            "close": "153.50",
+            "volume": 9584951,
+            "value": 1475016453,
+            "transactions": 7338,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-01",
+              "status": "AVAILABLE",
+              "record_count": 10770,
+              "acquired_at": "2026-10-05T17:58:40+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-02",
+            "open": "151.00",
+            "high": "151.50",
+            "low": "149.00",
+            "close": "149.50",
+            "volume": 11808377,
+            "value": 1775618259,
+            "transactions": 6775,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-02",
+              "status": "AVAILABLE",
+              "record_count": 10813,
+              "acquired_at": "2026-10-05T17:58:40+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-03",
+            "open": "151.00",
+            "high": "151.00",
+            "low": "147.00",
+            "close": "147.00",
+            "volume": 11343073,
+            "value": 1690675812,
+            "transactions": 8031,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-03",
+              "status": "AVAILABLE",
+              "record_count": 10994,
+              "acquired_at": "2026-10-05T17:58:41+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-04",
+            "open": "150.00",
+            "high": "151.00",
+            "low": "148.50",
+            "close": "150.00",
+            "volume": 4829835,
+            "value": 723406982,
+            "transactions": 3956,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-04",
+              "status": "AVAILABLE",
+              "record_count": 10963,
+              "acquired_at": "2026-10-05T17:58:41+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-08",
+            "open": "156.00",
+            "high": "156.50",
+            "low": "151.50",
+            "close": "152.00",
+            "volume": 12869005,
+            "value": 1973478127,
+            "transactions": 8933,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-08",
+              "status": "AVAILABLE",
+              "record_count": 10991,
+              "acquired_at": "2026-10-05T17:58:42+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-09",
+            "open": "154.00",
+            "high": "159.50",
+            "low": "152.50",
+            "close": "157.00",
+            "volume": 13955300,
+            "value": 2179726817,
+            "transactions": 9841,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-09",
+              "status": "AVAILABLE",
+              "record_count": 11020,
+              "acquired_at": "2026-10-05T17:58:43+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-10",
+            "open": "156.50",
+            "high": "163.00",
+            "low": "155.50",
+            "close": "161.50",
+            "volume": 20771262,
+            "value": 3327399048,
+            "transactions": 15950,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-10",
+              "status": "AVAILABLE",
+              "record_count": 11179,
+              "acquired_at": "2026-10-05T17:58:44+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-11",
+            "open": "157.00",
+            "high": "158.50",
+            "low": "156.00",
+            "close": "157.50",
+            "volume": 8954398,
+            "value": 1406798028,
+            "transactions": 7046,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-11",
+              "status": "AVAILABLE",
+              "record_count": 11193,
+              "acquired_at": "2026-10-05T17:58:44+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-14",
+            "open": "155.00",
+            "high": "160.00",
+            "low": "152.50",
+            "close": "159.50",
+            "volume": 6762699,
+            "value": 1061979925,
+            "transactions": 5920,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-14",
+              "status": "AVAILABLE",
+              "record_count": 11289,
+              "acquired_at": "2026-10-05T17:58:45+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-15",
+            "open": "157.50",
+            "high": "157.50",
+            "low": "153.00",
+            "close": "153.00",
+            "volume": 8949913,
+            "value": 1385681652,
+            "transactions": 8629,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-15",
+              "status": "AVAILABLE",
+              "record_count": 11358,
+              "acquired_at": "2026-10-05T17:58:46+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-16",
+            "open": "155.50",
+            "high": "158.50",
+            "low": "153.00",
+            "close": "158.00",
+            "volume": 7162052,
+            "value": 1117348962,
+            "transactions": 5036,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-16",
+              "status": "AVAILABLE",
+              "record_count": 11415,
+              "acquired_at": "2026-10-05T17:58:46+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-17",
+            "open": "160.00",
+            "high": "171.50",
+            "low": "159.50",
+            "close": "165.50",
+            "volume": 31259104,
+            "value": 5202194430,
+            "transactions": 23622,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-17",
+              "status": "AVAILABLE",
+              "record_count": 11479,
+              "acquired_at": "2026-10-05T17:58:47+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-18",
+            "open": "169.00",
+            "high": "174.00",
+            "low": "167.00",
+            "close": "172.00",
+            "volume": 32534327,
+            "value": 5549470017,
+            "transactions": 22682,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-18",
+              "status": "AVAILABLE",
+              "record_count": 11481,
+              "acquired_at": "2026-10-05T17:58:48+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-21",
+            "open": "172.50",
+            "high": "174.00",
+            "low": "166.50",
+            "close": "172.00",
+            "volume": 16305989,
+            "value": 2785518313,
+            "transactions": 15917,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-21",
+              "status": "AVAILABLE",
+              "record_count": 11524,
+              "acquired_at": "2026-10-05T17:58:48+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-22",
+            "open": "175.00",
+            "high": "181.50",
+            "low": "172.00",
+            "close": "173.00",
+            "volume": 32465392,
+            "value": 5724068347,
+            "transactions": 24336,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-22",
+              "status": "AVAILABLE",
+              "record_count": 11596,
+              "acquired_at": "2026-10-05T17:58:49+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-23",
+            "open": "175.50",
+            "high": "176.50",
+            "low": "170.50",
+            "close": "173.00",
+            "volume": 12955276,
+            "value": 2248343080,
+            "transactions": 14640,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-23",
+              "status": "AVAILABLE",
+              "record_count": 11696,
+              "acquired_at": "2026-10-05T17:58:50+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-24",
+            "open": "172.50",
+            "high": "173.50",
+            "low": "168.00",
+            "close": "170.50",
+            "volume": 11452074,
+            "value": 1943519384,
+            "transactions": 10788,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-24",
+              "status": "AVAILABLE",
+              "record_count": 11660,
+              "acquired_at": "2026-10-05T17:58:50+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-29",
+            "open": "172.50",
+            "high": "182.50",
+            "low": "170.50",
+            "close": "178.50",
+            "volume": 34967638,
+            "value": 6265305213,
+            "transactions": 24975,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-29",
+              "status": "AVAILABLE",
+              "record_count": 11730,
+              "acquired_at": "2026-10-05T17:58:51+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-09-30",
+            "open": "184.50",
+            "high": "185.00",
+            "low": "179.00",
+            "close": "181.00",
+            "volume": 23813597,
+            "value": 4314117535,
+            "transactions": 22002,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-09-30",
+              "status": "AVAILABLE",
+              "record_count": 11772,
+              "acquired_at": "2026-10-05T17:58:52+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-10-01",
+            "open": "180.50",
+            "high": "188.50",
+            "low": "178.50",
+            "close": "184.50",
+            "volume": 23765668,
+            "value": 4398407895,
+            "transactions": 18668,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-10-01",
+              "status": "AVAILABLE",
+              "record_count": 11871,
+              "acquired_at": "2026-10-05T17:58:52+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-10-02",
+            "open": "184.50",
+            "high": "188.00",
+            "low": "180.50",
+            "close": "187.00",
+            "volume": 14012491,
+            "value": 2585123959,
+            "transactions": 14845,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-10-02",
+              "status": "AVAILABLE",
+              "record_count": 11928,
+              "acquired_at": "2026-10-05T17:58:53+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-10-05",
+            "open": "188.50",
+            "high": "189.00",
+            "low": "183.00",
+            "close": "184.00",
+            "volume": 15530726,
+            "value": 2875005729,
+            "transactions": 15055,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-10-05",
+              "status": "AVAILABLE",
+              "record_count": 12060,
+              "acquired_at": "2026-10-05T17:58:54+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-10-06",
+            "open": "184.50",
+            "high": "195.00",
+            "low": "184.50",
+            "close": "191.00",
+            "volume": 34637793,
+            "value": 6615109776,
+            "transactions": 26297,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-10-06",
+              "status": "AVAILABLE",
+              "record_count": 12194,
+              "acquired_at": "2026-10-06T10:30:08+00:00",
+              "checksum": null
+            }
+          },
+          {
+            "instrument_id": "TPEX:5347",
+            "symbol": "5347",
+            "trade_date": "2026-10-07",
+            "open": "189.50",
+            "high": "194.50",
+            "low": "187.50",
+            "close": "190.00",
+            "volume": 20144021,
+            "value": 3830891262,
+            "transactions": 31626,
+            "observation_status": "traded",
+            "coverage": {
+              "dataset": "tpex_daily_price",
+              "partition_key": "2026-10-07",
+              "status": "AVAILABLE",
+              "record_count": 12245,
+              "acquired_at": "2026-10-07T10:30:07+00:00",
+              "checksum": null
+            }
+          }
+        ],
+        "availability": {
+          "status": "available",
+          "latest_observation_date": "2026-10-07",
+          "latest_observation_status": "traded",
+          "latest_observation_coverage": {
+            "dataset": "tpex_daily_price",
+            "partition_key": "2026-10-07",
+            "status": "AVAILABLE",
+            "record_count": 12245,
+            "acquired_at": "2026-10-07T10:30:07+00:00",
+            "checksum": null
+          },
+          "observation_coverage": {
+            "dataset": "tpex_daily_price",
+            "partition_key": "2026-10-07",
+            "status": "AVAILABLE",
+            "record_count": 12245,
+            "acquired_at": "2026-10-07T10:30:07+00:00",
+            "checksum": null
+          },
+          "latest_dataset_trade_date": "2026-10-07",
+          "assessed_date_coverage": {
+            "dataset": "tpex_daily_price",
+            "partition_key": "2026-10-07",
+            "status": "AVAILABLE",
+            "record_count": 12245,
+            "acquired_at": "2026-10-07T10:30:07+00:00",
+            "checksum": null
+          },
+          "freshness": {
+            "status": "current",
+            "reason": "covered_through_completed_date",
+            "assessed_through": "2026-10-07",
+            "evidence_start": "2025-10-07",
+            "evidence_truncated": false,
+            "calendar_days_old": 0,
+            "known_sessions_behind": 0,
+            "trading_days_behind": 0,
+            "missing_partition_count": 0
+          }
+        },
+        "captured_bar_selection_note": "Full response returned_count kept; evidence retains only rows Sep1-Oct7 for scoped acceptance, not the complete latest1000 response.",
+        "captured_bar_count": 24
+      },
+      "latency_ms": 4622.258
+    }
+  ],
+  "limitations": [
+    "TAIEX persisted scope is only Sep1-Oct6; TPEx scope is the actual latest publisher-dated row set, not complete history.",
+    "Stock capture evidence retains a scoped subset of the latest-N response.",
+    "Calendar MISSING does not prove a failed trading-date acquisition.",
+    "Source checkout does not establish deployed build identity or live quote readiness."
+  ]
+}
