@@ -2122,12 +2122,12 @@ CREATE TABLE IF NOT EXISTS ranking_snapshot_items (
   ranker_version TEXT DEFAULT '',
   scoring_config_version TEXT DEFAULT '',
   calibration_policy_version TEXT DEFAULT '',
-  alpha_score REAL DEFAULT 0.0,
-  catalyst_score REAL DEFAULT 0.0,
-  quality_score REAL DEFAULT 0.0,
-  risk_penalty REAL DEFAULT 0.0,
-  crowd_penalty REAL DEFAULT 0.0,
-  source_bonus REAL DEFAULT 0.0,
+  alpha_score REAL,
+  catalyst_score REAL,
+  quality_score REAL,
+  risk_penalty REAL,
+  crowd_penalty REAL,
+  source_bonus REAL,
   regime_multiplier REAL DEFAULT 1.0,
   raw_factor_values TEXT DEFAULT '{}',
   factor_versions TEXT DEFAULT '{}',
@@ -2202,6 +2202,21 @@ CREATE TABLE IF NOT EXISTS ranking_snapshot_items (
                 markets.add(value)
     for kind in ("factor", "strategy"):
         for market in sorted(markets):
+            # Re-entry safe: a rerun of the migration must not collide with the seeded
+            # FROZEN rows, so the default is written only when the pair is absent.
+            existing = conn.execute(
+                text(
+                    """
+SELECT kind, market
+FROM calibration_modes
+WHERE kind = :kind AND market = :market
+LIMIT 1
+"""
+                ),
+                {"kind": kind, "market": market},
+            ).first()
+            if existing:
+                continue
             conn.execute(
                 text(
                     """

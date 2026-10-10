@@ -17,7 +17,7 @@ from src.platform.marketdata.models import enabled_market_codes
 import logging
 
 from src.modules.strategy.calibration_gate import (
-    apply_calibration_plan,
+    apply_calibration_batch,
     plan_calibration_batch,
 )
 from src.modules.strategy.factor_weights import (
@@ -84,6 +84,9 @@ def calibrate_factor_weights(
         changed = 0
         rows_changed: list[dict] = []
         statuses: dict[str, str] = {}
+        proposals: dict[str, float] = {}
+        reasons: dict[str, str] = {}
+        observations: dict[str, dict] = {}
 
         for code in CALIBRATABLE_FACTORS:
             plan = batch["plans"][code]
@@ -104,13 +107,7 @@ def calibrate_factor_weights(
             if row is None:
                 statuses[code] = "TARGET_MISSING"
                 continue
-
-            # 記錄最近一次觀測(供 API 展示),無論是否調整。
-            row.meta = {
-                **(row.meta or {}),
-                "last_ic": ic, "last_ir": ir, "last_sample_size": n,
-                "last_calibrated_at": utc_now().isoformat(),
-            }
+            observations[code] = {"last_ic": ic, "last_ir": ir, "last_sample_size": n}
 
             target = compute_target(code, ic, ir, beta=beta)
             if target is None:
@@ -120,29 +117,46 @@ def calibrate_factor_weights(
             if abs(new - float(old)) < 0.01:
                 statuses[code] = "NO_CHANGE"
                 continue
+            proposals[code] = new
+            reasons[code] = f"auto(ic={ic}, ir={ir}, n={n})"
 
-            result = apply_calibration_plan(
+        # One all-or-nothing write transaction for the whole market batch: a mid-batch
+        # gate failure rolls back every earlier target instead of leaving partial weights.
+        if proposals:
+            result = apply_calibration_batch(
                 db,
-                plan=plan,
-                new_weight=new,
-                reason=f"auto(ic={ic}, ir={ir}, n={n})",
-                batch=batch,
+                plans={code: batch["plans"][code] for code in proposals},
+                proposals=proposals,
+                reasons=reasons,
             )
-            statuses[code] = result["status"]
-            if result["status"] == "STALE_CONFIG":
-                break  # batch snapshot no longer valid: stop the whole batch
-            if result["status"] != "APPLIED":
-                continue
+        else:
+            result = {"status": "NO_PROPOSAL", "results": {}, "applied": []}
+        for code, status in result["results"].items():
+            statuses[code] = status
+        for code in result["applied"]:
             changed += 1
             rows_changed.append(
                 {
                     "factor_code": code,
-                    "old_weight": float(old),
-                    "new_weight": new,
-                    "sample_size": n,
+                    "old_weight": float(batch["plans"][code]["old_weight"]),
+                    "new_weight": proposals[code],
+                    "sample_size": int(batch["plans"][code]["cohort"]["counts"]["units"]),
                 }
             )
 
+        # Display-only observation meta lands after the write transaction, and only an
+        # applied target gets last_calibrated_at: a refused batch must not look calibrated.
+        for code, obs in observations.items():
+            row = (
+                db.query(FactorWeight)
+                .filter(FactorWeight.factor_code == code, FactorWeight.market == market)
+                .first()
+            )
+            if row is None:
+                continue
+            row.meta = {**(row.meta or {}), **obs}
+            if code in result["applied"]:
+                row.meta = {**row.meta, "last_calibrated_at": utc_now().isoformat()}
         db.commit()
         first = batch["plans"][CALIBRATABLE_FACTORS[0]] if CALIBRATABLE_FACTORS else {}
         return {

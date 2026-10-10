@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import hashlib
 from datetime import date, datetime, timedelta
 from math import sqrt
 
@@ -14,12 +15,13 @@ from src.platform.persistence.json_safe import to_jsonable
 from src.modules.strategy.strategy_catalog import (
     ensure_strategy_catalog,
     get_effective_weight_map,
+    get_primary_horizon_sessions,
     get_strategy_profile_map,
     list_strategy_catalog,
 )
 from src.modules.strategy.factor_weights import get_factor_weights
 from src.modules.strategy.calibration_gate import (
-    apply_calibration_plan,
+    apply_calibration_batch,
     capture_decision_snapshot,
     plan_calibration_batch,
     RANKER_VERSION_V1,
@@ -32,6 +34,7 @@ from src.platform.persistence.models import (
     MarketRegimeSnapshot,
     NewsCache,
     PortfolioRiskSnapshot,
+    RankingSnapshot,
     StrategyFactorSnapshot,
     StrategyOutcome,
     StrategySignalRun,
@@ -1237,8 +1240,14 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
         if not symbol:
             continue
         payload = row.payload if isinstance(row.payload, dict) else {}
-        breakdown = payload.get("score_breakdown") if isinstance(payload.get("score_breakdown"), dict) else {}
-        factors = {code: float(breakdown.get(code) or 0.0) for code in CAPTURE_FACTOR_FIELDS}
+        breakdown = payload.get("score_breakdown") if isinstance(
+            payload.get("score_breakdown"), dict
+        ) else {}
+        # A factor the ranker did not emit stays missing; it is never a zero sample.
+        factors = {
+            code: (float(breakdown[code]) if breakdown.get(code) is not None else None)
+            for code in CAPTURE_FACTOR_FIELDS
+        }
         by_market.setdefault(market, []).append({
             "instrument_id": f"{market}:{symbol}",
             "symbol": row.stock_symbol,
@@ -1250,15 +1259,43 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
             "signal_run_id": int(row.id) if row.id is not None else None,
         })
     for market, decisions in sorted(by_market.items()):
+        # Capture identity is run-scoped: one market/session keeps one capture, but a
+        # same-day refresh or a correction can no longer reuse a fixed day-level id and
+        # silently inherit another execution's archived decision set.
+        run_ids = sorted({int(d["signal_run_id"]) for d in decisions if d["signal_run_id"] is not None})
+        run_token = (hashlib.sha256(str(run_ids).encode("utf-8")).hexdigest()[:12]
+                     if run_ids else "no-runs")
+        capture_id = f"decision-{market}-{session_date}-{run_token}"
+        # Seal the catalog authority at decision time so a later catalog edit cannot move
+        # this cohort in or out; the selector reads this, not the live catalog.
+        catalog_authority = get_primary_horizon_sessions()
         try:
             result = capture_decision_snapshot(
                 db,
-                capture_id=f"decision-{market}-{session_date}",
+                capture_id=capture_id,
                 market=market,
                 session_date=session_date,
                 decisions=decisions,
                 ranker_version=RANKER_VERSION_V1,
+                catalog_authority=catalog_authority,
             )
+            if int(result.get("conflicts") or 0):
+                # Same run identity, different content: a correction seals a new capture
+                # instead of revisiting, or silently ignoring, the archived one.
+                seq = len(
+                    db.query(RankingSnapshot)
+                    .filter(RankingSnapshot.capture_id.like(f"{capture_id}%"))
+                    .all()
+                )
+                result = capture_decision_snapshot(
+                    db,
+                    capture_id=f"{capture_id}-r{seq}",
+                    market=market,
+                    session_date=session_date,
+                    decisions=decisions,
+                    ranker_version=RANKER_VERSION_V1,
+                    catalog_authority=catalog_authority,
+                )
         except Exception:
             # capture 是 evidence 的 side channel: signal refresh must not fail because of it.
             logger.exception(
@@ -1268,11 +1305,12 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
             )
             continue
         logger.info(
-            "[策略層] decision capture: market=%s session=%s written=%s reused=%s items=%s",
+            "[策略層] decision capture: market=%s session=%s written=%s reused=%s conflicts=%s items=%s",
             market,
             session_date,
             result["written"],
             result["reused"],
+            result["conflicts"],
             result["item_count"],
         )
 
@@ -1884,6 +1922,8 @@ def rebalance_strategy_weights(
             targets = [f"{c['code']}|{reg}" for c in catalogs]
             batch = plan_calibration_batch(db, kind="strategy", market=market,
                                           targets=targets, regime=reg)
+            proposals: dict[str, float] = {}
+            reasons: dict[str, str] = {}
             for c in catalogs:
                 code = c["code"]
                 key = f"{code}|{reg}"
@@ -1912,30 +1952,33 @@ def rebalance_strategy_weights(
                 if abs(new_weight - old) < 0.01:
                     statuses[key] = "NO_CHANGE"
                     continue
-
-                result = apply_calibration_plan(
-                    db,
-                    plan=plan,
-                    new_weight=new_weight,
-                    reason=(
-                        f"auto_rebalance(win_rate={win_rate:.1f}%, avg_ret={avg_ret:.2f}%, "
-                        f"samples={sample_size}, alpha={alpha:.2f})"
-                    ),
-                    batch=batch,
+                proposals[key] = new_weight
+                reasons[key] = (
+                    f"auto_rebalance(win_rate={win_rate:.1f}%, avg_ret={avg_ret:.2f}%, "
+                    f"samples={sample_size}, alpha={alpha:.2f})"
                 )
-                statuses[key] = result["status"]
-                if result["status"] == "STALE_CONFIG":
-                    break  # stale batch snapshot: stop this market's batch
-                if result["status"] != "APPLIED":
-                    continue
+
+            # One all-or-nothing write transaction per market batch.
+            if not proposals:
+                continue
+            result = apply_calibration_batch(
+                db,
+                plans={key: batch["plans"][key] for key in proposals},
+                proposals=proposals,
+                reasons=reasons,
+            )
+            for key, status in result["results"].items():
+                statuses[key] = status
+            for key in result["applied"]:
                 changed += 1
                 rows_changed.append(
                     {
-                        "strategy_code": code,
+                        "strategy_code": key.partition("|")[0],
                         "market": market,
-                        "old_weight": float(old),
-                        "new_weight": new_weight,
-                        "sample_size": sample_size,
+                        "old_weight": float(batch["plans"][key]["old_weight"]),
+                        "new_weight": proposals[key],
+                        "sample_size": int(
+                            batch["plans"][key]["cohort"]["counts"]["units"]),
                     }
                 )
 

@@ -40,6 +40,7 @@ from src.platform.persistence.models import (
     FactorWeightHistory,
     RankingSnapshot,
     RankingSnapshotItem,
+    StrategyCatalog,
     StrategyOutcome,
     StrategyWeight,
     StrategyWeightHistory,
@@ -186,7 +187,7 @@ def live_config_payload(db, *, kind: str, market: str,
             .order_by(FactorWeight.factor_code)
             .all()
         )
-        return [[r.factor_code, round(float(r.weight), 6), bool(r.is_pinned),
+        return [[r.factor_code, float(r.weight), bool(r.is_pinned),
                  bool(r.auto_calibrate)] for r in rows]
     reg = (regime or "default").strip() or "default"
     rows = (
@@ -198,7 +199,7 @@ def live_config_payload(db, *, kind: str, market: str,
         .order_by(StrategyWeight.strategy_code, StrategyWeight.market)
         .all()
     )
-    return [[r.strategy_code, r.market, round(float(r.weight), 6), bool(r.is_pinned),
+    return [[r.strategy_code, r.market, float(r.weight), bool(r.is_pinned),
              bool(r.auto_calibrate)] for r in rows]
 
 
@@ -281,7 +282,12 @@ def export_rollout_baseline(db, *, baseline_name: str, markets=None,
                     .order_by(FactorWeight.factor_code)
                     .all()
                 )
-                payload = [[r.factor_code, float(r.weight)] for r in rows]
+                payload = [[r.factor_code, float(r.weight), bool(r.is_pinned),
+                            bool(r.auto_calibrate)] for r in rows]
+                meta = {"policy_version": CALIBRATION_POLICY_VERSION,
+                        "pin_flags": {r.factor_code: [bool(r.is_pinned),
+                                                      bool(r.auto_calibrate)]
+                                      for r in rows}}
             else:
                 rows = (
                     db.query(StrategyWeight)
@@ -289,8 +295,13 @@ def export_rollout_baseline(db, *, baseline_name: str, markets=None,
                     .order_by(StrategyWeight.strategy_code, StrategyWeight.regime)
                     .all()
                 )
-                payload = [[f"{r.strategy_code}|{r.regime or 'default'}", float(r.weight)]
+                payload = [[f"{r.strategy_code}|{r.regime or 'default'}", float(r.weight),
+                            bool(r.is_pinned), bool(r.auto_calibrate), r.market]
                             for r in rows]
+                meta = {"policy_version": CALIBRATION_POLICY_VERSION,
+                        "pin_flags": {f"{r.strategy_code}|{r.regime or 'default'}":
+                                      [bool(r.is_pinned), bool(r.auto_calibrate), r.market]
+                                      for r in rows}}
             config_hash = _sha256(_canonical(payload))
             if not payload:
                 # Empty-config marker so a later rollout can still find this baseline.
@@ -303,21 +314,20 @@ def export_rollout_baseline(db, *, baseline_name: str, markets=None,
                         weight=1.0,
                         config_hash=config_hash,
                         status="unvalidated-baseline",
-                        meta={"empty_payload": True,
-                              "policy_version": CALIBRATION_POLICY_VERSION},
+                        meta={**meta, "empty_payload": True},
                     )
                 )
-            for target, weight in payload:
+            for row in payload:
                 db.add(
                     CalibrationBaseline(
                         baseline_name=baseline_name,
                         kind=kind,
                         market=market,
-                        target=str(target),
-                        weight=float(weight),
+                        target=str(row[0]),
+                        weight=float(row[1]),
                         config_hash=config_hash,
                         status="unvalidated-baseline",
-                        meta={"policy_version": CALIBRATION_POLICY_VERSION},
+                        meta=meta,
                     )
                 )
             archived += 1
@@ -345,13 +355,32 @@ def ensure_rollout_baseline_and_modes(db, *, baseline_name: str = DEFAULT_BASELI
 
 # ---------------------------------------------------------------- cohort
 
-def _outcome_provenance(item, outcome) -> tuple[bool, str]:
-    """Exact point-in-time join plus producer provenance for one candidate sample."""
+def _catalog_horizon_map(db) -> dict[str, int]:
+    """Fallback primary-horizon map read from the caller's db (never a second session).
+
+    Only legacy captures without a sealed catalog authority need this; a PR-0A capture
+    carries its own horizon map so a later catalog edit cannot move a historical cohort.
+    """
+    out: dict[str, int] = {}
+    for row in db.query(StrategyCatalog).all():
+        params = row.params or {}
+        raw = params.get("horizon_days", params.get("horizon_sessions"))
+        try:
+            sessions = int(raw)
+        except (TypeError, ValueError):
+            sessions = 0
+        if sessions > 0:
+            out[row.code] = sessions
+    return out
+
+
+def _outcome_provenance(item, outcome, *, kind: str) -> tuple[bool, str]:
+    """Exact point-in-time join plus producer provenance for one candidate sample.
+
+    Outcome maturity (exit session, gross/net) is judged only on the outcome side: a
+    decision item cannot know its own future completion, so the seal never requires it.
+    """
     meta = outcome.meta or {}
-    if (item.point_in_time_status or "").upper() != POINT_IN_TIME_VERIFIED:
-        return False, "PIT_UNVERIFIED"
-    if not item.exit_session_complete:
-        return False, "EXIT_SESSION_INCOMPLETE"
     if (item.outcome_population_id or "") != POPULATION_SIGNAL_FORWARD_V2:
         return False, "POPULATION_NOT_V2"
     if (item.evaluation_version or "") != EVALUATION_VERSION_V2:
@@ -364,21 +393,30 @@ def _outcome_provenance(item, outcome) -> tuple[bool, str]:
         return False, "DECISION_JOIN_MISMATCH"
     if not (meta.get("input_hash") or ""):
         return False, "INPUT_HASH_MISSING"
+    if not (meta.get("outcome_revision") or ""):
+        return False, "OUTCOME_REVISION_MISSING"
     if not (meta.get("exit_session_date") or "") or not meta.get("exit_session_complete"):
         return False, "EXIT_SESSION_INCOMPLETE"
-    if meta.get("stock_gross_return_pct") is None or meta.get("stock_net_return_pct") is None:
-        return False, "GROSS_NET_UNAVAILABLE"
+    if kind == "factor":
+        # Factor IC reads raw factors against gross; a missing net stays usable.
+        if meta.get("stock_gross_return_pct") is None:
+            return False, "GROSS_UNAVAILABLE"
+    elif meta.get("stock_net_return_pct") is None:
+        return False, "NET_UNAVAILABLE"
     if outcome.outcome_return_pct is None:
         return False, "RETURN_NULL"
     return True, ""
 
 
-def _item_evidence(item, *, kind: str, horizon_map: dict | None = None) -> tuple[bool, str]:
+def _item_evidence(item, *, kind: str, expected_horizon: int | None) -> tuple[bool, str]:
     """Item-side evidence for one archived decision row.
 
     A caller-written VERIFIED label is not enough: the seal needs the timestamps and the
     capture hash that make the archived payload identifiable, so an unknown point-in-time
     input stays ineligible until the RC-D producer fills the real provenance.
+
+    The item never carries outcome maturity: completion is only knowable after the fact,
+    so it is judged on the outcome reference instead of on the immutable decision.
     """
     if (item.point_in_time_status or "").upper() != POINT_IN_TIME_VERIFIED:
         return False, "PIT_UNVERIFIED"
@@ -389,21 +427,18 @@ def _item_evidence(item, *, kind: str, horizon_map: dict | None = None) -> tuple
     if item.available_at_utc > item.decision_at_utc:
         # 輸入 arrived after the decision: that is lookahead, not point-in-time evidence.
         return False, "PIT_AVAILABILITY_AFTER_DECISION"
-    if not item.exit_session_complete:
-        return False, "EXIT_SESSION_INCOMPLETE"
     if (item.outcome_population_id or "") != POPULATION_SIGNAL_FORWARD_V2:
         return False, "POPULATION_NOT_V2"
     if (item.evaluation_version or "") != EVALUATION_VERSION_V2:
         return False, "EVALUATOR_NOT_V2"
     if item.primary_horizon_sessions is None:
         return False, "PRIMARY_HORIZON_MISSING"
-    if kind == "factor":
-        # Factor cohorts read the fixed primary horizon, not whatever the row claims.
-        if int(item.primary_horizon_sessions) != FACTOR_HORIZON_SESSIONS:
-            return False, "NON_PRIMARY_HORIZON"
-    else:
-        expected = (horizon_map or {}).get(item.strategy_code)
-        if expected is None or int(item.primary_horizon_sessions) != int(expected):
+    if kind == "strategy":
+        # The strategy horizon comes from the capture's sealed catalog authority, so a
+        # later catalog edit cannot move a historical cohort in or out of the sample.
+        if expected_horizon is None or int(item.primary_horizon_sessions) != int(
+            expected_horizon
+        ):
             return False, "NON_PRIMARY_HORIZON"
     return True, ""
 
@@ -450,6 +485,7 @@ def ensure_ranking_capture(db, *, capture_id: str, market: str, session_date: st
                            rank_source_mode: str = "REPLAY", item_count: int = 0,
                            scoring_config_version: str = "",
                            evaluation_version: str = "",
+                           catalog_authority: dict | None = None,
                            calibration_policy_version: str = CALIBRATION_POLICY_VERSION) -> int:
     """Create the capture row when missing; retry of a capture_id reuses the row."""
     existing = (
@@ -471,6 +507,7 @@ def ensure_ranking_capture(db, *, capture_id: str, market: str, session_date: st
         scoring_config_version=scoring_config_version,
         evaluation_version=evaluation_version,
         calibration_policy_version=calibration_policy_version,
+        catalog_authority=dict(catalog_authority or {}),
         meta={"rank_source_mode": rank_source_mode},
     )
     db.add(row)
@@ -484,6 +521,7 @@ def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date:
                               evaluation_version: str = "",
                               rank_source_mode: str = "REPLAY",
                               decision_at_utc=None, captured_at_utc=None,
+                              catalog_authority: dict | None = None,
                               population: str = POPULATION_LEGACY_UNLABELLED,
                               calibration_policy_version: str = CALIBRATION_POLICY_VERSION) -> dict:
     """Append-only capture: one header plus one immutable item per decision row.
@@ -491,7 +529,8 @@ def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date:
     Retry of the same capture_id reuses the header and the item keyed by
     decision_snapshot_id, so a same-day refresh never revises archived factors and
     never adds a second unit for the same instrument/strategy decision. The writer
-    does not update an existing item; correction must land as a new capture.
+    does not update an existing item; a same capture_id carrying different content is
+    reported as an identity conflict, never silently ignored.
     """
     decision_at = decision_at_utc
     captured_at = captured_at_utc
@@ -506,10 +545,11 @@ def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date:
         source_pool=rank_source_mode,
         scoring_config_version=scoring_config_version,
         evaluation_version=evaluation_version,
+        catalog_authority=catalog_authority,
         calibration_policy_version=calibration_policy_version,
     )
-    written = reused = 0
-    seen_ids: set[str] = set()
+    written = reused = conflicts = 0
+    seen_hashes: dict[str, str] = {}
     for row in decisions:
         instrument_id = str(row.get("instrument_id") or "").strip()
         strategy_code = str(row.get("strategy_code") or "").strip()
@@ -523,8 +563,22 @@ def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date:
             strategy_code=strategy_code,
             ranker_version=ranker_version,
         )
-        if decision_id in seen_ids:
-            # Same batch carries the same instrument/strategy decision: one unit only.
+        factors = row.get("raw_factor_values") or {}
+        item_hash = _sha256(_canonical({
+            "decision_snapshot_id": decision_id,
+            "market": market,
+            "session_date": session_date,
+            "instrument_id": instrument_id,
+            "strategy_code": strategy_code,
+            "ranker_version": ranker_version,
+            "factors": factors,
+            "calibration_policy_version": calibration_policy_version,
+        }))
+        if decision_id in seen_hashes:
+            if seen_hashes[decision_id] != item_hash:
+                # One batch carries two different payloads for the same decision.
+                conflicts += 1
+                continue
             reused += 1
             continue
         existing = (
@@ -533,10 +587,13 @@ def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date:
             .first()
         )
         if existing:
+            if (existing.capture_hash or "") != item_hash:
+                # Same capture_id, different content: a correction, never a silent ignore.
+                conflicts += 1
+                continue
             reused += 1
             continue
-        seen_ids.add(decision_id)
-        factors = row.get("raw_factor_values") or {}
+        seen_hashes[decision_id] = item_hash
         item = RankingSnapshotItem(
             decision_snapshot_id=decision_id,
             ranking_snapshot_id=snapshot_id,
@@ -571,18 +628,10 @@ def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date:
             signal_run_id=row.get("signal_run_id"),
         )
         for code in CALIBRATABLE_FACTORS:
-            if code in factors:
+            if factors.get(code) is not None:
+                # A factor the ranker did not emit stays NULL, never a zero sample.
                 setattr(item, code, float(factors[code]))
-        item.capture_hash = _sha256(_canonical({
-            "decision_snapshot_id": decision_id,
-            "market": market,
-            "session_date": session_date,
-            "instrument_id": instrument_id,
-            "strategy_code": strategy_code,
-            "ranker_version": ranker_version,
-            "factors": factors,
-            "calibration_policy_version": calibration_policy_version,
-        }))
+        item.capture_hash = item_hash
         db.add(item)
         written += 1
     db.commit()
@@ -598,12 +647,19 @@ def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date:
     )
     if capture is not None:
         capture.item_count = int(total)
+        # The header hash identifies the sealed payload set, so a replay can be checked.
+        capture.capture_hash = _sha256(_canonical(sorted(
+            (row.decision_snapshot_id, row.capture_hash or "")
+            for row in db.query(RankingSnapshotItem).all()
+            if row.ranking_snapshot_id == snapshot_id
+        )))
         db.commit()
     return {
         "capture_id": capture_id,
         "snapshot_id": snapshot_id,
         "written": written,
         "reused": reused,
+        "conflicts": conflicts,
         "item_count": int(total),
     }
 
@@ -614,9 +670,32 @@ def select_cohort(db, *, kind: str, market: str,
     if kind not in CALIBRATION_KINDS:
         raise ValueError(f"unknown calibration kind: {kind}")
 
-    horizon_map = get_primary_horizon_sessions() if kind == "strategy" else None
-    if kind == "strategy" and primary_horizon_sessions is not None:
-        horizon_map = {code: int(primary_horizon_sessions) for code in horizon_map}
+    # Primary horizon comes from the capture's sealed catalog authority. The live catalog
+    # is only a fallback for legacy captures that predate PR-0A, and it is read from the
+    # same db so a writer never mixes two connections' views.
+    authority = {
+        int(snap.id): (snap.catalog_authority or {})
+        for snap in db.query(RankingSnapshot).all()
+    }
+    live_horizons: dict | None = None
+    forced_horizon = (int(primary_horizon_sessions)
+                      if primary_horizon_sessions is not None else None)
+
+    def _expected_horizon(item) -> int | None:
+        nonlocal live_horizons
+        if forced_horizon is not None:
+            return forced_horizon
+        if kind != "strategy":
+            return FACTOR_HORIZON_SESSIONS
+        sealed = (authority.get(int(item.ranking_snapshot_id))
+                  if item.ranking_snapshot_id is not None else None)
+        if sealed:
+            return sealed.get(item.strategy_code)
+        if live_horizons is None:
+            # Legacy captures carry no sealed authority: read the catalog from this db,
+            # falling back to the module reader only when this db has no catalog rows.
+            live_horizons = _catalog_horizon_map(db) or get_primary_horizon_sessions()
+        return live_horizons.get(item.strategy_code)
 
     # Canonical decision selection happens before any outcome is inspected: an
     # incomplete first decision must not let a later same-day refresh become canonical.
@@ -635,7 +714,8 @@ def select_cohort(db, *, kind: str, market: str,
 
     for item in item_query.all():
         raw_rows += 1
-        ok, reason = _item_evidence(item, kind=kind, horizon_map=horizon_map)
+        ok, reason = _item_evidence(item, kind=kind,
+                                    expected_horizon=_expected_horizon(item))
         if not ok:
             _reject(reason)
             continue
@@ -661,7 +741,8 @@ def select_cohort(db, *, kind: str, market: str,
     for entry in canonical.values():
         if entry["item"].signal_run_id is not None:
             wanted_signals.add(int(entry["item"].signal_run_id))
-        horizons.add(int(entry["item"].primary_horizon_sessions))
+        horizons.add(FACTOR_HORIZON_SESSIONS if kind == "factor"
+                     else int(entry["item"].primary_horizon_sessions))
 
     outcome_index: dict[tuple[int, int], StrategyOutcome] = {}
     if wanted_signals:
@@ -675,14 +756,21 @@ def select_cohort(db, *, kind: str, market: str,
     signal_ids: set[int] = set()
     for entry in canonical.values():
         item = entry["item"]
+        join_horizon = (FACTOR_HORIZON_SESSIONS if kind == "factor"
+                        else int(item.primary_horizon_sessions))
         outcome = (
-            outcome_index.get((int(item.signal_run_id), int(item.primary_horizon_sessions)))
+            outcome_index.get((int(item.signal_run_id), join_horizon))
             if item.signal_run_id is not None else None
         )
         if outcome is None:
+            if kind == "factor" and int(item.primary_horizon_sessions) != FACTOR_HORIZON_SESSIONS:
+                # A factor decision sealed at another horizon has no fixed-horizon outcome:
+                # it cannot enter the factor cohort, and it is not evidence loss.
+                _reject("FACTOR_HORIZON_OUTCOME_MISSING")
+                continue
             _reject("OUTCOME_MISSING")
             continue
-        ok, reason = _outcome_provenance(item, outcome)
+        ok, reason = _outcome_provenance(item, outcome, kind=kind)
         if not ok:
             _reject(reason)
             continue
@@ -699,11 +787,16 @@ def select_cohort(db, *, kind: str, market: str,
                 "session_date": item.session_date,
                 "strategy_code": item.strategy_code,
                 "signal_run_id": item.signal_run_id,
+                "primary_horizon_sessions": int(item.primary_horizon_sessions),
                 "exit_session_date": meta.get("exit_session_date"),
                 "input_hash": meta.get("input_hash"),
                 "outcome_revision": meta.get("outcome_revision") or outcome.id,
-                "gross_return_pct": float(meta["stock_gross_return_pct"]),
-                "net_return_pct": float(meta["stock_net_return_pct"]),
+                "gross_return_pct": (
+                    float(meta["stock_gross_return_pct"])
+                    if meta.get("stock_gross_return_pct") is not None else None),
+                "net_return_pct": (
+                    float(meta["stock_net_return_pct"])
+                    if meta.get("stock_net_return_pct") is not None else None),
                 "factors": {
                     code: getattr(item, code, None) for code in CALIBRATABLE_FACTORS
                 },
@@ -718,10 +811,12 @@ def select_cohort(db, *, kind: str, market: str,
     dates = sorted({s["session_date"] for s in samples})
     horizon_value: object = FACTOR_HORIZON_SESSIONS
     if kind == "strategy":
-        per_strategy = {
-            s["strategy_code"]: (horizon_map or {}).get(s["strategy_code"]) for s in samples
-        }
+        per_strategy = {s["strategy_code"]: s.get("primary_horizon_sessions")
+                        for s in samples}
         horizon_value = per_strategy or None
+    # An archived decision that lost its outcome reference is evidence loss, not a
+    # smaller cohort: fail closed instead of quietly shrinking the sample.
+    integrity_suspect = bool(rejected.get("OUTCOME_MISSING") and samples)
     return {
         "kind": kind,
         "market": market,
@@ -736,30 +831,38 @@ def select_cohort(db, *, kind: str, market: str,
         "decision_dates": dates,
         "primary_horizon_sessions": horizon_value,
         "ranker_versions": sorted({s.get("ranker_version") or "" for s in samples}),
+        "integrity_suspect": integrity_suspect,
     }
 
 
 def cohort_ic_periods(cohort: dict, *, kind: str) -> dict:
-    """Per decision-date series: factor uses raw factor vs gross; strategy uses net."""
-    by_date: dict[str, list[dict]] = {}
+    """Per market/decision-date series: factor uses raw factor vs gross; strategy uses net.
+
+    A missing factor is not a zero: it stays out of that factor's series, and the ALL
+    layer keeps each market's periods apart before any aggregation.
+    """
+    by_period: dict[tuple, list[dict]] = {}
     for sample in cohort["samples"]:
-        by_date.setdefault(sample["session_date"], []).append(sample)
+        by_period.setdefault((sample.get("market") or "ALL", sample["session_date"]),
+                             []).append(sample)
 
     periods: dict[str, dict] = {}
-    for day, rows in by_date.items():
+    for (sub_market, day), rows in by_period.items():
+        key = f"{sub_market}|{day}"
         if kind == "factor":
-            returns = [r["gross_return_pct"] for r in rows]
-            periods[day] = {
-                code: spearman([float(r["factors"].get(code) or 0.0) for r in rows], returns)
-                for code in CALIBRATABLE_FACTORS
-            }
-            periods[day]["sample_count"] = len(rows)
+            usable = [r for r in rows if r["gross_return_pct"] is not None]
+            returns = [r["gross_return_pct"] for r in usable]
+            entry: dict = {"sample_count": len(usable)}
+            for code in CALIBRATABLE_FACTORS:
+                pairs = [(r["factors"].get(code), r["gross_return_pct"])
+                         for r in usable if r["factors"].get(code) is not None]
+                entry[code] = (spearman([p[0] for p in pairs], [p[1] for p in pairs])
+                               if len(pairs) >= 2 else None)
+            periods[key] = entry
         else:
-            nets = [r["net_return_pct"] for r in rows]
-            periods[day] = {
-                "net_return": statistics.fmean(nets) if nets else None,
-                "sample_count": len(rows),
-            }
+            nets = [r["net_return_pct"] for r in rows if r["net_return_pct"] is not None]
+            periods[key] = {"net_return": statistics.fmean(nets) if nets else None,
+                            "sample_count": len(nets)}
     return periods
 
 
@@ -768,7 +871,7 @@ def cohort_fingerprint(cohort: dict, *, kind: str, market: str,
                        policy_version: str = CALIBRATION_POLICY_VERSION) -> str:
     """Canonical SHA-256 of the exact immutable inputs that enter the statistics.
 
-    Excludes scheduler tick time, live/output weights, rounded IC and sample_size.
+    Excludes scheduler tick time, live/output weights, computed IC and sample_size.
     """
     cohort = cohort_for_target(cohort, kind=kind, target=target)
     value_key = "gross_return_pct" if kind == "factor" else "net_return_pct"
@@ -790,9 +893,12 @@ def cohort_fingerprint(cohort: dict, *, kind: str, market: str,
                 "instrument_id": s["instrument_id"],
                 "session_date": s["session_date"],
                 "strategy_code": s["strategy_code"],
+                "ranker_version": s.get("ranker_version"),
+                "primary_horizon_sessions": s.get("primary_horizon_sessions"),
                 "input_hash": s["input_hash"],
                 "outcome_revision": s["outcome_revision"],
-                "factors": ({k: float(v or 0.0) for k, v in s["factors"].items()}
+                "factors": ({k: (None if v is None else float(v))
+                             for k, v in s["factors"].items()}
                             if kind == "factor" else {}),
                 "return": s[value_key],
             }
@@ -835,8 +941,10 @@ def _readiness_one(cohort: dict, *, market: str, kind: str, target: str | None =
     training = [s for s in training if (s["exit_session_date"] or "") <= boundary]
 
     units_key = (
-        (lambda s: (s["instrument_id"], s["session_date"], s["strategy_code"]))
-        if kind == "strategy" else (lambda s: (s["instrument_id"], s["session_date"]))
+        (lambda s: (s.get("market") or "ALL", s["instrument_id"], s["session_date"],
+                    s["strategy_code"]))
+        if kind == "strategy"
+        else (lambda s: (s.get("market") or "ALL", s["instrument_id"], s["session_date"]))
     )
     units = len({units_key(s) for s in training})
     training_date_set = sorted({s["session_date"] for s in training})
@@ -849,12 +957,15 @@ def _readiness_one(cohort: dict, *, market: str, kind: str, target: str | None =
 
     per_factor: dict[str, dict] = {}
     if kind == "factor":
-        gross_all = [s["gross_return_pct"] for s in training]
         for code in CALIBRATABLE_FACTORS:
             series = [periods[day][code] for day in sorted(qualifying)
                       if periods[day].get(code) is not None]
-            xs = [float(s["factors"].get(code) or 0.0) for s in training]
-            ic = spearman(xs, gross_all) if len(training) >= 3 else None
+            # A missing factor is not a zero: it stays out of this factor's IC series.
+            pairs = [(float(s["factors"][code]), s["gross_return_pct"])
+                     for s in training
+                     if s["factors"].get(code) is not None
+                     and s["gross_return_pct"] is not None]
+            ic = spearman([p[0] for p in pairs], [p[1] for p in pairs]) if len(pairs) >= 3 else None
             ir = None
             if len(series) >= 3:
                 spread = statistics.stdev(series)
@@ -887,6 +998,9 @@ def _readiness_one(cohort: dict, *, market: str, kind: str, target: str | None =
     interval = target_report["interval"]
 
     reasons: list[str] = []
+    if cohort.get("integrity_suspect"):
+        # An archived decision lost its outcome reference: evidence loss, not a sample.
+        reasons.append("OUTCOME_REFERENCE_LOSS")
     if units < floors["units"]:
         reasons.append(f"UNITS_BELOW_FLOOR({units}/{floors['units']})")
     if len(training_date_set) < floors["dates"]:
@@ -1017,78 +1131,10 @@ def plan_calibration_batch(db, *, kind: str, market: str, targets: list[str],
     return {"kind": kind, "market": market, "targets": list(targets), "plans": plans}
 
 
-def apply_calibration_plan(db, *, plan: dict, new_weight: float,
-                           reason: str = "", output_config_hash: str = "",
-                           batch: dict | None = None) -> dict:
-    """One short write transaction: claim first, recheck, then weights and audit."""
+def _weight_write(db, *, plan: dict, new_weight: float, reason: str) -> str:
+    """Write one weight row and its history entry inside the caller's transaction."""
     kind, market, target = plan["kind"], plan["market"], plan["target"]
     regime = plan["regime"]
-    claim = CalibrationApplication(
-        kind=kind,
-        market=market,
-        target=target,
-        regime=regime,
-        calibration_policy_version=plan["calibration_policy_version"],
-        cohort_fingerprint=plan["cohort_fingerprint"],
-        population=POPULATION_SIGNAL_FORWARD_V2,
-        evaluation_version=EVALUATION_VERSION_V2,
-        expected_live_config_hash=plan["expected_live_config_hash"],
-        output_config_hash=output_config_hash,
-        sample_units=plan["cohort"]["counts"]["units"],
-        decision_dates=plan["cohort"]["counts"]["dates"],
-        valid_ic_periods=plan["readiness"]["training"]["ic_periods"],
-        raw_rows=plan["cohort"]["counts"]["raw_rows"],
-        signal_ids=plan["cohort"]["counts"]["signal_ids"],
-        old_weight=plan["old_weight"],
-        new_weight=new_weight,
-        mode=plan["mode"],
-        reason=reason,
-    )
-    db.add(claim)
-    try:
-        db.flush()
-    except IntegrityError as error:
-        db.rollback()
-        if not _is_application_key_conflict(error):
-            # A foreign-key or NOT NULL break is a real fault, not a replay of the cohort key.
-            raise
-        return {"status": "DUPLICATE_COHORT", "market": market, "kind": kind,
-                "target": target, "cohort_fingerprint": plan["cohort_fingerprint"]}
-
-    mode = read_calibration_mode(db, kind=kind, market=market)
-    if mode == MODE_FROZEN:
-        db.rollback()
-        return {"status": "MODE_FROZEN", "market": market, "kind": kind, "target": target}
-    if mode == MODE_SHADOW:
-        db.rollback()
-        return {"status": "MODE_SHADOW", "market": market, "kind": kind, "target": target}
-    if not plan["readiness"]["ready"]:
-        db.rollback()
-        return {"status": "READINESS_NOT_MET", "market": market, "kind": kind,
-                "target": target, "reasons": plan["readiness"]["reasons"]}
-
-    pinned, auto = pin_state(db, kind=kind, market=market, target=target, regime=regime)
-    if pinned or not auto:
-        db.rollback()
-        return {"status": "PINNED_OR_OFF", "market": market, "kind": kind, "target": target}
-
-    if live_config_hash(db, kind=kind, market=market, regime=regime) != plan[
-            "expected_live_config_hash"]:
-        db.rollback()
-        return {"status": "STALE_CONFIG", "market": market, "kind": kind, "target": target}
-
-    # Audit identity: the exact live config and evidence labels this proposal consumed.
-    horizon = plan["cohort"].get("primary_horizon_sessions")
-    if isinstance(horizon, dict):
-        horizon = horizon.get(str(target or "").partition("|")[0])
-    claim.ranker_version = ";".join(plan["cohort"].get("ranker_versions") or ())
-    claim.primary_horizon_sessions = horizon
-    claim.target_weight = new_weight
-    claim.source_config_versions = {
-        "live_config_payload": live_config_payload(db, kind=kind, market=market,
-                                                   regime=regime),
-    }
-
     if kind == "factor":
         row = (
             db.query(FactorWeight)
@@ -1096,9 +1142,7 @@ def apply_calibration_plan(db, *, plan: dict, new_weight: float,
             .first()
         )
         if not row:
-            db.rollback()
-            return {"status": "TARGET_MISSING", "market": market, "kind": kind,
-                    "target": target}
+            return "TARGET_MISSING"
         old = float(row.weight)
         row.weight = float(new_weight)
         row.reason = reason or "auto"
@@ -1114,65 +1158,189 @@ def apply_calibration_plan(db, *, plan: dict, new_weight: float,
                       "readiness": plan["readiness"]["training"]},
             )
         )
-    else:
-        code, _, reg = target.partition("|")
-        reg = reg or (regime or "default")
-        row = (
-            db.query(StrategyWeight)
-            .filter(
-                StrategyWeight.strategy_code == code,
-                StrategyWeight.market == market,
-                StrategyWeight.regime == reg,
-            )
-            .first()
+        return "APPLIED"
+    code, _, reg = target.partition("|")
+    reg = reg or (regime or "default")
+    row = (
+        db.query(StrategyWeight)
+        .filter(
+            StrategyWeight.strategy_code == code,
+            StrategyWeight.market == market,
+            StrategyWeight.regime == reg,
         )
-        if not row:
-            db.rollback()
-            return {"status": "TARGET_MISSING", "market": market, "kind": kind,
-                    "target": target}
-        old = float(row.weight)
-        row.weight = float(new_weight)
-        row.reason = reason or "auto"
-        row.effective_from = utc_now()
-        row.updated_at = utc_now()
-        db.add(
-            StrategyWeightHistory(
-                strategy_code=code, market=market, regime=reg,
-                old_weight=old, new_weight=float(new_weight),
-                reason=reason or "auto",
-                sample_size=plan["cohort"]["counts"]["units"],
-                meta={"cohort_fingerprint": plan["cohort_fingerprint"],
-                      "readiness": plan["readiness"]["training"]},
-            )
-        )
-
+        .first()
+    )
+    if not row:
+        return "TARGET_MISSING"
+    old = float(row.weight)
+    row.weight = float(new_weight)
+    row.reason = reason or "auto"
+    row.effective_from = utc_now()
+    row.updated_at = utc_now()
     db.add(
-        CalibrationProvenance(
-            kind=kind, market=market, target=target,
+        StrategyWeightHistory(
+            strategy_code=code, market=market, regime=reg,
+            old_weight=old, new_weight=float(new_weight),
+            reason=reason or "auto",
+            sample_size=plan["cohort"]["counts"]["units"],
+            meta={"cohort_fingerprint": plan["cohort_fingerprint"],
+                  "readiness": plan["readiness"]["training"]},
+        )
+    )
+    return "APPLIED"
+
+
+def apply_calibration_batch(db, *, plans: dict, proposals: dict,
+                            reasons: dict | None = None,
+                            output_config_hash: str = "") -> dict:
+    """All-or-nothing write transaction for one market/kind batch.
+
+    Every claim is inserted before any weight write, and every gate is rechecked before
+    the first weight write, so a mid-batch STALE_CONFIG, a pinned target or a crash
+    rolls back the whole batch: no earlier target can stay applied on a partial batch.
+    """
+    targets = [t for t in plans if t in proposals and proposals[t] is not None]
+    if not targets:
+        return {"status": "NO_PROPOSAL", "results": {}, "applied": []}
+    reasons = reasons or {}
+
+    def refuse(status: str, **extra) -> dict:
+        db.rollback()
+        return {"status": status, "results": {t: status for t in targets},
+                "applied": [], **extra}
+
+    claims = {}
+    for target in targets:
+        plan = plans[target]
+        claim = CalibrationApplication(
+            kind=plan["kind"],
+            market=plan["market"],
+            target=target,
+            regime=plan["regime"],
             calibration_policy_version=plan["calibration_policy_version"],
             cohort_fingerprint=plan["cohort_fingerprint"],
             population=POPULATION_SIGNAL_FORWARD_V2,
             evaluation_version=EVALUATION_VERSION_V2,
-            decision_snapshot_ids=[s["decision_snapshot_id"] for s in plan["cohort"]["samples"]],
-            outcome_revisions=[
-                {"outcome_revision": s["outcome_revision"], "input_hash": s["input_hash"]}
-                for s in plan["cohort"]["samples"]
-            ],
-            policy_payload={"floors": plan["readiness"]["floors"],
-                            "holdout_dates": HOLDOUT_DECISION_DATES},
+            expected_live_config_hash=plan["expected_live_config_hash"],
+            output_config_hash=output_config_hash,
+            sample_units=plan["cohort"]["counts"]["units"],
+            decision_dates=plan["cohort"]["counts"]["dates"],
+            valid_ic_periods=plan["readiness"]["training"]["ic_periods"],
+            raw_rows=plan["cohort"]["counts"]["raw_rows"],
+            signal_ids=plan["cohort"]["counts"]["signal_ids"],
+            old_weight=plan["old_weight"],
+            new_weight=float(proposals[target]),
+            mode=plan["mode"],
+            reason=reasons.get(target, ""),
         )
-    )
-    # Read the refreshed identity before the commit so an external writer landing later
-    # still misses the expected hash and is rejected as STALE_CONFIG.
-    refreshed = live_config_hash(db, kind=kind, market=market, regime=regime) if batch else None
+        db.add(claim)
+        claims[target] = claim
+    try:
+        db.flush()
+    except IntegrityError as error:
+        db.rollback()
+        if not _is_application_key_conflict(error):
+            # A foreign-key or NOT NULL break is a real fault, not a replay of the cohort key.
+            raise
+        return refuse("DUPLICATE_COHORT",
+                      cohort_fingerprints={t: plans[t]["cohort_fingerprint"]
+                                           for t in targets})
+
+    for target in targets:
+        plan = plans[target]
+        kind, market = plan["kind"], plan["market"]
+        mode = read_calibration_mode(db, kind=kind, market=market)
+        if mode == MODE_FROZEN:
+            return refuse("MODE_FROZEN")
+        if mode == MODE_SHADOW:
+            return refuse("MODE_SHADOW")
+        if not plan["readiness"]["ready"]:
+            return refuse("READINESS_NOT_MET",
+                          reasons=plan["readiness"]["reasons"])
+        pinned, auto = pin_state(db, kind=kind, market=market, target=target,
+                                 regime=plan["regime"])
+        if pinned or not auto:
+            return refuse("PINNED_OR_OFF")
+
+    checked: set[tuple] = set()
+    for target in targets:
+        plan = plans[target]
+        key = (plan["kind"], plan["market"], plan["regime"])
+        if key in checked:
+            continue
+        checked.add(key)
+        if live_config_hash(db, kind=plan["kind"], market=plan["market"],
+                            regime=plan["regime"]) != plan["expected_live_config_hash"]:
+            # One config snapshot for the whole batch: a sibling write inside the batch
+            # is expected, an outside change invalidates every proposal at once.
+            return refuse("STALE_CONFIG")
+
+    results: dict[str, str] = {}
+    for target in targets:
+        plan = plans[target]
+        claim = claims[target]
+        horizon = plan["cohort"].get("primary_horizon_sessions")
+        if isinstance(horizon, dict):
+            horizon = horizon.get(str(target or "").partition("|")[0])
+        claim.ranker_version = ";".join(plan["cohort"].get("ranker_versions") or ())
+        claim.primary_horizon_sessions = horizon
+        claim.target_weight = float(proposals[target])
+        claim.source_config_versions = {
+            "live_config_payload": live_config_payload(db, kind=plan["kind"],
+                                                       market=plan["market"],
+                                                       regime=plan["regime"]),
+        }
+        status = _weight_write(db, plan=plan, new_weight=float(proposals[target]),
+                               reason=reasons.get(target, ""))
+        if status == "TARGET_MISSING":
+            db.rollback()
+            return {"status": "TARGET_MISSING",
+                    "results": {t: ("TARGET_MISSING" if t == target else "ROLLED_BACK")
+                                for t in targets},
+                    "applied": []}
+        db.add(
+            CalibrationProvenance(
+                kind=plan["kind"], market=plan["market"], target=target,
+                calibration_policy_version=plan["calibration_policy_version"],
+                cohort_fingerprint=plan["cohort_fingerprint"],
+                population=POPULATION_SIGNAL_FORWARD_V2,
+                evaluation_version=EVALUATION_VERSION_V2,
+                decision_snapshot_ids=[s["decision_snapshot_id"]
+                                       for s in plan["cohort"]["samples"]],
+                outcome_revisions=[{"outcome_revision": s["outcome_revision"],
+                                     "input_hash": s["input_hash"]}
+                                   for s in plan["cohort"]["samples"]],
+                policy_payload={"floors": plan["readiness"]["floors"],
+                                "holdout_dates": HOLDOUT_DECISION_DATES},
+            )
+        )
+        results[target] = "APPLIED"
+
     db.commit()
-    if batch is not None:
-        # Sibling proposals in the same batch must see this write, not a stale snapshot.
-        for sibling in batch.get("plans", {}).values():
-            sibling["expected_live_config_hash"] = refreshed
-    return {"status": "APPLIED", "market": market, "kind": kind, "target": target,
-            "old_weight": plan["old_weight"], "new_weight": float(new_weight),
-            "cohort_fingerprint": plan["cohort_fingerprint"]}
+    return {"status": "APPLIED", "results": results, "applied": list(results)}
+
+
+def apply_calibration_plan(db, *, plan: dict, new_weight: float,
+                           reason: str = "", output_config_hash: str = "",
+                           batch: dict | None = None) -> dict:
+    """Single-target convenience path; it runs through the same batch transaction."""
+    result = apply_calibration_batch(
+        db,
+        plans={plan["target"]: plan},
+        proposals={plan["target"]: new_weight},
+        reasons={plan["target"]: reason},
+        output_config_hash=output_config_hash,
+    )
+    target = plan["target"]
+    status = result["status"]
+    out = {"status": status, "market": plan["market"], "kind": plan["kind"],
+           "target": target, "cohort_fingerprint": plan["cohort_fingerprint"]}
+    if status == "READINESS_NOT_MET" and "reasons" in result:
+        out["reasons"] = result["reasons"]
+    if status == "APPLIED":
+        out["old_weight"] = plan["old_weight"]
+        out["new_weight"] = float(new_weight)
+    return out
 
 
 def run_calibration(db, *, kind: str, market: str, target: str, regime: str = "default",

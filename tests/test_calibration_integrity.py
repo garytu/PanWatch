@@ -41,6 +41,7 @@ from src.modules.strategy.calibration_gate import (
     POPULATION_SIGNAL_FORWARD_V2,
     EVALUATION_VERSION_V2,
     apply_calibration_plan,
+    apply_calibration_batch,
     cohort_fingerprint,
     decision_snapshot_id_for,
     ensure_calibration_modes,
@@ -483,8 +484,11 @@ def test_gross_net_pair_required(db_session):
         ],
     )
     cohort = select_cohort(db_session, kind="factor", market="TW")
-    assert cohort["counts"]["units"] == 0
-    assert cohort["counts"]["rejected"].get("GROSS_NET_UNAVAILABLE") == 1
+    assert cohort["counts"]["units"] == 1
+    assert cohort["counts"]["rejected"].get("GROSS_UNAVAILABLE") is None
+    strategy = select_cohort(db_session, kind="strategy", market="TW")
+    assert strategy["counts"]["units"] == 0
+    assert strategy["counts"]["rejected"].get("NET_UNAVAILABLE") == 1
 
 
 def test_floors_are_encoded(db_session):
@@ -790,45 +794,78 @@ def test_v2_selector_ignores_mutable_projections(db_session):
 
 
 def test_batch_second_target_sees_own_write(db_session):
-    """A batch keeps its own writes; only an outside change is stale."""
+    """A batch keeps its own writes; one transaction applies every target together."""
     _seed_cohort(db_session, dates=32, correlated=("alpha_score", "catalyst_score"))
     set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
                          reason="floors met")
     batch = plan_calibration_batch(db_session, kind="factor", market="TW",
                                    targets=["alpha_score", "catalyst_score"])
-    first = apply_calibration_plan(db_session, plan=batch["plans"]["alpha_score"],
-                                   new_weight=1.3, batch=batch)
-    assert first["status"] == "APPLIED"
+    result = apply_calibration_batch(
+        db_session,
+        plans={t: batch["plans"][t] for t in ("alpha_score", "catalyst_score")},
+        proposals={"alpha_score": 1.3, "catalyst_score": 1.2},
+    )
+    assert result["status"] == "APPLIED"
+    assert sorted(result["applied"]) == ["alpha_score", "catalyst_score"]
+    weights = _live_factor_weights(db_session)
+    assert weights["alpha_score"] == 1.3
+    assert weights["catalyst_score"] == 1.2
+    assert db_session.query(CalibrationApplication).count() == 2
 
-    second = apply_calibration_plan(db_session, plan=batch["plans"]["catalyst_score"],
-                                    new_weight=1.2, batch=batch)
-    assert second["status"] == "APPLIED"
+
+def test_batch_rolls_back_every_target_on_pinned_sibling(db_session):
+    """A pinned sibling rejects the whole batch: no earlier target stays applied."""
+    _seed_cohort(db_session, dates=32, correlated=("alpha_score", "catalyst_score"))
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
+                         reason="floors met")
+    pinned = db_session.query(FactorWeight).filter(
+        FactorWeight.factor_code == "catalyst_score", FactorWeight.market == "TW"
+    ).first()
+    pinned.is_pinned = True
+    db_session.commit()
+
+    batch = plan_calibration_batch(db_session, kind="factor", market="TW",
+                                   targets=["alpha_score", "catalyst_score"])
+    result = apply_calibration_batch(
+        db_session,
+        plans={t: batch["plans"][t] for t in ("alpha_score", "catalyst_score")},
+        proposals={"alpha_score": 1.3, "catalyst_score": 1.2},
+    )
+    assert result["status"] == "PINNED_OR_OFF"
+    assert result["applied"] == []
+    assert db_session.query(CalibrationApplication).count() == 0
+    assert db_session.query(FactorWeightHistory).count() == 0
+    assert _alpha_weight(db_session) == 1.0
 
 
 def test_outside_config_change_stales_the_batch(db_session):
-    """Another writer changing config mid-batch rejects the rest of the batch."""
+    """Another writer changing config before the batch rejects every proposal."""
     _seed_cohort(db_session, dates=32, correlated=("alpha_score", "catalyst_score"))
     set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
                          reason="floors met")
     batch = plan_calibration_batch(db_session, kind="factor", market="TW",
                                    targets=["alpha_score", "catalyst_score"])
-    first = apply_calibration_plan(db_session, plan=batch["plans"]["alpha_score"],
-                                   new_weight=1.3, batch=batch)
-    assert first["status"] == "APPLIED"
-
     outside = db_session.query(FactorWeight).filter(
         FactorWeight.factor_code == "quality_score", FactorWeight.market == "TW"
     ).first()
     outside.weight = 1.7
     db_session.commit()
 
-    second = apply_calibration_plan(db_session, plan=batch["plans"]["catalyst_score"],
-                                    new_weight=1.2, batch=batch)
-    assert second["status"] == "STALE_CONFIG"
+    result = apply_calibration_batch(
+        db_session,
+        plans={t: batch["plans"][t] for t in ("alpha_score", "catalyst_score")},
+        proposals={"alpha_score": 1.3, "catalyst_score": 1.2},
+    )
+    assert result["status"] == "STALE_CONFIG"
+    assert result["applied"] == []
+    assert db_session.query(CalibrationApplication).count() == 0
     history = db_session.query(FactorWeightHistory).filter(
         FactorWeightHistory.factor_code == "catalyst_score"
     ).all()
     assert history == []
+    weights = _live_factor_weights(db_session)
+    assert weights["alpha_score"] == 1.0
+    assert weights["catalyst_score"] == 1.0
 
 
 def test_migration_127_is_idempotent_on_current_schema():
@@ -969,7 +1006,7 @@ def test_factor_cohort_pins_the_fixed_horizon(db_session):
     )
     cohort = select_cohort(db_session, kind="factor", market="TW")
     assert cohort["counts"]["units"] == 0
-    assert cohort["counts"]["rejected"].get("NON_PRIMARY_HORIZON") == 1
+    assert cohort["counts"]["rejected"].get("FACTOR_HORIZON_OUTCOME_MISSING") == 1
 
 
 def test_pending_first_decision_stays_canonical(db_session):
@@ -1252,3 +1289,250 @@ def test_application_ledger_records_audit_identity(db_session):
     assert row.primary_horizon_sessions == FACTOR_HORIZON_SESSIONS
     assert row.target_weight == 1.2
     assert row.source_config_versions.get("live_config_payload")
+
+
+# ------------------------------------------------- review regressions (PR-0A fixes)
+
+def test_missing_factor_is_not_zero(db_session):
+    """A factor the ranker did not emit stays missing; it is never a zero sample."""
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-05",
+        capture_id="null-vs-zero",
+        rows=[
+            _row(
+                market="TW", unit=0, session_date="2026-01-05", gross_return_pct=1.0,
+                exit_session_date="2026-01-12", signal_run_id=1, outcome_id=1,
+                factors={"alpha_score": None, "catalyst_score": 0.5,
+                         "quality_score": 0.5, "risk_penalty": 0.5, "crowd_penalty": 0.5},
+            ),
+            _row(
+                market="TW", unit=1, session_date="2026-01-05", gross_return_pct=2.0,
+                exit_session_date="2026-01-12", signal_run_id=2, outcome_id=2,
+                factors={"alpha_score": 0.0, "catalyst_score": 0.5,
+                         "quality_score": 0.5, "risk_penalty": 0.5, "crowd_penalty": 0.5},
+            ),
+        ],
+    )
+    assert db_session.query(RankingSnapshotItem).filter(
+        RankingSnapshotItem.alpha_score.is_(None)
+    ).count() == 1
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 2
+    base = cohort_fingerprint(cohort, kind="factor", market="TW", target="alpha_score")
+    mutated = {
+        **cohort,
+        "samples": [dict(s, factors={**s["factors"], "alpha_score": 0.0})
+                    for s in cohort["samples"]],
+    }
+    assert cohort_fingerprint(mutated, kind="factor", market="TW",
+                              target="alpha_score") != base
+
+
+def test_decision_item_without_outcome_maturity_stays_sealable(db_session):
+    """The decision item never carries outcome maturity; the outcome reference does."""
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-05",
+        capture_id="pending-exit",
+        rows=[
+            _row(
+                market="TW", unit=0, session_date="2026-01-05", gross_return_pct=1.0,
+                exit_session_date="2026-01-12", signal_run_id=1, outcome_id=1,
+                exit_session_complete=False,
+            ),
+        ],
+    )
+    outcome = db_session.query(StrategyOutcome).first()
+    outcome.meta = {**outcome.meta, "exit_session_complete": True}
+    db_session.commit()
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 1
+
+
+def test_outcome_reference_loss_refuses_readiness(db_session):
+    """An archived decision that lost its outcome is evidence loss, not a smaller cohort."""
+    _seed_cohort(db_session, dates=32)
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 160
+    db_session.query(StrategyOutcome).filter(StrategyOutcome.id == 1).delete()
+    db_session.commit()
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["integrity_suspect"] is True
+    readiness = evaluate_readiness(cohort, market="TW", kind="factor",
+                                   target="alpha_score")
+    assert readiness["ready"] is False
+    assert "OUTCOME_REFERENCE_LOSS" in readiness["reasons"]
+
+
+def test_capture_identity_conflict_is_reported(db_session):
+    """Same capture_id with different content is reported, never silently ignored."""
+    decisions = [{
+        "instrument_id": "inst-conflict",
+        "symbol": "C",
+        "strategy_code": "trend_follow",
+        "raw_factor_values": {"alpha_score": 1.0},
+        "ranking_value": 1.0,
+        "primary_horizon_sessions": 5,
+        "candidate_id": 1,
+        "signal_run_id": 11,
+    }]
+    first = capture_decision_snapshot(
+        db_session,
+        capture_id="cap-conflict",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=decisions,
+        ranker_version=RANKER_VERSION,
+    )
+    assert first["written"] == 1
+    assert first["conflicts"] == 0
+    changed = [dict(decisions[0], raw_factor_values={"alpha_score": 2.0})]
+    second = capture_decision_snapshot(
+        db_session,
+        capture_id="cap-conflict",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=changed,
+        ranker_version=RANKER_VERSION,
+    )
+    assert second["conflicts"] == 1
+    assert second["written"] == 0
+    item = db_session.query(RankingSnapshotItem).first()
+    assert item.alpha_score == 1.0
+
+
+def test_sealed_catalog_authority_survives_catalog_change(db_session):
+    """A later catalog edit cannot move a sealed cohort in or out."""
+    db_session.add(StrategyCatalog(code="trend_follow", name="trend",
+                                   params={"horizon_days": 5}))
+    db_session.commit()
+    decisions = [{
+        "instrument_id": "inst-sealed",
+        "symbol": "S",
+        "strategy_code": "trend_follow",
+        "raw_factor_values": {"alpha_score": 1.0},
+        "ranking_value": 1.0,
+        "primary_horizon_sessions": 5,
+        "candidate_id": 1,
+        "signal_run_id": 77,
+        "point_in_time_status": "VERIFIED",
+        "population": POPULATION_SIGNAL_FORWARD_V2,
+        "evaluation_version": EVALUATION_VERSION_V2,
+        "exit_session_date": "2026-01-12",
+    }]
+    capture_decision_snapshot(
+        db_session,
+        capture_id="sealed-authority",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=decisions,
+        ranker_version=RANKER_VERSION,
+        catalog_authority={"trend_follow": 5},
+        decision_at_utc=datetime.strptime("2026-01-05", "%Y-%m-%d"),
+        captured_at_utc=datetime.strptime("2026-01-05", "%Y-%m-%d"),
+    )
+    decision_id = decision_snapshot_id_for(
+        capture_id="sealed-authority",
+        market="TW",
+        session_date="2026-01-05",
+        instrument_id="inst-sealed",
+        strategy_code="trend_follow",
+        ranker_version=RANKER_VERSION,
+    )
+    db_session.add(
+        StrategySignalRun(
+            id=77, snapshot_date="2026-01-05", stock_symbol="S", stock_market="TW",
+            strategy_code="trend_follow", score=1.0, rank_score=1.0, holding_days=5,
+        )
+    )
+    db_session.add(
+        StrategyOutcome(
+            id=77,
+            signal_run_id=77,
+            strategy_code="trend_follow",
+            snapshot_date="2026-01-05",
+            stock_symbol="S",
+            stock_market="TW",
+            horizon_days=5,
+            target_date="2026-01-12",
+            outcome_return_pct=1.0,
+            outcome_status="evaluated",
+            meta={
+                "stock_gross_return_pct": 1.0,
+                "stock_net_return_pct": 0.9,
+                "exit_session_date": "2026-01-12",
+                "exit_session_complete": True,
+                "outcome_population_id": POPULATION_SIGNAL_FORWARD_V2,
+                "evaluation_version": EVALUATION_VERSION_V2,
+                "decision_snapshot_id": decision_id,
+                "input_hash": "input-sealed",
+                "outcome_revision": "rev-sealed",
+            },
+        )
+    )
+    db_session.commit()
+    before = select_cohort(db_session, kind="strategy", market="TW")
+    assert before["counts"]["units"] == 1
+    catalog = db_session.query(StrategyCatalog).filter(
+        StrategyCatalog.code == "trend_follow"
+    ).first()
+    catalog.params = {"horizon_days": 3}
+    db_session.commit()
+    after = select_cohort(db_session, kind="strategy", market="TW")
+    assert after["counts"]["units"] == 1
+
+
+def test_live_config_hash_detects_precision_change(db_session):
+    """No rounding in the config identity: a 1e-7 weight change is visible."""
+    _seed_cohort(db_session, dates=32)
+    base = live_config_hash(db_session, kind="factor", market="TW", regime="default")
+    row = db_session.query(FactorWeight).filter(
+        FactorWeight.factor_code == "alpha_score", FactorWeight.market == "TW"
+    ).first()
+    row.weight = 1.0000001
+    db_session.commit()
+    assert live_config_hash(db_session, kind="factor", market="TW",
+                            regime="default") != base
+
+
+def test_baseline_export_keeps_pin_flags(db_session):
+    """Rollout baseline carries pin/auto flags so activation can compare them."""
+    row = db_session.query(FactorWeight).filter(
+        FactorWeight.factor_code == "alpha_score", FactorWeight.market == "TW"
+    ).first()
+    row.is_pinned = True
+    row.auto_calibrate = False
+    db_session.commit()
+    export_rollout_baseline(db_session, baseline_name="pin-check", markets=["TW"],
+                            kinds=["factor"])
+    rows = db_session.query(CalibrationBaseline).filter(
+        CalibrationBaseline.baseline_name == "pin-check",
+        CalibrationBaseline.market == "TW",
+    ).all()
+    assert rows
+    alpha = [r for r in rows if r.target == "alpha_score"]
+    assert alpha
+    assert alpha[0].meta["pin_flags"]["alpha_score"] == [True, False]
+
+
+def test_migration_127_rerun_is_idempotent():
+    """Re-running the 127 runner must not collide with the seeded FROZEN rows."""
+    from src.platform.persistence.migrations import MIGRATIONS
+
+    runner = next(m.runner for m in MIGRATIONS if m.version == 127)
+    tmp = tempfile.mkdtemp()
+    try:
+        engine = create_engine(f"sqlite:///{tmp}/rerun.db")
+        Base.metadata.create_all(engine)
+        run_versioned_migrations(engine)
+        with engine.begin() as conn:
+            runner(conn)
+        with Session(bind=engine) as session:
+            pairs = [(m.kind, m.market) for m in session.query(CalibrationModeState).all()]
+            assert pairs
+            assert len(pairs) == len(set(pairs))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
