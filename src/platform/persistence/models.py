@@ -1514,7 +1514,8 @@ class RankingSnapshotItem(Base):
     decision_snapshot_id = Column(String, nullable=False, default="")
     ranking_snapshot_id = Column(
         Integer,
-        ForeignKey("ranking_snapshots.id", ondelete="CASCADE", name="fk_ranking_item_capture"),
+        # 封存 item 必須 survive capture 的 deletion: FK 只指向 capture 的 PK，沒有 cascade。
+        ForeignKey("ranking_snapshots.id", name="fk_ranking_item_capture"),
         nullable=True,
     )
     stock_symbol = Column(String, nullable=False, default="")

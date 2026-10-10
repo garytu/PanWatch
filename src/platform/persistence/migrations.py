@@ -2144,7 +2144,7 @@ CREATE TABLE IF NOT EXISTS ranking_snapshot_items (
   signal_run_id INTEGER,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_ranking_item_capture FOREIGN KEY (ranking_snapshot_id)
-    REFERENCES ranking_snapshots (ranking_snapshot_id) ON DELETE CASCADE,
+    REFERENCES ranking_snapshots (id),
   CONSTRAINT uq_ranking_decision_snapshot_id UNIQUE(decision_snapshot_id)
 )
 """

@@ -95,6 +95,10 @@ def _capture(db, *, market, session_date, capture_id, rows):
                 primary_horizon_sessions=row["primary_horizon_sessions"],
                 exit_session_date=row["exit_session_date"],
                 exit_session_complete=row.get("exit_session_complete", True),
+                decision_at_utc=datetime.strptime(session_date, "%Y-%m-%d"),
+                available_at_utc=row["available_at_utc"],
+                receipt_at_utc=row["available_at_utc"],
+                capture_hash=row["capture_hash"],
                 point_in_time_status=row["point_in_time_status"],
                 outcome_population_id=row["population"],
                 ranker_version=RANKER_VERSION,
@@ -180,6 +184,11 @@ def _row(**kwargs):
         "net_return_pct": net,
         "signal_run_id": kwargs["signal_run_id"],
         "exit_session_complete": kwargs.get("exit_session_complete", True),
+        "available_at_utc": kwargs.get("available_at_utc",
+                                       datetime.strptime(kwargs["session_date"], "%Y-%m-%d")),
+        "capture_hash": kwargs["capture_hash"]
+        if "capture_hash" in kwargs
+        else f"cap-{kwargs['market']}-{kwargs['unit']}-{kwargs['session_date']}",
         "outcome_id": kwargs["outcome_id"],
         "input_hash": kwargs.get("input_hash")
         or f"input-{kwargs['market']}-{kwargs['unit']}-{kwargs['session_date']}",
@@ -893,5 +902,239 @@ CREATE TABLE strategy_weights (
                 ("strategy", "HK"),
             }
             assert {m.mode for m in modes} == {MODE_FROZEN}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ------------------------------------------------- provenance and cohort scope
+
+def test_verified_label_without_evidence_is_ineligible(db_session):
+    """自行標為 VERIFIED 但無時間戳或無 capture hash 的資料仍拒絕。"""
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-05",
+        capture_id="pit-evidence",
+        rows=[
+            _row(
+                market="TW",
+                unit=0,
+                session_date="2026-01-05",
+                gross_return_pct=1.0,
+                exit_session_date="2026-01-12",
+                signal_run_id=1,
+                outcome_id=1,
+                available_at_utc=None,
+            ),
+            _row(
+                market="TW",
+                unit=1,
+                session_date="2026-01-05",
+                gross_return_pct=1.0,
+                exit_session_date="2026-01-12",
+                signal_run_id=2,
+                outcome_id=2,
+                capture_hash="",
+            ),
+        ],
+    )
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    assert cohort["counts"]["rejected"].get("PIT_TIMESTAMPS_MISSING") == 1
+    assert cohort["counts"]["rejected"].get("CAPTURE_HASH_MISSING") == 1
+
+
+def test_factor_cohort_pins_the_fixed_horizon(db_session):
+    """因子樣組只接受固定 5 sessions primary horizon。"""
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-05",
+        capture_id="short-horizon",
+        rows=[
+            _row(
+                market="TW",
+                unit=0,
+                session_date="2026-01-05",
+                gross_return_pct=1.0,
+                exit_session_date="2026-01-08",
+                signal_run_id=1,
+                outcome_id=1,
+                primary_horizon_sessions=3,
+            )
+        ],
+    )
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    assert cohort["counts"]["rejected"].get("NON_PRIMARY_HORIZON") == 1
+
+
+def test_pending_first_decision_stays_canonical(db_session):
+    """首未完成決策仍 canonical：後面的 refresh 不會變成樣組成員。"""
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-01",
+        capture_id="c-pending",
+        rows=[
+            _row(
+                market="TW",
+                unit=0,
+                session_date="2026-01-01",
+                gross_return_pct=1.0,
+                exit_session_date="2026-01-08",
+                signal_run_id=1,
+                outcome_id=1,
+            )
+        ],
+    )
+    db_session.query(StrategyOutcome).delete()
+    db_session.commit()
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-01",
+        capture_id="c-refresh",
+        rows=[
+            _row(
+                market="TW",
+                unit=0,
+                session_date="2026-01-01",
+                gross_return_pct=9.0,
+                exit_session_date="2026-01-08",
+                signal_run_id=2,
+                outcome_id=2,
+            )
+        ],
+    )
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    assert cohort["counts"]["rejected"].get("OUTCOME_MISSING") == 1
+    assert cohort["counts"]["rejected"].get("DUPLICATE_UNIT") == 1
+
+
+def test_all_layer_keeps_cross_market_units_apart(db_session):
+    """ALL 層必須 keep 不同市場相同 instrument_id 的獨立 units。"""
+    for market, capture_id, signal_run_id, outcome_id in (
+        ("TW", "shared-TW", 1, 1),
+        ("HK", "shared-HK", 2, 2),
+    ):
+        _capture(
+            db_session,
+            market=market,
+            session_date="2026-01-05",
+            capture_id=capture_id,
+            rows=[
+                _row(
+                    market=market,
+                    unit=0,
+                    session_date="2026-01-05",
+                    gross_return_pct=1.0,
+                    exit_session_date="2026-01-12",
+                    signal_run_id=signal_run_id,
+                    outcome_id=outcome_id,
+                    instrument_id="inst-shared",
+                )
+            ],
+        )
+    cohort = select_cohort(db_session, kind="factor", market="ALL")
+    assert cohort["counts"]["units"] == 2
+    assert cohort["counts"]["rejected"].get("DUPLICATE_UNIT") is None
+
+
+def test_strategy_target_readiness_is_isolated(db_session):
+    """成熟策略的樣組數不計為 rebound 的 readiness。"""
+    _seed_cohort(db_session, dates=32, units=5, strategy_code="trend_follow",
+                 net_offset=2.0)
+    _seed_cohort(db_session, dates=26, units=2, strategy_code="rebound",
+                 net_offset=2.0, primary_horizon_sessions=3, id_base=5000)
+    batch = plan_calibration_batch(
+        db_session,
+        kind="strategy",
+        market="TW",
+        targets=["trend_follow|default", "rebound|default"],
+    )
+    mature = batch["plans"]["trend_follow|default"]["readiness"]
+    rebound = batch["plans"]["rebound|default"]["readiness"]
+    assert mature["ready"] is True
+    assert rebound["ready"] is False
+    assert rebound["training"]["units"] == 36
+    assert any("UNITS_BELOW_FLOOR" in reason for reason in rebound["reasons"])
+    assert mature["training"]["units"] == 110
+    # 不同 target 的 fingerprint 必須 differ（樣組實際進入統計istics）。
+    assert (batch["plans"]["trend_follow|default"]["cohort_fingerprint"]
+            != batch["plans"]["rebound|default"]["cohort_fingerprint"])
+
+
+def test_integrity_fault_is_not_duplicate_cohort(db_session):
+    """非唯一鍵的 integrity 錯誤向上拋，不會變成 DUPLICATE_COHORT。"""
+    import sqlite3
+
+    from sqlalchemy.exc import IntegrityError
+
+    from src.modules.strategy.calibration_gate import _is_application_key_conflict
+
+    def _integrity(message: str) -> IntegrityError:
+        return IntegrityError("INSERT calibration_applications", None,
+                              sqlite3.OperationalError(message))
+
+    replay = _integrity("UNIQUE constraint failed:"
+                        " calibration_applications.kind,"
+                        " calibration_applications.target")
+    fault = _integrity("NOT NULL constraint failed:"
+                       " calibration_applications.target")
+    assert _is_application_key_conflict(replay) is True
+    assert _is_application_key_conflict(fault) is False
+
+    _seed_cohort(db_session, dates=32)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
+                         reason="floors met")
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+
+    def _boom() -> None:
+        raise fault
+
+    # 替替 flush 的 write reservation 時非-key integrity 錯誤 must 向上拋.
+    db_session.flush = _boom
+    with pytest.raises(IntegrityError):
+        apply_calibration_plan(db_session, plan=plan, new_weight=1.2)
+
+
+def test_migration_127_fk_targets_capture_id():
+    """Migration 的 item FK 指向 capture 的 PK，並開啟 foreign_keys 後仍可寫。"""
+    import sqlite3
+
+    from src.platform.persistence.migrations import MIGRATIONS
+
+    runner = next(m.runner for m in MIGRATIONS if m.version == 127)
+    tmp = tempfile.mkdtemp()
+    try:
+        db_path = f"{tmp}/fk.db"
+        engine = create_engine(f"sqlite:///{db_path}")
+        with engine.begin() as conn:
+            runner(conn)
+            sql = conn.execute(
+                text(
+                    "SELECT sql FROM sqlite_master WHERE type='table'"
+                    " AND name='ranking_snapshot_items'"
+                )
+            ).first()
+        assert sql is not None
+        assert "REFERENCES ranking_snapshots (id)" in sql[0]
+        assert "ON DELETE CASCADE" not in sql[0]
+
+        # SQLite 只驗證外鍵時 pragma 開啟:錯誤的 target column 在此會 raise。
+        con = sqlite3.connect(db_path)
+        con.execute("PRAGMA foreign_keys=ON")
+        con.execute("INSERT INTO ranking_snapshots (capture_id) VALUES ('probe-1')")
+        con.execute(
+            "INSERT INTO ranking_snapshot_items (ranking_snapshot_id, decision_snapshot_id)"
+            " VALUES (1, 'probe-decision')"
+        )
+        con.commit()
+        inserted = con.execute(
+            "SELECT ranking_snapshot_id FROM ranking_snapshot_items"
+        ).fetchall()
+        assert [row[0] for row in inserted] == [1]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

@@ -81,6 +81,12 @@ CALIBRATION_FLOORS: dict[str, dict[str, int]] = {
 ALL_MIN_QUALIFYING_MARKETS = 2
 
 
+def _is_application_key_conflict(error: BaseException) -> bool:
+    """True only for the calibration_applications unique-key replay, not other integrity breaks."""
+    message = str(error).lower()
+    return "calibration_applications" in message and "unique constraint failed" in message
+
+
 def _canonical(payload) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
                       default=str)
@@ -360,6 +366,62 @@ def _outcome_provenance(item, outcome) -> tuple[bool, str]:
     return True, ""
 
 
+def _item_evidence(item, *, kind: str, horizon_map: dict | None = None) -> tuple[bool, str]:
+    """Item-side evidence for one archived decision row.
+
+    A caller-written VERIFIED label is not enough: the seal needs the timestamps and the
+    capture hash that make the archived payload identifiable, so an unknown point-in-time
+    input stays ineligible until the RC-D producer fills the real provenance.
+    """
+    if (item.point_in_time_status or "").upper() != POINT_IN_TIME_VERIFIED:
+        return False, "PIT_UNVERIFIED"
+    if not (item.capture_hash or ""):
+        return False, "CAPTURE_HASH_MISSING"
+    if item.decision_at_utc is None or item.available_at_utc is None:
+        return False, "PIT_TIMESTAMPS_MISSING"
+    if item.available_at_utc < item.decision_at_utc:
+        return False, "PIT_AVAILABILITY_BEFORE_DECISION"
+    if not item.exit_session_complete:
+        return False, "EXIT_SESSION_INCOMPLETE"
+    if (item.outcome_population_id or "") != POPULATION_SIGNAL_FORWARD_V2:
+        return False, "POPULATION_NOT_V2"
+    if (item.evaluation_version or "") != EVALUATION_VERSION_V2:
+        return False, "EVALUATOR_NOT_V2"
+    if item.primary_horizon_sessions is None:
+        return False, "PRIMARY_HORIZON_MISSING"
+    if kind == "factor":
+        # Factor cohorts read the fixed primary horizon, not whatever the row claims.
+        if int(item.primary_horizon_sessions) != FACTOR_HORIZON_SESSIONS:
+            return False, "NON_PRIMARY_HORIZON"
+    else:
+        expected = (horizon_map or {}).get(item.strategy_code)
+        if expected is None or int(item.primary_horizon_sessions) != int(expected):
+            return False, "NON_PRIMARY_HORIZON"
+    return True, ""
+
+
+def cohort_for_target(cohort: dict, *, kind: str, target: str | None = None) -> dict:
+    """Scope a sealed cohort to one strategy target (factor cohorts are already per target).
+
+    Strategy readiness, floors and fingerprint must count only the target strategy's own
+    units; a two-unit rebound cohort may not borrow a mature strategy's sample.
+    """
+    if kind != "strategy" or not target:
+        return cohort
+    code = target.partition("|")[0]
+    rows = [s for s in cohort["samples"] if (s["strategy_code"] or "") == code]
+    return {
+        **cohort,
+        "samples": rows,
+        "decision_dates": sorted({s["session_date"] for s in rows}),
+        "counts": {
+            **cohort["counts"],
+            "units": len(rows),
+            "dates": len({s["session_date"] for s in rows}),
+        },
+    }
+
+
 def decision_snapshot_id_for(*, capture_id: str, market: str, session_date: str,
                              instrument_id: str, strategy_code: str, ranker_version: str) -> str:
     """Persistent id for one immutable item; retry of the same capture reuses it."""
@@ -417,35 +479,73 @@ def select_cohort(db, *, kind: str, market: str,
     if kind == "strategy" and primary_horizon_sessions is not None:
         horizon_map = {code: int(primary_horizon_sessions) for code in horizon_map}
 
-    query = (
-        db.query(RankingSnapshotItem, StrategyOutcome)
-        .join(
-            StrategyOutcome,
-            (RankingSnapshotItem.signal_run_id == StrategyOutcome.signal_run_id)
-            & (StrategyOutcome.horizon_days == RankingSnapshotItem.primary_horizon_sessions),
-        )
-        .filter(
-            RankingSnapshotItem.primary_horizon_sessions.isnot(None),
-            StrategyOutcome.outcome_return_pct.isnot(None),
-        )
+    # Canonical decision selection happens before any outcome is inspected: an
+    # incomplete first decision must not let a later same-day refresh become canonical.
+    item_query = db.query(RankingSnapshotItem).filter(
+        RankingSnapshotItem.primary_horizon_sessions.isnot(None)
     )
     if market != "ALL":
-        query = query.filter(RankingSnapshotItem.stock_market == market)
+        item_query = item_query.filter(RankingSnapshotItem.stock_market == market)
 
     rejected: dict[str, int] = {}
-    candidates: list[dict] = []
     raw_rows = 0
-    signal_ids: set[int] = set()
-    for item, outcome in query.all():
+    canonical: dict[tuple, dict] = {}
+
+    def _reject(reason: str) -> None:
+        rejected[reason] = rejected.get(reason, 0) + 1
+
+    for item in item_query.all():
         raw_rows += 1
+        ok, reason = _item_evidence(item, kind=kind, horizon_map=horizon_map)
+        if not ok:
+            _reject(reason)
+            continue
+        # The unit key carries the market: the ALL layer must keep market strata apart.
+        key = (item.stock_market, item.instrument_id or item.stock_symbol, item.session_date)
         if kind == "strategy":
-            expected = (horizon_map or {}).get(item.strategy_code)
-            if expected is None or int(item.primary_horizon_sessions) != int(expected):
-                rejected["NON_PRIMARY_HORIZON"] = rejected.get("NON_PRIMARY_HORIZON", 0) + 1
-                continue
+            key = (*key, item.strategy_code)
+        order = (
+            int(item.ranking_snapshot_id) if item.ranking_snapshot_id is not None else 0,
+            item.decision_snapshot_id or "",
+        )
+        current = canonical.get(key)
+        if not current:
+            canonical[key] = {"item": item, "order": order}
+            continue
+        # Same unit from a later capture is a refresh: the first decision wins.
+        _reject("DUPLICATE_UNIT")
+        if order < current["order"]:
+            canonical[key] = {"item": item, "order": order}
+
+    wanted_signals: set[int] = set()
+    horizons: set[int] = set()
+    for entry in canonical.values():
+        if entry["item"].signal_run_id is not None:
+            wanted_signals.add(int(entry["item"].signal_run_id))
+        horizons.add(int(entry["item"].primary_horizon_sessions))
+
+    outcome_index: dict[tuple[int, int], StrategyOutcome] = {}
+    if wanted_signals:
+        for outcome in db.query(StrategyOutcome).filter(
+            StrategyOutcome.signal_run_id.in_(wanted_signals),
+            StrategyOutcome.horizon_days.in_(horizons),
+        ).all():
+            outcome_index[(int(outcome.signal_run_id), int(outcome.horizon_days))] = outcome
+
+    candidates: list[dict] = []
+    signal_ids: set[int] = set()
+    for entry in canonical.values():
+        item = entry["item"]
+        outcome = (
+            outcome_index.get((int(item.signal_run_id), int(item.primary_horizon_sessions)))
+            if item.signal_run_id is not None else None
+        )
+        if outcome is None:
+            _reject("OUTCOME_MISSING")
+            continue
         ok, reason = _outcome_provenance(item, outcome)
         if not ok:
-            rejected[reason] = rejected.get(reason, 0) + 1
+            _reject(reason)
             continue
         meta = outcome.meta or {}
         if item.signal_run_id is not None:
@@ -470,22 +570,10 @@ def select_cohort(db, *, kind: str, market: str,
             }
         )
 
-    candidates.sort(key=lambda s: (s["session_date"], s["instrument_id"],
+    candidates.sort(key=lambda s: (s["session_date"], s["market"], s["instrument_id"],
                                    s["strategy_code"], s["capture_order"],
                                    s["decision_snapshot_id"]))
-    key_for = (
-        (lambda s: (s["instrument_id"], s["session_date"], s["strategy_code"]))
-        if kind == "strategy"
-        else (lambda s: (s["instrument_id"], s["session_date"]))
-    )
-    selected: dict = {}
-    for sample in candidates:
-        key = key_for(sample)
-        if key in selected:
-            rejected["DUPLICATE_UNIT"] = rejected.get("DUPLICATE_UNIT", 0) + 1
-            continue
-        selected[key] = sample
-    samples = list(selected.values())
+    samples = candidates
 
     dates = sorted({s["session_date"] for s in samples})
     horizon_value: object = FACTOR_HORIZON_SESSIONS
@@ -535,11 +623,13 @@ def cohort_ic_periods(cohort: dict, *, kind: str) -> dict:
 
 
 def cohort_fingerprint(cohort: dict, *, kind: str, market: str,
+                       target: str | None = None,
                        policy_version: str = CALIBRATION_POLICY_VERSION) -> str:
     """Canonical SHA-256 of the exact immutable inputs that enter the statistics.
 
     Excludes scheduler tick time, live/output weights, rounded IC and sample_size.
     """
+    cohort = cohort_for_target(cohort, kind=kind, target=target)
     value_key = "gross_return_pct" if kind == "factor" else "net_return_pct"
     samples = sorted(
         cohort["samples"],
@@ -590,6 +680,7 @@ def _bootstrap_interval(values: list[float], *, draws: int = BOOTSTRAP_DRAWS,
 
 
 def _readiness_one(cohort: dict, *, market: str, kind: str, target: str | None = None) -> dict:
+    cohort = cohort_for_target(cohort, kind=kind, target=target)
     floors = CALIBRATION_FLOORS.get(market, CALIBRATION_FLOORS["ALL"])
     dates = list(cohort["decision_dates"])
     holdout = dates[-HOLDOUT_DECISION_DATES:] if len(dates) > HOLDOUT_DECISION_DATES else []
@@ -729,8 +820,9 @@ def plan_calibration(db, *, kind: str, market: str, target: str,
     ensure_rollout_baseline_and_modes(db, baseline_name=baseline_name,
                                       market=market, kind=kind)
     cohort = select_cohort(db, kind=kind, market=market)
-    fingerprint = cohort_fingerprint(cohort, kind=kind, market=market)
-    readiness = evaluate_readiness(cohort, market=market, kind=kind, target=target)
+    target_cohort = cohort_for_target(cohort, kind=kind, target=target)
+    fingerprint = cohort_fingerprint(cohort, kind=kind, market=market, target=target)
+    readiness = evaluate_readiness(target_cohort, market=market, kind=kind, target=target)
     mode = read_calibration_mode(db, kind=kind, market=market)
     pinned, auto = pin_state(db, kind=kind, market=market, target=target, regime=regime)
     old_weight = current_weight(db, kind=kind, market=market, target=target, regime=regime)
@@ -744,7 +836,7 @@ def plan_calibration(db, *, kind: str, market: str, target: str,
         "pinned": pinned,
         "auto_calibrate": auto,
         "old_weight": old_weight,
-        "cohort": cohort,
+        "cohort": target_cohort,
         "cohort_fingerprint": fingerprint,
         "readiness": readiness,
         "expected_live_config_hash": expected_hash,
@@ -764,19 +856,22 @@ def plan_calibration_batch(db, *, kind: str, market: str, targets: list[str],
     mode = read_calibration_mode(db, kind=kind, market=market)
     plans: dict[str, dict] = {}
     for target in targets:
+        target_cohort = cohort_for_target(cohort, kind=kind, target=target)
         plans[target] = {
             "kind": kind,
             "market": market,
             "target": target,
             "regime": regime,
             "mode": mode,
-            "cohort": cohort,
-            "cohort_fingerprint": fingerprint,
-            "readiness": evaluate_readiness(cohort, market=market, kind=kind, target=target),
+            "cohort": target_cohort,
+            "cohort_fingerprint": cohort_fingerprint(cohort, kind=kind, market=market,
+                                                     target=target),
+            "readiness": evaluate_readiness(target_cohort, market=market, kind=kind,
+                                            target=target),
             "expected_live_config_hash": expected_hash,
             "calibration_policy_version": CALIBRATION_POLICY_VERSION,
             "old_weight": current_weight(db, kind=kind, market=market,
-                                        target=target, regime=regime),
+                                         target=target, regime=regime),
         }
     return {"kind": kind, "market": market, "targets": list(targets), "plans": plans}
 
@@ -811,8 +906,11 @@ def apply_calibration_plan(db, *, plan: dict, new_weight: float,
     db.add(claim)
     try:
         db.flush()
-    except IntegrityError:
+    except IntegrityError as error:
         db.rollback()
+        if not _is_application_key_conflict(error):
+            # A foreign-key or NOT NULL break is a real fault, not a replay of the cohort key.
+            raise
         return {"status": "DUPLICATE_COHORT", "market": market, "kind": kind,
                 "target": target, "cohort_fingerprint": plan["cohort_fingerprint"]}
 
@@ -911,10 +1009,12 @@ def apply_calibration_plan(db, *, plan: dict, new_weight: float,
                             "holdout_dates": HOLDOUT_DECISION_DATES},
         )
     )
+    # Read the refreshed identity before the commit so an external writer landing later
+    # still misses the expected hash and is rejected as STALE_CONFIG.
+    refreshed = live_config_hash(db, kind=kind, market=market, regime=regime) if batch else None
     db.commit()
     if batch is not None:
         # Sibling proposals in the same batch must see this write, not a stale snapshot.
-        refreshed = live_config_hash(db, kind=kind, market=market, regime=regime)
         for sibling in batch.get("plans", {}).values():
             sibling["expected_live_config_hash"] = refreshed
     return {"status": "APPLIED", "market": market, "kind": kind, "target": target,
