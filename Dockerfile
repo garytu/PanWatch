@@ -107,15 +107,20 @@ ENV PYTHONUNBUFFERED=1
 ENV DATA_DIR=/app/data
 ENV DOCKER=1
 
-# 默认时区（可在 docker run 时用 -e TZ=... 覆盖）
-ENV TZ=Asia/Shanghai
+# 台股預設時區（可在 docker run 時用 -e TZ=... 覆蓋）
+ENV TZ=Asia/Taipei
+
+# twmd 是獨立服務，請在啟動時提供容器可達的地址與憑證：
+# TWMD_BASE_URL、TWMD_CONTROL_BASE_URL、TWMD_API_TOKEN、TWMD_CONTROL_AGENT_TOKEN。
+# 本機 Docker Desktop 可使用 host.docker.internal；同網路容器使用服務名稱。
+# 不在映像中寫入地址或憑證，保留 Settings 的 .env / 環境變數優先順序。
 
 # 暴露端口（保持 8000 不变，避免影响存量用户升级）
 EXPOSE 8000
 
-# 健康检查（使用 Python）
+# 健康檢查使用與 server.py 相同的埠設定，支援 .env / PANWATCH_PORT 覆蓋。
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
+    CMD python -c "import urllib.request; from src.platform.runtime.config import Settings; urllib.request.urlopen(f'http://127.0.0.1:{Settings().panwatch_port}/api/health', timeout=5)" || exit 1
 
 # 启动命令
 CMD ["python", "server.py"]
