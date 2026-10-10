@@ -175,7 +175,7 @@ export default function DashboardPage() {
     // 機會兜底:overview 無機會時再取(不擋首屏)
     if (ov.status !== 'fulfilled' || !ov.value.action_center?.opportunities?.some(item => isMarketEnabled(item.stock_market))) {
       recommendationsApi
-        .listStrategySignals({ status: 'active', market: DEFAULT_MARKET, limit: 5 })
+        .listStrategySignals({ status: 'active', market: DEFAULT_MARKET, instrument_group: 'ORDINARY', limit: 5 })
         .then((r) => setOppFallback(r.items || []))
         .catch(() => {})
     }
@@ -226,10 +226,21 @@ export default function DashboardPage() {
   }, [scan])
 
   const opportunities = useMemo(() => {
-    const overviewItems = (overview?.action_center?.opportunities || []).filter(item => isMarketEnabled(item.stock_market))
-    const list = overviewItems.length ? overviewItems : oppFallback.filter(item => isMarketEnabled(item.stock_market))
+    const ordinary = (items: typeof oppFallback) => items.filter(item =>
+      isMarketEnabled(item.stock_market)
+      && (item.stock_market !== 'TW' || item.instrument_group === 'EQUITY')
+    )
+    const overviewItems = ordinary(overview?.action_center?.opportunities || [])
+    const list = overviewItems.length ? overviewItems : ordinary(oppFallback)
     return list.slice(0, 5)
   }, [overview, oppFallback])
+
+  const etfOpportunities = useMemo(
+    () => (overview?.action_center?.etf_opportunities || [])
+      .filter(item => isMarketEnabled(item.stock_market) && item.stock_market === 'TW' && item.instrument_group === 'ETF')
+      .slice(0, 5),
+    [overview],
+  )
 
   // 今日要緊事只收自選、持倉和提醒；全市場機會留在「機會精選」。
   const candidates = useMemo<CurateCandidate[]>(() => {
@@ -639,10 +650,11 @@ export default function DashboardPage() {
               進入機會頁
             </button>
           </div>
-          {opportunities.length === 0 ? (
+          {opportunities.length === 0 && etfOpportunities.length === 0 ? (
             <div className="py-6 text-center text-[12px] text-muted-foreground">{loading ? '載入中…' : '暫無活躍機會訊號'}</div>
           ) : (
             <div className="divide-y divide-border/40">
+              {opportunities.length === 0 && <div className="py-3 text-center text-[11px] text-muted-foreground">暫無普通股活躍機會</div>}
               {opportunities.slice(0, 3).map((o) => {
                 const score = Math.max(0, Math.min(100, o.rank_score ?? o.score ?? 0))
                 return (
@@ -669,6 +681,21 @@ export default function DashboardPage() {
                   </div>
                 )
               })}
+              {etfOpportunities.length > 0 && (
+                <div className="border-t border-border/60 pt-2">
+                  <div className="mb-1 text-[10px] font-medium text-muted-foreground">台股 ETF 機會 · 獨立分組</div>
+                  {etfOpportunities.slice(0, 3).map((o) => (
+                    <div
+                      key={`etf:${o.stock_symbol}`}
+                      className="flex cursor-pointer items-center justify-between gap-2 py-1.5 hover:bg-accent/30"
+                      onClick={() => openStock(o.stock_symbol, o.stock_market, o.stock_name || o.stock_symbol)}
+                    >
+                      <span className="min-w-0 truncate text-[11px]">{o.stock_name || o.stock_symbol} <span className="font-mono text-muted-foreground">{o.stock_symbol}</span></span>
+                      <span className="shrink-0 font-mono text-[11px]">{Number(o.rank_score || o.score || 0).toFixed(0)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

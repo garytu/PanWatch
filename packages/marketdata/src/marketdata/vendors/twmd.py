@@ -8,7 +8,7 @@ import json
 import math
 import re
 from dataclasses import asdict, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
@@ -75,6 +75,10 @@ from marketdata.vendors.base import (
 
 # Instrument reference data changes much less often than quotes. Cache only the catalog.
 _catalog_cache = TTLCache(default_ttl_sec=300)
+# Keep the received response alongside the compatibility-filtered catalog so the
+# discovery audit can account for malformed and duplicate rows without another call.
+_catalog_response_cache = TTLCache(default_ttl_sec=300)
+_catalog_response_receipts = TTLCache(default_ttl_sec=300)
 _TAIPEI = ZoneInfo("Asia/Taipei")
 _VALUATION_ENDPOINT = "/api/v1/valuations"
 _FLOW_ENDPOINT = "/api/v1/institutional-flows"
@@ -2926,7 +2930,13 @@ class TwmdClient:
         rows = self.get("instruments")
         if not isinstance(rows, list):
             return []
-        rows = [row for row in rows if row.get("venue") in {"TWSE", "TPEX"}]
+        _catalog_response_cache.set(key, rows)
+        _catalog_response_receipts.set(key, datetime.now(timezone.utc).isoformat())
+        rows = [
+            row for row in rows
+            if isinstance(row, dict) and isinstance(row.get("venue"), str)
+            and row.get("venue") in {"TWSE", "TPEX"}
+        ]
         if rows:
             _catalog_cache.set(key, rows)
         return rows

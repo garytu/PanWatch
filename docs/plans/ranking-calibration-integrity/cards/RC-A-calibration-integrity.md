@@ -1,6 +1,10 @@
 # RC-A: Calibration containment, immutable cohorts and gated restart
 
-Priority: P1. Status: pending. PR-0A has no implementation dependency; PR-3 depends on PR-0B, PR-1 and PR-2. All gates follow [ranking/calibration 契約](../contracts/ranking-vocabulary-v1.md).
+Priority: P1. Status: in_progress (PR-0A completed; PR-3 dependency-gated). PR-0A has no implementation dependency; PR-3 depends on PR-0B, PR-1 and PR-2. All gates follow [ranking/calibration 契約](../contracts/ranking-vocabulary-v1.md).
+
+## Delivery checkpoint
+
+2026-10-11: The user committed PR-0A review work separately as `57c12c1`. RC-B is completed; RC-D and RC-C remain required before PR-3 restart validation. This status does not assert activation or completed restart gates.
 
 ## Problem and delivered result
 

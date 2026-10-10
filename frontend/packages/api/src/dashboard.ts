@@ -238,6 +238,7 @@ export interface DashboardOverviewResponse {
   }
   action_center: {
     opportunities: StrategySignalItem[]
+    etf_opportunities?: StrategySignalItem[]
     risk_items: DashboardRiskSignalItem[]
   }
   market_pulse: {

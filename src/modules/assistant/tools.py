@@ -39,7 +39,7 @@ from src.platform.marketdata.marketdata_client import (
 )
 from src.platform.marketdata.models import MARKETS, MarketCode, is_market_enabled
 from src.platform.marketdata.stock_list import search_stocks
-from src.platform.persistence.models import Stock
+from src.platform.persistence.models import DiscoveryRun, Stock
 from src.platform.runtime.config import Settings
 
 
@@ -228,7 +228,7 @@ def _compact_research_candidate(item: dict[str, Any]) -> dict[str, Any]:
     payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
     source_meta = payload.get("source_meta") if isinstance(payload.get("source_meta"), dict) else {}
     quote = source_meta.get("quote") if isinstance(source_meta.get("quote"), dict) else {}
-    return {
+    compact = {
         "symbol": str(item.get("stock_symbol") or ""),
         "market": str(item.get("stock_market") or "CN"),
         "name": str(item.get("stock_name") or item.get("stock_symbol") or ""),
@@ -245,6 +245,48 @@ def _compact_research_candidate(item: dict[str, Any]) -> dict[str, Any]:
         "current_price": quote.get("current_price"),
         "change_pct": quote.get("change_pct"),
     }
+    if compact["market"] == "TW" or item.get("scan_run_refs"):
+        compact.update({
+            "instrument_id": item.get("instrument_id"),
+            "instrument_group": str(item.get("instrument_group") or "UNKNOWN"),
+            "instrument_authority": item.get("instrument_authority") or {},
+            "scan_run_id": item.get("scan_run_id"),
+            "scan_run_ids": item.get("scan_run_ids") or [],
+            "scan_run_refs": item.get("scan_run_refs") or [],
+            "scan_coverage": item.get("scan_coverage") or [],
+            "scan_coverage_state": item.get("scan_coverage_state") or "UNKNOWN",
+        })
+    return compact
+
+
+def _attach_candidate_scan_coverage(session: Session, items: list[dict[str, Any]]) -> None:
+    """Use the candidate's sealed revision; never substitute the newest run."""
+    refs = [ref for item in items for ref in (item.get("scan_run_refs") or []) if isinstance(ref, dict)]
+    ids = {ref["scan_run_id"] for ref in refs if isinstance(ref.get("scan_run_id"), int)}
+    runs = {row.id: row for row in session.query(DiscoveryRun).filter(DiscoveryRun.id.in_(ids)).all()} if ids else {}
+    fields = (
+        "source_mode", "scan_coverage_state", "coverage_scope", "requested_universe_count",
+        "not_requested_due_to_limit_count", "attempted_instrument_count", "unattempted_instrument_count",
+        "valid_price_count", "invalid_price_count", "missing_or_failed_price_count", "pending_price_count",
+        "failed_request_count", "price_data_dates", "pool_selected_count",
+        "candidate_selected_count", "candidate_excluded_count", "run_completed_at_utc",
+    )
+    for item in items:
+        if item.get("stock_market") != "TW" and not item.get("scan_run_refs"):
+            continue
+        summaries = []
+        for ref in item.get("scan_run_refs") or []:
+            if not isinstance(ref, dict) or not isinstance(ref.get("scan_run_id"), int):
+                continue
+            run = runs.get(ref["scan_run_id"])
+            if run is None or run.revision != ref.get("revision") or run.manifest_hash != ref.get("manifest_hash"):
+                continue
+            manifest = run.manifest or {}
+            summaries.append({**ref, **{field: manifest.get(field) for field in fields}})
+        item["scan_coverage"] = summaries
+        # Per-run states remain separate when turnover and gainers contributed.
+        item["scan_coverage_state"] = "LINKED" if summaries and len(summaries) == len(item.get("scan_run_refs") or []) else "UNKNOWN"
+
 
 
 def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
@@ -296,6 +338,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 holding=holding,
                 risk_level=risk_level,
                 include_payload=True,
+                instrument_group="ORDINARY" if holding != "held" else "",
             )
         except Exception:  # noqa: BLE001 - provider/database failures become controlled tool results
             return ToolResult.failure(
@@ -303,6 +346,7 @@ def build_panwatch_tool_registry(session: Session) -> ToolRegistry:
                 error_code="candidate_data_unavailable",
             )
 
+        _attach_candidate_scan_coverage(session, result.get("items", []))
         items = [_compact_research_candidate(item) for item in result.get("items", [])]
         names = "、".join(item["name"] for item in items[:3])
         summary = (

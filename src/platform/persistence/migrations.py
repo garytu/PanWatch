@@ -2233,6 +2233,165 @@ VALUES(:kind, :market, 'FROZEN', 'pr-0a containment default', :policy)
             )
 
 
+def _m128_discovery_coverage(conn: Connection) -> None:
+    """PR-0B bounded discovery manifests, captured authority, and cost inputs."""
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS discovery_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scan_run_key TEXT NOT NULL DEFAULT '',
+  revision INTEGER NOT NULL DEFAULT 1,
+  stock_market TEXT NOT NULL DEFAULT 'TW',
+  requested_venues TEXT DEFAULT '["TWSE","TPEX"]',
+  source_mode TEXT NOT NULL DEFAULT '',
+  provider_scope TEXT DEFAULT '',
+  provider_raw_status TEXT DEFAULT '',
+  scan_coverage_state TEXT NOT NULL DEFAULT 'UNKNOWN',
+  coverage_scope TEXT NOT NULL DEFAULT 'UNKNOWN',
+  run_started_at_utc DATETIME,
+  run_completed_at_utc DATETIME,
+  catalog_source TEXT DEFAULT '',
+  catalog_source_as_of TEXT,
+  catalog_captured_at_utc DATETIME,
+  catalog_authority_status TEXT DEFAULT 'UNKNOWN',
+  catalog_hash TEXT DEFAULT '',
+  catalog_response_row_count INTEGER DEFAULT 0,
+  catalog_unique_count INTEGER DEFAULT 0,
+  duplicate_catalog_record_count INTEGER DEFAULT 0,
+  invalid_catalog_record_count INTEGER DEFAULT 0,
+  eligible_catalog_count INTEGER DEFAULT 0,
+  requested_universe_count INTEGER DEFAULT 0,
+  not_requested_due_to_limit_count INTEGER DEFAULT 0,
+  attempted_instrument_count INTEGER DEFAULT 0,
+  unattempted_instrument_count INTEGER DEFAULT 0,
+  valid_price_count INTEGER DEFAULT 0,
+  invalid_price_count INTEGER DEFAULT 0,
+  missing_or_failed_price_count INTEGER DEFAULT 0,
+  pending_price_count INTEGER DEFAULT 0,
+  ranking_eligible_count INTEGER DEFAULT 0,
+  ranking_excluded_count INTEGER DEFAULT 0,
+  pool_selected_count INTEGER DEFAULT 0,
+  ranked_not_selected_count INTEGER DEFAULT 0,
+  candidate_selected_count INTEGER DEFAULT 0,
+  candidate_excluded_count INTEGER DEFAULT 0,
+  candidate_not_selected_count INTEGER DEFAULT 0,
+  catalog_request_count INTEGER DEFAULT 0,
+  price_snapshot_request_count INTEGER DEFAULT 0,
+  price_snapshot_batches_planned INTEGER DEFAULT 0,
+  unattempted_price_snapshot_batches INTEGER DEFAULT 0,
+  pending_price_snapshot_batches INTEGER DEFAULT 0,
+  failed_request_count INTEGER DEFAULT 0,
+  price_snapshot_count INTEGER DEFAULT 0,
+  price_data_dates TEXT DEFAULT '[]',
+  stage_id_sets TEXT DEFAULT '{}',
+  stage_reason_id_sets TEXT DEFAULT '{}',
+  stage_reason_counts TEXT DEFAULT '{}',
+  scan_limits TEXT DEFAULT '{}',
+  authority_by_instrument_id TEXT DEFAULT '{}',
+  candidate_ids TEXT DEFAULT '[]',
+  manifest TEXT DEFAULT '{}',
+  manifest_hash TEXT DEFAULT '',
+  selection_config_version TEXT DEFAULT '',
+  selection_config TEXT DEFAULT '{}',
+  selection_config_hash TEXT DEFAULT '',
+  retention_expires_at_utc DATETIME,
+  archived BOOLEAN NOT NULL DEFAULT 0,
+  archived_at_utc DATETIME,
+  archived_reason TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_discovery_run_key UNIQUE(scan_run_key)
+)
+"""))
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS discovery_exclusions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  discovery_run_id INTEGER NOT NULL,
+  stage TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  reason_code TEXT NOT NULL DEFAULT '',
+  instrument_ids TEXT DEFAULT '[]',
+  item_count INTEGER NOT NULL DEFAULT 0,
+  details TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_discovery_exclusion_run FOREIGN KEY (discovery_run_id)
+    REFERENCES discovery_runs(id) ON DELETE CASCADE,
+  CONSTRAINT uq_discovery_exclusion_partition UNIQUE(
+    discovery_run_id, stage, outcome, reason_code
+  )
+)
+"""))
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS instrument_cost_authorities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  instrument_id TEXT NOT NULL,
+  tax_category TEXT NOT NULL DEFAULT 'UNKNOWN',
+  classification_authority TEXT NOT NULL DEFAULT '',
+  classification_source TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  effective_from TEXT NOT NULL DEFAULT '',
+  effective_to TEXT,
+  stamp_duty_rate REAL,
+  commission_rate REAL,
+  minimum_commission REAL,
+  transfer_fee_rate REAL,
+  slippage_bps REAL,
+  evidence_hash TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_instrument_cost_authority_version_date
+    UNIQUE(instrument_id, policy_version, effective_from)
+)
+"""))
+
+    for table, fields in {
+        "discovery_runs": (
+            ("requested_venues", "TEXT DEFAULT '[\"TWSE\",\"TPEX\"]'"),
+            ("scan_limits", "TEXT DEFAULT '{}'"),
+            ("selection_config", "TEXT DEFAULT '{}'"),
+            ("selection_config_hash", "TEXT DEFAULT ''"),
+        ),
+        "entry_candidates": (
+            ("instrument_id", "TEXT"), ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"), ("scan_run_id", "INTEGER"),
+            ("scan_run_ids", "TEXT DEFAULT '[]'"), ("scan_run_refs", "TEXT DEFAULT '[]'"),
+        ),
+        "market_scan_snapshots": (
+            ("instrument_id", "TEXT"), ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"), ("scan_run_ids", "TEXT DEFAULT '[]'"),
+            ("scan_run_refs", "TEXT DEFAULT '[]'"),
+        ),
+        "strategy_signal_runs": (
+            ("instrument_id", "TEXT"), ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"), ("scan_run_id", "INTEGER"),
+            ("scan_run_ids", "TEXT DEFAULT '[]'"), ("scan_run_refs", "TEXT DEFAULT '[]'"),
+        ),
+        "ranking_snapshots": (("scan_run_ids", "TEXT DEFAULT '[]'"),),
+        "ranking_snapshot_items": (
+            ("scan_run_id", "INTEGER"), ("scan_run_ids", "TEXT DEFAULT '[]'"),
+            ("scan_run_refs", "TEXT DEFAULT '[]'"),
+            ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"),
+        ),
+    }.items():
+        for column, sql_type in fields:
+            _add_column_if_missing(
+                conn,
+                table,
+                column,
+                f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}",
+            )
+
+    for name, statement in (
+        ("ix_discovery_run_market_completed",
+         "CREATE INDEX ix_discovery_run_market_completed ON discovery_runs(stock_market, run_completed_at_utc)"),
+        ("ix_discovery_run_retention",
+         "CREATE INDEX ix_discovery_run_retention ON discovery_runs(retention_expires_at_utc, archived)"),
+        ("ix_discovery_exclusion_run_stage",
+         "CREATE INDEX ix_discovery_exclusion_run_stage ON discovery_exclusions(discovery_run_id, stage)"),
+        ("ix_instrument_cost_authority_dates",
+         "CREATE INDEX ix_instrument_cost_authority_dates ON instrument_cost_authorities(instrument_id, effective_from, effective_to)"),
+    ):
+        _create_index_if_missing(conn, name, statement)
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(101, "agent_config_kind_and_visibility", _m101_agent_config_kind),
     Migration(102, "backfill_agent_kind_data", _m102_backfill_agent_kind),
@@ -2261,6 +2420,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(125, "assistant_task_protocol", _m125_assistant_task_protocol),
     Migration(126, "assistant_task_events", _m126_assistant_task_events),
     Migration(127, "calibration_integrity", _m127_calibration_integrity),
+    Migration(128, "discovery_coverage", _m128_discovery_coverage),
 )
 
 

@@ -151,6 +151,7 @@ def get_entry_candidates(
     source: str = Query("", description="來源: market_scan/watchlist/mixed/all"),
     holding: str = Query("", description="持倉過濾: held/unheld/all"),
     strategy: str = Query("", description="策略標籤過濾"),
+    instrument_group: str = Query("", pattern="^(|ORDINARY|EQUITY|ETF|UNKNOWN)$"),
 ):
     if refresh:
         refresh_entry_candidates()
@@ -163,6 +164,7 @@ def get_entry_candidates(
         source=source,
         holding=holding,
         strategy=strategy,
+        instrument_group=instrument_group,
     )
 
 
@@ -231,6 +233,7 @@ def get_strategy_signal_list(
     strategy_code: str = Query("", description="策略程式碼"),
     risk_level: str = Query("", description="風險等級: low/medium/high/all"),
     include_payload: bool = Query(False, description="是否返回完整 payload（預設否，提升效能）"),
+    instrument_group: str = Query("", pattern="^(|ORDINARY|EQUITY|ETF|UNKNOWN)$"),
 ):
     result = list_strategy_signals(
         market=market,
@@ -243,6 +246,7 @@ def get_strategy_signal_list(
         strategy_code=strategy_code,
         risk_level=risk_level,
         include_payload=include_payload,
+        instrument_group=instrument_group,
     )
     # Phase 3: 注入 1-10 可解釋評分 + 正負因子拆解
     for _it in result.get("items", []):

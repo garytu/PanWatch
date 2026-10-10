@@ -156,6 +156,12 @@ const toSignalFromCandidate = (row: EntryCandidateItem): StrategySignalItem => {
   const riskLabel = riskLevel === 'high' ? '高風險' : riskLevel === 'low' ? '低風險' : '中風險'
   return {
     id: Number(row.id || 0),
+    instrument_id: row.instrument_id,
+    instrument_group: row.instrument_group,
+    instrument_authority: row.instrument_authority,
+    scan_run_id: row.scan_run_id,
+    scan_run_ids: row.scan_run_ids,
+    scan_run_refs: row.scan_run_refs,
     snapshot_date: row.snapshot_date || '',
     stock_symbol: row.stock_symbol,
     stock_market: row.stock_market || DEFAULT_MARKET,
@@ -239,6 +245,7 @@ export default function OpportunitiesPage() {
   const [risk, setRisk] = useLocalStorage<RiskFilter>('panwatch_opportunities_risk_v3', DEFAULT_FILTERS.risk)
   const [minScore, setMinScore] = useLocalStorage('panwatch_opportunities_min_score_v3', DEFAULT_FILTERS.minScore)
   const [snapshotDate, setSnapshotDate] = useState('')
+  const [instrumentGroup, setInstrumentGroup] = useState<'ORDINARY' | 'ETF'>('ORDINARY')
 
   const [insightOpen, setInsightOpen] = useState(false)
   const [insightSymbol, setInsightSymbol] = useState('')
@@ -291,6 +298,7 @@ export default function OpportunitiesPage() {
     try {
       const req = {
         status: 'active' as const,
+        instrument_group: (market === 'ALL' || market === 'TW') && holding !== 'held' ? instrumentGroup : undefined,
         source_pool: source,
         holding,
         market: market === 'ALL' ? '' : market,
@@ -326,6 +334,7 @@ export default function OpportunitiesPage() {
             snapshot_date: '',
             source: source === 'all' ? 'all' : source,
             holding: req.holding,
+            instrument_group: req.instrument_group,
             timeoutMs: 90000,
           })
           data = {
@@ -347,7 +356,7 @@ export default function OpportunitiesPage() {
     } finally {
       setLoading(false)
     }
-  }, [holding, market, minScore, risk, source, strategy])
+  }, [holding, instrumentGroup, market, minScore, risk, source, strategy])
 
   useEffect(() => {
     load()
@@ -411,6 +420,7 @@ export default function OpportunitiesPage() {
   }
 
   const resetFilters = useCallback(() => {
+    setInstrumentGroup('ORDINARY')
     setMarket(DEFAULT_FILTERS.market)
     setSource(DEFAULT_FILTERS.source)
     setHolding(DEFAULT_FILTERS.holding)
@@ -685,6 +695,12 @@ export default function OpportunitiesPage() {
         </div>
       )}
 
+      {(market === 'ALL' || market === 'TW') && holding !== 'held' && (
+        <div className="mb-3 flex gap-2" aria-label="機會分類">
+          <Button size="sm" variant={instrumentGroup === 'ORDINARY' ? 'default' : 'outline'} onClick={() => setInstrumentGroup('ORDINARY')}>普通股票</Button>
+          <Button size="sm" variant={instrumentGroup === 'ETF' ? 'default' : 'outline'} onClick={() => setInstrumentGroup('ETF')}>台股 ETF</Button>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {groupedItems.map((group) => {
           const item = group.primary
@@ -741,6 +757,7 @@ export default function OpportunitiesPage() {
                     )}
                   </div>
                 </div>
+                {item.stock_market === 'TW' && <div className="mt-1 text-[10px] text-muted-foreground">{item.instrument_group === 'ETF' ? 'ETF 機會' : item.instrument_group === 'EQUITY' ? '普通股' : '分類未知'}</div>}
                 <div className="mt-2 text-[12px] text-foreground line-clamp-2">{item.signal || item.reason || '--'}</div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                   <div>入場: {formatEntryDisplay(item.action, entryLow, entryHigh)}</div>

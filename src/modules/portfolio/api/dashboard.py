@@ -158,29 +158,56 @@ def get_dashboard_overview(
     snapshot_date = str(coverage.get("snapshot_date") or "")
 
     # Action list: unheld, active, executable first.
-    unheld = list_strategy_signals(
-        market=market_filter,
-        status="active",
-        min_score=55,
-        limit=max(30, int(action_limit) * 10),
-        snapshot_date=snapshot_date,
-        source_pool="all",
-        holding="unheld",
-        strategy_code="",
-        risk_level="all",
-        include_payload=False,
-    )
-    grouped_unheld = _group_signals(list(unheld.get("items") or []))
+    opportunity_query_limit = max(30, int(action_limit) * 10)
+
+    def _unheld_items(*, requested_market: str, instrument_group: str = "") -> list[dict]:
+        result = list_strategy_signals(
+            market=requested_market,
+            status="active",
+            min_score=55,
+            limit=opportunity_query_limit,
+            snapshot_date=snapshot_date,
+            source_pool="all",
+            holding="unheld",
+            strategy_code="",
+            risk_level="all",
+            instrument_group=instrument_group,
+            include_payload=False,
+        )
+        return list(result.get("items") or [])
+
+    if mkt == "TW":
+        # Query each captured instrument group independently so a full ETF page
+        # cannot consume the SQL limit before ordinary EQUITY opportunities load.
+        unheld_items = _unheld_items(requested_market="TW", instrument_group="EQUITY")
+        unheld_items.extend(_unheld_items(requested_market="TW", instrument_group="ETF"))
+    elif mkt == "ALL":
+        unheld_items = _unheld_items(requested_market="", instrument_group="ORDINARY")
+        unheld_items.extend(_unheld_items(requested_market="TW", instrument_group="ETF"))
+    else:
+        unheld_items = _unheld_items(requested_market=market_filter)
+    grouped_unheld = _group_signals(unheld_items)
+    def _tw_group(row: dict) -> str:
+        return str(row.get("instrument_group") or "UNKNOWN").strip().upper()
+
+    etf_opportunities = [
+        row for row in grouped_unheld
+        if str(row.get("stock_market") or "").upper() == "TW" and _tw_group(row) == "ETF"
+    ]
+    ordinary_unheld = [
+        row for row in grouped_unheld
+        if str(row.get("stock_market") or "").upper() != "TW" or _tw_group(row) == "EQUITY"
+    ]
     executable = [
         x
-        for x in grouped_unheld
+        for x in ordinary_unheld
         if str(x.get("action") or "").lower() in ("buy", "add")
         and (x.get("entry_low") is not None or x.get("entry_high") is not None)
     ]
     executable.sort(key=lambda x: float(x.get("rank_score") or 0.0), reverse=True)
     if len(executable) < int(action_limit):
         remaining = sorted(
-            [x for x in grouped_unheld if x not in executable],
+            [x for x in ordinary_unheld if x not in executable],
             key=lambda x: (
                 0 if str(x.get("status") or "") == "active" else 1,
                 -float(x.get("rank_score") or 0.0),
@@ -188,6 +215,11 @@ def get_dashboard_overview(
         )
         executable.extend(remaining[: max(0, int(action_limit) - len(executable))])
     action_items = executable[: int(action_limit)]
+    etf_opportunities.sort(
+        key=lambda x: (0 if str(x.get("action") or "").lower() in ("buy", "add") else 1,
+                       -float(x.get("rank_score") or 0.0))
+    )
+    etf_opportunities = etf_opportunities[: int(action_limit)]
 
     # Risk list: held symbols with risk flags.
     held = list_strategy_signals(
@@ -373,6 +405,7 @@ def get_dashboard_overview(
         },
         "action_center": {
             "opportunities": action_items,
+            "etf_opportunities": etf_opportunities,
             "risk_items": risk_items,
         },
         "market_pulse": {

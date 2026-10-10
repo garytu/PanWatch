@@ -1,6 +1,10 @@
 # RC-D: Immutable, session-based forward and execution outcomes
 
-Priority: P1. Status: pending. Ships in PR-1 after PR-0A identity/containment and PR-0B instrument/cost authority. Contract: [outcome vocabulary](../contracts/outcome-vocabulary-v1.md).
+Priority: P1. Status: ready. Owner: unassigned. Ships in PR-1 after PR-0A identity/containment and PR-0B instrument/cost authority. Contract: [outcome vocabulary](../contracts/outcome-vocabulary-v1.md).
+
+## Readiness checkpoint
+
+2026-10-11: PR-0A identity is committed (`57c12c1`); RC-B instrument/coverage authority is completed and reviewed. Dated cost adapter is available; missing subtype/tax authority must retain gross and report `cost_authority_missing` / net unavailable. No RC-D implementation has started.
 
 ## Problem and delivered result
 

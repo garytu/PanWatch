@@ -11,7 +11,13 @@ from src.platform.runtime.config import Settings
 from src.platform.notifications.notifier import get_global_proxy
 from src.platform.marketdata.collectors.discovery_collector import EastMoneyDiscoveryCollector
 from src.platform.persistence.database import get_db
-from src.platform.persistence.models import MarketScanSnapshot, Stock
+from src.platform.persistence.models import (
+    DiscoveryExclusion,
+    DiscoveryRun,
+    MarketScanSnapshot,
+    Stock,
+)
+from src.modules.strategy.discovery_coverage import discovery_run_payload
 
 
 router = APIRouter()
@@ -309,6 +315,67 @@ async def get_hot_stocks(
         )
     _cache_set(key, data)
     return data
+
+
+@router.get("/runs/latest")
+def get_latest_discovery_run(market: str = "TW", db: Session = Depends(get_db)):
+    """Return one persisted run with only the candidates linked to that run."""
+    mkt = _normalize_market(market)
+    run = (
+        db.query(DiscoveryRun)
+        .filter(DiscoveryRun.stock_market == mkt)
+        .order_by(DiscoveryRun.run_completed_at_utc.desc(), DiscoveryRun.id.desc())
+        .first()
+    )
+    if run is None:
+        raise HTTPException(404, "尚無已保存的 discovery run")
+    return _discovery_run_detail(db, run)
+
+
+@router.get("/runs/{scan_run_id}")
+def get_discovery_run(scan_run_id: int, db: Session = Depends(get_db)):
+    """Read one immutable discovery manifest and its bounded stage ledger."""
+    run = db.query(DiscoveryRun).filter(DiscoveryRun.id == scan_run_id).first()
+    if run is None:
+        raise HTTPException(404, "找不到 discovery run")
+    return _discovery_run_detail(db, run)
+
+
+def _discovery_run_detail(db: Session, run: DiscoveryRun) -> dict:
+    payload = discovery_run_payload(run)
+    payload["stage_ledger"] = [
+        {
+            "stage": item.stage,
+            "outcome": item.outcome,
+            "reason_code": item.reason_code,
+            "instrument_ids": item.instrument_ids or [],
+            "item_count": item.item_count,
+            "details": item.details or {},
+        }
+        for item in db.query(DiscoveryExclusion)
+        .filter(DiscoveryExclusion.discovery_run_id == run.id)
+        .order_by(DiscoveryExclusion.stage, DiscoveryExclusion.outcome, DiscoveryExclusion.reason_code)
+        .all()
+    ]
+    run_ref = {
+        "scan_run_id": run.id,
+        "revision": run.revision,
+        "manifest_hash": run.manifest_hash,
+        "source_mode": run.source_mode,
+    }
+    payload["items"] = [
+        {
+            **item,
+            "scan_run_id": run.id,
+            "scan_run_revision": run.revision,
+            "scan_run_manifest_hash": run.manifest_hash,
+            "scan_run_refs": [run_ref],
+        }
+        for item in (run.manifest or {}).get("candidate_items", [])
+        if isinstance(item, dict)
+    ]
+    payload["candidate_count"] = len(payload["items"])
+    return payload
 
 
 @router.post("/stocks/screen")

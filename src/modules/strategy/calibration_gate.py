@@ -508,6 +508,8 @@ def ensure_ranking_capture(db, *, capture_id: str, market: str, session_date: st
                            scoring_config_version: str = "",
                            evaluation_version: str = "",
                            catalog_authority: dict | None = None,
+                           scan_run_ids: list[int] | None = None,
+                           scan_run_refs_by_item: dict | None = None,
                            calibration_policy_version: str = CALIBRATION_POLICY_VERSION,
                            scoring_config_payload: dict | None = None,
                            commit: bool = True) -> int:
@@ -532,8 +534,11 @@ def ensure_ranking_capture(db, *, capture_id: str, market: str, session_date: st
         evaluation_version=evaluation_version,
         calibration_policy_version=calibration_policy_version,
         catalog_authority=dict(catalog_authority or {}),
+        scan_run_ids=sorted({int(value) for value in (scan_run_ids or []) if value is not None}),
+        scan_run_id=(int(scan_run_ids[0]) if scan_run_ids and len(set(scan_run_ids)) == 1 else None),
         meta={"rank_source_mode": rank_source_mode,
-              "scoring_config_payload": dict(scoring_config_payload or {})},
+              "scoring_config_payload": dict(scoring_config_payload or {}),
+              "scan_run_refs_by_item": dict(scan_run_refs_by_item or {})},
     )
     db.add(row)
     if commit:
@@ -590,6 +595,15 @@ def _decision_content(row: dict, *, market: str, session_date: str,
         "population": population,
         "calibration_policy_version": calibration_policy_version,
         "catalog_authority": catalog_authority,
+        "instrument_group": str(row.get("instrument_group") or "UNKNOWN"),
+        "instrument_authority": row.get("instrument_authority") or {},
+        "scan_run_ids": sorted({
+            int(value) for value in (row.get("scan_run_ids") or []) if value is not None
+        }),
+        "scan_run_refs": sorted(
+            (dict(value) for value in (row.get("scan_run_refs") or []) if isinstance(value, dict)),
+            key=lambda value: (int(value.get("scan_run_id") or 0), int(value.get("revision") or 0)),
+        ),
         "rank_source_mode": rank_source_mode,
         "factors": factors,
         "factor_version": str(row.get("factor_version") or ""),
@@ -673,6 +687,8 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
                               rank_source_mode: str = "REPLAY",
                               decision_at_utc=None, captured_at_utc=None,
                               catalog_authority: dict | None = None,
+                              scan_run_ids: list[int] | None = None,
+                              scan_run_refs_by_item: dict | None = None,
                               scoring_config_payload: dict | None = None,
                               population: str = POPULATION_LEGACY_UNLABELLED,
                               calibration_policy_version: str = CALIBRATION_POLICY_VERSION) -> dict:
@@ -705,6 +721,17 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
         # The decision id comes from the resolved capture, so a revision gets its own
         # persistent ids and can never collide with the archived decision.
         key = (instrument_id, strategy_code)
+        row = dict(row)
+        supplied_refs = (scan_run_refs_by_item or {}).get(f"{instrument_id}|{strategy_code}")
+        if supplied_refs is not None:
+            if row.get("scan_run_refs") and row["scan_run_refs"] != supplied_refs:
+                raise ValueError("capture run references conflict with decision references")
+            row["scan_run_refs"] = supplied_refs
+        if row.get("scan_run_refs"):
+            reference_ids = sorted({int(ref["scan_run_id"]) for ref in row["scan_run_refs"]})
+            if row.get("scan_run_ids") and sorted(set(row["scan_run_ids"])) != reference_ids:
+                raise ValueError("decision run IDs do not match its references")
+            row["scan_run_ids"] = reference_ids
         content = _decision_content(
             row,
             market=market,
@@ -734,6 +761,11 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
         hashes[key] = item_hash
         rows[key] = row
 
+    captured_scan_run_ids = sorted({
+        int(run_id) for content in contents.values() for run_id in content["scan_run_ids"]
+    })
+    if scan_run_ids is not None and sorted(set(scan_run_ids)) != captured_scan_run_ids:
+        raise ValueError("capture run IDs do not match its decisions")
     chosen, matched_id = _resolve_capture_revision(
         db, capture_id=capture_id, hashes=[value for value in hashes.values()]
     )
@@ -751,6 +783,11 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
             ),
         }
 
+    refs_by_item = {
+        f"{content['instrument_id']}|{content['strategy_code']}": content.get("scan_run_refs") or []
+        for content in contents.values()
+    }
+
     snapshot_id = ensure_ranking_capture(
         db,
         capture_id=chosen,
@@ -763,6 +800,8 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
         scoring_config_version=scoring_config_version,
         evaluation_version=evaluation_version,
         catalog_authority=catalog_authority,
+        scan_run_ids=captured_scan_run_ids,
+        scan_run_refs_by_item=refs_by_item,
         scoring_config_payload=scoring_config_payload,
         calibration_policy_version=calibration_policy_version,
         commit=False,
@@ -813,6 +852,12 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
             regime_multiplier=content["regime_multiplier"],
             candidate_id=content["candidate_id"],
             signal_run_id=content["signal_run_id"],
+            scan_run_ids=content["scan_run_ids"],
+            scan_run_id=(content["scan_run_ids"][0]
+                         if len(content["scan_run_ids"]) == 1 else None),
+            scan_run_refs=content["scan_run_refs"],
+            instrument_group=content["instrument_group"],
+            instrument_authority=content["instrument_authority"],
         )
         for code in CALIBRATABLE_FACTORS:
             # A factor the ranker did not emit stays NULL: an old table default cannot

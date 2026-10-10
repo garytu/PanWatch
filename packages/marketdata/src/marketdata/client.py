@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, wait
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from marketdata.cache import TTLCache
@@ -77,6 +80,11 @@ _TW_DISCOVERY_PRICE_SLOTS = threading.BoundedSemaphore(4)
 _TW_DISCOVERY_MAX_PRICE_IDS = 2_000
 _TW_DISCOVERY_PRICE_BATCH_SIZE = 100
 _TW_DISCOVERY_PRICE_SCAN_TIMEOUT_SEC = 15.0
+
+
+def _canonical_json_hash(value) -> str:
+    raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _completed_research_window(
@@ -717,7 +725,9 @@ class MarketData:
         from marketdata.vendors import twmd
         from marketdata.vendors.twmd import TwmdClient, number
 
-        selected_limit = max(1, min(int(limit), 100))
+        requested_top_n = int(limit)
+        requested_max_universe_size = max_universe_size
+        selected_limit = max(1, min(requested_top_n, 100))
         if mode not in {"turnover", "gainers"}:
             raise ValueError("Taiwan discovery mode must be turnover or gainers")
         if max_universe_size is not None:
@@ -727,29 +737,87 @@ class MarketData:
 
         sources = [source for source in self.config.sources_for("quote", "TW") if source.enabled]
         if len(sources) != 1 or sources[0].vendor != "twmd":
+            missing_at = datetime.now(timezone.utc).isoformat()
+            scan_limits = {
+                "requested_top_n": requested_top_n,
+                "top_n": selected_limit,
+                "requested_max_universe_size": requested_max_universe_size,
+                "max_universe_size": max_universe_size,
+                "price_snapshot_batch_size": _TW_DISCOVERY_PRICE_BATCH_SIZE,
+                "max_concurrent_price_requests": 4,
+                "deadline_budget_sec": _TW_DISCOVERY_PRICE_SCAN_TIMEOUT_SEC,
+            }
+            selection_config = {
+                "version": "tw-discovery-v1",
+                "mode": mode,
+                "requested_market": "TW",
+                "requested_venues": ["TWSE", "TPEX"],
+                **scan_limits,
+            }
             return TaiwanDiscoveryPool(
                 items=[], status="quote_source_disabled", catalog_count=0,
                 eligible_catalog_count=0, scanned_instrument_count=0,
                 price_snapshot_count=0, catalog_request_count=0,
                 price_snapshot_request_count=0,
+                catalog_source="twmd:/api/v1/instruments",
+                catalog_authority_status="UNKNOWN",
+                scan_coverage_state="MISSING",
+                coverage_scope="UNKNOWN",
+                requested_market="TW",
+                requested_venues=["TWSE", "TPEX"],
+                scan_limits=scan_limits,
+                selection_config=selection_config,
+                selection_config_hash=_canonical_json_hash(selection_config),
+                stage_id_sets={
+                    "catalog": {"unique": [], "eligible": [], "excluded": []},
+                    "universe_bound": {"requested": [], "not_requested_due_to_limit": []},
+                    "dispatch": {"attempted": [], "unattempted": []},
+                    "price_validation": {"valid": [], "invalid": [], "missing_or_failed": [], "pending": []},
+                    "ranking": {"eligible": [], "excluded": []},
+                    "pool_selection": {"selected": [], "ranked_not_selected": []},
+                    "candidate_selection": {"selected": [], "excluded": [], "not_selected": []},
+                },
+                stage_reason_id_sets={"catalog": {"quote_source_disabled": []}},
+                stage_reason_counts={"catalog": {"quote_source_disabled": 1}},
+                run_started_at_utc=missing_at,
+                run_completed_at_utc=missing_at,
             )
 
+        run_started_at = datetime.now(timezone.utc)
         source = sources[0]
         client = TwmdClient(source.config)
         scan_deadline = time.monotonic() + _TW_DISCOVERY_PRICE_SCAN_TIMEOUT_SEC
         if deadline_monotonic is not None:
             scan_deadline = min(scan_deadline, deadline_monotonic)
+        deadline_budget_sec = max(0.0, scan_deadline - time.monotonic())
         catalog_key = (client.base_url, client.config.get("token"))
         cached_catalog = twmd._catalog_cache.get(catalog_key)
-        catalog_cached = cached_catalog is not None
+        raw_cached_catalog = getattr(twmd, "_catalog_response_cache", None)
+        raw_cached_catalog = (
+            raw_cached_catalog.get(catalog_key)
+            if raw_cached_catalog is not None and cached_catalog is not None
+            else None
+        )
+        catalog_cached = raw_cached_catalog is not None or cached_catalog is not None
+        legacy_filtered_cache_only = cached_catalog is not None and raw_cached_catalog is None
         catalog_error = None
-        if cached_catalog is not None:
-            catalog = cached_catalog
+        catalog_receipt_cache = getattr(twmd, "_catalog_response_receipts", None)
+        catalog_receipt = (
+            catalog_receipt_cache.get(catalog_key)
+            if catalog_receipt_cache is not None else None
+        )
+        if raw_cached_catalog is not None:
+            raw_catalog = raw_cached_catalog
+            catalog_request_count = 0
+        elif cached_catalog is not None:
+            # An older adapter may have populated only the compatibility-filtered
+            # cache. Preserve it as UNKNOWN completeness instead of refetching.
+            raw_catalog = cached_catalog
             catalog_request_count = 0
         else:
             remaining = scan_deadline - time.monotonic()
             if remaining <= 0:
-                catalog, catalog_error, catalog_request_count = [], "timeout", 0
+                raw_catalog, catalog_error, catalog_request_count = [], "timeout", 0
             else:
                 catalog_request_count = 1
                 try:
@@ -761,48 +829,136 @@ class MarketData:
                     )
                     if not isinstance(catalog_payload, list):
                         raise ValueError("invalid_instruments_response")
-                    catalog = [
-                        row for row in catalog_payload
-                        if isinstance(row, dict) and row.get("venue") in {"TWSE", "TPEX"}
-                    ]
-                    if catalog:
-                        twmd._catalog_cache.set(catalog_key, catalog)
+                    raw_catalog = catalog_payload
+                    if raw_catalog:
+                        raw_response_cache = getattr(twmd, "_catalog_response_cache", None)
+                        if raw_response_cache is not None:
+                            raw_response_cache.set(catalog_key, raw_catalog)
+                        twmd._catalog_cache.set(
+                            catalog_key,
+                            [row for row in raw_catalog if isinstance(row, dict)
+                             and isinstance(row.get("venue"), str)
+                             and row.get("venue") in {"TWSE", "TPEX"}],
+                        )
+                        catalog_receipt = datetime.now(timezone.utc).isoformat()
+                        if catalog_receipt_cache is not None:
+                            catalog_receipt_cache.set(catalog_key, catalog_receipt)
                 except Exception as exc:
-                    catalog, catalog_error = [], getattr(exc, "reason_code", None) or "catalog_error"
-        if not isinstance(catalog, list):
-            catalog = []
+                    raw_catalog, catalog_error = [], getattr(exc, "reason_code", None) or "catalog_error"
+        if not isinstance(raw_catalog, list):
+            raw_catalog = []
 
+        catalog = [row for row in raw_catalog if isinstance(row, dict)
+                   and isinstance(row.get("venue"), str)
+                   and row.get("venue") in {"TWSE", "TPEX"}]
+        catalog_hash = _canonical_json_hash(raw_catalog)
+        receipt_value = catalog_receipt
+        if receipt_value:
+            try:
+                receipt_value = datetime.fromisoformat(receipt_value.replace("Z", "+00:00")).astimezone(
+                    timezone.utc
+                ).isoformat()
+            except (TypeError, ValueError):
+                receipt_value = None
+
+        canonical_rows: dict[str, dict] = {}
+        compatibility_eligible_rows: dict[str, dict] = {}
+        conflicting_ids: set[str] = set()
+        duplicate_ids: set[str] = set()
+        invalid_catalog_record_count = 0
+        duplicate_catalog_record_count = 0
+        for row in raw_catalog:
+            if not isinstance(row, dict):
+                invalid_catalog_record_count += 1
+                continue
+            venue = row.get("venue")
+            symbol = row.get("symbol")
+            instrument_id = row.get("instrument_id")
+            if (not isinstance(venue, str) or venue not in {"TWSE", "TPEX"} or not isinstance(symbol, str)
+                    or not isinstance(instrument_id, str)
+                    or instrument_id != f"{venue}:{symbol}"
+                    or re.fullmatch(r"(?:TWSE|TPEX):[0-9][0-9A-Z]{3,5}", instrument_id) is None):
+                invalid_catalog_record_count += 1
+                continue
+            if (row.get("is_active") is True and isinstance(row.get("security_type"), str)
+                    and row["security_type"] in {"EQUITY", "ETF"}):
+                # The list API historically retained the last qualifying row,
+                # even if a later duplicate was inactive or unsupported.
+                compatibility_eligible_rows[instrument_id] = row
+            previous = canonical_rows.get(instrument_id)
+            if previous is not None:
+                duplicate_catalog_record_count += 1
+                duplicate_ids.add(instrument_id)
+                if previous != row:
+                    conflicting_ids.add(instrument_id)
+                    # Capture the received final row and mark its authority
+                    # ambiguous; request eligibility is preserved separately.
+                    canonical_rows[instrument_id] = row
+                continue
+            canonical_rows[instrument_id] = row
+
+        authority_by_id: dict[str, dict] = {}
         eligible: dict[str, dict] = {}
         excluded_types: dict[str, int] = {}
-        for row in catalog:
-            if not isinstance(row, dict):
-                continue
-            venue, symbol = row.get("venue"), row.get("symbol")
+        catalog_excluded: dict[str, str] = {}
+        for instrument_id, row in canonical_rows.items():
+            venue = row.get("venue")
             instrument_id = row.get("instrument_id")
             security_type = row.get("security_type")
-            if venue not in {"TWSE", "TPEX"} or not isinstance(symbol, str):
-                continue
-            if instrument_id != f"{venue}:{symbol}":
-                continue
-            if row.get("is_active") is True and security_type in {"EQUITY", "ETF"}:
-                eligible[instrument_id] = row
-            elif row.get("is_active") is True:
+            if not isinstance(security_type, str):
+                security_type = "UNKNOWN"
+            authority_status = "UNKNOWN" if legacy_filtered_cache_only else "LATEST_ONLY"
+            if instrument_id in conflicting_ids:
+                authority_status = "CONFLICTING_CATALOG_ROWS"
+            if instrument_id in compatibility_eligible_rows:
+                eligible[instrument_id] = compatibility_eligible_rows[instrument_id]
+            elif row.get("is_active") is not True:
+                catalog_excluded[instrument_id] = "inactive"
+            elif security_type not in {"EQUITY", "ETF"}:
+                catalog_excluded[instrument_id] = "unsupported_or_unknown_security_type"
+            if catalog_excluded.get(instrument_id) == "unsupported_or_unknown_security_type":
                 type_name = str(security_type or "UNKNOWN")
                 excluded_types[type_name] = excluded_types.get(type_name, 0) + 1
+
+            authority_by_id[instrument_id] = {
+                "instrument_id": instrument_id,
+                "venue": venue,
+                "security_type": str(security_type or "UNKNOWN"),
+                "is_active": row.get("is_active") is True,
+                "taxonomy_subtype": "UNKNOWN",
+                "tax_category": "UNKNOWN",
+                "catalog_source": "twmd:/api/v1/instruments",
+                "catalog_source_as_of": None,
+                "catalog_captured_at_utc": receipt_value,
+                "catalog_hash": catalog_hash,
+                "authority_status": authority_status,
+                "point_in_time_status": "UNVERIFIABLE",
+            }
 
         ids = sorted(eligible)
         total_eligible = len(ids)
         if max_universe_size is not None:
             ids = ids[:max_universe_size]
         partial_scan = len(ids) < total_eligible
+        requested_ids = set(ids)
+        not_requested_ids = set(eligible) - requested_ids
         chunks = [ids[offset:offset + _TW_DISCOVERY_PRICE_BATCH_SIZE]
                   for offset in range(0, len(ids), _TW_DISCOVERY_PRICE_BATCH_SIZE)]
         attempts_lock = threading.Lock()
         request_attempts = 0
         requested_ids_count = 0
+        attempted_ids: set[str] = set()
         pending_batch_count = 0
         failed_request_count = 1 if catalog_error else 0
         snapshots: list[dict] = []
+        returned_by_id: dict[str, dict] = {}
+        invalid_return_ids: set[str] = set()
+        invalid_price_reasons: dict[str, str] = {}
+        failed_price_ids: set[str] = set()
+        missing_price_ids: set[str] = set()
+        pending_ids: set[str] = set()
+        pending_submitted_ids: set[str] = set()
+        attempts_frozen = False
         partial_scan = partial_scan or bool(catalog_error)
 
         try:
@@ -818,8 +974,11 @@ class MarketData:
             if remaining <= 0:
                 raise TimeoutError("discovery request deadline exceeded")
             with attempts_lock:
+                if attempts_frozen:
+                    raise TimeoutError("discovery run capture already frozen")
                 request_attempts += 1
                 requested_ids_count += len(chunk)
+                attempted_ids.update(chunk)
             return client.get_response(
                 "price-snapshots",
                 instrument_ids=",".join(chunk),
@@ -877,6 +1036,10 @@ class MarketData:
             for future in pending:
                 future.cancel()
                 partial_scan = True
+                chunk = futures[future][0]
+                pending_submitted_ids.update(chunk)
+                with attempts_lock:
+                    pending_ids.update(set(chunk) & attempted_ids)
             for future in done:
                 chunk, release_once = futures[future]
                 try:
@@ -884,11 +1047,13 @@ class MarketData:
                 except Exception:
                     partial_scan = True
                     failed_request_count += 1
+                    failed_price_ids.update(chunk)
                     continue
                 batch_rows = payload.get("snapshots") if isinstance(payload, dict) else None
                 if not isinstance(batch_rows, list):
                     partial_scan = True
                     failed_request_count += 1
+                    failed_price_ids.update(chunk)
                     continue
                 expected_ids = set(chunk)
                 returned_ids: set[str] = set()
@@ -898,29 +1063,89 @@ class MarketData:
                         malformed = True
                         continue
                     instrument_id = row.get("instrument_id")
+                    if not isinstance(instrument_id, str):
+                        malformed = True
+                        continue
                     if instrument_id not in expected_ids or instrument_id in returned_ids:
                         malformed = True
+                        if instrument_id in expected_ids:
+                            invalid_return_ids.add(instrument_id)
                         continue
                     returned_ids.add(instrument_id)
                     snapshots.append(row)
+                    returned_by_id[instrument_id] = row
                 if malformed or returned_ids != expected_ids:
                     partial_scan = True
                     failed_request_count += 1
+                missing_price_ids.update(expected_ids - returned_ids - invalid_return_ids)
             if pending:
                 break
 
-        allowed_ids = set(ids)
-        rows = [
-            row for row in snapshots
-            if row.get("instrument_id") in allowed_ids
-            and number(row.get("close")) is not None
-            and (row.get("availability") or {}).get("status") == "available"
-            and ((row.get("availability") or {}).get("freshness") or {}).get("status") == "current"
-        ]
+        # Futures can race with cancellation at the deadline. Freeze the exact
+        # observed attempt set before deriving stage partitions; a late worker
+        # must never mutate the returned immutable run evidence.
+        with attempts_lock:
+            attempts_frozen = True
+            final_request_attempts = request_attempts
+            final_requested_ids_count = requested_ids_count
+            final_attempted_ids = set(attempted_ids)
+
+        pending_ids.update(pending_submitted_ids & final_attempted_ids)
+        failed_price_ids.intersection_update(final_attempted_ids)
+
+        unattempted_ids = requested_ids - final_attempted_ids
+        valid_price_ids: set[str] = set()
+        invalid_price_ids: set[str] = set()
+        missing_failed_ids: set[str] = set()
+        for instrument_id in final_attempted_ids:
+            if instrument_id in pending_ids:
+                continue
+            if instrument_id in failed_price_ids:
+                missing_failed_ids.add(instrument_id)
+                continue
+            row = returned_by_id.get(instrument_id)
+            if instrument_id in invalid_return_ids:
+                invalid_price_ids.add(instrument_id)
+                invalid_price_reasons[instrument_id] = "malformed_or_duplicate_snapshot"
+                continue
+            if row is None:
+                missing_failed_ids.add(instrument_id)
+                missing_price_ids.add(instrument_id)
+                continue
+            availability = row.get("availability") if isinstance(row.get("availability"), dict) else {}
+            freshness = availability.get("freshness") if isinstance(availability.get("freshness"), dict) else {}
+            availability_status = str(availability.get("status") or "").lower()
+            freshness_status = str(freshness.get("status") or "").lower()
+            if availability_status == "pending" or freshness_status == "pending":
+                pending_ids.add(instrument_id)
+                continue
+            close = number(row.get("close"))
+            if close is None or close <= 0:
+                invalid_price_ids.add(instrument_id)
+                invalid_price_reasons[instrument_id] = "malformed_or_missing_close"
+                continue
+            if availability_status != "available":
+                invalid_price_ids.add(instrument_id)
+                invalid_price_reasons[instrument_id] = "unavailable_price"
+                continue
+            if freshness_status != "current":
+                invalid_price_ids.add(instrument_id)
+                invalid_price_reasons[instrument_id] = "stale_or_unknown_freshness"
+                continue
+            valid_price_ids.add(instrument_id)
+
+        rows = [returned_by_id[instrument_id] for instrument_id in valid_price_ids]
         field_name = "value" if mode == "turnover" else "change_pct"
+        ranking_excluded_ids = {
+            row["instrument_id"] for row in rows if number(row.get(field_name)) is None
+        }
         rows = [row for row in rows if number(row.get(field_name)) is not None]
         rows.sort(key=lambda row: (-number(row[field_name]), str(row["instrument_id"])))
         ranked_price_count = len(rows)
+        ranking_eligible_ids = {str(row["instrument_id"]) for row in rows}
+        selected_rows = rows[:selected_limit]
+        pool_selected_ids = {str(row["instrument_id"]) for row in selected_rows}
+        ranked_not_selected_ids = ranking_eligible_ids - pool_selected_ids
         items = [
             HotStock(
                 symbol=row["instrument_id"], market="TW",
@@ -934,10 +1159,14 @@ class MarketData:
                 change_basis=row.get("change_basis"),
                 units=row.get("units") or {},
                 availability=row.get("availability"),
+                instrument_id=row["instrument_id"],
+                venue=authority_by_id[row["instrument_id"]]["venue"],
+                security_type=authority_by_id[row["instrument_id"]]["security_type"],
+                is_active=authority_by_id[row["instrument_id"]]["is_active"],
             )
-            for row in rows[:selected_limit]
+            for row in selected_rows
         ]
-        unattempted_batches = max(0, len(chunks) - request_attempts)
+        unattempted_batches = max(0, len(chunks) - final_request_attempts)
         if catalog_error:
             status = "catalog_error"
         elif unattempted_batches:
@@ -948,14 +1177,159 @@ class MarketData:
             status = "no_current_eligible_prices"
         else:
             status = "partial" if partial_scan else "available"
-        data_dates = sorted({item.trade_date for item in items if item.trade_date})
+        data_dates = sorted({
+            returned_by_id[instrument_id]["trade_date"] for instrument_id in valid_price_ids
+            if isinstance(returned_by_id[instrument_id].get("trade_date"), str)
+            and returned_by_id[instrument_id]["trade_date"]
+        })
+        catalog_ids = set(canonical_rows)
+        excluded_catalog_ids = set(catalog_excluded)
+        catalog_incomplete = bool(
+            catalog_error or invalid_catalog_record_count or conflicting_ids or legacy_filtered_cache_only
+        )
+        if legacy_filtered_cache_only:
+            coverage_state = "UNKNOWN"
+        elif not catalog_ids and (catalog_error or not raw_catalog):
+            coverage_state = "MISSING"
+        elif not valid_price_ids:
+            coverage_state = "MISSING"
+        elif catalog_incomplete or (final_attempted_ids - valid_price_ids) or unattempted_ids or failed_request_count:
+            coverage_state = "PARTIAL"
+        else:
+            coverage_state = "COMPLETE"
+        coverage_scope = (
+            "BOUNDED_REQUESTED_UNIVERSE" if not_requested_ids
+            else "FULL_ELIGIBLE_CATALOG"
+        )
+        if legacy_filtered_cache_only:
+            coverage_scope = "UNKNOWN"
+        stage_id_sets = {
+            "catalog": {
+                "unique": sorted(catalog_ids),
+                "eligible": sorted(set(eligible)),
+                "excluded": sorted(excluded_catalog_ids),
+            },
+            "universe_bound": {
+                "requested": sorted(requested_ids),
+                "not_requested_due_to_limit": sorted(not_requested_ids),
+            },
+            "dispatch": {
+                "attempted": sorted(final_attempted_ids),
+                "unattempted": sorted(unattempted_ids),
+            },
+            "price_validation": {
+                "valid": sorted(valid_price_ids),
+                "invalid": sorted(invalid_price_ids),
+                "missing_or_failed": sorted(missing_failed_ids),
+                "pending": sorted(pending_ids),
+            },
+            "ranking": {
+                "eligible": sorted(ranking_eligible_ids),
+                "excluded": sorted(ranking_excluded_ids),
+            },
+            "pool_selection": {
+                "selected": sorted(pool_selected_ids),
+                "ranked_not_selected": sorted(ranked_not_selected_ids),
+            },
+            # Candidate selection is completed by the strategy adapter after its
+            # existing merge/cap and entry-plan gate; retain the pool IDs so its
+            # final partition can be reconciled before the run transaction commits.
+            "candidate_selection": {
+                "selected": [],
+                "excluded": [],
+                "not_selected": sorted(pool_selected_ids),
+            },
+        }
+        stage_reason_counts = {
+            "catalog": {
+                "inactive": sum(1 for x in excluded_catalog_ids if catalog_excluded[x] == "inactive"),
+                "unsupported_or_unknown_security_type": sum(
+                    1 for x in excluded_catalog_ids
+                    if catalog_excluded[x] == "unsupported_or_unknown_security_type"
+                ),
+            },
+            "price_validation": {
+                "valid_price": len(valid_price_ids),
+                **{
+                    reason: sum(1 for value in invalid_price_reasons.values() if value == reason)
+                    for reason in sorted(set(invalid_price_reasons.values()))
+                },
+                "failed_price_request": len(failed_price_ids),
+                "missing_returned_price": len(missing_price_ids),
+                "pending_price": len(pending_ids),
+            },
+            "ranking": {
+                "missing_ranking_metric": len(ranking_excluded_ids),
+            },
+            "universe_bound": {
+                "not_requested_due_to_limit": len(not_requested_ids),
+            },
+            "dispatch": {
+                "unattempted_deadline_or_capacity": len(unattempted_ids),
+            },
+        }
+        stage_reason_id_sets = {
+            "catalog": {
+                "inactive": sorted(x for x in excluded_catalog_ids if catalog_excluded[x] == "inactive"),
+                "unsupported_or_unknown_security_type": sorted(
+                    x for x in excluded_catalog_ids
+                    if catalog_excluded[x] == "unsupported_or_unknown_security_type"
+                ),
+            },
+            "catalog_diagnostics": {
+                "duplicate_catalog_record": sorted(duplicate_ids),
+                "conflicting_catalog_authority": sorted(conflicting_ids),
+            },
+            "universe_bound": {
+                "not_requested_due_to_limit": sorted(not_requested_ids),
+            },
+            "dispatch": {
+                "unattempted_deadline_or_capacity": sorted(unattempted_ids),
+            },
+            "price_validation": {
+                "valid_price": sorted(valid_price_ids),
+                **{
+                    reason: sorted(
+                        instrument_id
+                        for instrument_id, value in invalid_price_reasons.items()
+                        if value == reason
+                    )
+                    for reason in sorted(set(invalid_price_reasons.values()))
+                },
+            } | {
+                "failed_price_request": sorted(failed_price_ids),
+                "missing_returned_price": sorted(missing_price_ids),
+                "pending_price": sorted(pending_ids),
+            },
+            "ranking": {"missing_ranking_metric": sorted(ranking_excluded_ids)},
+            "pool_selection": {"ranked_not_selected": sorted(ranked_not_selected_ids)},
+        }
+        for instrument_id, authority in authority_by_id.items():
+            authority["catalog_hash"] = catalog_hash
+            authority["catalog_captured_at_utc"] = receipt_value
+        scan_limits = {
+            "requested_top_n": requested_top_n,
+            "top_n": selected_limit,
+            "requested_max_universe_size": requested_max_universe_size,
+            "max_universe_size": max_universe_size,
+            "price_snapshot_batch_size": _TW_DISCOVERY_PRICE_BATCH_SIZE,
+            "max_concurrent_price_requests": 4,
+            "deadline_budget_sec": round(deadline_budget_sec, 3),
+        }
+        selection_config = {
+            "version": "tw-discovery-v1",
+            "mode": mode,
+            "requested_market": "TW",
+            "requested_venues": ["TWSE", "TPEX"],
+            **scan_limits,
+        }
         return TaiwanDiscoveryPool(
             items=items, status=status, catalog_count=len(catalog),
             eligible_catalog_count=total_eligible,
-            scanned_instrument_count=requested_ids_count,
+            scanned_instrument_count=final_requested_ids_count,
             price_snapshot_count=len(snapshots),
             catalog_request_count=catalog_request_count,
-            price_snapshot_request_count=request_attempts,
+            price_snapshot_request_count=final_request_attempts,
             price_universe_selected_count=len(ids),
             price_snapshot_batches_planned=len(chunks),
             unattempted_price_snapshot_batches=unattempted_batches,
@@ -971,6 +1345,32 @@ class MarketData:
             price_data_dates=data_dates,
             provider_scope="twmd",
             error_reason=catalog_error,
+            stage_id_sets=stage_id_sets,
+            stage_reason_id_sets=stage_reason_id_sets,
+            stage_reason_counts=stage_reason_counts,
+            authority_by_instrument_id=authority_by_id,
+            catalog_response_row_count=len(raw_catalog),
+            catalog_unique_count=len(catalog_ids),
+            duplicate_catalog_record_count=duplicate_catalog_record_count,
+            invalid_catalog_record_count=invalid_catalog_record_count,
+            catalog_source="twmd:/api/v1/instruments",
+            catalog_source_as_of=None,
+            catalog_captured_at_utc=receipt_value,
+            catalog_hash=catalog_hash,
+            catalog_authority_status=(
+                "UNKNOWN" if legacy_filtered_cache_only
+                else "LATEST_ONLY" if catalog_ids else "UNKNOWN"
+            ),
+            scan_coverage_state=coverage_state,
+            coverage_scope=coverage_scope,
+            price_data_snapshot_count=len(snapshots),
+            run_started_at_utc=run_started_at.isoformat(),
+            run_completed_at_utc=datetime.now(timezone.utc).isoformat(),
+            requested_market="TW",
+            requested_venues=["TWSE", "TPEX"],
+            scan_limits=scan_limits,
+            selection_config=selection_config,
+            selection_config_hash=_canonical_json_hash(selection_config),
         )
 
     def hot_boards(self, **kw) -> list[HotBoard]:

@@ -11,8 +11,12 @@ from marketdata.vendors import twmd
 @pytest.fixture(autouse=True)
 def clear_catalog():
     twmd._catalog_cache.clear()
+    twmd._catalog_response_cache.clear()
+    twmd._catalog_response_receipts.clear()
     yield
     twmd._catalog_cache.clear()
+    twmd._catalog_response_cache.clear()
+    twmd._catalog_response_receipts.clear()
 
 
 def instrument(identity, **extra):
@@ -204,6 +208,11 @@ def test_taiwan_discovery_uses_current_eod_not_unsubscribed_live_universe(monkey
 
     pool = md.taiwan_discovery_pool(mode="turnover", limit=10, max_universe_size=10)
     assert [row.symbol for row in pool.items] == ["TPEX:6488", "TWSE:2330"]
+    assert pool.scan_limits["top_n"] == 10
+    assert pool.scan_limits["max_universe_size"] == 10
+    assert pool.selection_config["mode"] == "turnover"
+    assert pool.selection_config["requested_venues"] == ["TWSE", "TPEX"]
+    assert pool.selection_config_hash
     assert pool.partial_scan is True
     assert pool.excluded_security_type_counts == {"WARRANT": 1, "ETN": 1, "PREFERRED": 1}
     assert pool.eligible_catalog_count == 3
@@ -255,6 +264,72 @@ def test_taiwan_discovery_hard_caps_custom_price_universe(monkeypatch):
     assert pool.scanned_instrument_count == 2000
     assert len(requested_batches) == 20
     assert pool.partial_scan is True
+
+
+def test_taiwan_discovery_reconciles_valid_stale_invalid_missing_pending_and_duplicate_ids(monkeypatch):
+    from marketdata.vendors.twmd import TwmdClient
+
+    identities = [f"TWSE:{2300 + index}" for index in range(7)]
+    catalog = [instrument(identity) for identity in identities]
+    catalog.append({"instrument_id": "bad", "venue": [], "symbol": "bad"})
+    current = snapshot(identities[0])
+    stale = snapshot(identities[1])
+    stale["availability"]["freshness"] = {"status": "stale"}
+    malformed = snapshot(identities[2])
+    malformed["close"] = None
+    unavailable = snapshot(identities[3])
+    unavailable["availability"]["status"] = "unavailable"
+    pending = snapshot(identities[4])
+    pending["availability"]["status"] = "pending"
+    duplicate = snapshot(identities[5])
+    missing_identity = identities[6]
+
+    def get_response(self, path, **_kwargs):
+        if path == "instruments":
+            return catalog, {}
+        return {"snapshots": [current, stale, malformed, unavailable, pending, duplicate, duplicate, {"instrument_id": []}]}, {}
+
+    monkeypatch.setattr(TwmdClient, "get_response", get_response)
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
+    pool = md.taiwan_discovery_pool(limit=20, max_universe_size=20)
+
+    sets = pool.stage_id_sets
+    assert set(sets["dispatch"]["attempted"]) == set(identities)
+    assert sets["price_validation"]["valid"] == [identities[0]]
+    assert set(sets["price_validation"]["invalid"]) == {
+        identities[1], identities[2], identities[3], identities[5],
+    }
+    assert sets["price_validation"]["missing_or_failed"] == [missing_identity]
+    assert sets["price_validation"]["pending"] == [identities[4]]
+    reason_ids = pool.stage_reason_id_sets["price_validation"]
+    assert reason_ids["valid_price"] == [identities[0]]
+    assert reason_ids["stale_or_unknown_freshness"] == [identities[1]]
+    assert reason_ids["malformed_or_missing_close"] == [identities[2]]
+    assert reason_ids["unavailable_price"] == [identities[3]]
+    assert reason_ids["malformed_or_duplicate_snapshot"] == [identities[5]]
+    assert reason_ids["pending_price"] == [identities[4]]
+    assert reason_ids["missing_returned_price"] == [missing_identity]
+    assert pool.scan_coverage_state == "PARTIAL"
+
+
+def test_taiwan_discovery_failed_batch_has_explicit_failed_request_reason(monkeypatch):
+    from marketdata.vendors.twmd import TwmdClient
+
+    identities = ["TWSE:2301", "TPEX:2302"]
+    monkeypatch.setattr(
+        TwmdClient,
+        "get_response",
+        lambda _self, path, **_kwargs: (
+            ([instrument(identity) for identity in identities], {})
+            if path == "instruments"
+            else (_ for _ in ()).throw(RuntimeError("fixture upstream failure"))
+        ),
+    )
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
+    pool = md.taiwan_discovery_pool(limit=20, max_universe_size=20)
+    assert pool.stage_id_sets["price_validation"]["missing_or_failed"] == sorted(identities)
+    assert pool.stage_reason_id_sets["price_validation"]["failed_price_request"] == sorted(identities)
+    assert pool.stage_reason_counts["price_validation"]["failed_price_request"] == 2
 
 
 def _intraday_coverage_payload(**extra):
@@ -330,3 +405,81 @@ def test_intraday_coverage_read_rejects_ranges_longer_than_30_days():
         twmd.TwmdClient({}).bars_coverage(
             Symbol.parse("TWSE:2330"), "2026-09-10", "2026-10-10",
         )
+
+
+@pytest.mark.parametrize("before_dispatch", ["pending", "deadline"])
+def test_discovery_pre_dispatch_future_is_unattempted_not_a_failed_price_id(monkeypatch, before_dispatch):
+    from concurrent.futures import Future
+    from marketdata import client as client_module
+
+    class Slots:
+        def acquire(self, **_kw):
+            return True
+
+        def release(self):
+            pass
+
+    class Executor:
+        def submit(self, _fn):
+            future = Future()
+            if before_dispatch == "deadline":
+                future.set_exception(TimeoutError("deadline before dispatch"))
+            return future
+
+    def bounded_wait(futures, **_kw):
+        futures = set(futures)
+        return (set(), futures) if before_dispatch == "pending" else (futures, set())
+
+    def get_response(self, path, **_kw):
+        assert path == "instruments"
+        return [instrument("TWSE:2330")], {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    monkeypatch.setattr(client_module, "_TW_DISCOVERY_PRICE_POOL", Executor())
+    monkeypatch.setattr(client_module, "_TW_DISCOVERY_PRICE_SLOTS", Slots())
+    monkeypatch.setattr(client_module, "wait", bounded_wait)
+    pool = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]})).taiwan_discovery_pool()
+    assert pool.price_snapshot_request_count == 0
+    assert pool.stage_id_sets["dispatch"] == {"attempted": [], "unattempted": ["TWSE:2330"]}
+    assert all(not values for values in pool.stage_id_sets["price_validation"].values())
+    assert pool.stage_reason_id_sets["price_validation"].get("failed_price_request", []) == []
+
+
+def test_legacy_catalog_cache_remains_unknown_and_valid_dates_cover_more_than_top_n(monkeypatch):
+    def get_response(self, path, **kw):
+        assert path == "price-snapshots"  # Compatibility cache must not add a catalog request.
+        return {"snapshots": [
+            {**snapshot("TWSE:2330"), "trade_date": "2026-09-29", "value": 2000},
+            {**snapshot("TPEX:6488"), "trade_date": "2026-09-28", "value": 1000},
+        ]}, {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
+    client = twmd.TwmdClient({})
+    twmd._catalog_cache.set((client.base_url, client.config.get("token")), [instrument("TWSE:2330"), instrument("TPEX:6488")])
+    pool = md.taiwan_discovery_pool(limit=1)
+    assert pool.scan_coverage_state == "UNKNOWN"
+    assert pool.coverage_scope == "UNKNOWN"
+    assert pool.catalog_request_count == 0
+    assert pool.price_data_dates == ["2026-09-28", "2026-09-29"]
+    assert len(pool.items) == 1
+
+
+def test_conflicting_later_inactive_row_preserves_legacy_requests_but_not_authority(monkeypatch):
+    calls = []
+
+    def get_response(self, path, **kw):
+        if path == "instruments":
+            return [instrument("TWSE:2330"), instrument("TWSE:2330", is_active=False)], {}
+        calls.append(kw["instrument_ids"])
+        return {"snapshots": [snapshot("TWSE:2330")]}, {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
+    pool = md.taiwan_discovery_pool()
+    assert calls == ["TWSE:2330"]
+    assert [item.symbol for item in pool.items] == ["TWSE:2330"]
+    assert pool.stage_id_sets["catalog"]["eligible"] == ["TWSE:2330"]
+    assert pool.stage_id_sets["catalog"]["excluded"] == []
+    assert pool.authority_by_instrument_id["TWSE:2330"]["authority_status"] == "CONFLICTING_CATALOG_ROWS"
+    assert pool.scan_coverage_state == "PARTIAL"

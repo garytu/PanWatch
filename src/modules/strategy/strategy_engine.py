@@ -749,54 +749,71 @@ def _apply_portfolio_constraints(*, rows: list[StrategySignalRun]) -> dict:
             and not bool(x.is_holding_snapshot)
             and (x.action or "watch") in ("buy", "add")
         ]
-        active_unheld.sort(key=lambda x: float(x.rank_score or 0.0), reverse=True)
+        if market == "TW":
+            # ETFs remain separately visible and do not consume ordinary EQUITY
+            # opportunity capacity. Existing holdings never enter this path.
+            by_group: dict[str, list[StrategySignalRun]] = {"EQUITY": [], "ETF": []}
+            for row in active_unheld:
+                group = str(row.instrument_group or "UNKNOWN").upper()
+                if group in by_group:
+                    by_group[group].append(row)
+                else:
+                    _demote_signal(row, reason="分類權威未知: 不列入台股未持倉機會")
+                    demoted += 1
+                    by_reason["instrument_group_unknown"] = by_reason.get(
+                        "instrument_group_unknown", 0
+                    ) + 1
+            cohorts = [(f"{market}:{group}", values) for group, values in by_group.items()]
+        else:
+            cohorts = [(market, active_unheld)]
 
-        max_unheld = int(MAX_UNHELD_ACTIVE_BY_MARKET.get(market, 20))
-        for idx, row in enumerate(active_unheld):
-            if idx < max_unheld:
-                continue
-            _demote_signal(row, reason=f"組合約束: {market} 未持倉機會超限({max_unheld})")
-            demoted += 1
-            by_reason["cap_unheld"] = by_reason.get("cap_unheld", 0) + 1
-
-        remaining = [
-            x
-            for x in active_unheld[:max_unheld]
-            if (x.status or "inactive") == "active"
-        ]
-        if not remaining:
-            continue
-
-        high_rows = [x for x in remaining if (x.risk_level or "medium") == "high"]
-        max_ratio = float(MAX_HIGH_RISK_RATIO_BY_MARKET.get(market, 0.32))
-        allow_high = max(1, int(round(len(remaining) * max_ratio)))
-        high_rows.sort(key=lambda x: float(x.rank_score or 0.0), reverse=True)
-        for idx, row in enumerate(high_rows):
-            if idx < allow_high:
-                continue
-            _demote_signal(row, reason=f"組合約束: {market} 高風險佔比超限({int(max_ratio*100)}%)")
-            demoted += 1
-            by_reason["cap_high_risk"] = by_reason.get("cap_high_risk", 0) + 1
-
-        final_rows = [
-            x for x in remaining if (x.status or "inactive") == "active"
-        ]
-        if not final_rows:
-            continue
-        cap_per_strategy = max(1, int(round(len(final_rows) * MAX_SINGLE_STRATEGY_SHARE)))
-        by_strategy: dict[str, list[StrategySignalRun]] = {}
-        for x in final_rows:
-            by_strategy.setdefault(x.strategy_code or "unknown", []).append(x)
-        for code, srows in by_strategy.items():
-            srows.sort(key=lambda x: float(x.rank_score or 0.0), reverse=True)
-            for idx, row in enumerate(srows):
-                if idx < cap_per_strategy:
+        for cohort_market, cohort_rows in cohorts:
+            cohort_rows.sort(key=lambda x: float(x.rank_score or 0.0), reverse=True)
+            max_unheld = int(MAX_UNHELD_ACTIVE_BY_MARKET.get(market, 20))
+            for idx, row in enumerate(cohort_rows):
+                if idx < max_unheld:
                     continue
-                _demote_signal(row, reason=f"組合約束: {market} 策略{code}集中度過高")
+                _demote_signal(row, reason=f"組合約束: {cohort_market} 未持倉機會超限({max_unheld})")
                 demoted += 1
-                by_reason["cap_strategy_concentration"] = by_reason.get(
-                    "cap_strategy_concentration", 0
-                ) + 1
+                by_reason["cap_unheld"] = by_reason.get("cap_unheld", 0) + 1
+
+            remaining = [
+                x for x in cohort_rows[:max_unheld]
+                if (x.status or "inactive") == "active"
+            ]
+            if not remaining:
+                continue
+
+            high_rows = [x for x in remaining if (x.risk_level or "medium") == "high"]
+            max_ratio = float(MAX_HIGH_RISK_RATIO_BY_MARKET.get(market, 0.32))
+            allow_high = max(1, int(round(len(remaining) * max_ratio)))
+            high_rows.sort(key=lambda x: float(x.rank_score or 0.0), reverse=True)
+            for idx, row in enumerate(high_rows):
+                if idx < allow_high:
+                    continue
+                _demote_signal(row, reason=f"組合約束: {cohort_market} 高風險佔比超限({int(max_ratio*100)}%)")
+                demoted += 1
+                by_reason["cap_high_risk"] = by_reason.get("cap_high_risk", 0) + 1
+
+            final_rows = [
+                x for x in remaining if (x.status or "inactive") == "active"
+            ]
+            if not final_rows:
+                continue
+            cap_per_strategy = max(1, int(round(len(final_rows) * MAX_SINGLE_STRATEGY_SHARE)))
+            by_strategy: dict[str, list[StrategySignalRun]] = {}
+            for x in final_rows:
+                by_strategy.setdefault(x.strategy_code or "unknown", []).append(x)
+            for code, srows in by_strategy.items():
+                srows.sort(key=lambda x: float(x.rank_score or 0.0), reverse=True)
+                for idx, row in enumerate(srows):
+                    if idx < cap_per_strategy:
+                        continue
+                    _demote_signal(row, reason=f"組合約束: {cohort_market} 策略{code}集中度過高")
+                    demoted += 1
+                    by_reason["cap_strategy_concentration"] = by_reason.get(
+                        "cap_strategy_concentration", 0
+                    ) + 1
 
     return {"demoted": demoted, "by_reason": by_reason}
 
@@ -1173,6 +1190,12 @@ def _format_signal(
         "snapshot_date": row.snapshot_date,
         "stock_symbol": row.stock_symbol,
         "stock_market": row.stock_market,
+        "instrument_id": row.instrument_id,
+        "instrument_group": row.instrument_group or "UNKNOWN",
+        "instrument_authority": row.instrument_authority or {},
+        "scan_run_id": row.scan_run_id,
+        "scan_run_ids": row.scan_run_ids or [],
+        "scan_run_refs": row.scan_run_refs or [],
         "stock_name": row.stock_name,
         "strategy_code": row.strategy_code,
         "strategy_name": row.strategy_name,
@@ -1242,6 +1265,16 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
         symbol = (row.stock_symbol or "").strip().upper()
         if not symbol:
             continue
+        instrument_id = (row.instrument_id or "").strip().upper()
+        if market == "TW":
+            # Never manufacture a TW: prefix in front of an already venue-qualified
+            # symbol. A bare/unclassified Taiwan symbol is not an immutable identity.
+            if not instrument_id and symbol.split(":", 1)[0] in {"TWSE", "TPEX"}:
+                instrument_id = symbol
+            if not instrument_id or instrument_id.split(":", 1)[0] not in {"TWSE", "TPEX"}:
+                continue
+        else:
+            instrument_id = instrument_id or f"{market}:{symbol}"
         payload = row.payload if isinstance(row.payload, dict) else {}
         breakdown = payload.get("score_breakdown") if isinstance(
             payload.get("score_breakdown"), dict
@@ -1252,7 +1285,7 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
             for code in CAPTURE_FACTOR_FIELDS
         }
         by_market.setdefault(market, []).append({
-            "instrument_id": f"{market}:{symbol}",
+            "instrument_id": instrument_id,
             "symbol": row.stock_symbol,
             "strategy_code": row.strategy_code,
             "raw_factor_values": factors,
@@ -1260,6 +1293,10 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
             "primary_horizon_sessions": int(row.holding_days or 0) or None,
             "candidate_id": row.source_candidate_id,
             "signal_run_id": int(row.id) if row.id is not None else None,
+            "instrument_group": row.instrument_group or "UNKNOWN",
+            "instrument_authority": row.instrument_authority or {},
+            "scan_run_ids": list(row.scan_run_ids or []),
+            "scan_run_refs": list(row.scan_run_refs or []),
             "entry_price": row.entry_high or row.entry_low,
             "stop_loss": row.stop_loss,
             "target_price": row.target_price,
@@ -1271,7 +1308,7 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
                             "trace_id": row.trace_id, "source_meta": payload.get("source_meta") or {}},
         })
         configs_by_market.setdefault(market, []).append({
-            "instrument_id": f"{market}:{symbol}", "strategy_code": row.strategy_code,
+            "instrument_id": instrument_id, "strategy_code": row.strategy_code,
             "strategy_weight": payload.get("strategy_weight"),
             "factor_weights": payload.get("factor_weights"),
         })
@@ -1280,6 +1317,16 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
         # same-day refresh or a correction can no longer reuse a fixed day-level id and
         # silently inherit another execution's archived decision set.
         run_ids = sorted({int(d["signal_run_id"]) for d in decisions if d["signal_run_id"] is not None})
+        scan_run_ids = sorted({
+            int(run_id)
+            for decision in decisions
+            for run_id in (decision.get("scan_run_ids") or [])
+            if run_id is not None
+        })
+        scan_refs_by_item = {
+            decision["instrument_id"] + "|" + str(decision["strategy_code"]): decision.get("scan_run_refs") or []
+            for decision in decisions
+        }
         run_token = (hashlib.sha256(str(run_ids).encode("utf-8")).hexdigest()[:12]
                      if run_ids else "no-runs")
         capture_id = f"decision-{market}-{session_date}-{run_token}"
@@ -1300,6 +1347,8 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
                 catalog_authority=catalog_authority,
                 decision_at_utc=captured_at,
                 captured_at_utc=captured_at,
+                scan_run_ids=scan_run_ids,
+                scan_run_refs_by_item=scan_refs_by_item,
                 scoring_config_payload={
                     "ranker_version": RANKER_VERSION_V1,
                     "decisions": sorted(configs_by_market[market], key=lambda c:
@@ -1522,6 +1571,12 @@ def refresh_strategy_signals(
                 row.trace_id = c.source_trace_id or ""
                 row.is_holding_snapshot = bool(c.is_holding_snapshot)
                 row.context_quality_score = context_quality_score
+                row.instrument_id = c.instrument_id
+                row.instrument_group = c.instrument_group or "UNKNOWN"
+                row.instrument_authority = c.instrument_authority or {}
+                row.scan_run_id = c.scan_run_id
+                row.scan_run_ids = list(c.scan_run_ids or [])
+                row.scan_run_refs = list(c.scan_run_refs or [])
                 row.payload = to_jsonable(payload)
                 row.updated_at = utc_now()
                 touched_rows.append(row)
@@ -1600,6 +1655,7 @@ def list_strategy_signals(
     holding: str = "",
     strategy_code: str = "",
     risk_level: str = "",
+    instrument_group: str = "",
     include_payload: bool = False,
 ) -> dict:
     ensure_strategy_catalog()
@@ -1623,6 +1679,14 @@ def list_strategy_signals(
         mkt = (market or "").strip().upper()
         if mkt:
             q = q.filter(StrategySignalRun.stock_market == mkt)
+        instrument_kind = (instrument_group or "").strip().upper()
+        if instrument_kind == "ORDINARY":
+            q = q.filter(or_(
+                StrategySignalRun.stock_market != "TW",
+                StrategySignalRun.instrument_group == "EQUITY",
+            ))
+        elif instrument_kind:
+            q = q.filter(StrategySignalRun.instrument_group == instrument_kind)
         st = (status or "").strip().lower()
         if st and st != "all":
             q = q.filter(StrategySignalRun.status == st)

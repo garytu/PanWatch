@@ -13,6 +13,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
+from math import isfinite
+from typing import Any, Mapping
 
 
 @dataclass(frozen=True)
@@ -121,6 +124,183 @@ class CostModel:
             "buy": buy,
             "sell": sell,
         }
+
+
+@dataclass(frozen=True)
+class DatedCostResolution:
+    """A cost model resolved from explicit instrument/date authority."""
+
+    status: str
+    reason_code: str
+    instrument_id: str
+    session_date: str
+    tax_category: str
+    authority: dict[str, Any]
+    cost_model: CostModel | None
+
+    @property
+    def net_available(self) -> bool:
+        return self.status == "AVAILABLE" and self.cost_model is not None
+
+
+def _policy_value(policy: Mapping[str, Any] | object, name: str, default=None):
+    if isinstance(policy, Mapping):
+        return policy.get(name, default)
+    return getattr(policy, name, default)
+
+
+def _strict_policy_date(value: Any, label: str) -> date | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        raise ValueError(f"{label}_invalid")
+    if isinstance(value, date):
+        return value
+    raw = str(value)
+    try:
+        parsed = date.fromisoformat(raw)
+    except ValueError as exc:
+        raise ValueError(f"{label}_invalid") from exc
+    if parsed.isoformat() != raw:
+        raise ValueError(f"{label}_invalid")
+    return parsed
+
+
+def resolve_dated_cost_model(
+    *,
+    instrument_id: str,
+    session_date: date | str,
+    authority: Mapping[str, Any] | object | None,
+) -> DatedCostResolution:
+    """Resolve net-cost inputs only from complete, dated classification authority.
+
+    This strict v2 path never falls back to `security_type`, symbol suffixes, or
+    today's date. Legacy callers can continue using `cost_model_for_market`.
+    """
+    canonical_id = str(instrument_id or "").strip()
+    try:
+        day = _strict_policy_date(session_date, "session_date")
+    except ValueError:
+        day = None
+    day_text = day.isoformat() if day else str(session_date or "")
+    if not canonical_id or not day:
+        return DatedCostResolution(
+            "UNKNOWN", "cost_authority_missing", canonical_id, day_text,
+            "UNKNOWN", {}, None,
+        )
+    if authority is None:
+        return DatedCostResolution(
+            "UNKNOWN", "cost_authority_missing", canonical_id, day_text,
+            "UNKNOWN", {}, None,
+        )
+
+    values = {
+        name: _policy_value(authority, name)
+        for name in (
+            "instrument_id", "tax_category", "classification_authority",
+            "classification_source", "policy_version", "effective_from",
+            "effective_to", "stamp_duty_rate", "commission_rate",
+            "minimum_commission", "transfer_fee_rate", "slippage_bps",
+            "evidence_hash",
+        )
+    }
+    if str(values["instrument_id"] or "").strip() != canonical_id:
+        return DatedCostResolution(
+            "UNKNOWN", "cost_authority_instrument_mismatch", canonical_id,
+            day_text, str(values["tax_category"] or "UNKNOWN"), values, None,
+        )
+    category = str(values["tax_category"] or "UNKNOWN").strip().upper()
+    if category in {"", "UNKNOWN"}:
+        return DatedCostResolution(
+            "UNKNOWN", "cost_authority_missing", canonical_id,
+            day_text, "UNKNOWN", values, None,
+        )
+    try:
+        effective_from = _strict_policy_date(values["effective_from"], "effective_from")
+        effective_to = _strict_policy_date(values["effective_to"], "effective_to")
+    except ValueError:
+        effective_from = effective_to = None
+    if (
+        not str(values["classification_authority"] or "").strip()
+        or not str(values["classification_source"] or "").strip()
+        or not str(values["policy_version"] or "").strip()
+        or effective_from is None
+        or (effective_to is not None and effective_to < effective_from)
+    ):
+        return DatedCostResolution(
+            "UNKNOWN", "cost_authority_invalid", canonical_id, day_text,
+            category or "UNKNOWN", values, None,
+        )
+    if day < effective_from or (effective_to is not None and day > effective_to):
+        return DatedCostResolution(
+            "UNKNOWN", "cost_authority_date_mismatch", canonical_id,
+            day_text, category, values, None,
+        )
+
+    rates: dict[str, float] = {}
+    for key in (
+        "stamp_duty_rate", "commission_rate", "minimum_commission",
+        "transfer_fee_rate", "slippage_bps",
+    ):
+        value = values[key]
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            parsed = float("nan")
+        if not isfinite(parsed) or parsed < 0:
+            return DatedCostResolution(
+                "UNKNOWN", "cost_authority_invalid", canonical_id,
+                day_text, category, values, None,
+            )
+        rates[key] = parsed
+
+    captured = {
+        **values,
+        "tax_category": category,
+        "effective_from": effective_from.isoformat(),
+        "effective_to": effective_to.isoformat() if effective_to else None,
+    }
+    return DatedCostResolution(
+        "AVAILABLE",
+        "",
+        canonical_id,
+        day_text,
+        category,
+        captured,
+        CostModel(CostConfig(
+            stamp_duty_rate=rates["stamp_duty_rate"],
+            commission_rate=rates["commission_rate"],
+            min_commission=rates["minimum_commission"],
+            transfer_fee_rate=rates["transfer_fee_rate"],
+            slippage_bps=rates["slippage_bps"],
+        )),
+    )
+
+
+def load_dated_cost_authority(db, *, instrument_id: str, session_date: date | str):
+    """Load a single effective policy row; ambiguous/missing rows stay unknown."""
+    try:
+        day = _strict_policy_date(session_date, "session_date")
+    except ValueError:
+        return None
+    if day is None:
+        return None
+    from src.platform.persistence.models import InstrumentCostAuthority
+
+    day_text = day.isoformat()
+    rows = (
+        db.query(InstrumentCostAuthority)
+        .filter(
+            InstrumentCostAuthority.instrument_id == str(instrument_id or "").strip(),
+            InstrumentCostAuthority.effective_from <= day_text,
+            (InstrumentCostAuthority.effective_to.is_(None)
+             | (InstrumentCostAuthority.effective_to >= day_text)),
+        )
+        .order_by(InstrumentCostAuthority.effective_from.desc(), InstrumentCostAuthority.id.desc())
+        .limit(2)
+        .all()
+    )
+    return rows[0] if len(rows) == 1 else None
 
 
 # 全域性預設例項(可被覆蓋配置)

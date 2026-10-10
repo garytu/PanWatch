@@ -1,6 +1,12 @@
 import { fetchAPI } from './client'
 
 export interface EntryCandidateItem {
+  instrument_id?: string | null
+  instrument_group?: 'EQUITY' | 'ETF' | 'UNKNOWN' | string
+  instrument_authority?: Record<string, unknown>
+  scan_run_id?: number | null
+  scan_run_ids?: number[]
+  scan_run_refs?: Array<{ scan_run_id: number; revision: number; manifest_hash: string; source_mode: string }>
   id: number
   stock_symbol: string
   stock_market: string
@@ -121,6 +127,12 @@ export interface StrategySignalItem {
   snapshot_date: string
   stock_symbol: string
   stock_market: string
+  instrument_id?: string | null
+  instrument_group?: 'EQUITY' | 'ETF' | 'UNKNOWN' | string
+  instrument_authority?: Record<string, unknown>
+  scan_run_id?: number | null
+  scan_run_ids?: number[]
+  scan_run_refs?: Array<{ scan_run_id: number; revision: number; manifest_hash: string; source_mode: string }>
   stock_name: string
   strategy_code: string
   strategy_name: string
@@ -386,6 +398,7 @@ export const recommendationsApi = {
     snapshot_date?: string
     source?: 'market_scan' | 'watchlist' | 'mixed' | 'all'
     holding?: 'held' | 'unheld' | 'all'
+    instrument_group?: 'ORDINARY' | 'EQUITY' | 'ETF' | 'UNKNOWN'
     strategy?: string
     timeoutMs?: number
   }) => {
@@ -398,6 +411,7 @@ export const recommendationsApi = {
     if (params?.snapshot_date) q.set('snapshot_date', params.snapshot_date)
     if (params?.source) q.set('source', params.source)
     if (params?.holding) q.set('holding', params.holding)
+    if (params?.instrument_group) q.set('instrument_group', params.instrument_group)
     if (params?.strategy) q.set('strategy', params.strategy)
     const qs = q.toString()
     return fetchAPI<EntryCandidatesResponse>(
@@ -446,6 +460,7 @@ export const recommendationsApi = {
     snapshot_date?: string
     source_pool?: 'market_scan' | 'watchlist' | 'mixed' | 'all'
     holding?: 'held' | 'unheld' | 'all'
+    instrument_group?: 'ORDINARY' | 'EQUITY' | 'ETF' | 'UNKNOWN'
     strategy_code?: string
     risk_level?: 'low' | 'medium' | 'high' | 'all'
     include_payload?: boolean
@@ -459,6 +474,7 @@ export const recommendationsApi = {
     appendQuery(q, 'snapshot_date', params?.snapshot_date)
     appendQuery(q, 'source_pool', params?.source_pool)
     appendQuery(q, 'holding', params?.holding)
+    appendQuery(q, 'instrument_group', params?.instrument_group)
     appendQuery(q, 'strategy_code', params?.strategy_code)
     appendQuery(q, 'risk_level', params?.risk_level)
     appendQuery(q, 'include_payload', params?.include_payload)

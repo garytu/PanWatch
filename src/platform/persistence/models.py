@@ -504,6 +504,12 @@ class EntryCandidate(Base):
     evidence = Column(JSON, default=[])
     plan = Column(JSON, default={})
     meta = Column(JSON, default={})
+    instrument_id = Column(String, nullable=True)
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    scan_run_id = Column(Integer, nullable=True)
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -532,8 +538,140 @@ class MarketScanSnapshot(Base):
     score_seed = Column(Float, nullable=False, default=0.0)
     quote = Column(JSON, default={})
     meta = Column(JSON, default={})
+    instrument_id = Column(String, nullable=True)
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class DiscoveryRun(Base):
+    """Immutable bounded discovery manifest and stage partitions."""
+
+    __tablename__ = "discovery_runs"
+    __table_args__ = (
+        UniqueConstraint("scan_run_key", name="uq_discovery_run_key"),
+        Index("ix_discovery_run_market_completed", "stock_market", "run_completed_at_utc"),
+        Index("ix_discovery_run_retention", "retention_expires_at_utc", "archived"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scan_run_key = Column(String(64), nullable=False, default="")
+    revision = Column(Integer, nullable=False, default=1)
+    stock_market = Column(String, nullable=False, default="TW")
+    requested_venues = Column(JSON, default=["TWSE", "TPEX"])
+    source_mode = Column(String, nullable=False, default="")
+    provider_scope = Column(String, default="")
+    provider_raw_status = Column(String, default="")
+    scan_coverage_state = Column(String, nullable=False, default="UNKNOWN")
+    coverage_scope = Column(String, nullable=False, default="UNKNOWN")
+    run_started_at_utc = Column(DateTime, nullable=True)
+    run_completed_at_utc = Column(DateTime, nullable=True)
+    catalog_source = Column(String, default="")
+    catalog_source_as_of = Column(String, nullable=True)
+    catalog_captured_at_utc = Column(DateTime, nullable=True)
+    catalog_authority_status = Column(String, default="UNKNOWN")
+    catalog_hash = Column(String(64), default="")
+    catalog_response_row_count = Column(Integer, default=0)
+    catalog_unique_count = Column(Integer, default=0)
+    duplicate_catalog_record_count = Column(Integer, default=0)
+    invalid_catalog_record_count = Column(Integer, default=0)
+    eligible_catalog_count = Column(Integer, default=0)
+    requested_universe_count = Column(Integer, default=0)
+    not_requested_due_to_limit_count = Column(Integer, default=0)
+    attempted_instrument_count = Column(Integer, default=0)
+    unattempted_instrument_count = Column(Integer, default=0)
+    valid_price_count = Column(Integer, default=0)
+    invalid_price_count = Column(Integer, default=0)
+    missing_or_failed_price_count = Column(Integer, default=0)
+    pending_price_count = Column(Integer, default=0)
+    ranking_eligible_count = Column(Integer, default=0)
+    ranking_excluded_count = Column(Integer, default=0)
+    pool_selected_count = Column(Integer, default=0)
+    ranked_not_selected_count = Column(Integer, default=0)
+    candidate_selected_count = Column(Integer, default=0)
+    candidate_excluded_count = Column(Integer, default=0)
+    candidate_not_selected_count = Column(Integer, default=0)
+    catalog_request_count = Column(Integer, default=0)
+    price_snapshot_request_count = Column(Integer, default=0)
+    price_snapshot_batches_planned = Column(Integer, default=0)
+    unattempted_price_snapshot_batches = Column(Integer, default=0)
+    pending_price_snapshot_batches = Column(Integer, default=0)
+    failed_request_count = Column(Integer, default=0)
+    price_snapshot_count = Column(Integer, default=0)
+    price_data_dates = Column(JSON, default=[])
+    stage_id_sets = Column(JSON, default={})
+    stage_reason_id_sets = Column(JSON, default={})
+    stage_reason_counts = Column(JSON, default={})
+    scan_limits = Column(JSON, default={})
+    authority_by_instrument_id = Column(JSON, default={})
+    candidate_ids = Column(JSON, default=[])
+    manifest = Column(JSON, default={})
+    manifest_hash = Column(String(64), default="")
+    selection_config_version = Column(String, default="")
+    selection_config = Column(JSON, default={})
+    selection_config_hash = Column(String(64), default="")
+    retention_expires_at_utc = Column(DateTime, nullable=True)
+    archived = Column(Boolean, nullable=False, default=False)
+    archived_at_utc = Column(DateTime, nullable=True)
+    archived_reason = Column(String, default="")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class DiscoveryExclusion(Base):
+    """Bounded per-stage canonical ID sets and primary reason partitions."""
+
+    __tablename__ = "discovery_exclusions"
+    __table_args__ = (
+        UniqueConstraint(
+            "discovery_run_id", "stage", "outcome", "reason_code",
+            name="uq_discovery_exclusion_partition",
+        ),
+        Index("ix_discovery_exclusion_run_stage", "discovery_run_id", "stage"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    discovery_run_id = Column(
+        Integer, ForeignKey("discovery_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    stage = Column(String, nullable=False)
+    outcome = Column(String, nullable=False)
+    reason_code = Column(String, nullable=False, default="")
+    instrument_ids = Column(JSON, default=[])
+    item_count = Column(Integer, nullable=False, default=0)
+    details = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class InstrumentCostAuthority(Base):
+    """Versioned local classification input for dated Taiwan cost policy."""
+
+    __tablename__ = "instrument_cost_authorities"
+    __table_args__ = (
+        UniqueConstraint(
+            "instrument_id", "policy_version", "effective_from",
+            name="uq_instrument_cost_authority_version_date",
+        ),
+        Index("ix_instrument_cost_authority_dates", "instrument_id", "effective_from", "effective_to"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    instrument_id = Column(String, nullable=False)
+    tax_category = Column(String, nullable=False, default="UNKNOWN")
+    classification_authority = Column(String, nullable=False, default="")
+    classification_source = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
+    effective_from = Column(String, nullable=False, default="")
+    effective_to = Column(String, nullable=True)
+    stamp_duty_rate = Column(Float, nullable=True)
+    commission_rate = Column(Float, nullable=True)
+    minimum_commission = Column(Float, nullable=True)
+    transfer_fee_rate = Column(Float, nullable=True)
+    slippage_bps = Column(Float, nullable=True)
+    evidence_hash = Column(String(64), default="")
+    created_at = Column(DateTime, server_default=func.now())
 
 
 class EntryCandidateFeedback(Base):
@@ -665,6 +803,12 @@ class StrategySignalRun(Base):
     source_agent = Column(String, default="")
     source_suggestion_id = Column(Integer, nullable=True)
     source_candidate_id = Column(Integer, nullable=True)
+    instrument_id = Column(String, nullable=True)
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    scan_run_id = Column(Integer, nullable=True)
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
     trace_id = Column(String, default="")
     is_holding_snapshot = Column(Boolean, default=False)
     context_quality_score = Column(Float, nullable=True)
@@ -1480,6 +1624,7 @@ class RankingSnapshot(Base):
     captured_at_utc = Column(DateTime, nullable=True)  # timezone-aware
     source_pool = Column(String, default="")
     scan_run_id = Column(Integer, nullable=True)
+    scan_run_ids = Column(JSON, default=[])
     candidate_ids = Column(JSON, default=[])
     catalog_authority = Column(JSON, default={})
     universe_ids = Column(JSON, default=[])
@@ -1557,4 +1702,9 @@ class RankingSnapshotItem(Base):
     capture_hash = Column(String(64), default="")
     candidate_id = Column(Integer, nullable=True)  # 軟引用
     signal_run_id = Column(Integer, nullable=True)  # 軟引用（no FK:projection delete 不 cascade）
+    scan_run_id = Column(Integer, nullable=True)  # only set when exactly one run contributed
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
     created_at = Column(DateTime, server_default=func.now())

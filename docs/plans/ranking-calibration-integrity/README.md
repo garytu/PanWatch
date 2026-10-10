@@ -1,6 +1,6 @@
 # PanWatch Ranking & Calibration Integrity 計劃（V1.3）
 
-建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**設計已修訂，待實作與驗證**。此次只修改計畫；未修改 runtime、寫入 DB 或啟用 calibration。
+建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**PR-0A 已提交；RC-B 已完成本地實作與驗證；RC-D ready**。下列 execution board 為最新交付狀態；未啟用 calibration。
 
 目標：分開 discovery universe、ranking reference、signal-forward outcome、simulated execution outcome 與 calibration cohort；每筆決策可按當時 inputs 重現，同一 cohort 不會因排程重試持續改 weight。
 
@@ -30,17 +30,19 @@
 
 ## 工作流與交付結果
 
-### Execution board (2026-10-10)
+### Execution board (2026-10-11)
 
-The user's explicit `execute RC-B` request promotes RC-B from the initial pending design to execution. PR-0A identity prerequisite is completed in the current checkout (capture/sealed-catalog regression: 11 passed); RC-A as a whole remains in progress because PR-3 is not delivered. Existing RC-A review changes remain uncommitted and outside RC-B's assignment. `docs/plan/README.md` does not exist here; this board is the source of truth for these cards.
+The user's explicit `execute RC-B` request promotes RC-B from the initial pending design to execution. PR-0A identity prerequisite is completed in the current checkout (capture/sealed-catalog regression: 11 passed); RC-A as a whole remains in progress because PR-3 is not delivered. The user committed RC-A review changes separately as `57c12c1`; RC-B starts after that commit and preserves it. `docs/plan/README.md` does not exist here; this board is the source of truth for these cards.
 
 | card / gate | status | owner | dependency |
 | --- | --- | --- | --- |
 | PR-0A decision identity prerequisite | completed | coordinator | capture/sealed-catalog regression verified |
 | RC-A full card / PR-3 restart | in_progress | prior work | RC-B, RC-D, RC-C; no activation claim |
-| RC-B | in_progress | rc_b_worker (GPT-6 Luna/max) | PR-0A identity completed |
-| RC-D | pending | unassigned | PR-0A identity, RC-B |
+| RC-B | completed | coordinator (worker: rc_b_worker) | PR-0A identity completed; reviewed and verified |
+| RC-D | ready | unassigned | PR-0A identity and RC-B completed |
 | RC-C | pending | unassigned | PR-0A identity, RC-B, RC-D |
+
+RC-B completion evidence: [2026-10-11 review and verification](evidence/2026-10-11-rc-b-verification.md). The next ready card is RC-D; RC-C and RC-A PR-3 remain dependency-gated. No subsequent implementation has started.
 
 | card | 內容 | PR / 依賴 |
 | --- | --- | --- |

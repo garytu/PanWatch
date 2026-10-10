@@ -32,6 +32,67 @@ export interface HotStockItem {
   availability?: { status?: string | null; [key: string]: unknown } | string | null
 }
 
+export interface TaiwanDiscoveryRunItem {
+  candidate_id: number | null
+  instrument_id: string
+  stock_symbol: string
+  stock_name: string
+  instrument_group: 'EQUITY' | 'ETF' | 'UNKNOWN' | string
+  instrument_authority: Record<string, unknown>
+  status: string
+  score: number
+  action: string
+  action_label: string
+  reason: string
+  entry_low: number | null
+  entry_high: number | null
+  stop_loss: number | null
+  target_price: number | null
+  candidate_stage: 'selected' | 'excluded' | string
+  scan_run_id: number
+  scan_run_revision: number
+  scan_run_manifest_hash: string
+  scan_run_refs: Array<{ scan_run_id: number; revision: number; manifest_hash: string; source_mode: string }>
+}
+
+export interface TaiwanDiscoveryRun {
+  scan_run_id: number
+  revision: number
+  manifest_hash: string
+  archived: boolean
+  manifest: {
+    stock_market: string
+    source_mode: string
+    scan_coverage_state: string
+    coverage_scope: string
+    requested_universe_count: number
+    not_requested_due_to_limit_count: number
+    valid_price_count: number
+    unattempted_instrument_count?: number
+    failed_request_count?: number
+    price_data_dates?: string[]
+    invalid_price_count: number
+    missing_or_failed_price_count: number
+    pending_price_count: number
+    pool_selected_count: number
+    candidate_selected_count: number
+    candidate_excluded_count: number
+    candidate_not_selected_count: number
+    run_completed_at_utc: string | null
+    scan_limits: Record<string, unknown>
+    candidate_items: TaiwanDiscoveryRunItem[]
+  }
+  stage_ledger: Array<{
+    stage: string
+    outcome: string
+    reason_code: string
+    instrument_ids: string[]
+    item_count: number
+  }>
+  items: TaiwanDiscoveryRunItem[]
+  candidate_count: number
+}
+
 export interface HotBoardItem {
   code: string
   name: string
@@ -163,6 +224,9 @@ export const discoveryApi = {
         limit: params?.limit,
       })
     ),
+
+  latestTaiwanDiscoveryRun: () =>
+    fetchAPI<TaiwanDiscoveryRun>('/discovery/runs/latest?market=TW'),
 
   listHotBoards: (params?: {
     market?: 'CN' | 'HK' | 'US' | 'TW'

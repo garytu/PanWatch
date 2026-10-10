@@ -123,6 +123,13 @@ class HotStock:
     change_basis: str | None = None
     units: dict = field(default_factory=dict)
     availability: dict | None = None
+    # Taiwan discovery keeps the vendor's list-compatible symbol field while also
+    # exposing the canonical instrument identity and the authority captured from
+    # the same catalog response. Other markets may leave these fields empty.
+    instrument_id: str | None = None
+    venue: str | None = None
+    security_type: str | None = None
+    is_active: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +157,34 @@ class TaiwanDiscoveryPool:
     security_type_by_instrument_id: dict[str, str] = field(default_factory=dict)
     price_data_dates: list[str] = field(default_factory=list)
     provider_scope: str = ""
+    # Structured stage evidence. The legacy count fields above remain compatible;
+    # these ID partitions use canonical instrument IDs and are frozen at return.
+    stage_id_sets: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    # Primary reason partitions are exact canonical IDs. Rows without a valid
+    # identity remain represented by the aggregate invalid-row count only.
+    stage_reason_id_sets: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    stage_reason_counts: dict[str, dict[str, int]] = field(default_factory=dict)
+    authority_by_instrument_id: dict[str, dict[str, Any]] = field(default_factory=dict)
+    catalog_response_row_count: int = 0
+    catalog_unique_count: int = 0
+    duplicate_catalog_record_count: int = 0
+    invalid_catalog_record_count: int = 0
+    catalog_source: str = ""
+    catalog_source_as_of: str | None = None
+    catalog_captured_at_utc: str | None = None
+    catalog_hash: str = ""
+    catalog_authority_status: str = "UNKNOWN"
+    scan_coverage_state: str = "UNKNOWN"
+    coverage_scope: str = "BOUNDED_REQUESTED_UNIVERSE"
+    price_data_snapshot_count: int = 0
+    run_started_at_utc: str | None = None
+    run_completed_at_utc: str | None = None
+    selection_config_version: str = "tw-discovery-v1"
+    selection_config: dict[str, Any] = field(default_factory=dict)
+    selection_config_hash: str = ""
+    requested_market: str = "TW"
+    requested_venues: list[str] = field(default_factory=lambda: ["TWSE", "TPEX"])
+    scan_limits: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

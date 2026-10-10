@@ -12,6 +12,7 @@ const { dashboardApi, discoveryApi } = vi.hoisted(() => ({
     listHotBoards: vi.fn(),
     listHotStocks: vi.fn(),
     listBoardStocks: vi.fn(),
+    latestTaiwanDiscoveryRun: vi.fn(),
     screenTaiwanOfficialStocks: vi.fn(),
   },
 }))
@@ -91,7 +92,57 @@ describe('Taiwan official discovery UI', () => {
     discoveryApi.listHotStocks.mockResolvedValue([])
     discoveryApi.listHotBoards.mockResolvedValue([])
     discoveryApi.listBoardStocks.mockReset()
+    discoveryApi.latestTaiwanDiscoveryRun.mockResolvedValue(null)
     discoveryApi.screenTaiwanOfficialStocks.mockReset()
+  })
+
+  it('shows saved run candidates beside their own manifest and separates them from live stocks', async () => {
+    discoveryApi.latestTaiwanDiscoveryRun.mockResolvedValue({
+      scan_run_id: 73,
+      revision: 1,
+      manifest_hash: 'f'.repeat(64),
+      archived: false,
+      manifest: {
+        stock_market: 'TW', source_mode: 'turnover', scan_coverage_state: 'PARTIAL',
+        coverage_scope: 'BOUNDED_REQUESTED_UNIVERSE', requested_universe_count: 12,
+        not_requested_due_to_limit_count: 8, valid_price_count: 10, invalid_price_count: 1,
+        missing_or_failed_price_count: 1, pending_price_count: 0, pool_selected_count: 4,
+        candidate_selected_count: 1, candidate_excluded_count: 1, candidate_not_selected_count: 2,
+        run_completed_at_utc: '2026-10-10T02:00:00Z', scan_limits: {},
+        candidate_items: [],
+      },
+      stage_ledger: [],
+      candidate_count: 1,
+      items: [{
+        candidate_id: 9, instrument_id: 'TWSE:00631L', stock_symbol: 'TWSE:00631L',
+        stock_name: '元大台灣50', instrument_group: 'ETF',
+        instrument_authority: { security_type: 'ETF', catalog_hash: 'a'.repeat(64) },
+        status: 'active', score: 81, action: 'buy', action_label: '建倉', reason: '',
+        entry_low: 100, entry_high: 102, stop_loss: 95, target_price: 110,
+        candidate_stage: 'selected', scan_run_id: 73, scan_run_revision: 1,
+        scan_run_manifest_hash: 'f'.repeat(64),
+        scan_run_refs: [{ scan_run_id: 73, revision: 1, manifest_hash: 'f'.repeat(64), source_mode: 'turnover' }],
+      }],
+    })
+    const liveStock = {
+      symbol: 'TWSE:2330', market: 'TW', name: '即時行情公司', price: 100,
+      change_pct: 1, turnover: 1000, price_kind: 'eod', trade_date: '2026-10-10',
+      freshness: { status: 'current' },
+    }
+    discoveryApi.listHotStocks.mockResolvedValue([liveStock])
+    const onOpenStock = vi.fn()
+
+    render(<DiscoveryPanel monitorStocks={[]} onOpenStock={onOpenStock} />)
+
+    const saved = await screen.findByRole('region', { name: '已保存台股掃描' })
+    expect(within(saved).getByText(/掃描 73 · 成交額 · 部分資料缺漏 · 受限請求範圍/)).toBeTruthy()
+    expect(within(saved).getByText(/有效行情 10\/12/)).toBeTruthy()
+    expect(within(saved).getByText(/ETF 機會 · 入選/)).toBeTruthy()
+    expect(within(saved).getByText(/下方熱門行情榜是獨立的即時查詢/)).toBeTruthy()
+    expect(await screen.findByText('即時行情公司')).toBeTruthy()
+    fireEvent.click(within(saved).getByRole('button', { name: /元大台灣50/ }))
+    expect(onOpenStock).toHaveBeenCalledWith('TWSE:00631L', 'TW', '元大台灣50', false)
+    expect(discoveryApi.latestTaiwanDiscoveryRun).toHaveBeenCalledTimes(1)
   })
 
   it('submits an opt-in condition and presents official dates, scope, explanations, and exclusions', async () => {

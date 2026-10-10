@@ -1,6 +1,8 @@
 import logging
 from dataclasses import dataclass
 
+from marketdata.types import TaiwanDiscoveryPool
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,6 +23,10 @@ class HotStock:
     change_basis: str | None = None
     units: dict | None = None
     availability: dict | None = None
+    instrument_id: str | None = None
+    venue: str | None = None
+    security_type: str | None = None
+    is_active: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -78,9 +84,31 @@ class EastMoneyDiscoveryCollector:
                 change_basis=getattr(it, "change_basis", None),
                 units=getattr(it, "units", None),
                 availability=getattr(it, "availability", None),
+                instrument_id=getattr(it, "instrument_id", None),
+                venue=getattr(it, "venue", None),
+                security_type=getattr(it, "security_type", None),
+                is_active=getattr(it, "is_active", None),
             )
             for it in pkg_items
         ]
+
+    async def fetch_taiwan_discovery(
+        self,
+        *,
+        mode: str = "turnover",
+        limit: int = 20,
+    ) -> TaiwanDiscoveryPool:
+        """Return the existing bounded TW scan with its captured stage authority."""
+        import asyncio as _aio
+
+        return await _aio.to_thread(
+            get_market_data().taiwan_discovery_pool,
+            mode=mode,
+            limit=limit,
+            # The strategy caller historically used hot_stocks(), which ranks the
+            # full eligible catalog before applying this same top-N limit.
+            max_universe_size=None,
+        )
 
     async def fetch_hot_boards(
         self,

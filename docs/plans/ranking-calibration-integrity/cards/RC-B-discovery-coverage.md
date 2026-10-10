@@ -1,18 +1,22 @@
 # RC-B: Discovery stages and instrument/cost authority
 
-Priority: P1. Status: in_progress. Owner: rc_b_worker (GPT-6 Luna/max). Ships entirely in PR-0B, after PR-0A identity and before RC-D cost evaluation. Contract: [discovery/authority](../contracts/discovery-vocabulary-v1.md).
+Priority: P1. Status: completed. Owner: coordinator (implementation: rc_b_worker, GPT-6 Luna/max). Ships entirely in PR-0B, after PR-0A identity and before RC-D cost evaluation. Contract: [discovery/authority](../contracts/discovery-vocabulary-v1.md).
 
 ## Assignment checkpoint
 
-2026-10-10: User explicitly requested `execute RC-B`; the pending design card is promoted for execution. The prerequisite is PR-0A decision identity, not RC-A's future PR-3 restart work. Identity prerequisite verified in the current checkout: `tests/test_calibration_integrity.py -k 'capture or sealed_catalog'` — 11 passed, 66 deselected. Existing uncommitted RC-A review changes are preserved and are not part of this assignment. Calibration remains contained; this task does not activate it.
+2026-10-10: User explicitly requested `execute RC-B`; the pending design card is promoted for execution. The prerequisite is PR-0A decision identity, not RC-A's future PR-3 restart work. Identity prerequisite verified in the current checkout: `tests/test_calibration_integrity.py -k 'capture or sealed_catalog'` — 11 passed, 66 deselected. RC-A review changes were committed separately by the user as `57c12c1` and remain outside this assignment. Calibration remains contained; this task does not activate it.
 
 ## Progress checkpoint
 
-Assigned; implementation pending.
+2026-10-10: Implemented structured Taiwan discovery stage partitions, frozen request-attempt evidence, catalog authority capture, and a versioned selection-config payload/hash. Persisted immutable run manifests and exclusion ledgers with atomic candidate linkage, same-day run-specific candidate/authority summaries, 180-day referenced-run retention, migration 128 support, dated cost-authority resolution, and run-linked API/UI/AI/strategy/dashboard consumers. Legacy `/stocks` fields and list-only discovery callers remain compatible; Taiwan EQUITY and ETF dashboard opportunities use separate bounded queries and unknown unheld classifications remain inactive. Calibration remains FROZEN.
+
+Verification: RC-B backend suite — 209 passed, 12 warnings; `DiscoveryPanel.test.tsx` — 12 passed; frontend `tsc -b` and production build passed; `git diff --check` clean. Added fixtures cover migration from populated pre-128 tables, finalization rollback, fixed-clock retention, empty/failed runs, candidate and decision linkage, same-day refresh, stage reason partitions, same-code cross-venue identity, ETF saturation, and dated cost authority.
+
+2026-10-11 coordinator verification: full backend regression — 1,585 passed / 3 skipped; final card/integration regression after review fixes — 239 passed; full frontend — 127 passed in 28 files; TypeScript and production build passed. Fixed-input grouping replay retains 20/21 ordinary rows, independently retains one ETF, excludes one unknown unheld row and preserves one unknown held row. Details and limits are in the linked verification evidence.
 
 ## Handoff
 
-Pending worker implementation and independent coordinator review.
+Coordinator review completed on 2026-10-11. Fixed pre-dispatch deadline/pending accounting, malformed IDs/catalog fields, UNKNOWN legacy-cache scope, all-valid-price date coverage, conflicting duplicate compatibility, counter/ledger validation, capture-reference identity, and ordinary/ETF filtering before limits in Dashboard/Opportunities/AI (including candidate fallback). Added exact-revision AI counts and actual refresh → file DB reopen → same-day empty failure coverage. Final evidence: [review and verification](../evidence/2026-10-11-rc-b-verification.md). Read-only inspection of local `tw-market-data` source at HEAD `4bdccdb4e01ea70a55ce5aafdd80e6014248430d` found `security_type`, venue, `is_active`, and CFI fields, with no ETF subtype or tax-category/effective-cost policy. Captured authority therefore remains latest-only and point-in-time unverifiable; missing dated classification returns `cost_authority_missing` and net cost stays unavailable. This is local source inspection, not a claim about deployed service behavior.
 
 ## Problem and delivered result
 

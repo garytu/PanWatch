@@ -11,6 +11,7 @@ import {
   type DashboardWatchStock,
   type HotStockItem,
   type HotBoardItem,
+  type TaiwanDiscoveryRun,
   type TaiwanOfficialDiscoveryResponse,
 } from '@panwatch/api'
 import { Button } from '@panwatch/base-ui/components/ui/button'
@@ -46,6 +47,13 @@ const officialReasonLabels: Record<string, string> = {
   stale: '資料超過新鮮度範圍',
   condition_not_met: '未達所選門檻',
 }
+
+const coverageLabels: Record<string, string> = {
+  COMPLETE: '範圍內完整', PARTIAL: '部分資料缺漏', MISSING: '資料缺失', UNKNOWN: '完整度未知',
+  FULL_ELIGIBLE_CATALOG: '全部合資格目錄', BOUNDED_REQUESTED_UNIVERSE: '受限請求範圍',
+  turnover: '成交額', gainers: '漲幅',
+}
+const coverageLabel = (value: string) => coverageLabels[value] || value
 
 const officialReasonLabel = (reason: string) => officialReasonLabels[reason] || reason
 
@@ -102,6 +110,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
   const [stocksMode, setStocksMode] = useLocalStorage<'turnover' | 'gainers' | 'for_you'>('panwatch_dashboard_stocksMode', 'for_you')
   const [boardsMode, setBoardsMode] = useLocalStorage<'gainers' | 'turnover'>('panwatch_dashboard_boardsMode', 'gainers')
   const [hotStocks, setHotStocks] = useState<HotStockItem[]>([])
+  const [savedTaiwanRun, setSavedTaiwanRun] = useState<TaiwanDiscoveryRun | null>(null)
   const [hotBoards, setHotBoards] = useState<HotBoardItem[]>([])
   const [discoverLoading, setDiscoverLoading] = useState(false)
   const [discoverError, setDiscoverError] = useState('')
@@ -134,6 +143,18 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
     officialScreenSequence.current += 1
     setOfficialScreenLoading(false)
     setOfficialScreenResult(null)
+  }, [discoverMarket])
+
+  useEffect(() => {
+    let current = true
+    setSavedTaiwanRun(null)
+    if (discoverMarket === 'TW') {
+      void Promise.resolve()
+        .then(() => discoveryApi.latestTaiwanDiscoveryRun())
+        .then((run) => { if (current) setSavedTaiwanRun(run || null) })
+        .catch(() => { if (current) setSavedTaiwanRun(null) })
+    }
+    return () => { current = false }
   }, [discoverMarket])
 
   const watchlistSet = useMemo(
@@ -506,6 +527,51 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
             </section>
           )}
 
+          {discoverTab === 'stocks' && discoverMarket === 'TW' && savedTaiwanRun && (
+            <section className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3" aria-label="已保存台股掃描">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="text-[13px] font-semibold">已保存掃描結果</div>
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                    掃描 {savedTaiwanRun.scan_run_id} · {coverageLabel(savedTaiwanRun.manifest.source_mode)} · {coverageLabel(savedTaiwanRun.manifest.scan_coverage_state)} · {coverageLabel(savedTaiwanRun.manifest.coverage_scope)}
+                  </div>
+                </div>
+                <div className="text-right text-[10px] text-muted-foreground">
+                  <div>有效行情 {savedTaiwanRun.manifest.valid_price_count}/{savedTaiwanRun.manifest.requested_universe_count}</div>
+                  <div>入選 {savedTaiwanRun.manifest.candidate_selected_count} · 排除 {savedTaiwanRun.manifest.candidate_excluded_count} · 未選 {savedTaiwanRun.manifest.candidate_not_selected_count}</div>
+                </div>
+              </div>
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                這些候選與覆蓋數字屬於同一次保存掃描；下方熱門行情榜是獨立的即時查詢。
+                {savedTaiwanRun.manifest.not_requested_due_to_limit_count > 0 && ` 尚有 ${savedTaiwanRun.manifest.not_requested_due_to_limit_count} 檔未納入價格請求。`}
+                {savedTaiwanRun.manifest.pending_price_count > 0 && ` ${savedTaiwanRun.manifest.pending_price_count} 檔仍待完成。`}
+              </div>
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                未發送 {savedTaiwanRun.manifest.unattempted_instrument_count ?? 0} · 行情無效 {savedTaiwanRun.manifest.invalid_price_count} · 缺失或失敗 {savedTaiwanRun.manifest.missing_or_failed_price_count} · 待完成 {savedTaiwanRun.manifest.pending_price_count} · 失敗請求 {savedTaiwanRun.manifest.failed_request_count ?? 0}
+                <div>行情日期：{savedTaiwanRun.manifest.price_data_dates?.join('、') || '未知'} · 保存時間：{savedTaiwanRun.manifest.run_completed_at_utc || '未知'}</div>
+              </div>
+              {savedTaiwanRun.items.length === 0 ? (
+                <div className="mt-2 text-[11px] text-muted-foreground">這次保存的掃描沒有策略候選；請依上方完整度判讀資料。</div>
+              ) : (
+                <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {savedTaiwanRun.items.slice(0, 12).map((item) => (
+                    <button
+                      key={`${item.scan_run_id}-${item.instrument_id}`}
+                      onClick={() => onOpenStock(item.instrument_id, 'TW', item.stock_name, false)}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-background/70 px-2 py-1.5 text-left hover:bg-background"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[11px] font-medium">{item.stock_name}</span>
+                        <span className="font-mono text-[9px] text-muted-foreground">{item.instrument_id} · {item.instrument_group === 'ETF' ? 'ETF 機會' : item.instrument_group === 'EQUITY' ? '普通股' : '分類未知'} · {item.candidate_stage === 'selected' ? '入選' : '未入選'}</span>
+                      </span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">{item.action_label} · {Number(item.score || 0).toFixed(0)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {discoverLoading ? (
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -558,7 +624,7 @@ export default function DiscoveryPanel({ monitorStocks, onOpenStock }: Props) {
           ) : (
             <div className="space-y-2">
               <div className="px-1 text-[11px] text-muted-foreground">
-                {closeBoardLabel || '行情日期與種類依個股標示'}
+                {discoverMarket === 'TW' && <span className="mr-1">即時熱門行情 · </span>}{closeBoardLabel || '行情日期與種類依個股標示'}
               </div>
               {stocksMode === 'for_you' && <div className="px-1 text-[11px] text-muted-foreground">根據持倉/自選/監控訊號/風格偏好排序</div>}
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">

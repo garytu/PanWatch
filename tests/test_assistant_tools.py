@@ -245,6 +245,7 @@ def test_research_candidates_tool_reuses_strategy_signals_and_returns_compact_ca
         "holding": "unheld",
         "risk_level": "",
         "include_payload": True,
+        "instrument_group": "ORDINARY",
     }
     assert result.data == {
         "snapshot_date": "2026-09-13",
