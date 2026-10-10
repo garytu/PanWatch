@@ -1233,7 +1233,10 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
     Provenance stays UNVERIFIABLE until the RC-D evaluator labels the population, which
     keeps every market ineligible (and therefore FROZEN/SHADOW) without weakening the gate.
     """
+    db.flush()
+    captured_at = utc_now()
     by_market: dict[str, list[dict]] = {}
+    configs_by_market: dict[str, list[dict]] = {}
     for row in rows:
         market = (row.stock_market or "CN").strip().upper() or "CN"
         symbol = (row.stock_symbol or "").strip().upper()
@@ -1257,6 +1260,20 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
             "primary_horizon_sessions": int(row.holding_days or 0) or None,
             "candidate_id": row.source_candidate_id,
             "signal_run_id": int(row.id) if row.id is not None else None,
+            "entry_price": row.entry_high or row.entry_low,
+            "stop_loss": row.stop_loss,
+            "target_price": row.target_price,
+            "regime_multiplier": breakdown.get("regime_multiplier", 1.0),
+            "regime": (payload.get("market_regime") or {}).get("regime") or "default",
+            "eligibility": {"eligible": row.status == "active", "status": row.status,
+                            "action": row.action, "source_agent": row.source_agent,
+                            "source_suggestion_id": row.source_suggestion_id,
+                            "trace_id": row.trace_id, "source_meta": payload.get("source_meta") or {}},
+        })
+        configs_by_market.setdefault(market, []).append({
+            "instrument_id": f"{market}:{symbol}", "strategy_code": row.strategy_code,
+            "strategy_weight": payload.get("strategy_weight"),
+            "factor_weights": payload.get("factor_weights"),
         })
     for market, decisions in sorted(by_market.items()):
         # Capture identity is run-scoped: one market/session keeps one capture, but a
@@ -1281,6 +1298,14 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
                 decisions=decisions,
                 ranker_version=RANKER_VERSION_V1,
                 catalog_authority=catalog_authority,
+                decision_at_utc=captured_at,
+                captured_at_utc=captured_at,
+                scoring_config_payload={
+                    "ranker_version": RANKER_VERSION_V1,
+                    "decisions": sorted(configs_by_market[market], key=lambda c:
+                                         (c["instrument_id"], c["strategy_code"])),
+                    "catalog_authority": catalog_authority,
+                },
             )
         except Exception:
             # capture 是 evidence 的 side channel: signal refresh must not fail because of it.
@@ -1441,6 +1466,7 @@ def refresh_strategy_signals(
                     "entry_candidate_snapshot": c.snapshot_date,
                     "strategy_tags": c.strategy_tags or [],
                     "strategy_weight": weight,
+                    "factor_weights": dict(factor_weights),
                     "source_meta": compact_source_meta,
                     "score_breakdown": score_breakdown,
                     "market_regime": {
@@ -1500,6 +1526,8 @@ def refresh_strategy_signals(
                 row.updated_at = utc_now()
                 touched_rows.append(row)
 
+        # Seal the pre-constraint reference set and eligibility before projection caps.
+        _capture_ranking_decisions(db, rows=touched_rows, session_date=snapshot)
         constraint_stats = _apply_portfolio_constraints(rows=touched_rows)
         if constraint_stats.get("demoted", 0) > 0:
             logger.info(
@@ -1508,9 +1536,6 @@ def refresh_strategy_signals(
                 constraint_stats.get("demoted", 0),
                 constraint_stats.get("by_reason", {}),
             )
-
-        # Decision inputs are sealed before any later refresh can revise them (PR-0A item 3).
-        _capture_ranking_decisions(db, rows=touched_rows, session_date=snapshot)
 
         # Remove stale strategy rows for same candidate snapshot when strategy mapping changed.
         stale_ids = [int(row.id) for row in existing_rows

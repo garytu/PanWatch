@@ -32,13 +32,15 @@ def _seed_pair(db, sid, *, market, snapshot_date, alpha, ret, horizon=5):
     ))
 
 
-def test_calibrate_all_markets_closes_loop_into_scoring():
+def test_calibrate_all_markets_closes_loop_into_scoring(monkeypatch):
     """端到端:快照+outcome → calibrate_all_markets → CN alpha 權重上調 → 評分 raw_score 提升。"""
     from src.modules.strategy.factor_calibration import calibrate_all_markets
     from src.modules.strategy.factor_weights import get_factor_weights
     from src.modules.strategy.strategy_engine import _compute_factor_breakdown
     from src.platform.persistence.models import EntryCandidate
     import test_calibration_integrity as ci
+    import src.modules.strategy.calibration_gate as gate
+    monkeypatch.setattr(gate, "SESSION_EVALUATION_VERSIONS", {ci.EVALUATION_VERSION_V2})
 
     db = _mem_db()
     try:

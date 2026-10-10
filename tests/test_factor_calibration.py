@@ -144,11 +144,13 @@ def test_evaluate_factor_ic_excludes_unelapsed_horizon():
 
 # --------------------------- DB:calibrate_factor_weights ---------------------------
 
-def test_calibrate_moves_weight_from_ic_and_audits():
+def test_calibrate_moves_weight_from_ic_and_audits(monkeypatch):
     """ACTIVE gate + immutable v2 cohort → IC=+1 → 權重上調並寫 auto 審計。"""
     from src.modules.strategy.factor_calibration import calibrate_factor_weights
     from src.platform.persistence.models import FactorWeight, FactorWeightHistory
     import test_calibration_integrity as ci
+    import src.modules.strategy.calibration_gate as gate
+    monkeypatch.setattr(gate, "SESSION_EVALUATION_VERSIONS", {ci.EVALUATION_VERSION_V2})
 
     db = _mem_db()
     try:

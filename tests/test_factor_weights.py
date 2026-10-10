@@ -81,20 +81,23 @@ def test_get_all_factor_weights_lists_all_markets():
         db.close()
 
 
-def test_set_factor_weight_manual_writes_history():
-    """手動改權重寫 manual 審計,並能同時設 is_pinned。"""
+def test_set_factor_weight_obeys_frozen_gate():
+    """手動覆蓋不能繞過 FROZEN，也不留下成功標定審計。"""
     from src.modules.strategy.factor_weights import set_factor_weight
     from src.platform.persistence.models import FactorWeightHistory
 
     db = _mem_db()
     try:
         res = set_factor_weight("alpha_score", "CN", weight=1.3, is_pinned=True, db=db)
-        assert res["weight"] == 1.3
-        assert res["is_pinned"] is True
+        assert res["weight"] == 1.0
+        assert res["status"] == "MODE_FROZEN"
+        assert res["is_pinned"] is False
         hist = (db.query(FactorWeightHistory)
                 .filter_by(factor_code="alpha_score", market="CN", reason="manual").all())
-        assert len(hist) == 1
-        assert hist[0].new_weight == 1.3
+        assert hist == []
+        pinned = set_factor_weight("alpha_score", "CN", is_pinned=True, db=db)
+        assert pinned["is_pinned"] is True
+        assert pinned["weight"] == 1.0
     finally:
         db.close()
 

@@ -10,10 +10,11 @@
 from __future__ import annotations
 
 import logging
+import math
 
 from src.platform.scheduling.timezone import utc_now
 from src.platform.persistence.database import SessionLocal
-from src.platform.persistence.models import FactorWeight, FactorWeightHistory
+from src.platform.persistence.models import FactorWeight
 
 logger = logging.getLogger(__name__)
 
@@ -97,15 +98,22 @@ def set_factor_weight(
     weight: float | None = None, is_pinned: bool | None = None,
     auto_calibrate: bool | None = None, db=None,
 ) -> dict:
-    """手動覆蓋某因子權重 / pin / 開關自動標定;權重變化寫 manual 審計。"""
+    """權重覆蓋走標定 service gate；pin/開關可獨立設定。"""
     if factor_code not in CALIBRATABLE_FACTORS:
         raise ValueError(f"未知因子: {factor_code}")
     if market not in MARKETS:
         raise ValueError(f"未知市場: {market}")
+    if weight is not None and not math.isfinite(float(weight)):
+        raise ValueError("權重必須是有限數值")
     own = db is None
     db = db or SessionLocal()
     try:
         get_factor_weights(market, db=db)  # 確保行存在
+        from src.modules.strategy.calibration_gate import (
+            apply_calibration_plan, plan_calibration, read_calibration_mode,
+        )
+
+        status = "NO_CHANGE"
         row = (
             db.query(FactorWeight)
             .filter(FactorWeight.factor_code == factor_code, FactorWeight.market == market)
@@ -115,14 +123,12 @@ def set_factor_weight(
             old = float(row.weight)
             new = round(max(0.1, min(3.0, float(weight))), 4)  # 手動也有界,防誤填
             if abs(new - old) >= 1e-9:
-                row.weight = new
-                row.reason = "manual"
-                row.effective_from = utc_now()
-                row.updated_at = utc_now()
-                db.add(FactorWeightHistory(
-                    factor_code=factor_code, market=market,
-                    old_weight=old, new_weight=new, sample_size=0, reason="manual",
-                ))
+                plan = plan_calibration(db, kind="factor", market=market, target=factor_code)
+                result = apply_calibration_plan(db, plan=plan, new_weight=new, reason="manual")
+                status = result["status"]
+                if status != "APPLIED":
+                    return {**_serialize(row), "status": status, "mode": plan["mode"],
+                            "readiness": plan["readiness"]}
         if is_pinned is not None:
             row.is_pinned = bool(is_pinned)
             row.updated_at = utc_now()
@@ -130,7 +136,8 @@ def set_factor_weight(
             row.auto_calibrate = bool(auto_calibrate)
             row.updated_at = utc_now()
         db.commit()
-        return _serialize(row)
+        return {**_serialize(row), "status": status,
+                "mode": read_calibration_mode(db, kind="factor", market=market)}
     finally:
         if own:
             db.close()

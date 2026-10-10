@@ -77,6 +77,8 @@ def _capture(db, *, market, session_date, capture_id, rows):
         ranker_version=RANKER_VERSION,
         decision_at_utc=datetime.strptime(session_date, "%Y-%m-%d"),
         evaluation_version=EVALUATION_VERSION_V2,
+        catalog_authority={r["strategy_code"]: (3 if r["strategy_code"] == "rebound" else 5)
+                           for r in rows},
     )
     for row in rows:
         decision_id = decision_snapshot_id_for(
@@ -100,7 +102,9 @@ def _capture(db, *, market, session_date, capture_id, rows):
                 primary_horizon_sessions=row["primary_horizon_sessions"],
                 exit_session_date=row["exit_session_date"],
                 exit_session_complete=row.get("exit_session_complete", True),
-                decision_at_utc=datetime.strptime(session_date, "%Y-%m-%d"),
+                decision_at_utc=row.get("decision_at_utc") or (
+                    datetime.strptime(session_date, "%Y-%m-%d")
+                    + timedelta(seconds=row["signal_run_id"])),
                 available_at_utc=row["available_at_utc"],
                 receipt_at_utc=row["available_at_utc"],
                 capture_hash=row["capture_hash"],
@@ -112,6 +116,7 @@ def _capture(db, *, market, session_date, capture_id, rows):
                 signal_run_id=row["signal_run_id"],
                 raw_factor_values=row["factors"],
                 factor_versions={code: "factor-v1" for code in row["factors"]},
+                eligibility={"eligible": True},
                 **row["factors"],
             )
         )
@@ -217,7 +222,7 @@ def _seed_cohort(db, *, market="TW", dates=26, units=5, start_index=0,
                  point_in_time_status="VERIFIED", capture_prefix=None,
                  id_base=1, net_offset=-0.1, correlated=("alpha_score",)):
     """Write a synthetic cohort whose alpha IC is strongly positive."""
-    prefix = capture_prefix or f"c-{market}"
+    prefix = capture_prefix or f"c-{market}-{strategy_code}"
     counter = id_base
     for index, session_date in enumerate(SESSIONS[start_index:start_index + dates]):
         rows = []
@@ -257,7 +262,11 @@ def _seed_cohort(db, *, market="TW", dates=26, units=5, start_index=0,
 
 
 @pytest.fixture
-def db_session():
+def db_session(monkeypatch):
+    # Synthetic evidence exercises the future RC-D writer; production has no
+    # validated session evaluator yet and must reject labels on legacy rows.
+    import src.modules.strategy.calibration_gate as gate
+    monkeypatch.setattr(gate, "SESSION_EVALUATION_VERSIONS", {EVALUATION_VERSION_V2}, raising=False)
     tmp = tempfile.mkdtemp()
     engine = create_engine(f"sqlite:///{tmp}/t.db", echo=False)
     Base.metadata.create_all(engine)
@@ -269,6 +278,248 @@ def db_session():
     finally:
         session.close()
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_applier_rechecks_the_requested_factor(db_session):
+    _seed_cohort(db_session, dates=32)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE)
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="quality_score")
+    assert plan["readiness"]["ready"] is False
+    result = apply_calibration_plan(db_session, plan=plan, new_weight=1.3)
+    assert result["status"] == "READINESS_NOT_MET"
+    assert db_session.query(CalibrationApplication).count() == 0
+
+
+def test_applier_rechecks_all_market_strata(db_session):
+    _seed_cohort(db_session, dates=45)
+    get_factor_weights("ALL", db=db_session)
+    set_calibration_mode(db_session, kind="factor", market="ALL", mode=MODE_ACTIVE)
+    plan = plan_calibration(db_session, kind="factor", market="ALL", target="alpha_score")
+    assert plan["readiness"]["ready"] is False
+    result = apply_calibration_plan(db_session, plan=plan, new_weight=1.3)
+    assert result["status"] == "READINESS_NOT_MET"
+    assert db_session.query(CalibrationApplication).count() == 0
+
+
+def test_policy_version_cannot_release_application_identity(db_session):
+    _seed_cohort(db_session, dates=32)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE)
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    assert apply_calibration_plan(db_session, plan=plan, new_weight=1.2)["status"] == "APPLIED"
+    retry = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    retry["calibration_policy_version"] = "caller-invented-policy"
+    result = apply_calibration_plan(db_session, plan=retry, new_weight=1.4)
+    assert result["status"] == "POLICY_VERSION_MISMATCH"
+    assert _alpha_weight(db_session) == 1.2
+    assert db_session.query(CalibrationApplication).count() == 1
+
+
+@pytest.mark.parametrize("change,expected", [
+    ("weight", "STALE_CONFIG"), ("pin", "PINNED_OR_OFF"), ("mode", "MODE_FROZEN"),
+])
+def test_write_recheck_ignores_orm_cache(db_session, change, expected):
+    _seed_cohort(db_session, dates=32)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE)
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    # Keep objects alive: ordinary ORM queries otherwise conceal this race by
+    # dropping weak references from the session identity map.
+    weight = db_session.query(FactorWeight).filter_by(factor_code="alpha_score", market="TW").one()
+    mode = db_session.query(CalibrationModeState).filter_by(kind="factor", market="TW").one()
+    with Session(bind=db_session.bind) as other:
+        if change == "mode":
+            other.query(CalibrationModeState).filter_by(kind="factor", market="TW").update({"mode": MODE_FROZEN})
+        elif change == "pin":
+            other.query(FactorWeight).filter_by(factor_code="alpha_score", market="TW").update({"is_pinned": True})
+        else:
+            other.query(FactorWeight).filter_by(factor_code="alpha_score", market="TW").update({"weight": 1.8})
+        other.commit()
+    assert weight is not None and mode is not None
+    result = apply_calibration_plan(db_session, plan=plan, new_weight=1.3)
+    assert result["status"] == expected
+    assert db_session.query(CalibrationApplication).count() == 0
+
+
+def test_exception_rolls_back_without_help_from_caller(db_session, monkeypatch):
+    import src.modules.strategy.calibration_gate as gate
+    _seed_cohort(db_session, dates=32, correlated=("alpha_score", "catalyst_score"))
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE)
+    batch = plan_calibration_batch(db_session, kind="factor", market="TW",
+                                   targets=["alpha_score", "catalyst_score"])
+    original = gate._weight_write
+    def crash(db, **kwargs):
+        result = original(db, **kwargs)
+        if kwargs["plan"]["target"] == "catalyst_score":
+            raise RuntimeError("injected crash")
+        return result
+    monkeypatch.setattr(gate, "_weight_write", crash)
+    with pytest.raises(RuntimeError, match="injected crash"):
+        apply_calibration_batch(db_session, plans=batch["plans"],
+                                proposals={"alpha_score": 1.3, "catalyst_score": 1.2})
+    # A subsequent commit must not accidentally persist the failed batch.
+    db_session.commit()
+    assert _alpha_weight(db_session) == 1.0
+    assert db_session.query(CalibrationApplication).count() == 0
+    assert db_session.query(FactorWeightHistory).count() == 0
+    assert db_session.query(CalibrationProvenance).count() == 0
+
+
+def test_capture_does_not_invent_available_time(db_session):
+    capture_decision_snapshot(
+        db_session, capture_id="missing-available", market="TW", session_date="2026-01-05",
+        ranker_version=RANKER_VERSION, decision_at_utc=datetime(2026, 1, 5),
+        decisions=[{"instrument_id": "TW:1", "strategy_code": "trend_follow",
+                    "point_in_time_status": "VERIFIED", "population": POPULATION_SIGNAL_FORWARD_V2,
+                    "evaluation_version": EVALUATION_VERSION_V2, "primary_horizon_sessions": 5}],
+    )
+    assert db_session.query(RankingSnapshotItem).one().available_at_utc is None
+    assert select_cohort(db_session, kind="factor", market="TW")["counts"]["units"] == 0
+
+
+def test_version_label_without_session_producer_is_ineligible(db_session, monkeypatch):
+    import src.modules.strategy.calibration_gate as gate
+    monkeypatch.setattr(gate, "SESSION_EVALUATION_VERSIONS", frozenset())
+    _seed_cohort(db_session, dates=32)
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    assert cohort["counts"]["rejected"]["SESSION_EVALUATOR_UNAVAILABLE"] == 160
+
+
+def test_concurrent_workers_and_restart_apply_once(db_session):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    _seed_cohort(db_session, dates=32)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE)
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    db_session.rollback()
+    start = Barrier(2)
+    def worker():
+        with Session(bind=db_session.bind) as session:
+            start.wait(timeout=10)
+            return apply_calibration_plan(session, plan=plan, new_weight=1.3)["status"]
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: worker(), range(2)))
+    assert sorted(results) == ["APPLIED", "DUPLICATE_COHORT"]
+    with Session(bind=db_session.bind) as restarted:
+        fresh = plan_calibration(restarted, kind="factor", market="TW", target="alpha_score")
+        assert apply_calibration_plan(restarted, plan=fresh, new_weight=1.4)["status"] == "DUPLICATE_COHORT"
+        assert _alpha_weight(restarted) == 1.3
+        assert restarted.query(CalibrationApplication).count() == 1
+        assert restarted.query(FactorWeightHistory).count() == 1
+        assert restarted.query(CalibrationProvenance).count() == 1
+
+
+def test_canonical_decision_uses_time_then_strategy(db_session):
+    # Insertion order must not select a later decision or a random strategy hash.
+    for sid, code, decision_time in [(1, "trend_follow", datetime(2026, 1, 5, 12)),
+                                     (2, "rebound", datetime(2026, 1, 5, 10)),
+                                     (3, "pullback", datetime(2026, 1, 5, 10))]:
+        _capture(db_session, market="TW", session_date="2026-01-05", capture_id=f"canonical-{sid}",
+                 rows=[_row(market="TW", unit=0, session_date="2026-01-05", gross_return_pct=float(sid),
+                            exit_session_date="2026-01-12", signal_run_id=sid, outcome_id=sid,
+                            strategy_code=code)])
+        item = db_session.query(RankingSnapshotItem).filter_by(signal_run_id=sid).one()
+        item.decision_at_utc = decision_time
+        db_session.commit()
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 1
+    assert cohort["samples"][0]["strategy_code"] == "pullback"
+
+
+def test_ineligible_decision_cannot_become_canonical(db_session):
+    _seed_cohort(db_session, dates=1, units=1)
+    item = db_session.query(RankingSnapshotItem).one()
+    item.eligibility = {"eligible": False}
+    db_session.commit()
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    assert cohort["counts"]["rejected"]["DECISION_NOT_ELIGIBLE"] == 1
+
+
+def test_capture_prefixes_do_not_reuse_an_unrelated_capture(db_session):
+    decision = {"instrument_id": "TW:1", "strategy_code": "trend_follow", "primary_horizon_sessions": 5}
+    first = capture_decision_snapshot(db_session, capture_id="long-capture-other", market="TW",
+                                     session_date="2026-01-05", decisions=[decision], ranker_version=RANKER_VERSION)
+    second = capture_decision_snapshot(db_session, capture_id="long-capture", market="TW",
+                                      session_date="2026-01-05", decisions=[decision], ranker_version=RANKER_VERSION)
+    assert first["snapshot_id"] != second["snapshot_id"]
+    assert second["capture_id"] == "long-capture"
+
+
+def test_catalog_revision_creates_a_new_capture(db_session):
+    decision = {"instrument_id": "TW:1", "strategy_code": "trend_follow", "primary_horizon_sessions": 5,
+                "entry_price": 10.0, "stop_loss": 9.0, "target_price": 12.0}
+    arguments = dict(capture_id="catalog-revision", market="TW", session_date="2026-01-05",
+                     decisions=[decision], ranker_version=RANKER_VERSION)
+    original = capture_decision_snapshot(db_session, catalog_authority={"trend_follow": 5}, **arguments)
+    corrected = capture_decision_snapshot(db_session, catalog_authority={"trend_follow": 3}, **arguments)
+    assert corrected["snapshot_id"] != original["snapshot_id"]
+    assert corrected["capture_id"] == "catalog-revision-r1"
+    assert db_session.query(RankingSnapshot).filter_by(id=original["snapshot_id"]).one().catalog_authority == {"trend_follow": 5}
+    assert {i.entry_price for i in db_session.query(RankingSnapshotItem).all()} == {10.0}
+
+
+def test_all_bootstrap_keeps_markets_in_the_same_date_block(monkeypatch):
+    import src.modules.strategy.calibration_gate as gate
+    observed = []
+    monkeypatch.setattr(gate, "_bootstrap_interval", lambda values: observed.extend(values))
+    gate._date_block_interval({"TW|2026-01-01": 1.0, "HK|2026-01-01": -1.0,
+                               "TW|2026-01-02": 0.5, "HK|2026-01-02": 1.0})
+    assert observed == [0.0, 0.75]
+
+
+def test_pin_does_not_block_eligible_sibling(db_session):
+    from src.modules.strategy.factor_calibration import calibrate_factor_weights
+    _seed_cohort(db_session, dates=32, correlated=("alpha_score", "catalyst_score"))
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE)
+    row = db_session.query(FactorWeight).filter_by(factor_code="alpha_score", market="TW").one()
+    row.is_pinned = True
+    db_session.commit()
+    result = calibrate_factor_weights("TW", db=db_session)
+    assert result["statuses"]["alpha_score"] == "PINNED_OR_OFF"
+    assert result["statuses"]["catalyst_score"] == "APPLIED"
+    assert _alpha_weight(db_session) == 1.0
+
+
+def test_failed_capture_cannot_be_committed_later(db_session):
+    with pytest.raises(ValueError):
+        capture_decision_snapshot(db_session, capture_id="broken-capture", market="TW",
+            session_date="2026-01-05", ranker_version=RANKER_VERSION,
+            decisions=[{"instrument_id": "TW:1", "strategy_code": "trend_follow",
+                        "raw_factor_values": {"alpha_score": "not-a-number"}}])
+    db_session.commit()
+    assert db_session.query(RankingSnapshot).count() == 0
+    assert db_session.query(RankingSnapshotItem).count() == 0
+
+
+def test_capture_commit_failure_rolls_back_savepoint(db_session, monkeypatch):
+    with monkeypatch.context() as patch:
+        def fail_commit():
+            raise RuntimeError("commit failed")
+        patch.setattr(db_session, "commit", fail_commit)
+        with pytest.raises(RuntimeError, match="commit failed"):
+            capture_decision_snapshot(db_session, capture_id="failed-commit", market="TW",
+                session_date="2026-01-05", ranker_version=RANKER_VERSION,
+                decisions=[{"instrument_id": "TW:1", "strategy_code": "trend_follow"}])
+    db_session.commit()
+    assert db_session.query(RankingSnapshot).count() == 0
+    assert db_session.query(RankingSnapshotItem).count() == 0
+
+
+def test_baseline_preserves_history_and_initializes_all_modes(db_session):
+    db_session.add(FactorWeightHistory(factor_code="alpha_score", market="TW",
+        old_weight=0.9, new_weight=1.0, reason="manual", meta={"source": "prior"}))
+    db_session.commit()
+    plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    baselines = db_session.query(CalibrationBaseline).filter_by(market="TW").all()
+    archive = next(row.meta["history_snapshot"] for row in baselines if "history_snapshot" in row.meta)
+    assert len(archive) == 1
+    assert archive[0]["new_weight"] == 1.0
+    assert archive[0]["meta"] == {"source": "prior"}
+    assert baselines[0].meta["config_payload"]
+    modes = {(row.kind, row.market) for row in db_session.query(CalibrationModeState).all()}
+    assert modes >= {(kind, market) for kind in ("factor", "strategy")
+                     for market in ("TW", "CN", "HK", "US", "ALL")}
 
 
 def _live_factor_weights(db, market="TW"):
@@ -1446,6 +1697,8 @@ def test_sealed_catalog_authority_survives_catalog_change(db_session):
         "primary_horizon_sessions": 5,
         "candidate_id": 1,
         "signal_run_id": 77,
+        "available_at_utc": datetime(2026, 1, 5),
+        "eligibility": {"eligible": True},
         "point_in_time_status": "VERIFIED",
         "population": POPULATION_SIGNAL_FORWARD_V2,
         "evaluation_version": EVALUATION_VERSION_V2,

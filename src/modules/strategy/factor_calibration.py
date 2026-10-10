@@ -96,6 +96,9 @@ def calibrate_factor_weights(
             ir = stats.get("ir")
             n = int(readiness["training"]["units"])
             old = plan["old_weight"]
+            if plan["pinned"] or not plan["auto_calibrate"]:
+                statuses[code] = "PINNED_OR_OFF"
+                continue
             if old is None:
                 statuses[code] = "TARGET_MISSING"
                 continue
@@ -108,6 +111,10 @@ def calibrate_factor_weights(
                 statuses[code] = "TARGET_MISSING"
                 continue
             observations[code] = {"last_ic": ic, "last_ir": ir, "last_sample_size": n}
+
+            if not readiness["ready"]:
+                statuses[code] = "READINESS_NOT_MET"
+                continue
 
             target = compute_target(code, ic, ir, beta=beta)
             if target is None:
@@ -166,6 +173,8 @@ def calibrate_factor_weights(
             "rows": rows_changed,
             "mode": first.get("mode"),
             "statuses": statuses,
+            "readiness": {code: plan["readiness"] for code, plan in batch["plans"].items()},
+            "proposals": proposals,
         }
     except Exception as e:  # pragma: no cover - 防禦性
         logger.warning(f"[因子標定] market={market} 失敗: {e}")

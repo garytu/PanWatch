@@ -30,16 +30,20 @@ def test_list_weights_returns_all_market_factor_pairs():
         db.close()
 
 
-def test_update_weight_pins_and_sets_value():
-    """POST 手動設權重 + pin。"""
+def test_update_weight_returns_frozen_rejection():
+    """POST 手動權重不能繞過服務門控；pin-only 仍可用。"""
     from src.modules.strategy.api import factors
 
     db = _mem_db()
     try:
         payload = factors.FactorWeightUpdate(weight=1.25, is_pinned=True)
         res = factors.update_weight("alpha_score", "CN", payload, db=db)
-        assert res["weight"] == 1.25
-        assert res["is_pinned"] is True
+        assert res["weight"] == 1.0
+        assert res["status"] == "MODE_FROZEN"
+        assert res["mode"] == "FROZEN"
+        pinned = factors.update_weight("alpha_score", "CN",
+                                       factors.FactorWeightUpdate(is_pinned=True), db=db)
+        assert pinned["is_pinned"] is True
     finally:
         db.close()
 
