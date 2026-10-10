@@ -1,6 +1,18 @@
 # RC-B: Discovery stages and instrument/cost authority
 
-Priority: P1. Status: pending. Ships entirely in PR-0B, after PR-0A identity and before RC-D cost evaluation. Contract: [discovery/authority](../contracts/discovery-vocabulary-v1.md).
+Priority: P1. Status: in_progress. Owner: rc_b_worker (GPT-6 Luna/max). Ships entirely in PR-0B, after PR-0A identity and before RC-D cost evaluation. Contract: [discovery/authority](../contracts/discovery-vocabulary-v1.md).
+
+## Assignment checkpoint
+
+2026-10-10: User explicitly requested `execute RC-B`; the pending design card is promoted for execution. The prerequisite is PR-0A decision identity, not RC-A's future PR-3 restart work. Identity prerequisite verified in the current checkout: `tests/test_calibration_integrity.py -k 'capture or sealed_catalog'` — 11 passed, 66 deselected. Existing uncommitted RC-A review changes are preserved and are not part of this assignment. Calibration remains contained; this task does not activate it.
+
+## Progress checkpoint
+
+Assigned; implementation pending.
+
+## Handoff
+
+Pending worker implementation and independent coordinator review.
 
 ## Problem and delivered result
 

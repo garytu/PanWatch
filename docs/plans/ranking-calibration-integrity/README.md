@@ -30,6 +30,18 @@
 
 ## 工作流與交付結果
 
+### Execution board (2026-10-10)
+
+The user's explicit `execute RC-B` request promotes RC-B from the initial pending design to execution. PR-0A identity prerequisite is completed in the current checkout (capture/sealed-catalog regression: 11 passed); RC-A as a whole remains in progress because PR-3 is not delivered. Existing RC-A review changes remain uncommitted and outside RC-B's assignment. `docs/plan/README.md` does not exist here; this board is the source of truth for these cards.
+
+| card / gate | status | owner | dependency |
+| --- | --- | --- | --- |
+| PR-0A decision identity prerequisite | completed | coordinator | capture/sealed-catalog regression verified |
+| RC-A full card / PR-3 restart | in_progress | prior work | RC-B, RC-D, RC-C; no activation claim |
+| RC-B | in_progress | rc_b_worker (GPT-6 Luna/max) | PR-0A identity completed |
+| RC-D | pending | unassigned | PR-0A identity, RC-B |
+| RC-C | pending | unassigned | PR-0A identity, RC-B, RC-D |
+
 | card | 內容 | PR / 依賴 |
 | --- | --- | --- |
 | [RC-A](cards/RC-A-calibration-integrity.md) | FROZEN mode、pin、不可變 decision/reference、cohort/application ledger、primary horizon、floor/confidence、恢復 gate | PR-0A；PR-3 恢復依 PR-0B、PR-1、PR-2 |
