@@ -54,6 +54,8 @@ from src.modules.strategy.calibration_gate import (
     run_calibration,
     select_cohort,
     set_calibration_mode,
+    capture_decision_snapshot,
+    RANKER_VERSION_V1,
 )
 from src.modules.strategy.factor_weights import CALIBRATABLE_FACTORS, get_factor_weights
 from src.modules.strategy.factor_calibration import blend, compute_target
@@ -1138,3 +1140,93 @@ def test_migration_127_fk_targets_capture_id():
         assert [row[0] for row in inserted] == [1]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ------------------------------------------------- capture producer (PR-0A item 3)
+
+def test_capture_producer_writes_items_once(db_session):
+    """Producer 的 append-only capture: refresh 時 reuse,不會 add second unit."""
+    decisions = [
+        {
+            "instrument_id": f"TW:123{i}",
+            "symbol": f"123{i}",
+            "strategy_code": "trend_follow",
+            "raw_factor_values": {"alpha_score": 1.0 + i, "catalyst_score": 0.5},
+            "primary_horizon_sessions": 5,
+        }
+        for i in range(3)
+    ]
+    first = capture_decision_snapshot(
+        db_session,
+        capture_id="decision-TW-2026-01-05",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=decisions,
+        ranker_version=RANKER_VERSION_V1,
+    )
+    assert first["written"] == 3
+    assert first["item_count"] == 3
+
+    # Same-day refresh: same capture_id and same decisions must reuse the sealed items.
+    second = capture_decision_snapshot(
+        db_session,
+        capture_id="decision-TW-2026-01-05",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=[*decisions, decisions[0]],
+        ranker_version=RANKER_VERSION_V1,
+    )
+    assert second["written"] == 0
+    assert second["reused"] == 4
+    assert second["item_count"] == 3
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    # Three distinct decisions, not six: the duplicate row never became a second unit.
+    assert cohort["counts"]["rejected"].get("PIT_UNVERIFIED") == 3
+
+
+def test_capture_producer_keeps_new_items_ineligible(db_session):
+    """New capture 的 provenance 是 UNVERIFIABLE: ineligible until RC-D labels population."""
+    capture_decision_snapshot(
+        db_session,
+        capture_id="decision-TW-2026-01-05",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=[{
+            "instrument_id": "TW:1234",
+            "symbol": "1234",
+            "strategy_code": "trend_follow",
+            "raw_factor_values": {"alpha_score": 1.0},
+            "primary_horizon_sessions": 5,
+        }],
+        ranker_version=RANKER_VERSION_V1,
+    )
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    assert cohort["counts"]["rejected"].get("PIT_UNVERIFIED") == 1
+
+
+def test_late_arriving_input_is_not_point_in_time(db_session):
+    """Available 的 time after decision is lookahead: reject, not evidence."""
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-05",
+        capture_id="late-input",
+        rows=[
+            _row(
+                market="TW",
+                unit=0,
+                session_date="2026-01-05",
+                gross_return_pct=1.0,
+                exit_session_date="2026-01-12",
+                signal_run_id=1,
+                outcome_id=1,
+                available_at_utc=datetime.strptime("2026-01-05", "%Y-%m-%d")
+                + timedelta(days=1),
+            )
+        ],
+    )
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 0
+    assert cohort["counts"]["rejected"].get("PIT_AVAILABILITY_AFTER_DECISION") == 1

@@ -20,7 +20,9 @@ from src.modules.strategy.strategy_catalog import (
 from src.modules.strategy.factor_weights import get_factor_weights
 from src.modules.strategy.calibration_gate import (
     apply_calibration_plan,
+    capture_decision_snapshot,
     plan_calibration_batch,
+    RANKER_VERSION_V1,
 )
 from src.platform.scheduling.timezone import to_iso_with_tz, utc_now
 from src.platform.marketdata.models import MarketCode, enabled_market_codes
@@ -1210,6 +1212,71 @@ def _format_signal(
     }
 
 
+CAPTURE_FACTOR_FIELDS = (
+    "alpha_score",
+    "catalyst_score",
+    "quality_score",
+    "risk_penalty",
+    "crowd_penalty",
+    "source_bonus",
+)
+
+
+def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
+    """Append-only decision capture (PR-0A): immutable items, UI projection stays separate.
+
+    The capture stores the factor values that actually fed each decision, so calibration
+    reads archived decision inputs instead of mutable StrategyFactorSnapshot projections.
+    Provenance stays UNVERIFIABLE until the RC-D evaluator labels the population, which
+    keeps every market ineligible (and therefore FROZEN/SHADOW) without weakening the gate.
+    """
+    by_market: dict[str, list[dict]] = {}
+    for row in rows:
+        market = (row.stock_market or "CN").strip().upper() or "CN"
+        symbol = (row.stock_symbol or "").strip().upper()
+        if not symbol:
+            continue
+        payload = row.payload if isinstance(row.payload, dict) else {}
+        breakdown = payload.get("score_breakdown") if isinstance(payload.get("score_breakdown"), dict) else {}
+        factors = {code: float(breakdown.get(code) or 0.0) for code in CAPTURE_FACTOR_FIELDS}
+        by_market.setdefault(market, []).append({
+            "instrument_id": f"{market}:{symbol}",
+            "symbol": row.stock_symbol,
+            "strategy_code": row.strategy_code,
+            "raw_factor_values": factors,
+            "ranking_value": breakdown.get("raw_score"),
+            "primary_horizon_sessions": int(row.holding_days or 0) or None,
+            "candidate_id": row.source_candidate_id,
+            "signal_run_id": int(row.id) if row.id is not None else None,
+        })
+    for market, decisions in sorted(by_market.items()):
+        try:
+            result = capture_decision_snapshot(
+                db,
+                capture_id=f"decision-{market}-{session_date}",
+                market=market,
+                session_date=session_date,
+                decisions=decisions,
+                ranker_version=RANKER_VERSION_V1,
+            )
+        except Exception:
+            # capture 是 evidence 的 side channel: signal refresh must not fail because of it.
+            logger.exception(
+                "[策略層] decision capture 失敗: market=%s session=%s",
+                market,
+                session_date,
+            )
+            continue
+        logger.info(
+            "[策略層] decision capture: market=%s session=%s written=%s reused=%s items=%s",
+            market,
+            session_date,
+            result["written"],
+            result["reused"],
+            result["item_count"],
+        )
+
+
 def refresh_strategy_signals(
     *,
     snapshot_date: str = "",
@@ -1416,6 +1483,9 @@ def refresh_strategy_signals(
                 constraint_stats.get("demoted", 0),
                 constraint_stats.get("by_reason", {}),
             )
+
+        # Decision inputs are sealed before any later refresh can revise them (PR-0A item 3).
+        _capture_ranking_decisions(db, rows=touched_rows, session_date=snapshot)
 
         # Remove stale strategy rows for same candidate snapshot when strategy mapping changed.
         stale_ids = [int(row.id) for row in existing_rows

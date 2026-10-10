@@ -56,11 +56,13 @@ MODE_SHADOW = "SHADOW"
 MODE_ACTIVE = "ACTIVE"
 CALIBRATION_MODES = (MODE_FROZEN, MODE_SHADOW, MODE_ACTIVE)
 CALIBRATION_KINDS = ("factor", "strategy")
+RANKER_VERSION_V1 = "ranker-v1"
 
 POPULATION_LEGACY_UNLABELLED = "legacy-unlabelled"
 POPULATION_SIGNAL_FORWARD_V2 = "signal-forward-v2"
 EVALUATION_VERSION_V2 = "evaluation-v2"
 POINT_IN_TIME_VERIFIED = "VERIFIED"
+POINT_IN_TIME_UNVERIFIABLE = "UNVERIFIABLE"
 
 FACTOR_HORIZON_SESSIONS = 5
 HOLDOUT_DECISION_DATES = 5
@@ -379,8 +381,9 @@ def _item_evidence(item, *, kind: str, horizon_map: dict | None = None) -> tuple
         return False, "CAPTURE_HASH_MISSING"
     if item.decision_at_utc is None or item.available_at_utc is None:
         return False, "PIT_TIMESTAMPS_MISSING"
-    if item.available_at_utc < item.decision_at_utc:
-        return False, "PIT_AVAILABILITY_BEFORE_DECISION"
+    if item.available_at_utc > item.decision_at_utc:
+        # 輸入 arrived after the decision: that is lookahead, not point-in-time evidence.
+        return False, "PIT_AVAILABILITY_AFTER_DECISION"
     if not item.exit_session_complete:
         return False, "EXIT_SESSION_INCOMPLETE"
     if (item.outcome_population_id or "") != POPULATION_SIGNAL_FORWARD_V2:
@@ -467,6 +470,136 @@ def ensure_ranking_capture(db, *, capture_id: str, market: str, session_date: st
     db.add(row)
     db.commit()
     return int(row.id)
+
+
+def capture_decision_snapshot(db, *, capture_id: str, market: str, session_date: str,
+                              decisions: list[dict], ranker_version: str,
+                              scoring_config_version: str = "",
+                              evaluation_version: str = "",
+                              rank_source_mode: str = "REPLAY",
+                              decision_at_utc=None, captured_at_utc=None,
+                              population: str = POPULATION_LEGACY_UNLABELLED,
+                              calibration_policy_version: str = CALIBRATION_POLICY_VERSION) -> dict:
+    """Append-only capture: one header plus one immutable item per decision row.
+
+    Retry of the same capture_id reuses the header and the item keyed by
+    decision_snapshot_id, so a same-day refresh never revises archived factors and
+    never adds a second unit for the same instrument/strategy decision. The writer
+    does not update an existing item; correction must land as a new capture.
+    """
+    decision_at = decision_at_utc
+    captured_at = captured_at_utc
+    snapshot_id = ensure_ranking_capture(
+        db,
+        capture_id=capture_id,
+        market=market,
+        session_date=session_date,
+        ranker_version=ranker_version,
+        decision_at_utc=decision_at,
+        captured_at_utc=captured_at,
+        source_pool=rank_source_mode,
+        scoring_config_version=scoring_config_version,
+        evaluation_version=evaluation_version,
+        calibration_policy_version=calibration_policy_version,
+    )
+    written = reused = 0
+    seen_ids: set[str] = set()
+    for row in decisions:
+        instrument_id = str(row.get("instrument_id") or "").strip()
+        strategy_code = str(row.get("strategy_code") or "").strip()
+        if not instrument_id or not strategy_code:
+            continue
+        decision_id = decision_snapshot_id_for(
+            capture_id=capture_id,
+            market=market,
+            session_date=session_date,
+            instrument_id=instrument_id,
+            strategy_code=strategy_code,
+            ranker_version=ranker_version,
+        )
+        if decision_id in seen_ids:
+            # Same batch carries the same instrument/strategy decision: one unit only.
+            reused += 1
+            continue
+        existing = (
+            db.query(RankingSnapshotItem)
+            .filter(RankingSnapshotItem.decision_snapshot_id == decision_id)
+            .first()
+        )
+        if existing:
+            reused += 1
+            continue
+        seen_ids.add(decision_id)
+        factors = row.get("raw_factor_values") or {}
+        item = RankingSnapshotItem(
+            decision_snapshot_id=decision_id,
+            ranking_snapshot_id=snapshot_id,
+            stock_market=market,
+            stock_symbol=str(row.get("symbol") or instrument_id),
+            instrument_id=instrument_id,
+            strategy_code=strategy_code,
+            regime=str(row.get("regime") or "default"),
+            session_date=session_date,
+            decision_at_utc=decision_at,
+            captured_at_utc=captured_at,
+            available_at_utc=row.get("available_at_utc") or decision_at,
+            receipt_at_utc=row.get("receipt_at_utc") or captured_at,
+            quote_source_time=str(row.get("quote_source_time") or ""),
+            bar_source_time=str(row.get("bar_source_time") or ""),
+            point_in_time_status=str(row.get("point_in_time_status")
+                                    or POINT_IN_TIME_UNVERIFIABLE),
+            outcome_population_id=str(row.get("population") or population),
+            evaluation_version=str(row.get("evaluation_version") or evaluation_version),
+            ranker_version=ranker_version,
+            scoring_config_version=scoring_config_version,
+            calibration_policy_version=calibration_policy_version,
+            primary_horizon_sessions=row.get("primary_horizon_sessions"),
+            exit_session_date=str(row.get("exit_session_date") or ""),
+            exit_session_complete=row.get("exit_session_complete"),
+            raw_factor_values=factors,
+            factor_versions={code: str(row.get("factor_version") or "")
+                             for code in factors},
+            eligibility=row.get("eligibility") or {},
+            ranking_value=row.get("ranking_value"),
+            candidate_id=row.get("candidate_id"),
+            signal_run_id=row.get("signal_run_id"),
+        )
+        for code in CALIBRATABLE_FACTORS:
+            if code in factors:
+                setattr(item, code, float(factors[code]))
+        item.capture_hash = _sha256(_canonical({
+            "decision_snapshot_id": decision_id,
+            "market": market,
+            "session_date": session_date,
+            "instrument_id": instrument_id,
+            "strategy_code": strategy_code,
+            "ranker_version": ranker_version,
+            "factors": factors,
+            "calibration_policy_version": calibration_policy_version,
+        }))
+        db.add(item)
+        written += 1
+    db.commit()
+    total = (
+        db.query(RankingSnapshotItem)
+        .filter(RankingSnapshotItem.ranking_snapshot_id == snapshot_id)
+        .count()
+    )
+    capture = (
+        db.query(RankingSnapshot)
+        .filter(RankingSnapshot.id == snapshot_id)
+        .first()
+    )
+    if capture is not None:
+        capture.item_count = int(total)
+        db.commit()
+    return {
+        "capture_id": capture_id,
+        "snapshot_id": snapshot_id,
+        "written": written,
+        "reused": reused,
+        "item_count": int(total),
+    }
 
 
 def select_cohort(db, *, kind: str, market: str,
