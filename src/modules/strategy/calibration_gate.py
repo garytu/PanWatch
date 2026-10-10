@@ -176,8 +176,9 @@ def set_calibration_mode(db, *, kind: str, market: str, mode: str, reason: str =
 
 # ------------------------------------------------------- live config identity
 
-def live_config_hash(db, *, kind: str, market: str, regime: str = "default") -> str:
-    """Hash of the live weight payload a writer would consume (stale-config guard)."""
+def live_config_payload(db, *, kind: str, market: str,
+                        regime: str = "default") -> list:
+    """Exact live weight payload a writer would consume (source config identity)."""
     if kind == "factor":
         rows = (
             db.query(FactorWeight)
@@ -185,9 +186,8 @@ def live_config_hash(db, *, kind: str, market: str, regime: str = "default") -> 
             .order_by(FactorWeight.factor_code)
             .all()
         )
-        payload = [[r.factor_code, round(float(r.weight), 6), bool(r.is_pinned),
-                    bool(r.auto_calibrate)] for r in rows]
-        return _sha256(_canonical(payload))
+        return [[r.factor_code, round(float(r.weight), 6), bool(r.is_pinned),
+                 bool(r.auto_calibrate)] for r in rows]
     reg = (regime or "default").strip() or "default"
     rows = (
         db.query(StrategyWeight)
@@ -198,9 +198,14 @@ def live_config_hash(db, *, kind: str, market: str, regime: str = "default") -> 
         .order_by(StrategyWeight.strategy_code, StrategyWeight.market)
         .all()
     )
-    payload = [[r.strategy_code, r.market, round(float(r.weight), 6), bool(r.is_pinned),
-                bool(r.auto_calibrate)] for r in rows]
-    return _sha256(_canonical(payload))
+    return [[r.strategy_code, r.market, round(float(r.weight), 6), bool(r.is_pinned),
+             bool(r.auto_calibrate)] for r in rows]
+
+
+def live_config_hash(db, *, kind: str, market: str, regime: str = "default") -> str:
+    """Hash of the live weight payload a writer would consume (stale-config guard)."""
+    return _sha256(_canonical(live_config_payload(db, kind=kind, market=market,
+                                                  regime=regime)))
 
 
 def current_weight(db, *, kind: str, market: str, target: str, regime: str = "default"):
@@ -422,6 +427,7 @@ def cohort_for_target(cohort: dict, *, kind: str, target: str | None = None) -> 
             "units": len(rows),
             "dates": len({s["session_date"] for s in rows}),
         },
+        "ranker_versions": sorted({s.get("ranker_version") or "" for s in rows}),
     }
 
 
@@ -687,6 +693,7 @@ def select_cohort(db, *, kind: str, market: str,
             {
                 "decision_snapshot_id": item.decision_snapshot_id,
                 "capture_order": item.ranking_snapshot_id,
+                "ranker_version": item.ranker_version,
                 "market": item.stock_market,
                 "instrument_id": item.instrument_id or item.stock_symbol,
                 "session_date": item.session_date,
@@ -728,6 +735,7 @@ def select_cohort(db, *, kind: str, market: str,
         },
         "decision_dates": dates,
         "primary_horizon_sessions": horizon_value,
+        "ranker_versions": sorted({s.get("ranker_version") or "" for s in samples}),
     }
 
 
@@ -1068,6 +1076,18 @@ def apply_calibration_plan(db, *, plan: dict, new_weight: float,
             "expected_live_config_hash"]:
         db.rollback()
         return {"status": "STALE_CONFIG", "market": market, "kind": kind, "target": target}
+
+    # Audit identity: the exact live config and evidence labels this proposal consumed.
+    horizon = plan["cohort"].get("primary_horizon_sessions")
+    if isinstance(horizon, dict):
+        horizon = horizon.get(str(target or "").partition("|")[0])
+    claim.ranker_version = ";".join(plan["cohort"].get("ranker_versions") or ())
+    claim.primary_horizon_sessions = horizon
+    claim.target_weight = new_weight
+    claim.source_config_versions = {
+        "live_config_payload": live_config_payload(db, kind=kind, market=market,
+                                                   regime=regime),
+    }
 
     if kind == "factor":
         row = (

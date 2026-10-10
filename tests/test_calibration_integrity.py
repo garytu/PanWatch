@@ -55,6 +55,7 @@ from src.modules.strategy.calibration_gate import (
     select_cohort,
     set_calibration_mode,
     capture_decision_snapshot,
+    FACTOR_HORIZON_SESSIONS,
     RANKER_VERSION_V1,
 )
 from src.modules.strategy.factor_weights import CALIBRATABLE_FACTORS, get_factor_weights
@@ -1230,3 +1231,24 @@ def test_late_arriving_input_is_not_point_in_time(db_session):
     cohort = select_cohort(db_session, kind="factor", market="TW")
     assert cohort["counts"]["units"] == 0
     assert cohort["counts"]["rejected"].get("PIT_AVAILABILITY_AFTER_DECISION") == 1
+
+
+def test_application_ledger_records_audit_identity(db_session):
+    """Application ledger 的保存 source config、ranker version、horizon、target weight."""
+    _seed_cohort(db_session, dates=32)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
+                         reason="floors met")
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    apply_calibration_plan(db_session, plan=plan, new_weight=1.2,
+                           output_config_hash="cfg-out-1")
+    row = (
+        db_session.query(CalibrationApplication)
+        .filter(CalibrationApplication.market == "TW")
+        .order_by(CalibrationApplication.id.desc())
+        .first()
+    )
+    assert row is not None
+    assert row.ranker_version == RANKER_VERSION
+    assert row.primary_horizon_sessions == FACTOR_HORIZON_SESSIONS
+    assert row.target_weight == 1.2
+    assert row.source_config_versions.get("live_config_payload")
