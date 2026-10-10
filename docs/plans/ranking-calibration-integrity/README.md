@@ -1,6 +1,6 @@
 # PanWatch Ranking & Calibration Integrity 計劃（V1.3）
 
-建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**PR-0A 已提交；RC-B 已完成本地實作與驗證；RC-D ready**。下列 execution board 為最新交付狀態；未啟用 calibration。
+建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**PR-0A 已提交；RC-B 已完成本地實作與驗證；RC-D in_progress**。下列 execution board 為最新交付狀態；未啟用 calibration。
 
 目標：分開 discovery universe、ranking reference、signal-forward outcome、simulated execution outcome 與 calibration cohort；每筆決策可按當時 inputs 重現，同一 cohort 不會因排程重試持續改 weight。
 
@@ -39,10 +39,10 @@ The user's explicit `execute RC-B` request promotes RC-B from the initial pendin
 | PR-0A decision identity prerequisite | completed | coordinator | capture/sealed-catalog regression verified |
 | RC-A full card / PR-3 restart | in_progress | prior work | RC-B, RC-D, RC-C; no activation claim |
 | RC-B | completed | coordinator (worker: rc_b_worker) | PR-0A identity completed; reviewed and verified |
-| RC-D | ready | unassigned | PR-0A identity and RC-B completed |
+| RC-D | in_progress | rc_d_worker (GPT-6 Luna/max) | PR-0A identity and RC-B completed |
 | RC-C | pending | unassigned | PR-0A identity, RC-B, RC-D |
 
-RC-B completion evidence: [2026-10-11 review and verification](evidence/2026-10-11-rc-b-verification.md). The next ready card is RC-D; RC-C and RC-A PR-3 remain dependency-gated. No subsequent implementation has started.
+RC-B completion evidence: [2026-10-11 review and verification](evidence/2026-10-11-rc-b-verification.md). The user requested `execute rc-d` on 2026-10-11; RC-D is assigned in the current checkout on `codex/rc-d-point-in-time-outcomes`. Prerequisite regressions: immutable capture/sealed catalog — 11 passed; dated cost/capture identity — 2 passed. RC-C and RC-A PR-3 remain dependency-gated. Unrelated local files are preserved; calibration remains contained.
 
 | card | 內容 | PR / 依賴 |
 | --- | --- | --- |

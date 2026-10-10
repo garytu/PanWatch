@@ -1,10 +1,14 @@
 # RC-D: Immutable, session-based forward and execution outcomes
 
-Priority: P1. Status: ready. Owner: unassigned. Ships in PR-1 after PR-0A identity/containment and PR-0B instrument/cost authority. Contract: [outcome vocabulary](../contracts/outcome-vocabulary-v1.md).
+Priority: P1. Status: in_progress. Owner: rc_d_worker (GPT-6 Luna/max). Ships in PR-1 after PR-0A identity/containment and PR-0B instrument/cost authority. Contract: [outcome vocabulary](../contracts/outcome-vocabulary-v1.md).
 
 ## Readiness checkpoint
 
 2026-10-11: PR-0A identity is committed (`57c12c1`); RC-B instrument/coverage authority is completed and reviewed. Dated cost adapter is available; missing subtype/tax authority must retain gross and report `cost_authority_missing` / net unavailable. No RC-D implementation has started.
+
+## Assignment checkpoint
+
+2026-10-11: User explicitly requested `execute rc-d`. Board and card were ready; PR-0A identity and RC-B are completed. Current-checkout prerequisite verification: `tests/test_calibration_integrity.py -k 'capture or sealed_catalog'` — 11 passed / 66 deselected; `tests/test_discovery_coverage.py -k 'dated_cost or capture_identity'` — 2 passed / 12 deselected. Assigned to rc_d_worker (GPT-6 Luna/max) on `codex/rc-d-point-in-time-outcomes`; no worktree is created. Unrelated local changes remain outside this assignment. Calibration remains FROZEN; RC-C and RC-A PR-3 are not started by this task.
 
 ## Problem and delivered result
 
