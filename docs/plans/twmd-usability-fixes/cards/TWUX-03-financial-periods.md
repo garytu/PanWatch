@@ -1,6 +1,6 @@
 # TWUX-03：財報可用期間與獨立載入
 
-優先級：P2。狀態：blocked（PanWatch 部分已交付）。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
+優先級：P2。狀態：in_progress（上游索引已部署，PanWatch 接入中）。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
 
 ## 問題與交付結果
 
@@ -50,6 +50,8 @@
 - 若上游索引仍不足，獨立載入可先交付，但「最新已留存預設」維持待驗收，整張卡不可標為 completed。記錄契約缺口及恢復條件，不把上游資料補齊當成 PanWatch 已完成。
 
 ## Progress checkpoint
+
+2026-10-10：使用者要求恢復 TWUX-03。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。新版 twmd query image `sha256:5a040effe80e06268bd89a707fc791fe7b52b5d98cc93f11f094788c6b89463e` 已部署；唯讀查詢 `/api/v1/financial-statement-periods` 的 TWSE:2330 回覆 contract v1、完整索引、latest_readable 2024Q4，TPEX:5347 明確 unsupported。上游多期 isolated HTTP 驗收見 twmd deployment acceptance；本卡恢復 PanWatch typed client／UI 接入及雙邊驗證。
 
 2026-10-10：開始 PanWatch 可獨立交付的載入／選期改善。Owner：GPT-6 Luna/max implementation worker；coordinator：Codex。上游索引未提供，完整驗收仍等待。
 
