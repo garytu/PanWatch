@@ -61,6 +61,32 @@ def _catalog(instrument_id="TWSE:2330", security_type="EQUITY"):
     }]
 
 
+def test_financial_period_index_uses_shared_bounded_read_and_scoped_cache():
+    calls = []
+
+    class Client:
+        def financial_statement_periods(self, instrument_id, **selectors):
+            calls.append((instrument_id, selectors))
+            return SimpleNamespace(instrument_id=instrument_id, selectors=selectors)
+
+    service = TaiwanResearchService(
+        client=Client(), config={"base_url": "https://twmd.example", "token": "secret"},
+    )
+    first = service.financial_statement_periods("TWSE:2330", limit=1)
+    second = service.financial_statement_periods("TWSE:2330", limit=1)
+    service.financial_statement_periods("TWSE:2330", limit=2)
+
+    assert first.instrument_id == "TWSE:2330"
+    assert first.selectors["timeout_sec"] <= 2.0
+    assert second == first and second is not first
+    assert len(calls) == 2
+    assert calls[0][0] == "TWSE:2330"
+    assert calls[0][1] == {
+        "report_scope": "consolidated", "statement": None, "limit": 1,
+        "cursor": None, "timeout_sec": first.selectors["timeout_sec"],
+    }
+
+
 def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(monkeypatch):
     catalog = _catalog() + [
         {"instrument_id": "TWSE:00999", "venue": "TWSE", "symbol": "00999", "security_type": "ETN", "is_active": True, "name": "測試 ETN"},

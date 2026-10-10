@@ -2,7 +2,9 @@
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+
+from marketdata.errors import TwmdReadError
 
 from src.modules.research.taiwan_research import (
     TaiwanResearchService,
@@ -48,6 +50,115 @@ def get_taiwan_research(
     except Exception as exc:  # provider errors are normally isolated into block results
         raise HTTPException(status_code=503, detail="Taiwan research is temporarily unavailable") from exc
     return serialize_taiwan_research(payload)
+
+
+@router.get("/taiwan/financial-periods")
+def get_taiwan_financial_periods(
+    request: Request,
+    instrument_id: str = Query(..., min_length=1, max_length=32),
+    report_scope: str = Query("consolidated", pattern="^(consolidated|individual)$"),
+    statement: str | None = Query(None, pattern="^(balance_sheet|comprehensive_income|cash_flows)$"),
+    limit: int = Query(40, ge=1, le=40),
+    cursor: str | None = Query(None, max_length=2048),
+):
+    """Read retained period metadata independently of the selected fact report."""
+    if not is_market_enabled("TW"):
+        raise HTTPException(status_code=404, detail="Taiwan market is disabled")
+    allowed = {"instrument_id", "report_scope", "statement", "limit", "cursor"}
+    if set(request.query_params.keys()) - allowed:
+        raise HTTPException(status_code=422, detail="Unsupported financial-period selector")
+    if any(len(request.query_params.getlist(name)) != 1 for name in request.query_params.keys()):
+        raise HTTPException(status_code=422, detail="Financial-period selectors must appear once")
+    selectors = {
+        "instrument_id": instrument_id,
+        "report_scope": report_scope,
+        "statement": statement,
+        "limit": limit,
+    }
+    if cursor is not None:
+        selectors["cursor"] = cursor
+    try:
+        read = get_taiwan_research_service().financial_statement_periods(
+            instrument_id,
+            report_scope=report_scope,
+            statement=statement,
+            limit=limit,
+            cursor=cursor,
+        )
+        if read.coverage.status == "complete" and read.qualification.status == "qualified":
+            index_status = "available"
+            reason = read.coverage.reason
+        elif read.qualification.status == "unsupported":
+            index_status = "unsupported"
+            reason = read.qualification.reason
+        else:
+            index_status = read.coverage.status
+            reason = read.coverage.reason
+        return serialize_taiwan_research({
+            "instrument_id": read.instrument_id,
+            "endpoint": read.endpoint,
+            "index_status": index_status,
+            "reason": reason,
+            "selectors": {
+                **selectors,
+                "instrument_id": read.instrument_id,
+                "venue": read.venue,
+                "source": read.source,
+            },
+            "index": asdict(read),
+            "error": None,
+        })
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TwmdReadError as exc:
+        raw_code = exc.reason_code or "provider_error"
+        known_codes = {
+            "http_404": "endpoint_unsupported",
+            "http_409": "index_changed",
+            "http_503": "index_unavailable",
+            "timeout": "index_timeout",
+            "invalid_response": "invalid_response",
+            "transport_error": "transport_error",
+            "concurrency_limit": "concurrency_limit",
+        }
+        if raw_code in known_codes:
+            code = known_codes[raw_code]
+        elif raw_code.startswith("index_"):
+            code = raw_code
+        elif raw_code.startswith("http_"):
+            code = "index_unavailable"
+        else:
+            code = raw_code
+        if code in {"endpoint_unsupported", "instrument_not_found"}:
+            status = "unknown"
+        elif code in {
+            "unsupported_venue", "unsupported_report_scope", "catalog_security_type_not_equity",
+            "profile_industry_not_24", "listing_after_period",
+        }:
+            status = "unsupported"
+        else:
+            status = "error"
+        return serialize_taiwan_research({
+            "instrument_id": instrument_id,
+            "endpoint": "/api/v1/financial-statement-periods",
+            "index_status": status,
+            "reason": code,
+            "selectors": selectors,
+            "index": None,
+            "error": {"code": code, "http_status": exc.status_code},
+        })
+    except LookupError:
+        return serialize_taiwan_research({
+            "instrument_id": instrument_id,
+            "endpoint": "/api/v1/financial-statement-periods",
+            "index_status": "unknown",
+            "reason": "instrument_not_found",
+            "selectors": selectors,
+            "index": None,
+            "error": {"code": "instrument_not_found", "http_status": None},
+        })
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Financial-period index is temporarily unavailable") from exc
 
 
 @router.get("/taiwan/material-information")

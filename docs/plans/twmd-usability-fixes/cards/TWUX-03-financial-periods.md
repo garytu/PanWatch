@@ -1,6 +1,6 @@
 # TWUX-03：財報可用期間與獨立載入
 
-優先級：P2。狀態：in_progress（上游索引已部署，PanWatch 接入中）。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約；最新留存期間需 twmd 提供索引契約。
+優先級：P2。狀態：completed。責任：PanWatch＋twmd。依賴：TWUX-02 的區塊選擇契約與已部署的 twmd 留存期別索引。
 
 ## 問題與交付結果
 
@@ -57,7 +57,17 @@
 
 2026-10-10：已完成可獨立交付步驟 2、3、5，交 coordinator 審查。主研究請求只選擇九個非財報區塊；財報另用既有 selective-block API、共用排程與快取讀取。兩邊有各自的載入、錯誤、重試、取消與標的／期間序號檢查。回應必須符合所選 canonical 標的及財年／季度才會呈現。索引未知時明示可用期間待確認；缺少、錯誤／逾時、unsupported 分開保留；使用者所選期別不自動回退。仍等待上游索引契約；最新已留存預設與整卡完整驗收維持 blocked，不得標 completed。
 
+2026-10-10 worker checkpoint：TWMD v1 留存期別索引已部署後，完成 PanWatch typed client／嚴格 decoder、15 秒隔離深拷貝快取、共用有界研究排程、受保護 `/api/research/taiwan/financial-periods` 路由與 latest/manual 前端流程。只有 selector 一致、coverage complete、qualification qualified、latest_readable 為 present_readable 且附 authority 時才自動查該期；即使 latest 在第一頁之外仍採用其權威期別。索引未知／部分／舊端點／錯誤時保留明確年季手動查詢；明選期別失敗不回退。TPEX 免索引讀取，已知 unsupported 標的停止財報 fact probe。工作狀態：review；待 coordinator 獨立複核及 live smoke。
+
 ## Handoff
+
+2026-10-10 coordinator 最終驗收：PanWatch 接入 twmd `twmd.financial-statement-periods/v1`。獨立複核 typed decoder、完整資格／coverage／authority 門檻、最新期超出第一頁、手動選期與索引故障降級；全套 `.venv/bin/python -m pytest -q tests packages/marketdata/tests` 1479 passed、3 skipped，前端 `pnpm exec vitest run` 27 files／116 passed，`pnpm exec tsc -b`、`pnpm build`、`git diff --check` 通過。固定 Node 24.14.0／pnpm 9.15.9。PanWatch typed client 對已部署服務唯讀實測：TWSE:2330 contract v1、qualified／complete、limit 1 第一頁仍回 `has_more=true` 與 `latest_readable_period=2024Q4`；TPEX:5347 回 unsupported／unknown、無最新可讀期。上游部署映像 `sha256:5a040effe80e06268bd89a707fc791fe7b52b5d98cc93f11f094788c6b89463e`；正式環境只有一個留存財報期，多期情境由 twmd 隔離 HTTP 驗收與 PanWatch fixtures 覆蓋。PanWatch 未部署；此卡 completed，不代表 PW-14 盤中驗收完成。
+
+2026-10-10 implementation worker handoff：狀態 `review`，交 coordinator 獨立複核。變更只在 TWMD typed read、PanWatch research service／API、財報選期 panels 與對應測試；沒有編輯 TWMD checkout、部署或提交。client 嚴格驗證 v1 contract、selectors／標的、coverage／qualification、period presence、authority／revision、時間、頁面上限及 latest/page 一致性；快取依 URL、credential hash 和 instrument/report scope/statement/limit/cursor 隔離，採 15 秒 TTL、深拷貝並不快取錯誤。Research service 使用共享 `_submit_read` 排程，最多 2 秒上游讀取／5 秒服務 deadline，沒有逐季探測或另建 worker pool。HTTP 404 舊端點回未知並保留手動選期；已知 scope 不支援、partial/unknown、invalid response、timeout 各自保留狀態。
+
+前端以獨立可取消、序號隔離的索引請求取得期別；只在完整且符合資格的 matching response 中，使用 `latest_readable_period`（含超出第一頁的 authority）作預設；顯示來源、接收時間、semantic revision 與頁面期別 evidence。索引失敗仍可切換到明選年／季，按下查詢才讀所選期別；缺少或逾時不更改選擇、不回退。TWSE ETF／已知非支援產業不送財報 fact request，TPEX 維持既有本地 unsupported 處理。主研究的九個非財報區塊與財報載入仍獨立；既有原始 facts、精度、scale、單位、筆數與 timeout 語意未改。
+
+驗證：`.venv/bin/python -m pytest -q tests/test_taiwan_research_service.py tests/test_taiwan_research_api.py packages/marketdata/tests/test_twmd_financial_statements.py packages/marketdata/tests/test_twmd.py`（以 `PYTHONPATH=.:packages/marketdata/src` 執行），111 passed；固定 Node 24.14.0／pnpm 9.15.9 執行 `pnpm exec vitest run tests/TaiwanResearchPanel.test.tsx tests/api/research.test.ts`，30 passed；`pnpm exec tsc -b` 通過；`pnpm build` 通過（Browserslist caniuse-lite 資料過舊提示）；`git diff --check` 通過。Worker 尚未執行 live smoke；coordinator 已負責該唯讀確認。等 coordinator review／live smoke 後再決定驗收，worker 未改卡片 status／owner。
 
 PanWatch 部分已由 coordinator 獨立複核並提交，未部署；整卡維持 blocked，等待上游期別索引。改動為 `taiwan-research-panel.tsx`、`financial-statements-panel.tsx`、其前端回歸測試，以及[上游期別索引需求草案](../contracts/TWUX-03-retained-period-index.md)。
 

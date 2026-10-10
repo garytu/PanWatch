@@ -667,6 +667,92 @@ class TwmdFinancialStatementRead:
 
 
 @dataclass(frozen=True)
+class TwmdFinancialStatementPeriodAuthority:
+    """Retained report authority attached to one indexed fiscal period."""
+
+    capture_id: str
+    document_id: str
+    semantic_revision_id: str
+    revision_number: int
+    source_contract: str
+    parser_contract: str
+    original_received_at_utc: str
+    document_first_observed_at_utc: str
+    semantic_revision_first_observed_at_utc: str
+    latest_observed_at_utc: str
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementPeriodStatementCoverage:
+    presence: str
+    fact_count: int
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementPeriodIndexEntry:
+    fiscal_year: int
+    fiscal_quarter: int
+    report_scope: str
+    presence: str
+    reason: str
+    statement_coverage: dict[str, TwmdFinancialStatementPeriodStatementCoverage]
+    authority: TwmdFinancialStatementPeriodAuthority | None
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementPeriodQualification:
+    status: str
+    reason: str
+    industry_code: str | None
+    catalog: dict[str, Any] | None
+    profile: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementPeriodIndexCoverage:
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class TwmdFinancialStatementPeriodsRead:
+    """A typed, bounded page of certified retained financial periods."""
+
+    contract_version: str
+    instrument_id: str
+    venue: str
+    source: str
+    report_scope: str
+    statement: str | None
+    limit: int
+    supported_scope: dict[str, Any]
+    window_start: tuple[int, int]
+    window_end: tuple[int, int] | None
+    qualification: TwmdFinancialStatementPeriodQualification
+    coverage: TwmdFinancialStatementPeriodIndexCoverage
+    periods: tuple[TwmdFinancialStatementPeriodIndexEntry, ...]
+    next_cursor: str | None
+    has_more: bool
+    latest_retained_period: TwmdFinancialStatementPeriodIndexEntry | None
+    latest_readable_period: TwmdFinancialStatementPeriodIndexEntry | None
+    served_at_utc: str
+    endpoint: str = "/api/v1/financial-statement-periods"
+
+    @property
+    def safe_latest_readable_period(self) -> TwmdFinancialStatementPeriodIndexEntry | None:
+        """Return latest only when matching complete qualified evidence proves it readable."""
+        if (
+            self.coverage.status == "complete"
+            and self.qualification.status == "qualified"
+            and self.latest_readable_period is not None
+            and self.latest_readable_period.presence == "present_readable"
+            and self.latest_readable_period.authority is not None
+        ):
+            return self.latest_readable_period
+        return None
+
+
+@dataclass(frozen=True)
 class TwmdCompanyProfileSnapshot:
     """Latest whole-market profile snapshot evidence from twmd."""
 

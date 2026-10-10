@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 from marketdata.errors import TwmdReadError
 from marketdata.symbol import Symbol
+from marketdata.types import TwmdFinancialStatementPeriodsRead
 from marketdata.vendors.twmd import TwmdClient
 
 from src.modules.research.twmd_profile_revenue import (
@@ -60,6 +61,7 @@ _CACHE_TTLS = {
     "broker_flow": 300,
     "material_information": 300,
     "financial_statements": 300,
+    "financial_statement_periods": 15,
     "corporate_actions": 300,
     "benchmark_comparison": 300,
 }
@@ -426,6 +428,8 @@ def clear_taiwan_research_cache() -> None:
     """Clear bounded service caches; used by deterministic offline tests."""
     with _CACHE_LOCK:
         _CACHE.clear()
+    from marketdata.vendors.twmd import clear_financial_statement_periods_cache
+    clear_financial_statement_periods_cache()
 
 
 def _month(value: str, label: str) -> date:
@@ -1142,6 +1146,67 @@ class TaiwanResearchService:
     def __init__(self, *, client: TwmdClient | None = None, config: dict | None = None):
         self.config = dict(config if config is not None else twmd_config())
         self.client = client or _BoundedTwmdClient(self.config)
+
+    def financial_statement_periods(
+        self,
+        instrument_id: str,
+        *,
+        report_scope: str = "consolidated",
+        statement: str | None = None,
+        limit: int = 40,
+        cursor: str | None = None,
+    ) -> TwmdFinancialStatementPeriodsRead:
+        """Read the issuer's bounded retained-period index through the shared scheduler."""
+        read_caller = object()
+        deadline = time.monotonic() + 5.0
+        if not _REQUEST_SLOTS.acquire(blocking=False):
+            raise TwmdReadError(
+                "Taiwan research request capacity is full", reason_code="concurrency_limit",
+            )
+        future = None
+        try:
+            if re.fullmatch(r"(?:TWSE|TPEX):[0-9][0-9A-Z]{3,5}", instrument_id, re.ASCII):
+                canonical = instrument_id
+            else:
+                catalog_key = (*_scope(self.config), "catalog", "TW")
+                rows = _cache_get(catalog_key)
+                if rows is None:
+                    future = _submit_read(
+                        _instrument_catalog, self.client, self.config,
+                        coalesce_key=catalog_key, caller_id=read_caller, deadline=deadline,
+                    )
+                    rows = future.result(timeout=max(0.0, deadline - time.monotonic()))
+                    future = None
+                canonical, _instrument = _resolve(rows, instrument_id)
+
+            selectors = (report_scope, statement, limit, cursor)
+            key = _cache_key(self.config, canonical, "financial_statement_periods", selectors)
+            cached = _cache_get(key)
+            if cached is not None:
+                return cached
+
+            def read_index():
+                result = self.client.financial_statement_periods(
+                    canonical,
+                    report_scope=report_scope,
+                    statement=statement,
+                    limit=limit,
+                    cursor=cursor,
+                    timeout_sec=max(0.1, min(2.0, deadline - time.monotonic())),
+                )
+                _cache_set(key, result, _CACHE_TTLS["financial_statement_periods"])
+                return result
+
+            future = _submit_read(
+                read_index, coalesce_key=key, caller_id=read_caller, deadline=deadline,
+            )
+            return future.result(timeout=max(0.0, deadline - time.monotonic()))
+        except TimeoutError as exc:
+            if future is not None:
+                future.cancel()
+            raise TwmdReadError("financial-period index read timed out", reason_code="timeout") from exc
+        finally:
+            _REQUEST_SLOTS.release()
 
     def collect(
         self,

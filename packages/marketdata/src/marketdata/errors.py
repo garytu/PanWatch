@@ -18,7 +18,9 @@ class TwmdReadError(VendorError):
         *,
         status_code: int | None = None,
         reason_code: str | None = None,
+        detail_code: str | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code
         self.reason_code = reason_code
+        self.detail_code = detail_code

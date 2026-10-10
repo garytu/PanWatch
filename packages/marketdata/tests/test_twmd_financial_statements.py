@@ -9,6 +9,7 @@ import pytest
 
 from marketdata.errors import TwmdReadError
 from marketdata.financial_statements import decode_financial_statement_response
+from marketdata.financial_statement_periods import decode_financial_statement_periods_response
 from marketdata.vendors import twmd
 
 
@@ -23,8 +24,10 @@ def response():
 @pytest.fixture(autouse=True)
 def clear_financial_cache():
     twmd._financial_statements_cache.clear()
+    twmd._financial_statement_periods_cache.clear()
     yield
     twmd._financial_statements_cache.clear()
+    twmd._financial_statement_periods_cache.clear()
 
 
 def decode(payload: dict, *, limit: int = 500):
@@ -261,3 +264,173 @@ def test_incomplete_quarter_rejected_before_http(monkeypatch):
 
     with pytest.raises(ValueError):
         client.financial_statements("TWSE:2330", 2026, 4, today_taipei=date(2026, 10, 7))
+
+
+def _period_index_payload(*, limit: int = 1, coverage: str = "complete") -> dict:
+    authority = {
+        "capture_id": "capture-2024q4",
+        "document_id": "document-2024q4",
+        "semantic_revision_id": "revision-2024q4",
+        "revision_number": 2,
+        "source_contract": "mops.financial-statements/v1",
+        "parser_contract": "mops.inline-xbrl-financial-statements/v1",
+        "original_received_at_utc": "2025-03-15T01:00:00Z",
+        "document_first_observed_at_utc": "2025-03-15T01:00:00Z",
+        "semantic_revision_first_observed_at_utc": "2025-03-15T01:00:00Z",
+        "latest_observed_at_utc": "2025-03-16T01:00:00Z",
+    }
+    readable = {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
+        "report_scope": "consolidated",
+        "presence": "present_readable",
+        "reason": "validated_retained_report",
+        "statement_coverage": {
+            "balance_sheet": {"presence": "present_readable", "fact_count": 154},
+            "comprehensive_income": {"presence": "present_readable", "fact_count": 86},
+            "cash_flows": {"presence": "present_readable", "fact_count": 154},
+        },
+        "authority": authority,
+    }
+    qualification = {
+        "status": "qualified" if coverage == "complete" else "pending",
+        "reason": "twse_equity_industry_24" if coverage == "complete" else "index_invalidated",
+        "industry_code": "24" if coverage == "complete" else None,
+        "catalog": {
+            "instrument_id": "TWSE:2330", "venue": "TWSE", "security_type": "EQUITY",
+            "is_active": True, "dataset": "twse_instruments", "partition_key": "2026-10-08",
+            "status": "AVAILABLE", "record_count": 1898, "acquired_at": "2026-10-09T00:00:00Z",
+            "sha256": "a" * 64,
+        } if coverage == "complete" else None,
+        "profile": {
+            "instrument_id": "TWSE:2330", "industry_code": "24", "listed_on": "1994-09-05",
+            "report_date": "2026-10-08", "capture_id": "profile-capture",
+            "source_contract": "twse_openapi_t187ap03_L/v1", "payload_sha256": "b" * 64,
+        } if coverage == "complete" else None,
+    }
+    periods = [{
+        "fiscal_year": 2026, "fiscal_quarter": 3, "report_scope": "consolidated",
+        "presence": "missing" if coverage == "complete" else "unknown",
+        "reason": "no_retained_report" if coverage == "complete" else "index_invalidated",
+        "statement_coverage": {}, "authority": None,
+    }]
+    return {
+        "contract_version": "twmd.financial-statement-periods/v1",
+        "selectors": {
+            "instrument_id": "TWSE:2330", "venue": "TWSE", "source": "mops_financial_statements",
+            "report_scope": "consolidated", "statement": None, "limit": limit,
+        },
+        "supported_scope": {
+            "venues": ["TWSE"], "source": "mops_financial_statements",
+            "source_contract": "mops.financial-statements/v1", "industry_codes": ["24"],
+            "security_types": ["EQUITY"], "report_scopes": ["consolidated"],
+            "statements": ["balance_sheet", "comprehensive_income", "cash_flows"],
+        },
+        "window": {"start": {"fiscal_year": 2024, "fiscal_quarter": 1},
+                   "end": {"fiscal_year": 2026, "fiscal_quarter": 3}},
+        "qualification": qualification,
+        "coverage": {
+            "status": coverage,
+            "reason": "retained_metadata_complete" if coverage == "complete" else "index_invalidated",
+        },
+        "periods": periods,
+        "next_cursor": None,
+        "has_more": False,
+        "latest_retained_period": readable if coverage == "complete" else None,
+        "latest_readable_period": readable if coverage == "complete" else None,
+        "served_at_utc": "2026-10-10T02:00:00Z",
+    }
+
+
+def test_period_index_keeps_latest_readable_outside_first_page_and_preserves_authority():
+    read = decode_financial_statement_periods_response(
+        _period_index_payload(), instrument_id="TWSE:2330", report_scope="consolidated",
+        statement=None, limit=1, cursor=None,
+    )
+    assert read.periods[0].presence == "missing"
+    assert (read.latest_readable_period.fiscal_year, read.latest_readable_period.fiscal_quarter) == (2024, 4)
+    assert read.safe_latest_readable_period.authority.revision_number == 2
+    assert read.safe_latest_readable_period.authority.capture_id == "capture-2024q4"
+    assert read.safe_latest_readable_period.statement_coverage["balance_sheet"].fact_count == 154
+
+
+def test_period_index_rejects_page_retained_period_newer_than_latest_authority():
+    payload = _period_index_payload()
+    page_period = payload["periods"][0]
+    latest = payload["latest_readable_period"]
+    page_period.update(
+        presence="present_readable", reason="validated_retained_report",
+        statement_coverage=copy.deepcopy(latest["statement_coverage"]),
+        authority=copy.deepcopy(latest["authority"]),
+    )
+
+    with pytest.raises(TwmdReadError, match="newer than latest_retained_period"):
+        decode_financial_statement_periods_response(
+            payload, instrument_id="TWSE:2330", report_scope="consolidated",
+            statement=None, limit=1, cursor=None,
+        )
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda data: data.update(contract_version="twmd.financial-statement-periods/v2"),
+    lambda data: data["selectors"].update(instrument_id="TWSE:2317"),
+    lambda data: data["periods"][0].update(report_scope="individual"),
+    lambda data: data["latest_readable_period"]["authority"].update(revision_number=0),
+    lambda data: data["latest_readable_period"]["authority"].update(source_contract="other/v1"),
+    lambda data: data["latest_readable_period"].update(presence="missing"),
+])
+def test_period_index_rejects_mismatched_or_corrupt_scope_evidence(mutate):
+    payload = _period_index_payload()
+    mutate(payload)
+    with pytest.raises(TwmdReadError) as error:
+        decode_financial_statement_periods_response(
+            payload, instrument_id="TWSE:2330", report_scope="consolidated",
+            statement=None, limit=1, cursor=None,
+        )
+    assert error.value.reason_code == "invalid_response"
+
+
+@pytest.mark.parametrize("status", ["partial", "unknown"])
+def test_period_index_partial_or_unknown_never_supplies_safe_default(status):
+    read = decode_financial_statement_periods_response(
+        _period_index_payload(coverage=status), instrument_id="TWSE:2330",
+        report_scope="consolidated", statement=None, limit=1, cursor=None,
+    )
+    assert read.latest_readable_period is None
+    assert read.safe_latest_readable_period is None
+    assert read.periods[0].presence == "unknown"
+
+
+def test_period_index_client_is_bounded_cached_deep_copied_and_selector_isolated(monkeypatch):
+    calls = []
+
+    def response(self, path, *, timeout_sec=None, retries=None, **params):
+        calls.append((self.base_url, self.config.get("token"), path, params))
+        payload = _period_index_payload(limit=params["limit"])
+        payload["selectors"]["statement"] = params.get("statement")
+        if params.get("cursor"):
+            payload["periods"] = []
+            payload["window"]["end"] = {"fiscal_year": 2024, "fiscal_quarter": 4}
+        return payload, {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", response)
+    first = twmd.TwmdClient({"base_url": "https://one.invalid", "token": "secret-one"})
+    second = twmd.TwmdClient({"base_url": "https://two.invalid", "token": "secret-two"})
+    read = first.financial_statement_periods("TWSE:2330", limit=1)
+    read.supported_scope["venues"].append("TPEX")
+    read.qualification.catalog["security_type"] = "ETF"
+    first.financial_statement_periods("TWSE:2330", limit=1)
+    first.financial_statement_periods("TWSE:2330", limit=2)
+    first.financial_statement_periods("TWSE:2330", limit=1, cursor="opaque-next")
+    first.financial_statement_periods("TWSE:2330", limit=1, statement="cash_flows")
+    second.financial_statement_periods("TWSE:2330", limit=1)
+
+    assert len(calls) == 5
+    assert calls[0][2] == "financial-statement-periods"
+    assert calls[0][3] == {"instrument_id": "TWSE:2330", "report_scope": "consolidated", "limit": 1}
+    assert calls[1][3]["limit"] == 2
+    assert calls[2][3]["cursor"] == "opaque-next"
+    assert calls[3][3]["statement"] == "cash_flows"
+    assert calls[4][0:2] == ("https://two.invalid", "secret-two")
+    assert first.financial_statement_periods("TWSE:2330", limit=1).supported_scope["venues"] == ["TWSE"]
+    assert "secret-one" not in repr(calls[0][3])

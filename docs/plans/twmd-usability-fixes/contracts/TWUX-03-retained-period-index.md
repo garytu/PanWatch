@@ -1,6 +1,6 @@
 # TWUX-03：財報留存期別索引需求
 
-狀態：待 PanWatch／twmd 共同確認。本文是上游契約需求草案，不是已存在或已部署的 API。
+狀態：歷史需求草案，已由 [twmd 正式 v1 契約](/Users/garytu/works/tw-market-data-main/docs/plan/contracts/financial-statement-periods.md) 與 [部署驗收](/Users/garytu/works/tw-market-data-main/docs/financial-period-index-deployment-acceptance.md) 取代。2026-10-10 已部署 `/api/v1/financial-statement-periods`，PanWatch 接入完成；以下保留原始需求供追溯，不代表目前能力缺口。
 
 ## 已核對能力與缺口
 
@@ -42,4 +42,4 @@ PanWatch 只在完整、符合所有 selectors 的回覆中預設最新 `present
 
 ## 恢復條件
 
-TWUX-03 的「最新已留存預設」仍 blocked，直到上游正式提供並部署符合上述 selectors、presence／coverage、authority／revision、唯讀邊界與查詢預算的索引，PanWatch typed client 與 UI 接入通過雙邊測試，且部署中的服務版本通過多期唯讀驗收。其餘獨立載入、未知期別提示及明確年度／季度查詢可先交付。
+原恢復條件已達成：上游正式索引已部署；PanWatch typed client／UI 接入、回歸測試與線上唯讀檢查已完成。線上當時只有單一 retained 期別，多期與分頁情境由上游隔離 HTTP 驗收及 PanWatch fixtures 證明；這項資料量邊界記錄於卡片 Handoff。

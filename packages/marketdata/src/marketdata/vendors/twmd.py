@@ -18,6 +18,9 @@ from marketdata.cache import TTLCache
 from marketdata.benchmarks import decode_benchmark_bars, decode_benchmark_definitions, decode_daily_bars
 from marketdata.errors import TwmdReadError
 from marketdata.financial_statements import decode_financial_statement_response
+from marketdata.financial_statement_periods import (
+    decode_financial_statement_periods_response,
+)
 from marketdata.http import MarketHttpError, MarketHttpResponse, market_get, record_error
 from marketdata.symbol import Symbol
 from marketdata.types import (
@@ -34,6 +37,7 @@ from marketdata.types import (
     TwmdCapitalReductionObservation,
     TwmdCapitalReductionRead,
     TwmdFinancialStatementRead,
+    TwmdFinancialStatementPeriodsRead,
     TwmdValuationObservation,
     TwmdValuationRead,
     TwmdBenchmarkBarsRead,
@@ -95,6 +99,7 @@ _RESEARCH_READ_CACHE_TTL_SEC = 300.0
 _company_profile_cache = TTLCache(default_ttl_sec=_RESEARCH_READ_CACHE_TTL_SEC)
 _monthly_revenue_cache = TTLCache(default_ttl_sec=_RESEARCH_READ_CACHE_TTL_SEC)
 _financial_statements_cache = TTLCache(default_ttl_sec=_RESEARCH_READ_CACHE_TTL_SEC)
+_financial_statement_periods_cache = TTLCache(default_ttl_sec=15.0, max_size=1024)
 _PROFILE_CONTRACTS = {
     "TWSE": "twse_openapi_t187ap03_L/v1",
     "TPEX": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
@@ -129,6 +134,11 @@ _TPEX_FLOW_FIELDS = (
     "combined_dealer_sell_shares", "combined_dealer_net_shares",
     "total_institutional_net_shares",
 )
+
+
+def clear_financial_statement_periods_cache() -> None:
+    """Invalidate cached retained-period pages after a caller requests refresh."""
+    _financial_statement_periods_cache.clear()
 
 
 def _date_value(value: date | str, label: str) -> date:
@@ -1423,12 +1433,79 @@ class TwmdClient:
             )
         if response.status_code < 200 or response.status_code >= 300:
             record_error(f"twmd GET /api/v1/{path}: HTTP {response.status_code}")
+            detail_code = None
+            reason_code = f"http_{response.status_code}"
+            if path == "financial-statement-periods" and isinstance(response.data, dict):
+                detail = response.data.get("detail")
+                if isinstance(detail, dict) and isinstance(detail.get("code"), str):
+                    detail_code = detail["code"]
+                    reason_code = detail_code
             raise TwmdReadError(
                 f"twmd GET /api/v1/{path} returned HTTP {response.status_code}",
                 status_code=response.status_code,
-                reason_code=f"http_{response.status_code}",
+                reason_code=reason_code,
+                detail_code=detail_code,
             )
         return response.data, response.headers
+
+    def financial_statement_periods(
+        self,
+        instrument_id: str,
+        *,
+        report_scope: str = "consolidated",
+        statement: str | None = None,
+        limit: int = 40,
+        cursor: str | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdFinancialStatementPeriodsRead:
+        """Read one bounded page of retained report periods without probing facts."""
+        if not isinstance(instrument_id, str) or not re.fullmatch(
+            r"(?:TWSE|TPEX):[0-9][0-9A-Z]{3,5}", instrument_id, re.ASCII,
+        ):
+            raise ValueError("financial-period reads require a canonical TWSE:/TPEX: instrument ID")
+        if report_scope not in {"consolidated", "individual"}:
+            raise ValueError("financial-period report_scope must be consolidated or individual")
+        if statement is not None and statement not in {
+            "balance_sheet", "comprehensive_income", "cash_flows",
+        }:
+            raise ValueError("financial-period statement selector is unsupported")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 40:
+            raise ValueError("financial-period limit must be between 1 and 40")
+        if cursor is not None and (
+            not isinstance(cursor, str) or not cursor or len(cursor) > 2048
+        ):
+            raise ValueError("financial-period cursor must be a non-empty token up to 2048 characters")
+
+        cache_key = (
+            self.base_url.rstrip("/"),
+            hashlib.sha256(str(self.config.get("token") or "").encode()).hexdigest(),
+            instrument_id, report_scope, statement, limit, cursor,
+        )
+        cached = _financial_statement_periods_cache.get(cache_key)
+        if cached is not None:
+            return copy.deepcopy(cached)
+        params = {
+            "instrument_id": instrument_id,
+            "report_scope": report_scope,
+            "limit": limit,
+        }
+        if statement is not None:
+            params["statement"] = statement
+        if cursor is not None:
+            params["cursor"] = cursor
+        payload, _response_headers = self.get_response(
+            "financial-statement-periods", timeout_sec=timeout_sec, retries=0, **params,
+        )
+        result = decode_financial_statement_periods_response(
+            payload,
+            instrument_id=instrument_id,
+            report_scope=report_scope,
+            statement=statement,
+            limit=limit,
+            cursor=cursor,
+        )
+        _financial_statement_periods_cache.set(cache_key, copy.deepcopy(result))
+        return result
 
     def benchmark_definitions(self, *, timeout_sec: float | None = None) -> tuple[TwmdBenchmarkDefinition, ...]:
         """Read and validate the fixed official index identities."""

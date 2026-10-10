@@ -36,6 +36,7 @@ from marketdata.types import (
     TwmdDailyBarsRead,
     TwmdMaterialInformationRead,
     TwmdFinancialStatementRead,
+    TwmdFinancialStatementPeriodsRead,
     TwmdBrokerFlowCoverageRead,
     TwmdBrokerFlowPriceLevelsRead,
     TwmdBrokerFlowQuantityRead,
@@ -380,6 +381,26 @@ class MarketData:
         return self._twmd_research_client("financial_statements").financial_statements(
             instrument_id, fiscal_year, fiscal_quarter, report_scope=report_scope,
             statement=statement, limit=limit, today_taipei=today_taipei,
+            timeout_sec=timeout_sec,
+        )
+
+    def financial_statement_periods(
+        self,
+        instrument_id: str,
+        *,
+        report_scope: str = "consolidated",
+        statement: str | None = None,
+        limit: int = 40,
+        cursor: str | None = None,
+        timeout_sec: float | None = None,
+    ) -> TwmdFinancialStatementPeriodsRead:
+        """Read a bounded page of retained report periods for one issuer."""
+        return self._twmd_research_client("financial_statements").financial_statement_periods(
+            instrument_id,
+            report_scope=report_scope,
+            statement=statement,
+            limit=limit,
+            cursor=cursor,
             timeout_sec=timeout_sec,
         )
 

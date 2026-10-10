@@ -1,4 +1,10 @@
-import type { FinancialStatementFact, FinancialStatementName, ResearchDataBlock } from '@panwatch/api'
+import type {
+  FinancialPeriodEntry,
+  FinancialStatementFact,
+  FinancialStatementName,
+  ResearchDataBlock,
+  TaiwanFinancialPeriodIndexResult,
+} from '@panwatch/api'
 
 type AnyBlock = ResearchDataBlock<Record<string, any>>
 
@@ -92,6 +98,14 @@ export interface FinancialStatementsPanelProps {
   block?: AnyBlock
   fiscalScope?: FinancialFiscalScope
   onFiscalScopeChange?: (scope: FinancialFiscalScope) => void
+  selectionMode?: 'latest' | 'manual'
+  onSelectionModeChange?: (mode: 'latest' | 'manual') => void
+  periodIndex?: TaiwanFinancialPeriodIndexResult | null
+  indexLoading?: boolean
+  indexError?: string
+  onRetryIndex?: () => void
+  onManualQuery?: () => void
+  manualQueryDisabled?: boolean
   loading?: boolean
   error?: string
   unsupportedReason?: string
@@ -102,6 +116,14 @@ export function FinancialStatementsPanel({
   block,
   fiscalScope,
   onFiscalScopeChange,
+  selectionMode = 'manual',
+  onSelectionModeChange,
+  periodIndex = null,
+  indexLoading = false,
+  indexError = '',
+  onRetryIndex,
+  onManualQuery,
+  manualQueryDisabled = false,
   loading = false,
   error = '',
   unsupportedReason = '',
@@ -115,6 +137,58 @@ export function FinancialStatementsPanel({
   const coverage = data?.coverage
   const facts = Array.isArray(data?.facts) ? data.facts as FinancialStatementFact[] : []
   const year = Number(data?.fiscal_year)
+  const index = periodIndex?.index
+  const latestCandidate = periodIndex?.index_status === 'available'
+    && index?.coverage.status === 'complete'
+    && index.qualification.status === 'qualified'
+    && index.latest_readable_period?.presence === 'present_readable'
+    && index.latest_readable_period.authority
+    ? index.latest_readable_period
+    : null
+  const periodOptions = (() => {
+    const options = new Map<string, FinancialPeriodEntry>()
+    for (const item of index?.periods || []) options.set(`${item.fiscal_year}-Q${item.fiscal_quarter}`, item)
+    for (const item of [index?.latest_retained_period, index?.latest_readable_period]) {
+      if (item) options.set(`${item.fiscal_year}-Q${item.fiscal_quarter}`, item)
+    }
+    return [...options.values()].sort((left, right) => (
+      right.fiscal_year - left.fiscal_year || right.fiscal_quarter - left.fiscal_quarter
+    ))
+  })()
+  const selectedIndexPeriod = periodOptions.find((item) => (
+    item.fiscal_year === fiscalScope?.year && item.fiscal_quarter === fiscalScope?.quarter
+  ))
+  const indexStatusText = (() => {
+    const code = periodIndex?.error?.code || periodIndex?.reason
+    const messages: Record<string, string> = {
+      endpoint_unsupported: '目前 twmd 版本尚未提供留存期別索引；最新可用期別未知。',
+      index_timeout: '留存期別索引讀取逾時；最新可用期別未知。',
+      timeout: '留存期別索引讀取逾時；最新可用期別未知。',
+      index_changed: '留存期別索引已更新；請重新載入索引。',
+      index_corrupt: '留存期別索引資料無法驗證；最新可用期別未知。',
+      index_schema_incompatible: 'twmd 留存期別索引格式不相容；最新可用期別未知。',
+      invalid_response: '留存期別索引回應格式無法驗證；最新可用期別未知。',
+      transport_error: '目前無法連線讀取留存期別索引；最新可用期別未知。',
+      index_unavailable: '留存期別索引暫時無法讀取；最新可用期別未知。',
+      index_not_initialized: '留存期別索引尚未完成初始化；可用期間未知。',
+      index_invalidated: '留存期別索引完整性尚未確認；可用期間未知。',
+      instrument_not_found: '來源目錄沒有此標的；可用期間未知。',
+      unsupported_venue: '此交易所目前不支援財報期別索引。',
+      unsupported_report_scope: '此報表範圍目前不支援期別索引。',
+      profile_industry_not_24: '此標的產業不在財報期別索引支援範圍。',
+      catalog_security_type_not_equity: '此證券類型不適用發行公司財報。',
+    }
+    if (periodIndex?.index_status === 'unsupported') return messages[code || ''] || `此標的不支援財報期別索引（${code || 'unsupported'}）。`
+    if (periodIndex?.index_status === 'error' || periodIndex?.index_status === 'unknown') {
+      return messages[code || ''] || `可用期間待確認（${code || 'index_unknown'}）。`
+    }
+    if (periodIndex?.index_status === 'partial') return `期別索引只有部分證據（${periodIndex.reason}）；最新可用期別不會自動選取。`
+    if (index?.coverage.status === 'unknown' || index?.coverage.status === 'partial') {
+      return `可用期間待確認（${index.coverage.reason}）；最新可用期別不會自動選取。`
+    }
+    if (periodIndex?.index_status === 'available') return `索引來源 MOPS · 查詢時間 ${index?.served_at_utc || '未知'}`
+    return ''
+  })()
   const unsupportedLabel = unsupportedReason === 'financial_statements_twse_only'
     ? '目前財報來源只支援符合範圍的上市公司'
     : unsupportedReason === 'financial_statements_security_type_not_supported'
@@ -124,30 +198,57 @@ export function FinancialStatementsPanel({
     <section className="rounded-lg border border-border/50 p-3 space-y-2 lg:col-span-2">
       {block ? blockHeading(block) : <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-semibold">台股財報（來源原始事實）</h4><span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground">{loading ? '載入中' : unsupportedReason ? '不適用' : error ? '讀取失敗' : '待查詢'}</span></div>}
       {hasPeriodSelector && fiscalScope && onFiscalScopeChange ? <>
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="space-y-1 text-[10px] text-muted-foreground">財報年度
-            <select aria-label="財報年度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.year} onChange={(event) => {
-              const year = Number(event.target.value)
-              const latestCompleted = maxCompletedQuarter(year)
-              onFiscalScopeChange({ year, quarter: Math.min(fiscalScope.quarter, Math.max(1, latestCompleted)) })
-            }}>
-              {Array.from({ length: Math.max(1, taipeiTodayParts().year - 2023) }, (_, index) => 2024 + index).map((year) => <option key={year} value={year} disabled={maxCompletedQuarter(year) === 0}>{year}</option>)}
-            </select>
-          </label>
-          <label className="space-y-1 text-[10px] text-muted-foreground">財報季度
-            <select aria-label="財報季度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.quarter} onChange={(event) => onFiscalScopeChange({ ...fiscalScope, quarter: Number(event.target.value) })}>
-              {Array.from({ length: Math.max(1, maxCompletedQuarter(fiscalScope.year)) }, (_, index) => index + 1).map((quarter) => <option key={quarter} value={quarter}>Q{quarter}</option>)}
-            </select>
-          </label>
-          <span className="pb-1 text-[10px] text-muted-foreground">只查已結束的季度；來源尚未提供留存期別清單，可用期間待確認。</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" aria-pressed={selectionMode === 'latest'} className={`rounded border px-2 py-1 text-[10px] ${selectionMode === 'latest' ? 'border-primary text-foreground' : 'border-border text-muted-foreground'}`} onClick={() => onSelectionModeChange?.('latest')}>最新可用</button>
+          <button type="button" aria-pressed={selectionMode === 'manual'} className={`rounded border px-2 py-1 text-[10px] ${selectionMode === 'manual' ? 'border-primary text-foreground' : 'border-border text-muted-foreground'}`} onClick={() => onSelectionModeChange?.('manual')}>指定期間</button>
+          {indexLoading ? <span className="text-[10px] text-muted-foreground" role="status">正在讀取可用期別…</span> : null}
+          {!indexLoading && indexStatusText ? <span className="text-[10px] text-muted-foreground">{indexStatusText}</span> : null}
+          {onRetryIndex && (indexError || periodIndex?.index_status === 'error') ? <button type="button" className="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted" onClick={onRetryIndex}>重新載入期別</button> : null}
         </div>
-        <p className="text-[10px] text-muted-foreground">目前選擇 {fiscalScope.year} Q{fiscalScope.quarter} 僅是查詢條件，不代表該期已留存或為最新可用期間；缺少資料或讀取逾時後會保留所選期別。</p>
+        {indexError ? <div className="rounded border border-destructive/30 p-2 text-xs text-destructive" role="alert">期別索引讀取失敗：{indexError}；可指定期間查詢。</div> : null}
+        {selectionMode === 'latest' ? <>
+          {latestCandidate ? <div className="rounded bg-muted/30 px-2 py-1.5 text-[10px] text-muted-foreground">
+            預設期別 {latestCandidate.fiscal_year} Q{latestCandidate.fiscal_quarter} · MOPS 留存且可讀
+            {' · 修訂 '}{latestCandidate.authority?.semantic_revision_id}
+            {' · 原始接收 '}{latestCandidate.authority?.original_received_at_utc}
+          </div> : <p className="text-xs text-muted-foreground">沒有經完整且符合標的條件的索引確認最新可讀期別。指定期間可手動查詢；不會自動改查其他季度。</p>}
+        </> : <>
+          {periodOptions.length ? <label className="space-y-1 text-[10px] text-muted-foreground">索引期別與狀態
+            <select aria-label="索引可用期別" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={`${fiscalScope.year}-Q${fiscalScope.quarter}`} onChange={(event) => {
+              const match = /^(\d{4})-Q([1-4])$/.exec(event.target.value)
+              if (match) onFiscalScopeChange({ year: Number(match[1]), quarter: Number(match[2]) })
+            }}>
+              {periodOptions.map((item) => <option key={`${item.fiscal_year}-Q${item.fiscal_quarter}`} value={`${item.fiscal_year}-Q${item.fiscal_quarter}`}>
+                {item.fiscal_year} Q{item.fiscal_quarter} · {item.presence === 'present_readable' ? '已留存可讀' : item.presence === 'present_unreadable' ? '已留存但不可讀' : item.presence === 'missing' ? '索引確認未留存' : item.presence === 'unsupported' ? '不適用' : '狀態未知'} · {item.reason}
+              </option>)}
+            </select>
+          </label> : null}
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="space-y-1 text-[10px] text-muted-foreground">財報年度
+              <select aria-label="財報年度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.year} onChange={(event) => {
+                const year = Number(event.target.value)
+                const latestCompleted = maxCompletedQuarter(year)
+                onFiscalScopeChange({ year, quarter: Math.min(fiscalScope.quarter, Math.max(1, latestCompleted)) })
+              }}>
+                {Array.from({ length: Math.max(1, taipeiTodayParts().year - 2023) }, (_, index) => 2024 + index).map((year) => <option key={year} value={year} disabled={maxCompletedQuarter(year) === 0}>{year}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-[10px] text-muted-foreground">財報季度
+              <select aria-label="財報季度" className="block rounded border border-border bg-background px-2 py-1 text-xs text-foreground" value={fiscalScope.quarter} onChange={(event) => onFiscalScopeChange({ ...fiscalScope, quarter: Number(event.target.value) })}>
+                {Array.from({ length: Math.max(1, maxCompletedQuarter(fiscalScope.year)) }, (_, index) => index + 1).map((quarter) => <option key={quarter} value={quarter}>Q{quarter}</option>)}
+              </select>
+            </label>
+            {selectedIndexPeriod ? <span className="pb-1 text-[10px] text-muted-foreground">索引狀態 {selectedIndexPeriod.presence} · {selectedIndexPeriod.reason}</span> : <span className="pb-1 text-[10px] text-muted-foreground">所選期別沒有索引證據；僅按明選年度／季度查詢。</span>}
+            {onManualQuery ? <button type="button" className="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted disabled:opacity-50" disabled={loading || manualQueryDisabled} onClick={onManualQuery}>查詢所選期別</button> : null}
+          </div>
+          <p className="text-[10px] text-muted-foreground">明選期別會保留原選擇；缺少資料或讀取逾時後不會回退到其他季度。</p>
+        </>}
       </> : null}
       {loading ? <div className="text-xs text-muted-foreground" role="status">{block ? '正在更新所選期別；目前保留已取得的財報。' : `正在載入 ${fiscalScope ? `${fiscalScope.year} Q${fiscalScope.quarter}` : '所選期別'} 財報…`}</div> : null}
       {!loading && error ? <div className="rounded border border-destructive/30 p-2 text-xs text-destructive" role="alert">財報讀取失敗：{error}</div> : null}
       {!block && !loading && !error && unsupportedReason ? <div className="text-xs text-muted-foreground">不支援：{unsupportedLabel}。</div> : null}
       {!block && !loading && !error && unsupportedReason ? <details className="text-[10px] text-muted-foreground"><summary className="cursor-pointer">來源限制詳情</summary><code>{unsupportedReason}</code></details> : null}
-      {!block && !loading && !error && !unsupportedReason && hasPeriodSelector ? <div className="text-xs text-muted-foreground">尚未取得所選期別的財報。</div> : null}
+      {!block && !loading && !error && !unsupportedReason && hasPeriodSelector && selectionMode === 'manual' ? <div className="text-xs text-muted-foreground">尚未取得所選期別的財報。</div> : null}
       {report ? <>
         <div className="break-all text-[11px] text-muted-foreground">{data.fiscal_year}Q{data.fiscal_quarter} · 合併 · {report.member_filename} · 修訂 {report.semantic_revision_id}</div>
         <div className="text-[11px] text-muted-foreground">報表接收 {report.original_received_at_utc || '未知'} · 最新發現 {coverage?.latest_discovery_presence || '未知'}{coverage?.original_received_at_utc ? `（${coverage.original_received_at_utc}）` : ''} · 發布時間未知</div>

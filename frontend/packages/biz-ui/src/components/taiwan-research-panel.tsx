@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { researchApi, type ResearchBlockName, type ResearchDataBlock, type ResearchFreshness, type TaiwanResearchPayload } from '@panwatch/api'
+import { researchApi, type ResearchBlockName, type ResearchDataBlock, type ResearchFreshness, type TaiwanFinancialPeriodIndexResult, type TaiwanResearchPayload } from '@panwatch/api'
 import { Button } from '@panwatch/base-ui/components/ui/button'
 import { BrokerFlowPanel } from './broker-flow-panel'
 import { FinancialStatementsPanel, defaultFiscalScope, taipeiTodayParts } from './financial-statements-panel'
@@ -620,16 +620,24 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
   const [financialLoading, setFinancialLoading] = useState(false)
   const [financialError, setFinancialError] = useState('')
   const [financialUnsupported, setFinancialUnsupported] = useState<{ symbolScope: string; reason: string } | null>(null)
+  const [financialPeriodIndex, setFinancialPeriodIndex] = useState<TaiwanFinancialPeriodIndexResult | null>(null)
+  const [financialIndexLoading, setFinancialIndexLoading] = useState(false)
+  const [financialIndexError, setFinancialIndexError] = useState('')
+  const [financialSelectionMode, setFinancialSelectionMode] = useState<'latest' | 'manual'>('latest')
   const [fiscalScope, setFiscalScope] = useState(defaultFiscalScope)
   const mainRequestSequence = useRef(0)
   const financialRequestSequence = useRef(0)
+  const financialIndexRequestSequence = useRef(0)
   const payloadRef = useRef<TaiwanResearchPayload | null>(null)
   const payloadInputRef = useRef<string | null>(null)
   const financialBlockRef = useRef<AnyBlock | null>(null)
   const financialInputScopeRef = useRef<string | null>(null)
-  const unsupportedFinancialScopeRef = useRef<{ symbolScope: string; reason: string } | null>(null)
+  const financialIndexInputScopeRef = useRef<string | null>(null)
   const mainControllerRef = useRef<AbortController | null>(null)
   const financialControllerRef = useRef<AbortController | null>(null)
+  const financialIndexControllerRef = useRef<AbortController | null>(null)
+  const financialSelectionModeRef = useRef<'latest' | 'manual'>('latest')
+  const loadFinancialRef = useRef<((scope: { year: number; quarter: number }, indexResult?: TaiwanFinancialPeriodIndexResult | null) => Promise<void>) | null>(null)
   const inputScope = `${market}:${symbol}`
 
   const loadMain = useCallback(async (reason: 'auto' | 'refresh' = 'auto') => {
@@ -709,10 +717,13 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     }
   }, [open, market, loadMain])
 
-  const loadFinancial = useCallback(async () => {
+  const loadFinancial = useCallback(async (
+    scope: { year: number; quarter: number },
+    indexResult: TaiwanFinancialPeriodIndexResult | null = financialPeriodIndex,
+  ) => {
     if (!symbol || market !== 'TW') return
     const symbolScope = `${market}:${symbol}`
-    const requestScope = `${symbolScope}:${fiscalScope.year}:${fiscalScope.quarter}`
+    const requestScope = `${symbolScope}:${scope.year}:${scope.quarter}`
     const sequence = ++financialRequestSequence.current
     financialControllerRef.current?.abort()
     financialControllerRef.current = null
@@ -731,10 +742,14 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       return
     }
 
-    const cachedUnsupported = unsupportedFinancialScopeRef.current
-    if (cachedUnsupported?.symbolScope === symbolScope) {
+    const unsupportedIndex = indexResult?.index_status === 'unsupported'
+      || indexResult?.index?.qualification.status === 'unsupported'
+    if (unsupportedIndex) {
       setFinancialBlock(null)
-      setFinancialUnsupported(cachedUnsupported)
+      setFinancialUnsupported({
+        symbolScope,
+        reason: indexResult?.index?.qualification.reason || indexResult?.reason || 'unsupported',
+      })
       setFinancialLoading(false)
       return
     }
@@ -745,8 +760,8 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     financialControllerRef.current = controller
     try {
       const result = await researchApi.taiwan(symbol, {
-        fiscal_year: fiscalScope.year,
-        fiscal_quarter: fiscalScope.quarter,
+        fiscal_year: scope.year,
+        fiscal_quarter: scope.quarter,
         blocks: ['financial_statements'],
       }, { signal: controller.signal })
       if (sequence === financialRequestSequence.current) {
@@ -767,15 +782,12 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
         const years = [data?.fiscal_year, evidenceSelectors?.fiscal_year, result.selectors?.fiscal_year].filter((value) => value != null)
         const quarters = [data?.fiscal_quarter, evidenceSelectors?.fiscal_quarter, result.selectors?.fiscal_quarter].filter((value) => value != null)
         if (!instrumentMatches || !years.length || !quarters.length
-          || !years.every((value) => Number(value) === fiscalScope.year)
-          || !quarters.every((value) => Number(value) === fiscalScope.quarter)) {
+          || !years.every((value) => Number(value) === scope.year)
+          || !quarters.every((value) => Number(value) === scope.quarter)) {
           throw new Error('財報回應標的或期別與所選查詢不符。')
         }
         financialBlockRef.current = resultBlock
         setFinancialBlock(resultBlock)
-        if (resultBlock.status === 'unsupported' || (resultBlock.data as any)?.qualification?.status === 'unsupported') {
-          unsupportedFinancialScopeRef.current = { symbolScope, reason: resultBlock.reason || (resultBlock.data as any)?.qualification?.reason || 'unsupported' }
-        }
       }
     } catch (cause) {
       if (sequence === financialRequestSequence.current && !controller.signal.aborted) {
@@ -784,27 +796,203 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     } finally {
       if (sequence === financialRequestSequence.current) setFinancialLoading(false)
     }
-  }, [fiscalScope.quarter, fiscalScope.year, market, symbol])
+  }, [financialPeriodIndex, market, symbol])
+
+  loadFinancialRef.current = loadFinancial
+
+  const loadFinancialPeriodIndex = useCallback(async () => {
+    if (!symbol || market !== 'TW') return
+    const symbolScope = `${market}:${symbol}`
+    const sequence = ++financialIndexRequestSequence.current
+    financialIndexControllerRef.current?.abort()
+    financialIndexControllerRef.current = null
+    financialIndexInputScopeRef.current = symbolScope
+    setFinancialIndexError('')
+    setFinancialPeriodIndex(null)
+
+    const previousFinancialScope = financialInputScopeRef.current
+    if (previousFinancialScope && !previousFinancialScope.startsWith(`${symbolScope}:`)) {
+      financialRequestSequence.current++
+      financialControllerRef.current?.abort()
+      financialControllerRef.current = null
+      financialInputScopeRef.current = null
+      financialBlockRef.current = null
+      setFinancialBlock(null)
+      setFinancialError('')
+      setFinancialLoading(false)
+    } else if (financialSelectionModeRef.current === 'latest') {
+      financialRequestSequence.current++
+      financialControllerRef.current?.abort()
+      financialControllerRef.current = null
+      financialInputScopeRef.current = null
+      financialBlockRef.current = null
+      setFinancialBlock(null)
+      setFinancialError('')
+      setFinancialLoading(false)
+    }
+
+    if (symbol.toUpperCase().startsWith('TPEX:')) {
+      setFinancialUnsupported({ symbolScope, reason: 'financial_statements_twse_only' })
+      setFinancialPeriodIndex(null)
+      setFinancialIndexLoading(false)
+      return
+    }
+
+    setFinancialUnsupported(null)
+    setFinancialIndexLoading(true)
+    const controller = new AbortController()
+    financialIndexControllerRef.current = controller
+    try {
+      const result = await researchApi.financialPeriods(symbol, {
+        report_scope: 'consolidated', limit: 40,
+      }, { signal: controller.signal })
+      if (sequence !== financialIndexRequestSequence.current) return
+      const requestedSymbol = symbol.trim().toUpperCase()
+      const identities = [result.instrument_id, result.selectors?.instrument_id, result.index?.instrument_id]
+        .filter((value) => value != null)
+      const instrumentMatches = identities.length > 0 && identities.every((value) => {
+        const identity = String(value).toUpperCase()
+        const canonicalParts = /^(TWSE|TPEX):([0-9A-Z]{4,6})$/.exec(identity)
+        return Boolean(canonicalParts && (
+          requestedSymbol.includes(':') ? identity === requestedSymbol : canonicalParts[2] === requestedSymbol
+        ))
+      })
+      const index = result.index
+      const indexMatches = !index || (
+        index.contract_version === 'twmd.financial-statement-periods/v1'
+        && index.instrument_id === result.instrument_id
+        && index.report_scope === 'consolidated'
+        && index.statement === null
+        && index.limit === 40
+        && index.source === 'mops_financial_statements'
+        && result.selectors.report_scope === 'consolidated'
+        && result.selectors.statement === null
+        && result.selectors.limit === 40
+      )
+      if (!instrumentMatches || !indexMatches) throw new Error('期別索引標的或選擇條件與本次查詢不符。')
+      setFinancialPeriodIndex(result)
+      if (result.index_status === 'unsupported' || index?.qualification.status === 'unsupported') {
+        setFinancialUnsupported({
+          symbolScope,
+          reason: index?.qualification.reason || result.reason || 'unsupported',
+        })
+      }
+      const latest = result.index_status === 'available'
+        && index?.coverage.status === 'complete'
+        && index.qualification.status === 'qualified'
+        && index.latest_readable_period?.presence === 'present_readable'
+        && index.latest_readable_period.authority
+        ? index.latest_readable_period
+        : null
+      if (financialSelectionModeRef.current === 'latest') {
+        if (latest) {
+          const latestScope = { year: latest.fiscal_year, quarter: latest.fiscal_quarter }
+          setFiscalScope(latestScope)
+          void loadFinancialRef.current?.(latestScope, result)
+        } else {
+          financialRequestSequence.current++
+          financialControllerRef.current?.abort()
+          financialControllerRef.current = null
+          financialInputScopeRef.current = null
+          financialBlockRef.current = null
+          setFinancialBlock(null)
+          setFinancialError('')
+          setFinancialLoading(false)
+        }
+      }
+    } catch (cause) {
+      if (sequence === financialIndexRequestSequence.current && !controller.signal.aborted) {
+        setFinancialPeriodIndex(null)
+        setFinancialIndexError(cause instanceof Error ? cause.message : '留存期別索引讀取失敗。')
+        if (financialSelectionModeRef.current === 'latest') {
+          financialRequestSequence.current++
+          financialControllerRef.current?.abort()
+          financialControllerRef.current = null
+          financialInputScopeRef.current = null
+          financialBlockRef.current = null
+          setFinancialBlock(null)
+          setFinancialLoading(false)
+        }
+      }
+    } finally {
+      if (sequence === financialIndexRequestSequence.current) setFinancialIndexLoading(false)
+    }
+  }, [market, symbol])
+
+  const changeFinancialSelectionMode = useCallback((mode: 'latest' | 'manual') => {
+    financialSelectionModeRef.current = mode
+    setFinancialSelectionMode(mode)
+    if (mode === 'manual') {
+      financialRequestSequence.current++
+      financialControllerRef.current?.abort()
+      financialControllerRef.current = null
+      setFinancialLoading(false)
+      return
+    }
+    const index = financialPeriodIndex?.index
+    const latest = financialPeriodIndex?.index_status === 'available'
+      && index?.coverage.status === 'complete'
+      && index.qualification.status === 'qualified'
+      && index.latest_readable_period?.presence === 'present_readable'
+      && index.latest_readable_period.authority
+      ? index.latest_readable_period
+      : null
+    if (latest) {
+      const latestScope = { year: latest.fiscal_year, quarter: latest.fiscal_quarter }
+      setFiscalScope(latestScope)
+      void loadFinancialRef.current?.(latestScope, financialPeriodIndex)
+    } else {
+      financialRequestSequence.current++
+      financialControllerRef.current?.abort()
+      financialControllerRef.current = null
+      financialInputScopeRef.current = null
+      financialBlockRef.current = null
+      setFinancialBlock(null)
+      setFinancialError('')
+      setFinancialLoading(false)
+    }
+  }, [financialPeriodIndex])
+
+  const submitManualFinancialQuery = useCallback(() => {
+    void loadFinancial(fiscalScope, financialPeriodIndex)
+  }, [financialPeriodIndex, fiscalScope, loadFinancial])
+
+  const retryFinancialQuery = useCallback(() => {
+    void loadFinancial(fiscalScope, financialPeriodIndex)
+  }, [financialPeriodIndex, fiscalScope, loadFinancial])
 
   useEffect(() => {
-    if (open && market === 'TW') void loadFinancial()
+    if (open && market === 'TW') {
+      financialSelectionModeRef.current = 'latest'
+      setFinancialSelectionMode('latest')
+      setFiscalScope(defaultFiscalScope())
+      void loadFinancialPeriodIndex()
+    }
     else {
       financialRequestSequence.current++
       financialControllerRef.current?.abort()
       financialControllerRef.current = null
+      financialIndexRequestSequence.current++
+      financialIndexControllerRef.current?.abort()
+      financialIndexControllerRef.current = null
       financialBlockRef.current = null
       financialInputScopeRef.current = null
-      unsupportedFinancialScopeRef.current = null
+      financialIndexInputScopeRef.current = null
       setFinancialBlock(null)
       setFinancialError('')
       setFinancialUnsupported(null)
       setFinancialLoading(false)
+      setFinancialPeriodIndex(null)
+      setFinancialIndexError('')
+      setFinancialIndexLoading(false)
     }
     return () => {
       financialRequestSequence.current++
       financialControllerRef.current?.abort()
+      financialIndexRequestSequence.current++
+      financialIndexControllerRef.current?.abort()
     }
-  }, [open, market, loadFinancial])
+  }, [open, market, loadFinancialPeriodIndex])
 
   if (market !== 'TW') return null
   const visiblePayload = payloadInputRef.current === inputScope ? payload : null
@@ -816,6 +1004,13 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     : financialUnsupported?.symbolScope === inputScope ? financialUnsupported.reason : ''
   const visibleFinancialLoading = financialInputScopeRef.current === financialScopeKey && financialLoading
   const visibleFinancialError = financialInputScopeRef.current === financialScopeKey ? financialError : ''
+  const visibleFinancialPeriodIndex = financialIndexInputScopeRef.current === inputScope ? financialPeriodIndex : null
+  const visibleFinancialIndexLoading = financialIndexInputScopeRef.current === inputScope && financialIndexLoading
+  const visibleFinancialIndexError = financialIndexInputScopeRef.current === inputScope ? financialIndexError : ''
+  const manualQueryDisabled = Boolean(visibleFinancialUnsupportedReason)
+    || visibleFinancialIndexLoading
+    || visibleFinancialPeriodIndex?.index_status === 'unsupported'
+    || visibleFinancialPeriodIndex?.index?.qualification.status === 'unsupported'
   const visibleMainLoading = payloadInputRef.current === inputScope && mainLoading
   const visibleMainError = payloadInputRef.current === inputScope ? mainError : ''
   return (
@@ -836,10 +1031,18 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
         block={visibleFinancialBlock || undefined}
         fiscalScope={fiscalScope}
         onFiscalScopeChange={setFiscalScope}
+        selectionMode={financialSelectionMode}
+        onSelectionModeChange={changeFinancialSelectionMode}
+        periodIndex={visibleFinancialPeriodIndex}
+        indexLoading={visibleFinancialIndexLoading}
+        indexError={visibleFinancialIndexError}
+        onRetryIndex={() => void loadFinancialPeriodIndex()}
+        onManualQuery={submitManualFinancialQuery}
+        manualQueryDisabled={manualQueryDisabled}
         loading={visibleFinancialLoading}
         error={visibleFinancialError}
         unsupportedReason={visibleFinancialUnsupportedReason}
-        onRetry={() => void loadFinancial()}
+        onRetry={retryFinancialQuery}
       />
       {blocks ? <>
         <div className="text-[11px] text-muted-foreground">{visiblePayload?.instrument_id} · {visiblePayload?.instrument?.security_type || '標的類型未知'} · 區間 {visiblePayload?.selectors.start_date} 至 {visiblePayload?.selectors.end_date}</div>

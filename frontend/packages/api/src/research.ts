@@ -247,6 +247,85 @@ export interface FinancialStatementsResearchData {
 
 export type FinancialStatementName = 'balance_sheet' | 'comprehensive_income' | 'cash_flows'
 
+export type FinancialPeriodPresence = 'present_readable' | 'present_unreadable' | 'missing' | 'unsupported' | 'unknown'
+
+export interface FinancialPeriodAuthority {
+  capture_id: string
+  document_id: string
+  semantic_revision_id: string
+  revision_number: number
+  source_contract: string
+  parser_contract: string
+  original_received_at_utc: string
+  document_first_observed_at_utc: string
+  semantic_revision_first_observed_at_utc: string
+  latest_observed_at_utc: string
+}
+
+export interface FinancialPeriodEntry {
+  fiscal_year: number
+  fiscal_quarter: number
+  report_scope: 'consolidated' | 'individual'
+  presence: FinancialPeriodPresence
+  reason: string
+  statement_coverage: Partial<Record<FinancialStatementName, { presence: FinancialPeriodPresence; fact_count: number }>>
+  authority: FinancialPeriodAuthority | null
+}
+
+export interface FinancialStatementPeriodsIndex {
+  contract_version: 'twmd.financial-statement-periods/v1'
+  instrument_id: string
+  venue: 'TWSE' | 'TPEX'
+  source: 'mops_financial_statements'
+  report_scope: 'consolidated' | 'individual'
+  statement: FinancialStatementName | null
+  limit: number
+  supported_scope: {
+    venues: string[]
+    source: string
+    source_contract: string
+    industry_codes: string[]
+    security_types: string[]
+    report_scopes: string[]
+    statements: FinancialStatementName[]
+  }
+  window_start: [number, number]
+  window_end: [number, number] | null
+  qualification: {
+    status: 'qualified' | 'pending' | 'unsupported'
+    reason: string
+    industry_code: string | null
+    catalog: Record<string, unknown> | null
+    profile: Record<string, unknown> | null
+  }
+  coverage: { status: 'complete' | 'partial' | 'unknown'; reason: string }
+  periods: FinancialPeriodEntry[]
+  next_cursor: string | null
+  has_more: boolean
+  latest_retained_period: FinancialPeriodEntry | null
+  latest_readable_period: FinancialPeriodEntry | null
+  served_at_utc: string
+  endpoint: '/api/v1/financial-statement-periods'
+}
+
+export interface TaiwanFinancialPeriodIndexResult {
+  instrument_id: string
+  endpoint: '/api/v1/financial-statement-periods'
+  index_status: 'available' | 'partial' | 'unknown' | 'unsupported' | 'error'
+  reason: string
+  selectors: {
+    instrument_id: string
+    report_scope: 'consolidated' | 'individual'
+    statement: FinancialStatementName | null
+    limit: number
+    cursor?: string
+    venue?: 'TWSE' | 'TPEX'
+    source?: 'mops_financial_statements'
+  }
+  index: FinancialStatementPeriodsIndex | null
+  error: { code: string; http_status: number | null } | null
+}
+
 export interface FinancialStatementReport {
   document_id: string
   capture_id: string
@@ -403,6 +482,13 @@ export interface TaiwanResearchParams {
   blocks?: ResearchBlockName[]
 }
 
+export interface TaiwanFinancialPeriodsParams {
+  report_scope?: 'consolidated' | 'individual'
+  statement?: FinancialStatementName
+  limit?: number
+  cursor?: string
+}
+
 function withQuery(path: string, params: Record<string, string | number | string[] | undefined>): string {
   const query = new URLSearchParams()
   for (const [key, rawValue] of Object.entries(params)) {
@@ -423,6 +509,20 @@ export const researchApi = {
       withQuery('/research/taiwan', { instrument_id: instrumentId, ...params }),
       { timeoutMs: 30_000, ...options },
     ),
+  financialPeriods: (
+    instrumentId: string,
+    params: TaiwanFinancialPeriodsParams = {},
+    options?: { signal?: AbortSignal },
+  ) => fetchAPI<TaiwanFinancialPeriodIndexResult>(
+    withQuery('/research/taiwan/financial-periods', {
+      instrument_id: instrumentId,
+      report_scope: params.report_scope || 'consolidated',
+      statement: params.statement,
+      limit: params.limit ?? 40,
+      cursor: params.cursor,
+    }),
+    { timeoutMs: 10_000, ...options },
+  ),
   corporateActions: (instrumentId: string, startDate: string, endDate: string) =>
     fetchAPI<CorporateActionResearchResult>(
       withQuery('/research/taiwan/corporate-actions', {

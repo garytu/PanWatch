@@ -10,7 +10,7 @@
 | --- | --- | --- | --- | --- |
 | TWUX-01 | P1 | [行情日期、休市背景與 AI 上下文](cards/TWUX-01-market-context.md) | completed | 無 |
 | TWUX-02 | P1 | [研究讀取排程與區塊重試](cards/TWUX-02-research-loading.md) | completed | 無 |
-| TWUX-03 | P2 | [財報可用期間與獨立載入](cards/TWUX-03-financial-periods.md) | in_progress | TWUX-02 已完成；twmd 期別索引已部署，PanWatch 接入中 |
+| TWUX-03 | P2 | [財報可用期間與獨立載入](cards/TWUX-03-financial-periods.md) | completed | TWUX-02 已完成；twmd 期別索引已部署並接入 |
 | TWUX-04 | P2 | [歷史分 K 日期選擇](cards/TWUX-04-intraday-dates.md) | completed | 無；TWUX-01 已完成 |
 | TWUX-05 | P2 | [熱門股榜保留行情來源資訊](cards/TWUX-05-discovery-provenance.md) | completed | TWUX-01 的共用行情標示 |
 
@@ -30,11 +30,11 @@ TWUX-02 負責共用排程、選擇性區塊讀取與重試；TWUX-03 重用該�
 | TWUX-04 | 日期選擇，接既有 coverage 查詢找可用日 | `/bars` 已支援日期；`/bars/coverage` 已支援有界日期範圍 | 否，不需要為日期選擇新增上游 API |
 | TWUX-05 | 保留 collector 已有欄位並呈現在榜單 | 既有行情 metadata 可沿用 | 否 |
 
-twmd 現有 `/api/v1/financial-statements` 必填 fiscal_year／fiscal_quarter，只能讀明確季度，尚無對外的可用期清單。TWUX-03 的兩邊順序是：**共同確認索引契約 → twmd 提供唯讀索引及測試樣本 → PanWatch 接入與選期 → 聯合唯讀驗收**。契約名稱與路徑待設計，不把建議 endpoint 當成既有功能。
+twmd 原有 `/api/v1/financial-statements` 必填 fiscal_year／fiscal_quarter，只能讀明確季度。2026-10-10 已部署 `/api/v1/financial-statement-periods` v1 唯讀索引；PanWatch 已接入 typed read、選期及獨立載入，並完成唯讀接入驗收。正式環境目前僅有單一已留存期別；多期及第一頁以外最新期別由上游隔離 HTTP 驗收與 PanWatch fixtures 驗證。
 
 twmd 的 `get_financial_statement_state` 目前先呼叫 `_financial_state_all`，再取指定 scope。需量測這條路徑是否造成慢查詢；若確認是瓶頸，再規劃有界的指定期別讀取／索引，保留來源 authority、修訂與損壞資料的錯誤語意，不僅靠 PanWatch 拉長 timeout。
 
-來源：[財報契約](/Users/garytu/works/tw-market-data-main/docs/financial-statements-api.md)、[財報讀取](/Users/garytu/works/tw-market-data-main/src/twmd/storage/sqlite.py:5077)、[分 K／coverage 契約](/Users/garytu/works/tw-market-data-main/docs/intraday-bars.md)。本次只補 PanWatch 計劃，沒有修改 twmd 程式。
+來源：[財報契約](/Users/garytu/works/tw-market-data-main/docs/financial-statements-api.md)、[期別索引契約](/Users/garytu/works/tw-market-data-main/docs/plan/contracts/financial-statement-periods.md)、[部署驗收](/Users/garytu/works/tw-market-data-main/docs/financial-period-index-deployment-acceptance.md)、[分 K／coverage 契約](/Users/garytu/works/tw-market-data-main/docs/intraday-bars.md)。本次未修改 twmd 程式。
 
 ## 共通邊界
 
@@ -72,9 +72,9 @@ pnpm build
 
 ## 本次交付與整體驗證
 
-2026-10-10 按使用者要求依 TWUX-01 → 02 → 03 → 04 → 05 執行，01／02／04／05 completed；03 的獨立載入與明確選期已交付，完整卡仍 blocked，等待 [twmd 留存期別索引契約](contracts/TWUX-03-retained-period-index.md) 落實。沒有把已知 2024Q4 或最近完成季度冒稱最新可用期。
+2026-10-10 按使用者要求依 TWUX-01 → 02 → 03 → 04 → 05 執行，先完成 01／02／04／05，待 twmd 期別索引部署後恢復並完成 03。最新可讀期只依完整、符合標的且帶留存 authority 的索引證據自動選擇；索引未知時保留手動年季查詢。
 
-- `.venv/bin/python -m pytest -q tests packages/marketdata/tests`：1465 passed、3 skipped、14 warnings，19.12 秒。
-- `pnpm exec vitest run`：27 test files／113 tests passed；`pnpm exec tsc -b`、`pnpm build` 通過，使用固定 Node 24.14.0／pnpm 9.15.9。
+- `.venv/bin/python -m pytest -q tests packages/marketdata/tests`：1479 passed、3 skipped、14 warnings，18.74 秒。
+- `pnpm exec vitest run`：27 test files／116 tests passed；`pnpm exec tsc -b`、`pnpm build` 通過，使用固定 Node 24.14.0／pnpm 9.15.9。
 - `git diff --check` 通過。各卡記錄獨立審查、相關測試、唯讀資料日期與版本。原有未提交檔案不納入本次交付。
-- 沒有合併、重建或部署；盤中 ready／PW-14 驗收仍另行處理。03 待上游提供有界索引、版本與 fixtures 後，接入選期及共同唯讀驗收，才可完成完整卡。
+- PanWatch 沒有合併、重建或部署；盤中 ready／PW-14 驗收仍另行處理。TWUX-03 的 PanWatch typed client 唯讀實測：部署中 TWSE:2330 為 qualified／complete，latest_readable 2024Q4；TPEX:5347 為 unsupported／unknown。正式環境尚無多留存期樣本，這部分以已驗證的隔離上游 HTTP 測試及本專案 fixtures 覆蓋。
