@@ -16,7 +16,10 @@ from src.platform.marketdata.models import enabled_market_codes
 
 import logging
 
-from src.modules.strategy.factor_eval import evaluate_factor_ic
+from src.modules.strategy.calibration_gate import (
+    apply_calibration_batch,
+    plan_calibration_batch,
+)
 from src.modules.strategy.factor_weights import (
     CALIBRATABLE_FACTORS,
     PENALTY_FACTORS,
@@ -72,63 +75,98 @@ def calibrate_factor_weights(
     own = db is None
     db = db or SessionLocal()
     try:
-        ic_result = evaluate_factor_ic(
-            days=days, horizon=horizon, min_samples=min_samples, market=market, db=db
+        # Gate first: one sealed cohort/config snapshot is shared by the whole batch.
+        batch = plan_calibration_batch(
+            db, kind="factor", market=market, targets=list(CALIBRATABLE_FACTORS)
         )
-        factors = ic_result.get("factors", {})
-        get_factor_weights(market, db=db)  # 確保 5 個因子行存在
 
         lo, hi = float(clamp[0]), float(clamp[1])
         changed = 0
         rows_changed: list[dict] = []
+        statuses: dict[str, str] = {}
+        proposals: dict[str, float] = {}
+        reasons: dict[str, str] = {}
+        observations: dict[str, dict] = {}
 
         for code in CALIBRATABLE_FACTORS:
+            plan = batch["plans"][code]
+            readiness = plan["readiness"]
+            stats = readiness["per_factor"].get(code, {})
+            ic = stats.get("ic")
+            ir = stats.get("ir")
+            n = int(readiness["training"]["units"])
+            old = plan["old_weight"]
+            if old is None:
+                statuses[code] = "TARGET_MISSING"
+                continue
             row = (
                 db.query(FactorWeight)
                 .filter(FactorWeight.factor_code == code, FactorWeight.market == market)
                 .first()
             )
-            old = float(row.weight)
-            stats = factors.get(code, {})
-            ic = stats.get("ic")
-            ir = stats.get("ir")
-            n = int(stats.get("sample_size", 0))
-
-            # 記錄最近一次觀測(供 API 展示),無論是否調整。
-            row.meta = {
-                **(row.meta or {}),
-                "last_ic": ic, "last_ir": ir, "last_sample_size": n,
-                "last_calibrated_at": utc_now().isoformat(),
-            }
-
-            if row.is_pinned or not row.auto_calibrate:
+            if row is None:
+                statuses[code] = "TARGET_MISSING"
                 continue
-            if n < min_samples or ic is None:
-                continue
+            observations[code] = {"last_ic": ic, "last_ir": ir, "last_sample_size": n}
+
             target = compute_target(code, ic, ir, beta=beta)
             if target is None:
+                statuses[code] = "NO_PROPOSAL"
                 continue
-            new = round(blend(old, target, alpha=alpha, lo=lo, hi=hi), 4)
-            if abs(new - old) < 0.01:
+            new = round(blend(float(old), target, alpha=alpha, lo=lo, hi=hi), 4)
+            if abs(new - float(old)) < 0.01:
+                statuses[code] = "NO_CHANGE"
                 continue
+            proposals[code] = new
+            reasons[code] = f"auto(ic={ic}, ir={ir}, n={n})"
 
-            row.weight = new
-            row.reason = f"auto(ic={ic}, ir={ir}, n={n})"
-            row.effective_from = utc_now()
-            row.updated_at = utc_now()
-            db.add(FactorWeightHistory(
-                factor_code=code, market=market, old_weight=old, new_weight=new,
-                ic=ic, ir=ir, sample_size=n, reason="auto",
-                meta={"target": round(target, 4), "alpha": alpha},
-            ))
+        # One all-or-nothing write transaction for the whole market batch: a mid-batch
+        # gate failure rolls back every earlier target instead of leaving partial weights.
+        if proposals:
+            result = apply_calibration_batch(
+                db,
+                plans={code: batch["plans"][code] for code in proposals},
+                proposals=proposals,
+                reasons=reasons,
+            )
+        else:
+            result = {"status": "NO_PROPOSAL", "results": {}, "applied": []}
+        for code, status in result["results"].items():
+            statuses[code] = status
+        for code in result["applied"]:
             changed += 1
-            rows_changed.append({
-                "factor_code": code, "old_weight": old, "new_weight": new, "sample_size": n,
-            })
+            rows_changed.append(
+                {
+                    "factor_code": code,
+                    "old_weight": float(batch["plans"][code]["old_weight"]),
+                    "new_weight": proposals[code],
+                    "sample_size": int(batch["plans"][code]["cohort"]["counts"]["units"]),
+                }
+            )
 
+        # Display-only observation meta lands after the write transaction, and only an
+        # applied target gets last_calibrated_at: a refused batch must not look calibrated.
+        for code, obs in observations.items():
+            row = (
+                db.query(FactorWeight)
+                .filter(FactorWeight.factor_code == code, FactorWeight.market == market)
+                .first()
+            )
+            if row is None:
+                continue
+            row.meta = {**(row.meta or {}), **obs}
+            if code in result["applied"]:
+                row.meta = {**row.meta, "last_calibrated_at": utc_now().isoformat()}
         db.commit()
-        return {"market": market, "checked": len(CALIBRATABLE_FACTORS),
-                "changed": changed, "rows": rows_changed}
+        first = batch["plans"][CALIBRATABLE_FACTORS[0]] if CALIBRATABLE_FACTORS else {}
+        return {
+            "market": market,
+            "checked": len(CALIBRATABLE_FACTORS),
+            "changed": changed,
+            "rows": rows_changed,
+            "mode": first.get("mode"),
+            "statuses": statuses,
+        }
     except Exception as e:  # pragma: no cover - 防禦性
         logger.warning(f"[因子標定] market={market} 失敗: {e}")
         db.rollback()

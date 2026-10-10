@@ -145,18 +145,18 @@ def test_evaluate_factor_ic_excludes_unelapsed_horizon():
 # --------------------------- DB:calibrate_factor_weights ---------------------------
 
 def test_calibrate_moves_weight_from_ic_and_audits():
-    """alpha 與收益完全正相關 → IC=+1 → 權重上調並寫 auto 審計。"""
+    """ACTIVE gate + immutable v2 cohort → IC=+1 → 權重上調並寫 auto 審計。"""
     from src.modules.strategy.factor_calibration import calibrate_factor_weights
     from src.platform.persistence.models import FactorWeight, FactorWeightHistory
+    import test_calibration_integrity as ci
 
     db = _mem_db()
     try:
-        d = _old_date()
-        for i in range(1, 7):  # 6 條,alpha 與 ret 單調一致
-            _seed_pair(db, i, market="CN", snapshot_date=d, alpha=float(i), ret=float(i))
-        db.commit()
+        ci._seed_cohort(db, market="CN", dates=32, units=5)
+        ci.set_calibration_mode(db, kind="factor", market="CN", mode=ci.MODE_ACTIVE,
+                                reason="floors met")
 
-        calibrate_factor_weights("CN", min_samples=5, db=db)
+        calibrate_factor_weights("CN", db=db)
 
         row = db.query(FactorWeight).filter_by(factor_code="alpha_score", market="CN").first()
         assert row.weight > 1.0
@@ -174,17 +174,17 @@ def test_calibrate_skips_pinned():
     """已 pin 的因子即使有強 IC 也不動。"""
     from src.modules.strategy.factor_calibration import calibrate_factor_weights
     from src.platform.persistence.models import FactorWeight
+    import test_calibration_integrity as ci
 
     db = _mem_db()
     try:
         db.add(FactorWeight(factor_code="alpha_score", market="CN", weight=1.0, is_pinned=True))
         db.commit()
-        d = _old_date()
-        for i in range(1, 7):
-            _seed_pair(db, i, market="CN", snapshot_date=d, alpha=float(i), ret=float(i))
-        db.commit()
+        ci._seed_cohort(db, market="CN", dates=32, units=5)
+        ci.set_calibration_mode(db, kind="factor", market="CN", mode=ci.MODE_ACTIVE,
+                                reason="floors met")
 
-        calibrate_factor_weights("CN", min_samples=5, db=db)
+        calibrate_factor_weights("CN", db=db)
 
         row = db.query(FactorWeight).filter_by(factor_code="alpha_score", market="CN").first()
         assert row.weight == 1.0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import hashlib
 from datetime import date, datetime, timedelta
 from math import sqrt
 
@@ -14,10 +15,17 @@ from src.platform.persistence.json_safe import to_jsonable
 from src.modules.strategy.strategy_catalog import (
     ensure_strategy_catalog,
     get_effective_weight_map,
+    get_primary_horizon_sessions,
     get_strategy_profile_map,
     list_strategy_catalog,
 )
 from src.modules.strategy.factor_weights import get_factor_weights
+from src.modules.strategy.calibration_gate import (
+    apply_calibration_batch,
+    capture_decision_snapshot,
+    plan_calibration_batch,
+    RANKER_VERSION_V1,
+)
 from src.platform.scheduling.timezone import to_iso_with_tz, utc_now
 from src.platform.marketdata.models import MarketCode, enabled_market_codes
 from src.platform.persistence.database import SessionLocal
@@ -26,6 +34,7 @@ from src.platform.persistence.models import (
     MarketRegimeSnapshot,
     NewsCache,
     PortfolioRiskSnapshot,
+    RankingSnapshot,
     StrategyFactorSnapshot,
     StrategyOutcome,
     StrategySignalRun,
@@ -1206,6 +1215,93 @@ def _format_signal(
     }
 
 
+CAPTURE_FACTOR_FIELDS = (
+    "alpha_score",
+    "catalyst_score",
+    "quality_score",
+    "risk_penalty",
+    "crowd_penalty",
+    "source_bonus",
+)
+
+
+def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
+    """Append-only decision capture (PR-0A): immutable items, UI projection stays separate.
+
+    The capture stores the factor values that actually fed each decision, so calibration
+    reads archived decision inputs instead of mutable StrategyFactorSnapshot projections.
+    Provenance stays UNVERIFIABLE until the RC-D evaluator labels the population, which
+    keeps every market ineligible (and therefore FROZEN/SHADOW) without weakening the gate.
+    """
+    by_market: dict[str, list[dict]] = {}
+    for row in rows:
+        market = (row.stock_market or "CN").strip().upper() or "CN"
+        symbol = (row.stock_symbol or "").strip().upper()
+        if not symbol:
+            continue
+        payload = row.payload if isinstance(row.payload, dict) else {}
+        breakdown = payload.get("score_breakdown") if isinstance(
+            payload.get("score_breakdown"), dict
+        ) else {}
+        # A factor the ranker did not emit stays missing; it is never a zero sample.
+        factors = {
+            code: (float(breakdown[code]) if breakdown.get(code) is not None else None)
+            for code in CAPTURE_FACTOR_FIELDS
+        }
+        by_market.setdefault(market, []).append({
+            "instrument_id": f"{market}:{symbol}",
+            "symbol": row.stock_symbol,
+            "strategy_code": row.strategy_code,
+            "raw_factor_values": factors,
+            "ranking_value": breakdown.get("raw_score"),
+            "primary_horizon_sessions": int(row.holding_days or 0) or None,
+            "candidate_id": row.source_candidate_id,
+            "signal_run_id": int(row.id) if row.id is not None else None,
+        })
+    for market, decisions in sorted(by_market.items()):
+        # Capture identity is run-scoped: one market/session keeps one capture, but a
+        # same-day refresh or a correction can no longer reuse a fixed day-level id and
+        # silently inherit another execution's archived decision set.
+        run_ids = sorted({int(d["signal_run_id"]) for d in decisions if d["signal_run_id"] is not None})
+        run_token = (hashlib.sha256(str(run_ids).encode("utf-8")).hexdigest()[:12]
+                     if run_ids else "no-runs")
+        capture_id = f"decision-{market}-{session_date}-{run_token}"
+        # Seal the catalog authority at decision time so a later catalog edit cannot move
+        # this cohort in or out; the selector reads this, not the live catalog.
+        catalog_authority = get_primary_horizon_sessions()
+        try:
+            # Newly created signal rows are still pending: flush first so row.id exists and
+            # the capture can carry a real signal reference instead of "no-runs".
+            db.flush()
+            result = capture_decision_snapshot(
+                db,
+                capture_id=capture_id,
+                market=market,
+                session_date=session_date,
+                decisions=decisions,
+                ranker_version=RANKER_VERSION_V1,
+                catalog_authority=catalog_authority,
+            )
+        except Exception:
+            # capture 是 evidence 的 side channel: signal refresh must not fail because of it.
+            logger.exception(
+                "[策略層] decision capture 失敗: market=%s session=%s",
+                market,
+                session_date,
+            )
+            continue
+        logger.info(
+            "[策略層] decision capture: market=%s session=%s capture=%s written=%s reused=%s conflicts=%s items=%s",
+            market,
+            session_date,
+            result["capture_id"],
+            result["written"],
+            result["reused"],
+            result["conflicts"],
+            result["item_count"],
+        )
+
+
 def refresh_strategy_signals(
     *,
     snapshot_date: str = "",
@@ -1412,6 +1508,9 @@ def refresh_strategy_signals(
                 constraint_stats.get("demoted", 0),
                 constraint_stats.get("by_reason", {}),
             )
+
+        # Decision inputs are sealed before any later refresh can revise them (PR-0A item 3).
+        _capture_ranking_decisions(db, rows=touched_rows, session_date=snapshot)
 
         # Remove stale strategy rows for same candidate snapshot when strategy mapping changed.
         stale_ids = [int(row.id) for row in existing_rows
@@ -1799,107 +1898,79 @@ def rebalance_strategy_weights(
     db = SessionLocal()
     try:
         catalogs = list_strategy_catalog(enabled_only=True)
-        by_pair, by_all = _aggregate_recent_outcomes(db=db, days=window_days)
-
         changed = 0
         checked = 0
         skipped_low_sample = 0
         rows_changed: list[dict] = []
+        statuses: dict[str, str] = {}
+        modes: dict[str, str] = {}
 
-        targets: list[tuple[str, str, dict]] = []
-        for c in catalogs:
-            code = c["code"]
-            default_weight = float(c.get("default_weight", 1.0))
-            all_metrics = by_all.get(code, {"sample_size": 0, "wins": 0, "avg_return_pct": 0.0})
-            targets.append((code, "ALL", {"default_weight": default_weight, **all_metrics}))
-            for market in enabled_market_codes():
-                metrics = by_pair.get((code, market), {"sample_size": 0, "wins": 0, "avg_return_pct": 0.0})
-                targets.append((code, market, {"default_weight": default_weight, **metrics}))
+        for market in ("ALL", *enabled_market_codes()):
+            targets = [f"{c['code']}|{reg}" for c in catalogs]
+            batch = plan_calibration_batch(db, kind="strategy", market=market,
+                                          targets=targets, regime=reg)
+            proposals: dict[str, float] = {}
+            reasons: dict[str, str] = {}
+            for c in catalogs:
+                code = c["code"]
+                key = f"{code}|{reg}"
+                default_weight = float(c.get("default_weight", 1.0))
+                plan = batch["plans"][key]
+                readiness = plan["readiness"]
+                stats = readiness["per_factor"].get("net_return", {})
+                old = plan["old_weight"]
+                modes[market] = plan["mode"]
+                checked += 1
+                if old is None:
+                    statuses[key] = "TARGET_MISSING"
+                    continue
+                sample_size = int(readiness["training"]["units"])
+                if sample_size < min_samples:
+                    skipped_low_sample += 1
+                    continue
 
-        for code, market, metrics in targets:
-            checked += 1
-            sample_size = int(metrics.get("sample_size", 0))
-            wins = int(metrics.get("wins", 0))
-            avg_ret = float(metrics.get("avg_return_pct", 0.0))
-            default_weight = float(metrics.get("default_weight", 1.0))
-
-            row = (
-                db.query(StrategyWeight)
-                .filter(
-                    StrategyWeight.strategy_code == code,
-                    StrategyWeight.market == market,
-                    StrategyWeight.regime == reg,
+                win_rate = float(stats.get("win_rate") or 0.0)
+                avg_ret = float(stats.get("mean") or 0.0)
+                win_term = _clamp((win_rate - 50.0) / 50.0, -1.0, 1.0)
+                ret_term = _clamp(avg_ret / 8.0, -1.0, 1.0)
+                target = default_weight * (1.0 + 0.45 * win_term + 0.35 * ret_term)
+                target = _clamp(target, 0.45, 1.90)
+                new_weight = float(round(_clamp(old * (1.0 - alpha) + target * alpha, 0.45, 1.90), 4))
+                if abs(new_weight - old) < 0.01:
+                    statuses[key] = "NO_CHANGE"
+                    continue
+                proposals[key] = new_weight
+                reasons[key] = (
+                    f"auto_rebalance(win_rate={win_rate:.1f}%, avg_ret={avg_ret:.2f}%, "
+                    f"samples={sample_size}, alpha={alpha:.2f})"
                 )
-                .first()
-            )
-            old_weight = float(row.weight if row else default_weight)
-            if sample_size < min_samples:
-                skipped_low_sample += 1
+
+            # One all-or-nothing write transaction per market batch.
+            if not proposals:
                 continue
-
-            win_rate = (wins / sample_size * 100.0) if sample_size > 0 else 0.0
-            win_term = _clamp((win_rate - 50.0) / 50.0, -1.0, 1.0)
-            ret_term = _clamp(avg_ret / 8.0, -1.0, 1.0)
-            target = default_weight * (1.0 + 0.45 * win_term + 0.35 * ret_term)
-            target = _clamp(target, 0.45, 1.90)
-            new_weight = old_weight * (1.0 - alpha) + target * alpha
-            new_weight = float(round(_clamp(new_weight, 0.45, 1.90), 4))
-
-            if abs(new_weight - old_weight) < 0.01:
-                continue
-
-            reason = (
-                f"auto_rebalance(win_rate={win_rate:.1f}%, avg_ret={avg_ret:.2f}%, "
-                f"samples={sample_size}, alpha={alpha:.2f})"
+            result = apply_calibration_batch(
+                db,
+                plans={key: batch["plans"][key] for key in proposals},
+                proposals=proposals,
+                reasons=reasons,
             )
-            if not row:
-                row = StrategyWeight(
-                    strategy_code=code,
-                    market=market,
-                    regime=reg,
-                    weight=new_weight,
-                    reason=reason,
-                    meta={"window_days": window_days, "sample_size": sample_size},
-                    effective_from=utc_now(),
+            for key, status in result["results"].items():
+                statuses[key] = status
+            for key in result["applied"]:
+                changed += 1
+                rows_changed.append(
+                    {
+                        "strategy_code": key.partition("|")[0],
+                        "market": market,
+                        "old_weight": float(batch["plans"][key]["old_weight"]),
+                        "new_weight": proposals[key],
+                        "sample_size": int(
+                            batch["plans"][key]["cohort"]["counts"]["units"]),
+                    }
                 )
-                db.add(row)
-            else:
-                row.weight = new_weight
-                row.reason = reason
-                row.meta = {"window_days": window_days, "sample_size": sample_size}
-                row.effective_from = utc_now()
-                row.updated_at = utc_now()
-
-            db.add(
-                StrategyWeightHistory(
-                    strategy_code=code,
-                    market=market,
-                    regime=reg,
-                    old_weight=float(old_weight),
-                    new_weight=float(new_weight),
-                    reason=reason,
-                    window_days=window_days,
-                    sample_size=sample_size,
-                    meta={
-                        "wins": wins,
-                        "win_rate": round(win_rate, 3),
-                        "avg_return_pct": round(avg_ret, 4),
-                        "target": round(target, 4),
-                    },
-                )
-            )
-            changed += 1
-            rows_changed.append(
-                {
-                    "strategy_code": code,
-                    "market": market,
-                    "old_weight": round(old_weight, 4),
-                    "new_weight": round(new_weight, 4),
-                    "sample_size": sample_size,
-                }
-            )
 
         db.commit()
+        first_plan = next(iter(statuses.values()), None)
         return {
             "window_days": window_days,
             "min_samples": min_samples,
@@ -1908,6 +1979,9 @@ def rebalance_strategy_weights(
             "changed": changed,
             "skipped_low_sample": skipped_low_sample,
             "changes": rows_changed,
+            "statuses": statuses,
+            "modes": modes,
+            "mode": next(iter(modes.values()), None),
         }
     except Exception as e:
         db.rollback()
