@@ -1270,6 +1270,9 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
         # this cohort in or out; the selector reads this, not the live catalog.
         catalog_authority = get_primary_horizon_sessions()
         try:
+            # Newly created signal rows are still pending: flush first so row.id exists and
+            # the capture can carry a real signal reference instead of "no-runs".
+            db.flush()
             result = capture_decision_snapshot(
                 db,
                 capture_id=capture_id,
@@ -1279,23 +1282,6 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
                 ranker_version=RANKER_VERSION_V1,
                 catalog_authority=catalog_authority,
             )
-            if int(result.get("conflicts") or 0):
-                # Same run identity, different content: a correction seals a new capture
-                # instead of revisiting, or silently ignoring, the archived one.
-                seq = len(
-                    db.query(RankingSnapshot)
-                    .filter(RankingSnapshot.capture_id.like(f"{capture_id}%"))
-                    .all()
-                )
-                result = capture_decision_snapshot(
-                    db,
-                    capture_id=f"{capture_id}-r{seq}",
-                    market=market,
-                    session_date=session_date,
-                    decisions=decisions,
-                    ranker_version=RANKER_VERSION_V1,
-                    catalog_authority=catalog_authority,
-                )
         except Exception:
             # capture 是 evidence 的 side channel: signal refresh must not fail because of it.
             logger.exception(
@@ -1305,9 +1291,10 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
             )
             continue
         logger.info(
-            "[策略層] decision capture: market=%s session=%s written=%s reused=%s conflicts=%s items=%s",
+            "[策略層] decision capture: market=%s session=%s capture=%s written=%s reused=%s conflicts=%s items=%s",
             market,
             session_date,
+            result["capture_id"],
             result["written"],
             result["reused"],
             result["conflicts"],

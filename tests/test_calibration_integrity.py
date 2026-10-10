@@ -42,6 +42,7 @@ from src.modules.strategy.calibration_gate import (
     EVALUATION_VERSION_V2,
     apply_calibration_plan,
     apply_calibration_batch,
+    cohort_ic_periods,
     cohort_fingerprint,
     decision_snapshot_id_for,
     ensure_calibration_modes,
@@ -1049,7 +1050,8 @@ def test_pending_first_decision_stays_canonical(db_session):
     )
     cohort = select_cohort(db_session, kind="factor", market="TW")
     assert cohort["counts"]["units"] == 0
-    assert cohort["counts"]["rejected"].get("OUTCOME_MISSING") == 1
+    assert cohort["counts"]["rejected"].get("OUTCOME_REFERENCE_LOST") == 1
+    assert cohort["counts"]["rejected"].get("DUPLICATE_UNIT") == 1
     assert cohort["counts"]["rejected"].get("DUPLICATE_UNIT") == 1
 
 
@@ -1276,8 +1278,8 @@ def test_application_ledger_records_audit_identity(db_session):
     set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
                          reason="floors met")
     plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
-    apply_calibration_plan(db_session, plan=plan, new_weight=1.2,
-                           output_config_hash="cfg-out-1")
+    applied = apply_calibration_plan(db_session, plan=plan, new_weight=1.2)
+    assert applied["status"] == "APPLIED"
     row = (
         db_session.query(CalibrationApplication)
         .filter(CalibrationApplication.market == "TW")
@@ -1289,6 +1291,8 @@ def test_application_ledger_records_audit_identity(db_session):
     assert row.primary_horizon_sessions == FACTOR_HORIZON_SESSIONS
     assert row.target_weight == 1.2
     assert row.source_config_versions.get("live_config_payload")
+    # The persisted output hash is the config the batch actually produced.
+    assert len(str(row.output_config_hash)) == 64
 
 
 # ------------------------------------------------- review regressions (PR-0A fixes)
@@ -1398,10 +1402,34 @@ def test_capture_identity_conflict_is_reported(db_session):
         decisions=changed,
         ranker_version=RANKER_VERSION,
     )
-    assert second["conflicts"] == 1
-    assert second["written"] == 0
-    item = db_session.query(RankingSnapshotItem).first()
-    assert item.alpha_score == 1.0
+    # Different content under one capture_id is a data revision: it seals its own capture
+    # instead of revisiting, or silently ignoring, the archived decision.
+    assert second["capture_id"] == "cap-conflict-r1"
+    assert second["written"] == 1
+    assert second["conflicts"] == 0
+    third = capture_decision_snapshot(
+        db_session,
+        capture_id="cap-conflict",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=changed,
+        ranker_version=RANKER_VERSION,
+    )
+    # The same correction replayed reuses that revision, so a retry cannot stack captures.
+    assert third["capture_id"] == "cap-conflict-r1"
+    assert third["written"] == 0
+    assert third["reused"] == 1
+    items = db_session.query(RankingSnapshotItem).all()
+    assert len(items) == 2
+    assert sorted(float(row.alpha_score) for row in items) == [1.0, 2.0]
+    base = db_session.query(RankingSnapshot).filter(
+        RankingSnapshot.capture_id == "cap-conflict"
+    ).first()
+    original = db_session.query(RankingSnapshotItem).filter(
+        RankingSnapshotItem.ranking_snapshot_id == int(base.id)
+    ).first()
+    assert original is not None
+    assert original.alpha_score == 1.0
 
 
 def test_sealed_catalog_authority_survives_catalog_change(db_session):
@@ -1536,3 +1564,189 @@ def test_migration_127_rerun_is_idempotent():
             assert len(pairs) == len(set(pairs))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+# --------------------------------------- second-round review regressions (PR-0A)
+
+def test_forged_readiness_cannot_reach_a_weight_write(db_session):
+    """The applier re-derives readiness: a caller-forged ready plan cannot write a weight."""
+    _seed_cohort(db_session, dates=6, units=2)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
+                         reason="premature restart")
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    assert plan["readiness"]["ready"] is False
+    forged = {
+        **plan,
+        "readiness": {
+            **plan["readiness"],
+            "ready": True,
+            "reasons": [],
+            "training": {"units": 999, "dates": 999, "ic_periods": 999, "purged": 0},
+        },
+    }
+    result = apply_calibration_plan(db_session, plan=forged, new_weight=1.9)
+    assert result["status"] == "READINESS_NOT_MET"
+    assert db_session.query(CalibrationApplication).count() == 0
+    assert _alpha_weight(db_session) == 1.0
+
+
+def test_forged_fingerprint_cannot_reach_a_weight_write(db_session):
+    """The applier re-derives the cohort fingerprint: a stale plan cannot write a weight."""
+    _seed_cohort(db_session, dates=32)
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
+                         reason="floors met")
+    plan = plan_calibration(db_session, kind="factor", market="TW", target="alpha_score")
+    assert plan["readiness"]["ready"] is True
+    stale = {**plan, "cohort_fingerprint": "0" * 64}
+    result = apply_calibration_plan(db_session, plan=stale, new_weight=1.2)
+    assert result["status"] == "COHORT_FINGERPRINT_STALE"
+    assert db_session.query(CalibrationApplication).count() == 0
+    assert _alpha_weight(db_session) == 1.0
+
+
+def test_batch_claims_share_one_input_snapshot(db_session):
+    """Every claim in one batch records the same input payload and the same output hash."""
+    _seed_cohort(db_session, dates=32, correlated=("alpha_score", "catalyst_score"))
+    set_calibration_mode(db_session, kind="factor", market="TW", mode=MODE_ACTIVE,
+                         reason="floors met")
+    batch = plan_calibration_batch(db_session, kind="factor", market="TW",
+                                   targets=["alpha_score", "catalyst_score"])
+    result = apply_calibration_batch(
+        db_session,
+        plans={t: batch["plans"][t] for t in ("alpha_score", "catalyst_score")},
+        proposals={"alpha_score": 1.3, "catalyst_score": 1.2},
+    )
+    assert result["status"] == "APPLIED"
+    rows = db_session.query(CalibrationApplication).filter(
+        CalibrationApplication.market == "TW"
+    ).all()
+    assert len(rows) == 2
+    inputs = {repr(row.source_config_versions["live_config_payload"]) for row in rows}
+    assert len(inputs) == 1
+    assert len({row.output_config_hash for row in rows}) == 1
+    # The recorded output payload is the config the batch produced, for both targets.
+    produced = {row[0]: row[1] for row in rows[0].source_config_versions["output_config_payload"]}
+    assert produced["alpha_score"] == 1.3
+    assert produced["catalyst_score"] == 1.2
+
+
+def test_per_factor_period_floor_counts_only_that_factor(db_session):
+    """A factor present on one unit per day cannot borrow the cohort's period count."""
+    rows = [
+        _row(
+            market="TW",
+            unit=unit,
+            session_date="2026-01-05",
+            gross_return_pct=float(unit),
+            exit_session_date="2026-01-12",
+            signal_run_id=100 + unit,
+            outcome_id=100 + unit,
+            factors={"quality_score": float(unit)},
+        )
+        for unit in range(5)
+    ]
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-05",
+        capture_id="c-per-factor-units",
+        rows=rows,
+    )
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["units"] == 5
+    periods = cohort_ic_periods(cohort, kind="factor")
+    entry = periods["TW|2026-01-05"]
+    assert entry["sample_count"] == 5
+    assert entry["alpha_score_units"] == 0
+    readiness = evaluate_readiness(cohort, market="TW", kind="factor",
+                                   target="alpha_score")
+    assert readiness["ready"] is False
+    assert readiness["per_factor"]["alpha_score"]["series"] == 0
+    assert readiness["per_factor"]["alpha_score"]["sample_units"] == 0
+
+
+def test_pending_outcome_is_not_reference_loss(db_session):
+    """No evaluated record yet at that date is PENDING, not a lost reference."""
+    _capture(
+        db_session,
+        market="TW",
+        session_date="2026-01-05",
+        capture_id="c-pending-only",
+        rows=[
+            _row(
+                market="TW", unit=0, session_date="2026-01-05", gross_return_pct=1.0,
+                exit_session_date="2026-01-12", signal_run_id=1, outcome_id=1,
+            ),
+        ],
+    )
+    db_session.query(StrategyOutcome).delete()
+    db_session.commit()
+    cohort = select_cohort(db_session, kind="factor", market="TW")
+    assert cohort["counts"]["rejected"].get("OUTCOME_PENDING") == 1
+    assert cohort["integrity_suspect"] is False
+
+
+def test_strategy_outcome_loss_is_scoped_to_its_target(db_session):
+    """One strategy's lost outcome may not refuse another strategy's readiness."""
+    _seed_cohort(db_session, dates=32, units=5, strategy_code="trend_follow",
+                 net_offset=2.0)
+    _seed_cohort(db_session, dates=32, units=5, strategy_code="rebound",
+                 net_offset=2.0, primary_horizon_sessions=3, id_base=5000)
+    db_session.query(StrategyOutcome).filter(StrategyOutcome.id == 5000).delete()
+    db_session.commit()
+    batch = plan_calibration_batch(
+        db_session,
+        kind="strategy",
+        market="TW",
+        targets=["trend_follow|default", "rebound|default"],
+    )
+    mature = batch["plans"]["trend_follow|default"]["readiness"]
+    rebound = batch["plans"]["rebound|default"]["readiness"]
+    assert mature["ready"] is True
+    assert rebound["ready"] is False
+    assert "OUTCOME_REFERENCE_LOSS" in rebound["reasons"]
+
+
+def test_decision_payload_change_seals_a_revision(db_session):
+    """A changed horizon or ranking value is a different decision, not a replay."""
+    decision = {
+        "instrument_id": "inst-payload",
+        "symbol": "TW9",
+        "strategy_code": "trend_follow",
+        "raw_factor_values": {"alpha_score": 1.0},
+        "primary_horizon_sessions": 5,
+        "ranking_value": 1.0,
+    }
+    first = capture_decision_snapshot(
+        db_session,
+        capture_id="cap-payload",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=[decision],
+        ranker_version=RANKER_VERSION,
+    )
+    assert first["written"] == 1
+    assert first["capture_id"] == "cap-payload"
+    moved = capture_decision_snapshot(
+        db_session,
+        capture_id="cap-payload",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=[dict(decision, ranking_value=2.0)],
+        ranker_version=RANKER_VERSION,
+    )
+    assert moved["capture_id"] == "cap-payload-r1"
+    assert moved["written"] == 1
+    horizon_shift = capture_decision_snapshot(
+        db_session,
+        capture_id="cap-payload",
+        market="TW",
+        session_date="2026-01-05",
+        decisions=[dict(decision, primary_horizon_sessions=7)],
+        ranker_version=RANKER_VERSION,
+    )
+    assert horizon_shift["capture_id"] == "cap-payload-r2"
+    assert horizon_shift["written"] == 1
+    items = db_session.query(RankingSnapshotItem).all()
+    assert len(items) == 3
+    assert sorted(int(row.primary_horizon_sessions) for row in items) == [5, 5, 7]
