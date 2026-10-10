@@ -87,6 +87,55 @@ def test_financial_period_index_uses_shared_bounded_read_and_scoped_cache():
     }
 
 
+def test_financial_period_refresh_bypasses_service_cache_and_requests_client_refresh():
+    calls = []
+
+    class Client:
+        def financial_statement_periods(self, instrument_id, **selectors):
+            calls.append(selectors)
+            return SimpleNamespace(instrument_id=instrument_id, generation=len(calls))
+
+    service = TaiwanResearchService(client=Client(), config={"base_url": "http://refresh-fixture"})
+    assert service.financial_statement_periods("TWSE:2330").generation == 1
+    assert service.financial_statement_periods("TWSE:2330").generation == 1
+    assert service.financial_statement_periods("TWSE:2330", refresh=True).generation == 2
+    assert service.financial_statement_periods("TWSE:2330").generation == 2
+    assert len(calls) == 2 and calls[1]["refresh"] is True
+    assert calls[1]["timeout_sec"] <= 2.0
+
+
+@pytest.mark.parametrize("catalog_state", ["active", "inactive", "omitted"])
+def test_expected_financial_revision_bypasses_both_cache_layers_and_rejects_races(monkeypatch, catalog_state):
+    response = json.loads((FIXTURES / "captured/financial-statements-twse-2330-2024q4.json").read_text())
+    rows = _catalog()
+    rows[0]["is_active"] = catalog_state == "active"
+    fact_calls = []
+
+    def get_response(self, path, **params):
+        if path == "instruments":
+            return ([] if catalog_state == "omitted" else rows), {}
+        assert path == "financial-statements"
+        fact_calls.append(params)
+        return copy.deepcopy(response), {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    service = TaiwanResearchService(config={"base_url": f"http://revision-{catalog_state}"})
+    params = {"fiscal_year": 2024, "fiscal_quarter": 4, "blocks": ["financial_statements"],
+              "today_taipei": date(2026, 10, 10)}
+    first = service.collect("TWSE:2330", **params)["blocks"]["financial_statements"]
+    assert first["status"] == "available"
+    response["report"]["semantic_revision_id"] = "updated-semantic-revision"
+    response["facts"][0].update(value="42000", lexical_value="42", scale=3)
+    updated = service.collect("TWSE:2330", **params, expected_financial_revision="updated-semantic-revision")["blocks"]["financial_statements"]
+    assert updated["data"]["report"]["semantic_revision_id"] == "updated-semantic-revision"
+    assert updated["data"]["facts"][0]["value"] == "42000"
+    service.collect("TWSE:2330", **params, expected_financial_revision="updated-semantic-revision")
+    assert len(fact_calls) == 2
+    failed = service.collect("TWSE:2330", **params, expected_financial_revision="newer-index-revision")["blocks"]["financial_statements"]
+    assert failed["status"] == "error" and failed["reason"] == "financial_revision_changed"
+    assert failed["data"] is None
+
+
 def test_four_research_blocks_keep_exact_values_dates_units_and_period_evidence(monkeypatch):
     catalog = _catalog() + [
         {"instrument_id": "TWSE:00999", "venue": "TWSE", "symbol": "00999", "security_type": "ETN", "is_active": True, "name": "測試 ETN"},

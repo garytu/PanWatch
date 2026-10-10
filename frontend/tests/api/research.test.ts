@@ -18,13 +18,23 @@ describe('selective research requests', () => {
     expect(new URL(String(fetchMock.mock.calls[1][0]), 'http://test').searchParams.has('blocks')).toBe(false)
   })
 
+  it('sends the expected financial revision only to the PanWatch facts route', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ code: 0, data: {} }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }))
+    await researchApi.taiwan('TWSE:2330', { fiscal_year: 2024, fiscal_quarter: 4,
+      blocks: ['financial_statements'], expected_financial_revision: 'revision-2' })
+    const query = new URL(String(fetchMock.mock.calls[0][0]), 'http://test').searchParams
+    expect(query.get('expected_financial_revision')).toBe('revision-2')
+  })
+
   it('uses the bounded financial-period endpoint with the caller abort signal', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       code: 0, data: { index_status: 'unknown' },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     const controller = new AbortController()
     await researchApi.financialPeriods('TWSE:2330', {
-      report_scope: 'consolidated', statement: 'cash_flows', limit: 40, cursor: 'opaque-cursor',
+      report_scope: 'consolidated', statement: 'cash_flows', limit: 40, cursor: 'opaque-cursor', refresh: true,
     }, { signal: controller.signal })
 
     const [url, options] = fetchMock.mock.calls[0]
@@ -35,6 +45,7 @@ describe('selective research requests', () => {
     expect(query.get('statement')).toBe('cash_flows')
     expect(query.get('limit')).toBe('40')
     expect(query.get('cursor')).toBe('opaque-cursor')
+    expect(query.get('refresh')).toBe('true')
     expect(options?.signal).toBeInstanceOf(AbortSignal)
     expect(options?.signal?.aborted).toBe(false)
   })

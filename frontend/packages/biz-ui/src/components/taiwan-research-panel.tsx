@@ -612,6 +612,19 @@ function monthProvenance(item: any, coverage: any[]): string {
   return `來源 ${sources.length ? sources.join(', ') : '未提供'} · 報表日 ${dates.length ? dates.join(', ') : '未提供'}`
 }
 
+function indexedFinancialRevision(
+  result: TaiwanFinancialPeriodIndexResult | null,
+  scope: { year: number; quarter: number },
+): string | undefined {
+  const index = result?.index
+  if (result?.index_status !== 'available' || index?.coverage.status !== 'complete'
+    || index.qualification.status !== 'qualified') return undefined
+  const entry = [...index.periods, index.latest_readable_period].find((item) => (
+    item?.fiscal_year === scope.year && item.fiscal_quarter === scope.quarter
+  ))
+  return entry?.presence === 'present_readable' ? entry.authority?.semantic_revision_id : undefined
+}
+
 export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; market: string; open: boolean }) {
   const [payload, setPayload] = useState<TaiwanResearchPayload | null>(null)
   const [mainLoading, setMainLoading] = useState(false)
@@ -756,6 +769,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
 
     setFinancialUnsupported(null)
     setFinancialLoading(true)
+    const expectedRevision = indexedFinancialRevision(indexResult, scope)
     const controller = new AbortController()
     financialControllerRef.current = controller
     try {
@@ -763,6 +777,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
         fiscal_year: scope.year,
         fiscal_quarter: scope.quarter,
         blocks: ['financial_statements'],
+        ...(expectedRevision ? { expected_financial_revision: expectedRevision } : {}),
       }, { signal: controller.signal })
       if (sequence === financialRequestSequence.current) {
         const resultBlock = result.blocks?.financial_statements as AnyBlock | undefined
@@ -786,6 +801,12 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
           || !quarters.every((value) => Number(value) === scope.quarter)) {
           throw new Error('財報回應標的或期別與所選查詢不符。')
         }
+        if (resultBlock.reason === 'financial_revision_changed'
+          || (expectedRevision && data?.report && data.report.semantic_revision_id !== expectedRevision)) {
+          financialBlockRef.current = null
+          setFinancialBlock(null)
+          throw new Error('財報修訂與期別索引不一致；請重新載入期別後查詢。')
+        }
         financialBlockRef.current = resultBlock
         setFinancialBlock(resultBlock)
       }
@@ -800,7 +821,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
 
   loadFinancialRef.current = loadFinancial
 
-  const loadFinancialPeriodIndex = useCallback(async () => {
+  const loadFinancialPeriodIndex = useCallback(async (refresh = false) => {
     if (!symbol || market !== 'TW') return
     const symbolScope = `${market}:${symbol}`
     const sequence = ++financialIndexRequestSequence.current
@@ -820,7 +841,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       setFinancialBlock(null)
       setFinancialError('')
       setFinancialLoading(false)
-    } else if (financialSelectionModeRef.current === 'latest') {
+    } else if (financialSelectionModeRef.current === 'latest' || refresh) {
       financialRequestSequence.current++
       financialControllerRef.current?.abort()
       financialControllerRef.current = null
@@ -845,6 +866,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
     try {
       const result = await researchApi.financialPeriods(symbol, {
         report_scope: 'consolidated', limit: 40,
+        ...(refresh ? { refresh: true } : {}),
       }, { signal: controller.signal })
       if (sequence !== financialIndexRequestSequence.current) return
       const requestedSymbol = symbol.trim().toUpperCase()
@@ -852,6 +874,10 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
         .filter((value) => value != null)
       const instrumentMatches = identities.length > 0 && identities.every((value) => {
         const identity = String(value).toUpperCase()
+        // Failed resolution/provider reads echo the original input, including
+        // bare symbols. They carry no index evidence to use for auto-selection.
+        if (!result.index && ['error', 'unknown'].includes(result.index_status)
+          && identity === requestedSymbol) return true
         const canonicalParts = /^(TWSE|TPEX):([0-9A-Z]{4,6})$/.exec(identity)
         return Boolean(canonicalParts && (
           requestedSymbol.includes(':') ? identity === requestedSymbol : canonicalParts[2] === requestedSymbol
@@ -929,29 +955,8 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
       setFinancialLoading(false)
       return
     }
-    const index = financialPeriodIndex?.index
-    const latest = financialPeriodIndex?.index_status === 'available'
-      && index?.coverage.status === 'complete'
-      && index.qualification.status === 'qualified'
-      && index.latest_readable_period?.presence === 'present_readable'
-      && index.latest_readable_period.authority
-      ? index.latest_readable_period
-      : null
-    if (latest) {
-      const latestScope = { year: latest.fiscal_year, quarter: latest.fiscal_quarter }
-      setFiscalScope(latestScope)
-      void loadFinancialRef.current?.(latestScope, financialPeriodIndex)
-    } else {
-      financialRequestSequence.current++
-      financialControllerRef.current?.abort()
-      financialControllerRef.current = null
-      financialInputScopeRef.current = null
-      financialBlockRef.current = null
-      setFinancialBlock(null)
-      setFinancialError('')
-      setFinancialLoading(false)
-    }
-  }, [financialPeriodIndex])
+    void loadFinancialPeriodIndex(true)
+  }, [loadFinancialPeriodIndex])
 
   const submitManualFinancialQuery = useCallback(() => {
     void loadFinancial(fiscalScope, financialPeriodIndex)
@@ -1036,7 +1041,7 @@ export function TaiwanResearchPanel({ symbol, market, open }: { symbol: string; 
         periodIndex={visibleFinancialPeriodIndex}
         indexLoading={visibleFinancialIndexLoading}
         indexError={visibleFinancialIndexError}
-        onRetryIndex={() => void loadFinancialPeriodIndex()}
+        onRetryIndex={() => void loadFinancialPeriodIndex(true)}
         onManualQuery={submitManualFinancialQuery}
         manualQueryDisabled={manualQueryDisabled}
         loading={visibleFinancialLoading}

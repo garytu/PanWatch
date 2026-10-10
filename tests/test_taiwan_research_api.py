@@ -243,11 +243,47 @@ def test_financial_period_index_old_endpoint_and_duplicate_selectors_are_distinc
         duplicate = client.get(
             "/api/research/taiwan/financial-periods?instrument_id=TWSE%3A2330&limit=1&limit=2"
         )
+        bare = client.get("/api/research/taiwan/financial-periods?instrument_id=2330")
 
     assert old.status_code == 200
     assert old.json()["index_status"] == "unknown"
     assert old.json()["error"]["code"] == "endpoint_unsupported"
     assert duplicate.status_code == 422
+    assert bare.json()["instrument_id"] == "2330"
+    assert bare.json()["error"]["code"] == "endpoint_unsupported"
+
+
+def test_financial_api_forwards_revision_and_explicit_index_refresh(monkeypatch):
+    calls = []
+
+    class Service:
+        def collect(self, instrument_id, **selectors):
+            calls.append(("facts", instrument_id, selectors))
+            return {"blocks": {}}
+
+        def financial_statement_periods(self, instrument_id, **selectors):
+            calls.append(("index", instrument_id, selectors))
+            return _period_index_read()
+
+    monkeypatch.setattr(taiwan, "is_market_enabled", lambda _market: True)
+    monkeypatch.setattr(taiwan, "get_taiwan_research_service", Service)
+    app = _app()
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    with TestClient(app) as client:
+        facts = client.get("/api/research/taiwan", params={
+            "instrument_id": "TWSE:2330", "blocks": "financial_statements",
+            "fiscal_year": 2024, "fiscal_quarter": 4, "expected_financial_revision": "revision-2024q4",
+        })
+        index = client.get("/api/research/taiwan/financial-periods", params={
+            "instrument_id": "TWSE:2330", "limit": 1, "refresh": "true",
+        })
+        invalid = client.get("/api/research/taiwan", params={
+            "instrument_id": "TWSE:2330", "expected_financial_revision": "x" * 129,
+        })
+    assert facts.status_code == index.status_code == 200
+    assert invalid.status_code == 422
+    assert calls[0][2]["expected_financial_revision"] == "revision-2024q4"
+    assert calls[1][2]["refresh"] is True
 
 
 def test_financial_period_index_classifies_known_out_of_scope_instrument(monkeypatch):

@@ -1057,7 +1057,7 @@ def _status_error(exc: Exception) -> tuple[str, int | None]:
     if isinstance(exc, TwmdReadError):
         status = exc.status_code if type(exc.status_code) is int and 100 <= exc.status_code <= 599 else None
         reason = exc.reason_code or (f"http_{status}" if status else "provider_error")
-        if reason in {"invalid_response", "transport_error", "timeout", "provider_error"}:
+        if reason in {"invalid_response", "transport_error", "timeout", "provider_error", "financial_revision_changed"}:
             return reason, status
         if re.fullmatch(r"http_\d{3}", reason):
             parsed_status = int(reason[-3:])
@@ -1081,6 +1081,7 @@ def _safe_block_error_reason(reason: str, http_status: object) -> str:
         "invalid_response", "transport_error", "timeout", "provider_error",
         "concurrency_limit", "instrument_not_found", "ambiguous_instrument",
         "invalid_instrument_id", "instrument_inactive",
+        "financial_revision_changed",
     }:
         return reason
     if re.fullmatch(r"http_\d{3}", reason):
@@ -1155,6 +1156,7 @@ class TaiwanResearchService:
         statement: str | None = None,
         limit: int = 40,
         cursor: str | None = None,
+        refresh: bool = False,
     ) -> TwmdFinancialStatementPeriodsRead:
         """Read the issuer's bounded retained-period index through the shared scheduler."""
         read_caller = object()
@@ -1181,7 +1183,7 @@ class TaiwanResearchService:
 
             selectors = (report_scope, statement, limit, cursor)
             key = _cache_key(self.config, canonical, "financial_statement_periods", selectors)
-            cached = _cache_get(key)
+            cached = None if refresh else _cache_get(key)
             if cached is not None:
                 return cached
 
@@ -1193,12 +1195,14 @@ class TaiwanResearchService:
                     limit=limit,
                     cursor=cursor,
                     timeout_sec=max(0.1, min(2.0, deadline - time.monotonic())),
+                    **({"refresh": True} if refresh else {}),
                 )
                 _cache_set(key, result, _CACHE_TTLS["financial_statement_periods"])
                 return result
 
             future = _submit_read(
-                read_index, coalesce_key=key, caller_id=read_caller, deadline=deadline,
+                read_index, coalesce_key=(*key, "refresh") if refresh else key,
+                caller_id=read_caller, deadline=deadline,
             )
             return future.result(timeout=max(0.0, deadline - time.monotonic()))
         except TimeoutError as exc:
@@ -1219,11 +1223,18 @@ class TaiwanResearchService:
         fiscal_year: int | None = None,
         fiscal_quarter: int | None = None,
         statement: str | None = None,
+        expected_financial_revision: str | None = None,
         blocks: list[str] | tuple[str, ...] | None = None,
         today_taipei: date | None = None,
         now_utc: datetime | None = None,
     ) -> dict[str, Any]:
         requested_blocks = _requested_blocks(blocks)
+        if expected_financial_revision is not None and (
+            not isinstance(expected_financial_revision, str)
+            or not 1 <= len(expected_financial_revision) <= 128
+            or "financial_statements" not in requested_blocks
+        ):
+            raise ValueError("expected financial revision requires a financial block and 1–128 characters")
         read_caller = object()
         deadline = time.monotonic() + _REQUEST_DEADLINE_SECONDS
         request_clock = now_utc or datetime.now(timezone.utc)
@@ -1289,6 +1300,8 @@ class TaiwanResearchService:
                 "benchmark_id": None,
             }),
         }
+        if expected_financial_revision is not None:
+            template["financial_statements"][1]["expected_semantic_revision_id"] = expected_financial_revision
         def retained_financial(canonical: str) -> ResearchDataBlock:
             endpoint, financial_selectors = template["financial_statements"]
             financial_selectors = {**financial_selectors, "instrument_id": canonical}
@@ -1305,6 +1318,8 @@ class TaiwanResearchService:
                         canonical, fiscal_year, fiscal_quarter, statement=statement,
                         today_taipei=today,
                         timeout_sec=max(0.1, min(20.0, deadline - time.monotonic())),
+                        **({"expected_semantic_revision_id": expected_financial_revision}
+                           if expected_financial_revision is not None else {}),
                     )
                 ), coalesce_key=key, caller_id=read_caller, deadline=deadline)
                 return future.result(timeout=max(0.0, deadline - time.monotonic()))
@@ -1439,6 +1454,8 @@ class TaiwanResearchService:
                         limit=1000,
                         today_taipei=today,
                         timeout_sec=max(0.1, min(20.0, deadline - time.monotonic())),
+                        **({"expected_semantic_revision_id": expected_financial_revision}
+                           if expected_financial_revision is not None else {}),
                     )
                 ),
                 "corporate_actions": lambda: _corporate_actions_for_client(

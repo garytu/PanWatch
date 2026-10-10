@@ -203,7 +203,7 @@ export function FinancialStatementsPanel({
           <button type="button" aria-pressed={selectionMode === 'manual'} className={`rounded border px-2 py-1 text-[10px] ${selectionMode === 'manual' ? 'border-primary text-foreground' : 'border-border text-muted-foreground'}`} onClick={() => onSelectionModeChange?.('manual')}>指定期間</button>
           {indexLoading ? <span className="text-[10px] text-muted-foreground" role="status">正在讀取可用期別…</span> : null}
           {!indexLoading && indexStatusText ? <span className="text-[10px] text-muted-foreground">{indexStatusText}</span> : null}
-          {onRetryIndex && (indexError || periodIndex?.index_status === 'error') ? <button type="button" className="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted" onClick={onRetryIndex}>重新載入期別</button> : null}
+          {onRetryIndex ? <button type="button" className="rounded border border-border px-2 py-1 text-[10px] text-foreground hover:bg-muted disabled:opacity-50" disabled={indexLoading} onClick={onRetryIndex}>重新載入期別</button> : null}
         </div>
         {indexError ? <div className="rounded border border-destructive/30 p-2 text-xs text-destructive" role="alert">期別索引讀取失敗：{indexError}；可指定期間查詢。</div> : null}
         {selectionMode === 'latest' ? <>

@@ -401,6 +401,68 @@ def test_period_index_partial_or_unknown_never_supplies_safe_default(status):
     assert read.periods[0].presence == "unknown"
 
 
+def test_index_refresh_bypasses_only_the_selected_cached_page(monkeypatch):
+    calls = []
+
+    def get_response(self, path, **params):
+        calls.append((path, params))
+        return _period_index_payload(limit=params["limit"]), {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    client = twmd.TwmdClient({"base_url": "http://fixture"})
+    client.financial_statement_periods("TWSE:2330", limit=1)
+    client.financial_statement_periods("TWSE:2330", limit=1)
+    client.financial_statement_periods("TWSE:2330", limit=1, refresh=True)
+    client.financial_statement_periods("TWSE:2330", limit=1)
+    assert len(calls) == 2
+    assert all(path == "financial-statement-periods" for path, _params in calls)
+    assert all("refresh" not in params and params["retries"] == 0 for _path, params in calls)
+
+
+def test_expected_revision_bypasses_old_facts_and_caches_the_matching_revision(monkeypatch, response):
+    calls = []
+    revision = response["report"]["semantic_revision_id"]
+
+    def get_response(self, path, **params):
+        calls.append((path, params))
+        return copy.deepcopy(response), {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    client = twmd.TwmdClient({"base_url": "http://fixture"})
+    assert client.financial_statements("TWSE:2330", 2024, 4).report.semantic_revision_id == revision
+    response["report"]["semantic_revision_id"] = "updated-semantic-revision"
+    response["facts"][0].update(value="42000", lexical_value="42", scale=3)
+    read = client.financial_statements(
+        "TWSE:2330", 2024, 4, expected_semantic_revision_id="updated-semantic-revision",
+    )
+    assert read.report.semantic_revision_id == "updated-semantic-revision"
+    assert read.facts[0].value == "42000"
+    client.financial_statements("TWSE:2330", 2024, 4, expected_semantic_revision_id="updated-semantic-revision")
+    assert len(calls) == 2
+    assert all("expected_semantic_revision_id" not in params for _path, params in calls)
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_expected_revision_never_returns_a_different_or_missing_report(monkeypatch, response, missing):
+    calls = []
+    if missing:
+        response.update(report=None, facts=[], total_fact_count=0, returned_fact_count=0, truncated=False)
+        response["coverage"].update(status="MISSING", reason="report_not_advertised", latest_discovery_presence="not_advertised")
+
+    def get_response(self, _path, **_params):
+        calls.append(1)
+        return copy.deepcopy(response), {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    client = twmd.TwmdClient({"base_url": "http://fixture"})
+    client.financial_statements("TWSE:2330", 2024, 4)
+    for _ in range(2):
+        with pytest.raises(TwmdReadError) as exc:
+            client.financial_statements("TWSE:2330", 2024, 4, expected_semantic_revision_id="changed-revision")
+        assert exc.value.reason_code == "financial_revision_changed"
+    assert len(calls) == 3
+
+
 def test_period_index_client_is_bounded_cached_deep_copied_and_selector_isolated(monkeypatch):
     calls = []
 

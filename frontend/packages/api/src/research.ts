@@ -478,6 +478,7 @@ export interface TaiwanResearchParams {
   end_month?: string
   fiscal_year?: number
   fiscal_quarter?: number
+  expected_financial_revision?: string
   statement?: FinancialStatementName
   blocks?: ResearchBlockName[]
 }
@@ -487,6 +488,7 @@ export interface TaiwanFinancialPeriodsParams {
   statement?: FinancialStatementName
   limit?: number
   cursor?: string
+  refresh?: boolean
 }
 
 function withQuery(path: string, params: Record<string, string | number | string[] | undefined>): string {
@@ -520,6 +522,7 @@ export const researchApi = {
       statement: params.statement,
       limit: params.limit ?? 40,
       cursor: params.cursor,
+      refresh: params.refresh ? 'true' : undefined,
     }),
     { timeoutMs: 10_000, ...options },
   ),

@@ -27,6 +27,7 @@ def get_taiwan_research(
     fiscal_year: int | None = Query(None, ge=2024),
     fiscal_quarter: int | None = Query(None, ge=1, le=4),
     statement: str | None = Query(None, pattern="^(balance_sheet|comprehensive_income|cash_flows)$"),
+    expected_financial_revision: str | None = Query(None, min_length=1, max_length=128),
     blocks: list[str] | None = Query(None),
 ):
     if not is_market_enabled("TW"):
@@ -44,6 +45,8 @@ def get_taiwan_research(
         # Omitting `blocks` preserves the legacy all-block request contract.
         if blocks is not None:
             selectors["blocks"] = _requested_blocks(blocks)
+        if expected_financial_revision is not None:
+            selectors["expected_financial_revision"] = expected_financial_revision
         payload = get_taiwan_research_service().collect(instrument_id, **selectors)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -60,11 +63,12 @@ def get_taiwan_financial_periods(
     statement: str | None = Query(None, pattern="^(balance_sheet|comprehensive_income|cash_flows)$"),
     limit: int = Query(40, ge=1, le=40),
     cursor: str | None = Query(None, max_length=2048),
+    refresh: bool = Query(False),
 ):
     """Read retained period metadata independently of the selected fact report."""
     if not is_market_enabled("TW"):
         raise HTTPException(status_code=404, detail="Taiwan market is disabled")
-    allowed = {"instrument_id", "report_scope", "statement", "limit", "cursor"}
+    allowed = {"instrument_id", "report_scope", "statement", "limit", "cursor", "refresh"}
     if set(request.query_params.keys()) - allowed:
         raise HTTPException(status_code=422, detail="Unsupported financial-period selector")
     if any(len(request.query_params.getlist(name)) != 1 for name in request.query_params.keys()):
@@ -84,6 +88,7 @@ def get_taiwan_financial_periods(
             statement=statement,
             limit=limit,
             cursor=cursor,
+            **({"refresh": True} if refresh else {}),
         )
         if read.coverage.status == "complete" and read.qualification.status == "qualified":
             index_status = "available"

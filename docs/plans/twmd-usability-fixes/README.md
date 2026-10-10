@@ -74,7 +74,8 @@ pnpm build
 
 2026-10-10 按使用者要求依 TWUX-01 → 02 → 03 → 04 → 05 執行，先完成 01／02／04／05，待 twmd 期別索引部署後恢復並完成 03。最新可讀期只依完整、符合標的且帶留存 authority 的索引證據自動選擇；索引未知時保留手動年季查詢。
 
-- `.venv/bin/python -m pytest -q tests packages/marketdata/tests`：1479 passed、3 skipped、14 warnings，18.74 秒。
-- `pnpm exec vitest run`：27 test files／116 tests passed；`pnpm exec tsc -b`、`pnpm build` 通過，使用固定 Node 24.14.0／pnpm 9.15.9。
+- `.venv/bin/python -m pytest -q tests packages/marketdata/tests`：1489 passed、3 skipped、14 warnings，18.43 秒。重審修正首輪出現既有 SSE 時序測試失敗，單獨與完整重跑均通過。
+- `pnpm exec vitest run`：27 test files／124 tests passed；`pnpm exec tsc -b`、`pnpm build` 通過，使用固定 Node 24.14.0／pnpm 9.15.9。
+- TWUX-03 重審修正：依索引 semantic revision 隔離研究快取並重讀不匹配的 fact 快取；最新模式及期別刷新會重新取得索引；bare symbol 的未知／逾時回應保留來源原因。原始財報事實與手動期別不回退。
 - `git diff --check` 通過。各卡記錄獨立審查、相關測試、唯讀資料日期與版本。原有未提交檔案不納入本次交付。
 - PanWatch 沒有合併、重建或部署；盤中 ready／PW-14 驗收仍另行處理。TWUX-03 的 PanWatch typed client 唯讀實測：部署中 TWSE:2330 為 qualified／complete，latest_readable 2024Q4；TPEX:5347 為 unsupported／unknown。正式環境尚無多留存期樣本，這部分以已驗證的隔離上游 HTTP 測試及本專案 fixtures 覆蓋。

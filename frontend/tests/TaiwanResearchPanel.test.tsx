@@ -158,7 +158,7 @@ function financialEnvelope(
     report_scope: 'consolidated',
     qualification: { status: unsupported ? 'unsupported' : 'qualified', reason },
     coverage: { status: status === 'available' ? 'AVAILABLE' : 'MISSING', reason, latest_discovery_presence: 'missing' },
-    report,
+    report: report ? { semantic_revision_id: 'period-revision', ...report } : null,
     facts: [],
     returned_fact_count: 0,
     total_fact_count: 0,
@@ -284,7 +284,7 @@ it('lets the stock research entry select a historical fiscal year and quarter', 
   expect(calls[0][0]).toBe('2330')
   expect(calls[0][1]?.blocks).not.toContain('financial_statements')
   expect(calls[0][2]?.signal).toBeInstanceOf(AbortSignal)
-  expect(calls[1][1]).toEqual({ fiscal_year: scope.year, fiscal_quarter: scope.quarter, blocks: ['financial_statements'] })
+  expect(calls[1][1]).toEqual({ fiscal_year: scope.year, fiscal_quarter: scope.quarter, blocks: ['financial_statements'], expected_financial_revision: 'period-revision' })
   expect(calls[1][2]?.signal).toBeInstanceOf(AbortSignal)
   expect(screen.getByText(/索引來源 MOPS/)).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '指定期間' }))
@@ -319,7 +319,7 @@ it('defaults from latest retained authority even when it is outside the first mi
   render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
   await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
   const financialCall = vi.mocked(researchApi.taiwan).mock.calls[1]
-  expect(financialCall[1]).toEqual({ fiscal_year: 2024, fiscal_quarter: 4, blocks: ['financial_statements'] })
+  expect(financialCall[1]).toEqual({ fiscal_year: 2024, fiscal_quarter: 4, blocks: ['financial_statements'], expected_financial_revision: 'period-revision' })
   expect(screen.getByText(/預設期別 2024 Q4 · MOPS 留存且可讀/)).toBeTruthy()
   expect(screen.getByText(/retained-2024q4\.html/)).toBeTruthy()
 
@@ -547,7 +547,7 @@ it('clears prior-period financial data while preserving independently loaded res
   const priorFinancialResult = {
     ...mainResult,
     blocks: { financial_statements: block({ instrument_id: 'TWSE:2330', fiscal_year: initialScope.year, fiscal_quarter: initialScope.quarter,
-      qualification: { status: 'qualified' }, coverage: { status: 'AVAILABLE' }, report: { member_filename: 'old-period-report.html', semantic_revision_id: 'old-revision' }, facts: [], returned_fact_count: 0, total_fact_count: 0, truncated: false }, 'available', 'selected_record_present', { instrument_id: 'TWSE:2330', selectors: { instrument_id: 'TWSE:2330', fiscal_year: initialScope.year, fiscal_quarter: initialScope.quarter } }) },
+      qualification: { status: 'qualified' }, coverage: { status: 'AVAILABLE' }, report: { member_filename: 'old-period-report.html', semantic_revision_id: 'period-revision' }, facts: [], returned_fact_count: 0, total_fact_count: 0, truncated: false }, 'available', 'selected_record_present', { instrument_id: 'TWSE:2330', selectors: { instrument_id: 'TWSE:2330', fiscal_year: initialScope.year, fiscal_quarter: initialScope.quarter } }) },
   }
   vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => {
     if (params.blocks?.includes('financial_statements')) {
@@ -986,4 +986,121 @@ it('shows venue-matched raw-price comparison and partial source evidence', async
   expect(screen.getByText('採集與擷取時間不代表來源發布時間。')).toBeTruthy()
   expect(screen.getAllByText(/來源回傳部分資料/).length).toBeGreaterThan(0)
   expect(screen.getByText(/只比較兩邊都有資料的共同觀察日/)).toBeTruthy()
+})
+
+it('refuses financial facts whose revision contradicts the selected index authority', async () => {
+  vi.mocked(researchApi.financialPeriods).mockResolvedValue(periodIndexResult('TWSE:2330', {year:2024,quarter:4}) as any)
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => Promise.resolve(
+    params.blocks?.includes('financial_statements')
+      ? financialEnvelope('TWSE:2330',2024,4,'available','selected_record_present', {member_filename:'stale-revision-report.html',semantic_revision_id:'older-revision',capture_id:'older-capture',document_id:'older-document'})
+      : researchEnvelope('TWSE:2330',{valuation:block({observations:[]})})
+  ) as any)
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
+  expect(screen.queryByText(/stale-revision-report.html/)).toBeNull()
+})
+
+it('latest action refreshes the index after upstream evidence changes', async () => {
+  vi.mocked(researchApi.financialPeriods).mockResolvedValue(periodIndexResult('TWSE:2330',{year:2024,quarter:4}) as any)
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => Promise.resolve(
+    params.blocks?.includes('financial_statements')
+      ? financialEnvelope('TWSE:2330',params.fiscal_year!,params.fiscal_quarter!,'missing','never_collected')
+      : researchEnvelope('TWSE:2330',{valuation:block({observations:[]})})
+  ) as any)
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await waitFor(() => expect(researchApi.financialPeriods).toHaveBeenCalledTimes(1))
+  await screen.findByText(/預設期別 2024 Q4/)
+  vi.mocked(researchApi.financialPeriods).mockResolvedValue(periodIndexResult('TWSE:2330',{year:2025,quarter:4}) as any)
+  vi.setSystemTime(new Date('2026-10-09T04:01:00Z'))
+  fireEvent.click(screen.getByRole('button',{name:'指定期間'}))
+  fireEvent.click(screen.getByRole('button',{name:'最新可用'}))
+  await waitFor(() => expect(researchApi.financialPeriods).toHaveBeenCalledTimes(2))
+  await screen.findByText(/預設期別 2025 Q4/)
+  expect(vi.mocked(researchApi.financialPeriods).mock.calls[1][1]?.refresh).toBe(true)
+  expect(vi.mocked(researchApi.taiwan).mock.calls.at(-1)?.[1]).toMatchObject({ fiscal_year: 2025, fiscal_quarter: 4 })
+})
+
+it('preserves the classified timeout for a supported bare-symbol request', async () => {
+  vi.mocked(researchApi.financialPeriods).mockResolvedValue({
+    instrument_id:'2330',endpoint:'/api/v1/financial-statement-periods',index_status:'error',reason:'index_timeout',
+    selectors:{instrument_id:'2330',report_scope:'consolidated',statement:null,limit:40},index:null,
+    error:{code:'index_timeout',http_status:503},
+  } as any)
+  vi.mocked(researchApi.taiwan).mockResolvedValue(researchEnvelope('TWSE:2330',{valuation:block({observations:[]})}) as any)
+  render(<TaiwanResearchPanel symbol="2330" market="TW" open />)
+  await screen.findByText(/留存期別索引讀取逾時/)
+  expect(screen.queryByText(/期別索引標的或選擇條件與本次查詢不符/)).toBeNull()
+})
+
+it('refreshes unknown index evidence while preserving the manually selected period', async () => {
+  vi.mocked(researchApi.financialPeriods).mockResolvedValueOnce(
+    periodIndexResult('TWSE:2330', defaultFiscalScope(), 'unknown', 'index_not_initialized') as any,
+  ).mockResolvedValue(periodIndexResult('TWSE:2330', { year: 2024, quarter: 4 }) as any)
+  vi.mocked(researchApi.taiwan).mockResolvedValue(researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) }) as any)
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText(/留存期別索引尚未完成初始化/)
+  fireEvent.click(screen.getByRole('button', { name: '指定期間' }))
+  fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2025' } })
+  fireEvent.change(screen.getByRole('combobox', { name: '財報季度' }), { target: { value: '2' } })
+  fireEvent.click(screen.getByRole('button', { name: '重新載入期別' }))
+  await screen.findByText(/索引來源 MOPS/)
+  expect((screen.getByRole('combobox', { name: '財報年度' }) as HTMLSelectElement).value).toBe('2025')
+  expect((screen.getByRole('combobox', { name: '財報季度' }) as HTMLSelectElement).value).toBe('2')
+  expect(researchApi.taiwan).toHaveBeenCalledTimes(1)
+  expect(vi.mocked(researchApi.financialPeriods).mock.calls[1][1]?.refresh).toBe(true)
+})
+
+it('shows a revision-change error without falling back to another period', async () => {
+  vi.mocked(researchApi.financialPeriods).mockResolvedValue(periodIndexResult('TWSE:2330', { year: 2024, quarter: 4 }) as any)
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => Promise.resolve(
+    params.blocks?.includes('financial_statements')
+      ? financialEnvelope('TWSE:2330', 2024, 4, 'error', 'financial_revision_changed')
+      : researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) })
+  ) as any)
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText(/財報修訂與期別索引不一致/)
+  expect(researchApi.taiwan).toHaveBeenCalledTimes(2)
+  expect(screen.getByRole('button', { name: '重新載入期別' })).toBeTruthy()
+  expect(screen.getByText(/預設期別 2024 Q4/)).toBeTruthy()
+})
+
+it('rejects an error envelope that echoes a different bare symbol', async () => {
+  vi.mocked(researchApi.financialPeriods).mockResolvedValue({
+    ...periodIndexResult('TWSE:2330', defaultFiscalScope(), 'unknown', 'index_not_initialized'),
+    instrument_id: '2454', selectors: { instrument_id: '2454' },
+  } as any)
+  vi.mocked(researchApi.taiwan).mockResolvedValue(researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) }) as any)
+  render(<TaiwanResearchPanel symbol="2330" market="TW" open />)
+  await screen.findByText(/期別索引標的或選擇條件與本次查詢不符/)
+  expect(researchApi.taiwan).toHaveBeenCalledTimes(1)
+})
+
+it('cancels an old financial response when manual mode refreshes the index revision', async () => {
+  vi.mocked(researchApi.financialPeriods).mockResolvedValueOnce(
+    periodIndexResult('TWSE:2330', defaultFiscalScope(), 'unknown', 'index_not_initialized') as any,
+  ).mockResolvedValue(periodIndexResult('TWSE:2330', { year: 2024, quarter: 4 }) as any)
+  let resolveOld!: (value: any) => void
+  const old = new Promise<any>((resolve) => { resolveOld = resolve })
+  vi.mocked(researchApi.taiwan).mockImplementation((_symbol, params) => (
+    params.blocks?.includes('financial_statements') ? old
+      : Promise.resolve(researchEnvelope('TWSE:2330', { valuation: block({ observations: [] }) }) as any)
+  ))
+  render(<TaiwanResearchPanel symbol="TWSE:2330" market="TW" open />)
+  await screen.findByText(/留存期別索引尚未完成初始化/)
+  fireEvent.click(screen.getByRole('button', { name: '指定期間' }))
+  fireEvent.change(screen.getByRole('combobox', { name: '財報年度' }), { target: { value: '2024' } })
+  fireEvent.change(screen.getByRole('combobox', { name: '財報季度' }), { target: { value: '4' } })
+  fireEvent.click(screen.getByRole('button', { name: '查詢所選期別' }))
+  await waitFor(() => expect(researchApi.taiwan).toHaveBeenCalledTimes(2))
+  fireEvent.click(screen.getByRole('button', { name: '重新載入期別' }))
+  await screen.findByText(/索引來源 MOPS/)
+  expect(vi.mocked(researchApi.taiwan).mock.calls[1][2]?.signal?.aborted).toBe(true)
+  resolveOld(financialEnvelope('TWSE:2330', 2024, 4, 'available', 'selected_record_present', {
+    member_filename: 'cancelled-old-report.html', semantic_revision_id: 'old-revision',
+  }))
+  await Promise.resolve()
+  expect(screen.queryByText(/cancelled-old-report.html/)).toBeNull()
+  expect(screen.queryByText(/財報修訂與期別索引不一致/)).toBeNull()
+  expect((screen.getByRole('combobox', { name: '財報年度' }) as HTMLSelectElement).value).toBe('2024')
+  expect(researchApi.taiwan).toHaveBeenCalledTimes(2)
 })

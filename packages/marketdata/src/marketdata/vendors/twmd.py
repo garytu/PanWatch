@@ -1457,6 +1457,7 @@ class TwmdClient:
         limit: int = 40,
         cursor: str | None = None,
         timeout_sec: float | None = None,
+        refresh: bool = False,
     ) -> TwmdFinancialStatementPeriodsRead:
         """Read one bounded page of retained report periods without probing facts."""
         if not isinstance(instrument_id, str) or not re.fullmatch(
@@ -1481,7 +1482,7 @@ class TwmdClient:
             hashlib.sha256(str(self.config.get("token") or "").encode()).hexdigest(),
             instrument_id, report_scope, statement, limit, cursor,
         )
-        cached = _financial_statement_periods_cache.get(cache_key)
+        cached = None if refresh else _financial_statement_periods_cache.get(cache_key)
         if cached is not None:
             return copy.deepcopy(cached)
         params = {
@@ -1625,6 +1626,7 @@ class TwmdClient:
         limit: int = 1000,
         today_taipei: date | None = None,
         timeout_sec: float | None = None,
+        expected_semantic_revision_id: str | None = None,
     ) -> TwmdFinancialStatementRead:
         """Read one explicit retained TWSE consolidated report and its bounded facts."""
         if not isinstance(instrument_id, str) or not re.fullmatch(r"TWSE:[0-9]{4,6}", instrument_id, re.ASCII):
@@ -1641,6 +1643,11 @@ class TwmdClient:
             raise ValueError("financial-statement statement selector is unsupported")
         if type(limit) is not int or not 1 <= limit <= 5000:
             raise ValueError("financial-statement limit must be between 1 and 5000")
+        if expected_semantic_revision_id is not None and (
+            not isinstance(expected_semantic_revision_id, str)
+            or not 1 <= len(expected_semantic_revision_id) <= 128
+        ):
+            raise ValueError("expected financial revision must be a non-empty string up to 128 characters")
         today = today_taipei or datetime.now(_TAIPEI).date()
         quarter_end = (
             date(fiscal_year, 12, 31) if fiscal_quarter == 4
@@ -1655,7 +1662,10 @@ class TwmdClient:
             instrument_id, fiscal_year, fiscal_quarter, report_scope, statement, limit,
         )
         cached = _financial_statements_cache.get(cache_key)
-        if cached is not None:
+        if cached is not None and (
+            expected_semantic_revision_id is None
+            or (cached.report is not None and cached.report.semantic_revision_id == expected_semantic_revision_id)
+        ):
             return copy.deepcopy(cached)
         params = {
             "instrument_id": instrument_id,
@@ -1678,6 +1688,13 @@ class TwmdClient:
             statement=statement,
             limit=limit,
         )
+        if expected_semantic_revision_id is not None and (
+            result.report is None or result.report.semantic_revision_id != expected_semantic_revision_id
+        ):
+            raise TwmdReadError(
+                "financial report revision no longer matches the retained-period index",
+                reason_code="financial_revision_changed",
+            )
         _financial_statements_cache.set(cache_key, copy.deepcopy(result))
         return result
 
