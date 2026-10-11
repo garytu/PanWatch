@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -92,10 +95,8 @@ def get_index_klines(index_code: str, market: MarketCode, days: int = 120) -> li
     except Exception as e:
         logger.debug(f"指數K線獲取失敗 {index_code}: {e}")
         return []
-    return [
-        KlineData(date=b.date, open=b.open, close=b.close, high=b.high, low=b.low, volume=b.volume)
-        for b in bars
-    ]
+    return [_captured_kline(b, source_contract="panwatch.marketdata.index-daily/v1")
+            for b in bars]
 
 
 @dataclass
@@ -111,6 +112,44 @@ class KlineData:
     provider: str | None = None
     adjustment_mode: str | None = None
     volume_unit: str | None = None
+    source_contract: str | None = None
+    content_sha256: str | None = None
+    capture_id: str | None = None
+    receipt_at_utc: str | None = None
+    source_available_at_utc: str | None = None
+    timeframe: str = "day"
+    final: bool | None = None
+
+
+def _captured_kline(bar, *, source_contract: str) -> KlineData:
+    """Attach exact normalized row identity and the time this adapter received it."""
+    value = {
+        "date": str(bar.date),
+        "open": float(bar.open),
+        "high": float(bar.high),
+        "low": float(bar.low),
+        "close": float(bar.close),
+        "volume": float(getattr(bar, "volume", 0) or 0),
+        "provider": getattr(bar, "provider", None),
+        "adjustment_mode": getattr(bar, "adjustment_mode", None),
+        "volume_unit": getattr(bar, "volume_unit", None),
+        "timeframe": getattr(bar, "timeframe", "day"),
+        "final": getattr(bar, "final", None),
+    }
+    digest = hashlib.sha256(json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+    ).encode("utf-8")).hexdigest()
+    return KlineData(
+        date=value["date"], open=value["open"], close=value["close"], high=value["high"],
+        low=value["low"], volume=value["volume"], provider=value["provider"],
+        adjustment_mode=value["adjustment_mode"], volume_unit=value["volume_unit"],
+        source_contract=source_contract if value["provider"] else None,
+        content_sha256=digest, capture_id=str(uuid.uuid4()),
+        receipt_at_utc=datetime.now(timezone.utc).isoformat(),
+        source_available_at_utc=getattr(bar, "source_available_at_utc", None),
+        timeframe=value["timeframe"],
+        final=value["final"],
+    )
 
 
 @dataclass
@@ -464,10 +503,8 @@ class KlineCollector:
                 else (max(120, int(days * 0.6)) if self.market in (MarketCode.CN, MarketCode.HK) else 1))
         want = min(max(days, 3000), 20000) if self.market in (MarketCode.CN, MarketCode.HK) else days
         bars = get_market_data().klines(symbol, market=self.market.value, days=want, min_count=need)
-        return [KlineData(date=b.date, open=b.open, close=b.close, high=b.high,
-                          low=b.low, volume=b.volume, provider=getattr(b, "provider", None),
-                          adjustment_mode=getattr(b, "adjustment_mode", None),
-                          volume_unit=getattr(b, "volume_unit", None)) for b in bars]
+        return [_captured_kline(b, source_contract="panwatch.marketdata.daily-kline/v1")
+                for b in bars]
 
     def get_technical_indicators(
         self, symbol: str = "", klines: list[KlineData] | None = None

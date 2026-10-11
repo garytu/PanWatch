@@ -1,10 +1,10 @@
 # RC-D: Immutable, session-based forward and execution outcomes
 
-Priority: P1. Status: in_progress. Owner: rc_d_worker (GPT-6 Luna/max). Ships in PR-1 after PR-0A identity/containment and PR-0B instrument/cost authority. Contract: [outcome vocabulary](../contracts/outcome-vocabulary-v1.md).
+Priority: P1. Status: completed. Owner: coordinator (worker: rc_d_worker, GPT-6 Luna/max). Ships in PR-1 after PR-0A identity/containment and PR-0B instrument/cost authority. Contract: [outcome vocabulary](../contracts/outcome-vocabulary-v1.md).
 
 ## Readiness checkpoint
 
-2026-10-11: PR-0A identity is committed (`57c12c1`); RC-B instrument/coverage authority is completed and reviewed. Dated cost adapter is available; missing subtype/tax authority must retain gross and report `cost_authority_missing` / net unavailable. No RC-D implementation has started.
+2026-10-11: PR-0A identity is committed (`57c12c1`); RC-B instrument/coverage authority is completed and reviewed. Dated cost adapter is available; missing subtype/tax authority must retain gross and report `cost_authority_missing` / net unavailable. RC-D was ready before assignment; the completion checkpoint below records the delivered local result.
 
 ## Assignment checkpoint
 
@@ -60,3 +60,21 @@ Delivered result: immutable decision references; separate fixed-horizon and exec
 Extend `tests/test_strategy_outcome_efficiency.py`, `tests/test_backtest.py`, `tests/test_pw13_evidence_inventory.py`, `tests/test_factor_eval.py`; add offline fixed-clock fixtures for full-session gaps/holidays, timestamp precision, pending→insufficient→complete retry, entry expiry, open gap, both barriers, missing cost/benchmark, corporate-action basis, v2/legacy coexistence and outcome-scheduler ordering. Run these tests plus README regression and `git diff --check`.
 
 Retained observations alone cannot prove full sessions; adapter/calendar evidence may keep some markets unavailable. Historical 3,341 rows remain legacy with original values. Storage/retry load is bounded and per-symbol bars/benchmark should be reused within a run. This is simulated research evaluation, not verified real execution or total-return performance.
+
+## Progress checkpoint
+
+2026-10-11: RC-D implementation is present in the assigned checkout. Added separate signal-forward-v2, candidate-forward-v2, and strategy-execution-v2 rows keyed by immutable decision/population/session-horizon/evaluator identity; append-only stock and benchmark attempt snapshots; captured candidate and strategy entry plans; authoritative-calendar and daily-bar provenance validation; dated costs; isolated benchmark retries; partitioned v2 statistics; and scheduler/API ordering gates. Legacy outcome rows and backtest execution behavior remain labelled with their existing calendar-day / next-open-stop-first basis. Calibration remains FROZEN; this work does not enable calibration.
+
+Runtime coverage is intentionally fail-closed. Session horizons require a covered authoritative TW/CN calendar; HK/US weekday holidays and uncovered fallback ranges remain unknown. Initial stock return support accepts raw/unadjusted bar bases; adjusted series without corporate-action source/version proof remain insufficient. Benchmark identities currently cover Taiwan-listed TWSE/TPEX instruments; unavailable benchmark evidence never invalidates the archived stock result. Missing dated cost authority preserves gross return and leaves net unavailable. Decision captures with unverifiable point-in-time rank provenance remain explicitly UNVERIFIABLE and cannot enter calibration eligibility.
+
+## Handoff
+
+Implementation files include `src/modules/strategy/outcome_kernel.py`, `outcomes.py`, `calibration_gate.py`, `strategy_engine.py`, `entry_candidates.py`, `src/platform/persistence/models.py`, `migrations.py`, `src/platform/marketdata/collectors/kline_collector.py`, `src/platform/scheduling/trading_calendar.py`, `src/modules/research/context_scheduler.py`, `src/modules/research/api/recommendations.py`, `src/modules/portfolio/api/dashboard.py`, and the legacy backtest policy metadata in `src/modules/strategy/backtest/`. RC-D tests are in `tests/test_point_in_time_outcomes.py`; the coordinator added complementary integration coverage in `tests/test_outcome_integration.py`.
+
+Verified with a temporary SQLite database only; the production database was not opened for writes. The focused command `.venv/bin/python /private/tmp/panwatch-rc-d-pytest.py -q tests/test_point_in_time_outcomes.py tests/test_backtest.py tests/test_outcome_integration.py` passed 49 tests. The README backend regression list plus calibration/discovery suites and RC-D tests passed 244 tests with 12 existing Pydantic deprecation warnings before the final small preflight/dashboard additions. `git diff --check` passed; no commit or push was made. Parent review and its final broad regression run remain pending.
+
+## Coordinator completion checkpoint
+
+2026-10-11: Full implementation diff, callers, accepted contracts and worker handoff independently reviewed. Coordinator added real-calendar/closure identity, populated migration/schema parity, scheduler commit/failure guards, version-specific queue fairness, full unfilled/zero-return cases and benchmark deadline tests. Actual candidate refresh → projection mutation → same-day deletion → archived primary-horizon evaluation preserves the captured score, plan, hash and UNVERIFIABLE status. Coordinator also pinned validation/price/calendar/retry policy metadata, rejected benchmark numeric overflow and future/pre-close captures, completed dashboard/API frontend types and explicit legacy UI labels, and provided a reproducible disposable-DB test launcher.
+
+Final verification: full backend suite **1,620 passed / 3 skipped / 14 existing warnings**; final relevant regression **250 passed / 12 existing warnings**; frontend **127 passed / 28 files**, TypeScript and build passed. Task and staged whitespace checks passed. [Exact commands, evidence and limits](../evidence/2026-10-11-rc-d-verification.md). Task marked completed locally; RC-C is ready and not started. RC-A PR-3 remains gated, all calibration stays FROZEN, and unrelated local edits are preserved. No deployment or activation is claimed.

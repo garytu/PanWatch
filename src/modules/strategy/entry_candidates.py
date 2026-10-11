@@ -1735,6 +1735,96 @@ def refresh_entry_candidates(
             discovery_runs_by_key=discovery_runs_by_key,
         )
         db.flush()
+
+        # Preserve the candidate's actual entry plan before the mutable daily
+        # projection is committed. The capture stays UNVERIFIABLE for calibration
+        # until the candidate quote itself carries source-time evidence; the RC-D
+        # outcome populations can still evaluate later, trusted daily bars.
+        from src.modules.strategy.calibration_gate import capture_decision_snapshot
+        from src.modules.strategy.outcome_kernel import (
+            EVALUATOR_CANDIDATE_FORWARD_V2,
+            POPULATION_CANDIDATE_FORWARD_V2,
+            SCORE_VERSION_CANDIDATE_V1,
+        )
+
+        capture_by_market: dict[str, list[dict]] = {}
+        for row in candidate_rows:
+            market = (row.stock_market or "").strip().upper()
+            symbol = (row.stock_symbol or "").strip()
+            instrument_id = (row.instrument_id or "").strip()
+            if not market or not symbol:
+                continue
+            if market != "TW":
+                instrument_id = instrument_id or f"{market}:{symbol}"
+            if market == "TW" and instrument_id.split(":", 1)[0] not in {"TWSE", "TPEX"}:
+                continue
+            capture_by_market.setdefault(market, []).append({
+                "instrument_id": instrument_id,
+                "symbol": symbol,
+                "strategy_code": "candidate_forward",
+                "raw_factor_values": {
+                    "candidate_score": float(row.score or 0),
+                    "plan_quality": float(row.plan_quality or 0),
+                },
+                "ranking_value": float(row.score or 0),
+                "primary_horizon_sessions": 3,
+                "candidate_id": int(row.id),
+                "signal_run_id": None,
+                "instrument_group": row.instrument_group or "UNKNOWN",
+                "instrument_authority": row.instrument_authority or {},
+                "scan_run_ids": list(row.scan_run_ids or []),
+                "scan_run_refs": list(row.scan_run_refs or []),
+                "entry_price": row.entry_high or row.entry_low,
+                "entry_low": row.entry_low,
+                "entry_high": row.entry_high,
+                "stop_loss": row.stop_loss,
+                "target_price": row.target_price,
+                "action": row.action or "watch",
+                "is_holding_snapshot": bool(row.is_holding_snapshot),
+                "candidate_source": row.candidate_source or "",
+                "score_version": SCORE_VERSION_CANDIDATE_V1,
+                "eligibility": {
+                    "status": row.status,
+                    "action": row.action,
+                    "candidate_source": row.candidate_source,
+                    "plan_quality": row.plan_quality,
+                },
+                "point_in_time_status": "UNVERIFIABLE",
+            })
+        for market, decisions in sorted(capture_by_market.items()):
+            ordered_ids = sorted(int(item["candidate_id"]) for item in decisions)
+            token = uuid.uuid5(uuid.NAMESPACE_URL, f"{market}:{snapshot}:{ordered_ids}").hex[:12]
+            capture_scan_run_ids = sorted({
+                int(scan_id)
+                for decision in decisions
+                for scan_id in (decision.get("scan_run_ids") or [])
+                if scan_id is not None
+            })
+            refs_by_item = {
+                f"{decision['instrument_id']}|{decision['strategy_code']}":
+                    decision.get("scan_run_refs") or []
+                for decision in decisions
+            }
+            capture_decision_snapshot(
+                db,
+                capture_id=f"candidate-{market}-{snapshot}-{token}",
+                market=market,
+                session_date=snapshot,
+                decisions=decisions,
+                ranker_version=SCORE_VERSION_CANDIDATE_V1,
+                evaluation_version=EVALUATOR_CANDIDATE_FORWARD_V2,
+                population=POPULATION_CANDIDATE_FORWARD_V2,
+                decision_at_utc=utc_now(),
+                captured_at_utc=utc_now(),
+                scoring_config_payload={
+                    "score_version": SCORE_VERSION_CANDIDATE_V1,
+                    "population": POPULATION_CANDIDATE_FORWARD_V2,
+                    "candidate_ids": ordered_ids,
+                },
+                scan_run_ids=capture_scan_run_ids,
+                scan_run_refs_by_item=refs_by_item,
+                commit=False,
+            )
         items = [_format_candidate_row(row) for row in candidate_rows]
 
         db.commit()
@@ -2263,6 +2353,8 @@ def get_entry_candidate_stats(*, days: int = 30) -> dict:
             outcome_summary.append(
                 {
                     "horizon_days": int(h or 0),
+                    "population": "legacy-unlabelled",
+                    "return_basis": "legacy calendar-day close projection",
                     "source": src or "watchlist",
                     "source_label": _candidate_source_label(src or "watchlist"),
                     "total": total_eval,
@@ -2273,8 +2365,14 @@ def get_entry_candidate_stats(*, days: int = 30) -> dict:
             )
         outcome_summary.sort(key=lambda x: (x["horizon_days"], x["total"]), reverse=True)
 
+        from src.modules.strategy.outcomes import point_in_time_outcome_stats
         return {
             "window_days": days,
+            "legacy_outcome_basis": {
+                "population": "legacy-unlabelled",
+                "return_basis": "legacy calendar-day close projection",
+            },
+            "outcomes_v2": point_in_time_outcome_stats(days=days, db=db),
             "feedback": {
                 "total": total,
                 "useful": useful,

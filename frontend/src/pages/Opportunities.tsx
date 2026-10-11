@@ -570,10 +570,10 @@ export default function OpportunitiesPage() {
           </div>
         </div>
         <div className="card p-3">
-          <div className="text-[11px] text-muted-foreground">3日勝率(自動評估)</div>
+          <div className="text-[11px] text-muted-foreground">3 日歷史勝率（舊口徑）</div>
           <div className="text-[18px] font-bold mt-1">{outcome3d ? `${outcome3d.win_rate.toFixed(1)}%` : '--'}</div>
           <div className="text-[10px] text-muted-foreground mt-1">
-            自動樣本: {outcome3d ? `${outcome3d.total}` : '--'}
+            日曆日收盤口徑 · 樣本: {outcome3d ? `${outcome3d.total}` : '--'}
           </div>
         </div>
       </div>

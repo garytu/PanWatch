@@ -26,6 +26,10 @@ from src.modules.strategy.calibration_gate import (
     plan_calibration_batch,
     RANKER_VERSION_V1,
 )
+from src.modules.strategy.outcome_kernel import (
+    EVALUATOR_SIGNAL_FORWARD_V2,
+    POPULATION_SIGNAL_FORWARD_V2,
+)
 from src.platform.scheduling.timezone import to_iso_with_tz, utc_now
 from src.platform.marketdata.models import MarketCode, enabled_market_codes
 from src.platform.persistence.database import SessionLocal
@@ -1298,8 +1302,14 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
             "scan_run_ids": list(row.scan_run_ids or []),
             "scan_run_refs": list(row.scan_run_refs or []),
             "entry_price": row.entry_high or row.entry_low,
+            "entry_low": row.entry_low,
+            "entry_high": row.entry_high,
             "stop_loss": row.stop_loss,
             "target_price": row.target_price,
+            "action": row.action or "watch",
+            "is_holding_snapshot": bool(row.is_holding_snapshot),
+            "candidate_source": row.source_pool or "",
+            "score_version": RANKER_VERSION_V1,
             "regime_multiplier": breakdown.get("regime_multiplier", 1.0),
             "regime": (payload.get("market_regime") or {}).get("regime") or "default",
             "eligibility": {"eligible": row.status == "active", "status": row.status,
@@ -1344,6 +1354,8 @@ def _capture_ranking_decisions(db, *, rows: list, session_date: str) -> None:
                 session_date=session_date,
                 decisions=decisions,
                 ranker_version=RANKER_VERSION_V1,
+                evaluation_version=EVALUATOR_SIGNAL_FORWARD_V2,
+                population=POPULATION_SIGNAL_FORWARD_V2,
                 catalog_authority=catalog_authority,
                 decision_at_utc=captured_at,
                 captured_at_utc=captured_at,
@@ -2196,6 +2208,8 @@ def get_strategy_stats(*, days: int = 45) -> dict:
             by_strategy.append(
                 {
                     "strategy_code": c,
+                    "population": "legacy-unlabelled",
+                    "return_basis": "legacy calendar-day close projection",
                     "strategy_name": prof.get("name") or c,
                     "strategy_version": prof.get("version") or "v1",
                     "market": m,
@@ -2233,6 +2247,8 @@ def get_strategy_stats(*, days: int = 45) -> dict:
             by_market.append(
                 {
                     "market": (market or "CN").strip().upper(),
+                    "population": "legacy-unlabelled",
+                    "return_basis": "legacy calendar-day close projection",
                     "total": t,
                     "wins": w,
                     "win_rate": round((w / t * 100.0), 2) if t else 0.0,
@@ -2340,8 +2356,14 @@ def get_strategy_stats(*, days: int = 45) -> dict:
                     }
                 )
 
+        from src.modules.strategy.outcomes import point_in_time_outcome_stats
         return {
             "window_days": days,
+            "legacy_outcome_basis": {
+                "population": "legacy-unlabelled",
+                "return_basis": "legacy calendar-day close projection",
+            },
+            "outcomes_v2": point_in_time_outcome_stats(days=days, db=db),
             "coverage": coverage,
             "constraints": {
                 "constrained_top20": int(constrained_count),

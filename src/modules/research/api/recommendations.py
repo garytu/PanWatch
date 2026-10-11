@@ -26,6 +26,7 @@ from src.modules.strategy.strategy_engine import (
     rebalance_strategy_weights,
     refresh_strategy_signals,
 )
+from src.modules.strategy.outcomes import evaluate_point_in_time_outcomes
 from src.modules.strategy.factor_eval import evaluate_factor_ic
 from src.modules.research.signal_explain import enrich_signal
 from src.platform.persistence.database import SessionLocal
@@ -208,12 +209,26 @@ def candidate_stats(days: int = Query(30, ge=1, le=365)):
 def evaluate_candidate_outcomes(
     limit: int = Query(400, ge=20, le=2000),
     snapshot_days: int = Query(45, ge=7, le=365),
+    evaluation_revision: str | None = Query(
+        None, min_length=1, max_length=48, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$",
+        description="具名 evaluator rollout revision",
+    ),
 ):
-    return evaluate_entry_candidate_outcomes(
+    legacy = evaluate_entry_candidate_outcomes(
         horizons=(1, 3, 5, 10),
         snapshot_days=snapshot_days,
         limit=limit,
     )
+    point_in_time = evaluate_point_in_time_outcomes(
+        horizons=(1, 3, 5, 10), snapshot_days=max(snapshot_days, 180), limit=limit,
+        evaluation_revision=evaluation_revision,
+    )
+    return {
+        **legacy,
+        "population": "legacy-unlabelled",
+        "return_basis": "legacy calendar-day close projection",
+        "point_in_time_outcomes_v2": point_in_time,
+    }
 
 
 @router.get("/strategy-catalog")
@@ -342,12 +357,26 @@ def strategy_signal_refresh_status():
 def evaluate_strategy_signal_outcomes(
     limit: int = Query(800, ge=20, le=5000),
     snapshot_days: int = Query(60, ge=7, le=365),
+    evaluation_revision: str | None = Query(
+        None, min_length=1, max_length=48, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$",
+        description="具名 evaluator rollout revision",
+    ),
 ):
-    return evaluate_strategy_outcomes(
+    legacy = evaluate_strategy_outcomes(
         horizons=(1, 3, 5, 10),
         snapshot_days=snapshot_days,
         limit=limit,
     )
+    point_in_time = evaluate_point_in_time_outcomes(
+        horizons=(1, 3, 5, 10), snapshot_days=max(snapshot_days, 180), limit=limit,
+        evaluation_revision=evaluation_revision,
+    )
+    return {
+        **legacy,
+        "population": "legacy-unlabelled",
+        "return_basis": "legacy calendar-day close projection",
+        "point_in_time_outcomes_v2": point_in_time,
+    }
 
 
 @router.post("/strategy-weights/rebalance")

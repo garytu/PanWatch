@@ -221,7 +221,11 @@ class MarketData:
         req = Request(symbols=(symbol,), market=market, timeframe="day", limit=days,
                       extra=(("days", days),))
         resp = self._kline_engine.fetch(req, min_count=min_count, cache_ttl_sec=0)
-        return resp.data or []
+        bars = resp.data or []
+        for bar in bars:
+            if not getattr(bar, "provider", None) and resp.vendor:
+                bar.provider = resp.vendor
+        return bars
 
     def intraday_klines(self, symbol: str, *, market: str = "TW", timeframe: str = "1m", limit: int = 270) -> list[Bar]:
         """按 priority 主備取盤中分K。返回 list[Bar]。"""
@@ -266,11 +270,18 @@ class MarketData:
             from marketdata.vendors.kline import fetch_eastmoney_kline
             bars = fetch_eastmoney_kline(secid, days)
             if bars:
+                for bar in bars:
+                    if not getattr(bar, "provider", None):
+                        bar.provider = "eastmoney"
                 return bars
         tsym = INDEX_TENCENT.get(c) or INDEX_TENCENT.get(c.upper())
         if tsym:
             from marketdata.vendors.kline import fetch_tencent_kline_raw
-            return fetch_tencent_kline_raw(tsym, days)
+            bars = fetch_tencent_kline_raw(tsym, days)
+            for bar in bars:
+                if not getattr(bar, "provider", None):
+                    bar.provider = "tencent"
+            return bars
         return []
 
     def capital_flow(

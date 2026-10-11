@@ -17,6 +17,7 @@ from src.modules.strategy.strategy_engine import (
     rebalance_strategy_weights,
     refresh_strategy_signals,
 )
+from src.modules.strategy.outcomes import evaluate_point_in_time_outcomes
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,28 @@ class ContextMaintenanceScheduler:
                 strategy_stats.get("skipped_not_due", 0),
                 strategy_stats.get("skipped_no_price", 0),
             )
+            with kline_source("outcome_eval"):
+                v2_stats = await asyncio.to_thread(
+                    evaluate_point_in_time_outcomes,
+                    horizons=(1, 3, 5, 10),
+                    snapshot_days=180,
+                    limit=1200,
+                )
+            logger.log(
+                logging.INFO if v2_stats.get("attempted", 0) else logging.DEBUG,
+                "[上下文維護] RC-D point-in-time 結果完成: decisions=%s created=%s attempted=%s complete=%s pending=%s insufficient=%s ambiguous=%s benchmark_attempts=%s",
+                v2_stats.get("decisions", 0), v2_stats.get("created", 0),
+                v2_stats.get("attempted", 0), v2_stats.get("completed", 0),
+                v2_stats.get("pending", 0), v2_stats.get("insufficient", 0),
+                v2_stats.get("ambiguous", 0), v2_stats.get("benchmarks_attempted", 0),
+            )
+            if (not v2_stats.get("committed") or v2_stats.get("error")
+                    or v2_stats.get("skipped_running")):
+                logger.error(
+                    "[上下文維護] RC-D 評估未成功提交，跳過調權與校準: error=%s skipped_running=%s",
+                    v2_stats.get("error"), v2_stats.get("skipped_running", False),
+                )
+                return
             rebalance = await asyncio.to_thread(
                 rebalance_strategy_weights,
                 window_days=45,
@@ -160,11 +183,35 @@ class ContextMaintenanceScheduler:
             snapshot_days=60,
             limit=1200,
         )
-        agent_stats, candidate_stats, strategy_eval_stats = await asyncio.gather(
+        point_in_time_task = asyncio.to_thread(
+            evaluate_point_in_time_outcomes,
+            horizons=(1, 3, 5, 10),
+            snapshot_days=180,
+            limit=1200,
+        )
+        agent_stats, candidate_stats, strategy_eval_stats, point_in_time_stats = await asyncio.gather(
             agent_task,
             candidate_task,
             strategy_eval_task,
+            point_in_time_task,
         )
+        committed = bool(
+            point_in_time_stats.get("committed")
+            and not point_in_time_stats.get("error")
+            and not point_in_time_stats.get("skipped_running")
+        )
+        if not committed:
+            return {
+                "agent_predictions": agent_stats,
+                "entry_candidates": candidate_stats,
+                "strategy_outcomes": strategy_eval_stats,
+                "point_in_time_outcomes_v2": point_in_time_stats,
+                "post_evaluation_calibration_skipped": True,
+                "post_evaluation_calibration_skip_reason": (
+                    "evaluation_commit_missing" if not point_in_time_stats.get("skipped_running")
+                    else "evaluation_already_running"
+                ),
+            }
         # Outcome transaction must complete before any cohort seal: rebalance runs after evaluation.
         strategy_rebalance_stats = await asyncio.to_thread(
             rebalance_strategy_weights,
@@ -181,8 +228,10 @@ class ContextMaintenanceScheduler:
             "agent_predictions": agent_stats,
             "entry_candidates": candidate_stats,
             "strategy_outcomes": strategy_eval_stats,
+            "point_in_time_outcomes_v2": point_in_time_stats,
             "strategy_rebalance": strategy_rebalance_stats,
             "factor_calibration": factor_calibration_stats,
+            "post_evaluation_calibration_skipped": False,
         }
 
     async def _refresh_opportunities_job(self):

@@ -1,5 +1,5 @@
 import { fetchAPI } from './client'
-import type { StrategySignalItem } from './recommendations'
+import type { PointInTimeOutcomeStats, StrategySignalItem } from './recommendations'
 
 type QueryValue = string | number | boolean | null | undefined
 
@@ -223,6 +223,8 @@ export interface DashboardOverviewResponse {
     risk_positions: number
     win_rate_3d?: number | null
     win_sample_3d: number
+    win_rate_3d_population?: 'legacy-unlabelled'
+    win_rate_3d_basis?: string
     errors_24h: number
   }
   portfolio: {
@@ -246,6 +248,8 @@ export interface DashboardOverviewResponse {
     hot_topics: DashboardTopicItem[]
   }
   strategy: {
+    legacy_outcome_basis?: { population: 'legacy-unlabelled'; return_basis: string }
+    outcomes_v2?: PointInTimeOutcomeStats
     coverage: Record<string, any>
     factor_stats: Record<string, any>
     by_market: Array<Record<string, any>>

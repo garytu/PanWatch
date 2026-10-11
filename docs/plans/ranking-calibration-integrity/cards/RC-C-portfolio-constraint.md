@@ -1,6 +1,10 @@
 # RC-C: Unsaturated ranking and stable TW instrument constraints
 
-Priority: P1. Status: pending. Ships in PR-2 after PR-0A, PR-0B and PR-1. Contract: [ranking/calibration sections 5–6](../contracts/ranking-vocabulary-v1.md).
+Priority: P1. Status: ready. Ships in PR-2 after PR-0A, PR-0B and PR-1. Contract: [ranking/calibration sections 5–6](../contracts/ranking-vocabulary-v1.md).
+
+## Readiness checkpoint
+
+2026-10-11: PR-0A identity, RC-B and RC-D are completed in the current checkout. RC-D reviewed verification is recorded in [the evidence report](../evidence/2026-10-11-rc-d-verification.md). RC-C is ready and unassigned; implementation requires a separate user request. Calibration remains FROZEN.
 
 ## Problem and delivered result
 

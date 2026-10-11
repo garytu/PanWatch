@@ -29,6 +29,29 @@ from src.modules.strategy.backtest.data_adapter import PriceBar, first_index_aft
 
 logger = logging.getLogger(__name__)
 
+LEGACY_OUTCOME_POLICY_METADATA = {
+    "backtest_execution_v1": {
+        "population": "legacy-backtest-execution",
+        "entry_rule": "next-available-session-open",
+        "exit_rule": "for each overnight bar: check stop open/low, then target open/high, then trading-session horizon close",
+        "same_bar_policy": "legacy stop-first check order; a low-stop check precedes target-open gap check",
+        "horizon_basis": "available daily bars / trading sessions",
+        "cost_basis": "legacy CostModel and configured sizer",
+    },
+    "calendar_horizon_return_v1": {
+        "population": "legacy-calendar-horizon-return",
+        "entry_rule": "supplied signal entry_price",
+        "exit_rule": "last available daily close on or before signal_date plus calendar days",
+        "horizon_basis": "calendar days",
+        "provenance": "legacy helper; no point-in-time source validation",
+    },
+    "point_in_time_v2_comparison": {
+        "forward": "next-session-close entry and h-th following exchange-session close",
+        "execution": "three-session limit entry, gap-first exits, same-bar dual touch is ambiguous",
+        "population": "separate immutable v2 populations",
+    },
+}
+
 
 @dataclass(frozen=True)
 class Signal:
@@ -301,11 +324,14 @@ def _corporate_action_metadata(
             ),
             "numerical_results_adjusted": False,
         }
-    return {"corporate_actions": instruments}
+    return {
+        "outcome_policies": copy.deepcopy(LEGACY_OUTCOME_POLICY_METADATA),
+        "corporate_actions": instruments,
+    }
 
 
 def horizon_return(signal: Signal, bars: list[PriceBar], horizon_days: int) -> float | None:
-    """復刻 strategy_engine.evaluate_strategy_outcomes 口徑,用於交叉驗證。
+    """Legacy calendar-day close projection; see LEGACY_OUTCOME_POLICY_METADATA.
 
     base = signal.entry_price;target_day = signal_date + horizon_days(自然日);
     outcome = 最近 <= target_day 的收盤價;return% = (outcome-base)/base*100。

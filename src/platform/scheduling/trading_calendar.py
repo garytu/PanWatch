@@ -24,9 +24,10 @@ from __future__ import annotations
 from src.platform.marketdata.models import enabled_market_codes
 
 import asyncio
+import hashlib
 import logging
-from datetime import date, datetime, timedelta
 import json
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -329,6 +330,62 @@ def market_calendar_context(market, d: date | datetime | None = None) -> dict:
         "coverage_start": covered_range[0].isoformat() if covered_range else None,
         "coverage_end": covered_range[1].isoformat() if covered_range else None,
         "next_trading_day": next_day.isoformat() if next_day else None,
+    }
+
+
+def market_calendar_evidence(market, start: date, end: date) -> dict:
+    """Return a versioned calendar identity only for an authoritative covered range.
+
+    Weekend-only HK/US and uncovered or fallback CN/TW ranges intentionally stay
+    unverifiable for point-in-time outcome evaluation.
+    """
+    from src.platform.marketdata.models import MarketCode, MARKETS
+
+    code = _to_market_code(market)
+    market_def = MARKETS.get(code) if code else None
+    timezone = market_def.timezone if market_def else _FALLBACK_TZ
+    if code == MarketCode.TW:
+        dates, covered_range, source = _TW_TRADING_DATES, _TW_RANGE, "TWSE annual schedule"
+    elif code == MarketCode.CN:
+        dates, covered_range, source = _CN_TRADING_DATES, _CN_RANGE, "Sina trade-date history"
+    else:
+        dates, covered_range, source = None, None, ""
+    covered = bool(
+        dates and covered_range and covered_range[0] <= start <= end <= covered_range[1]
+    )
+    if not covered:
+        return {
+            "status": "unknown", "calendar_version": "", "source": source,
+            "timezone": timezone, "confidence": "UNKNOWN",
+            "coverage_start": covered_range[0].isoformat() if covered_range else None,
+            "coverage_end": covered_range[1].isoformat() if covered_range else None,
+        }
+    payload = {
+        "market": code.value,
+        "source": source,
+        "timezone": timezone,
+        "coverage_start": covered_range[0].isoformat(),
+        "coverage_end": covered_range[1].isoformat(),
+        "dates": sorted(day.isoformat() for day in dates),
+    }
+    if code == MarketCode.TW:
+        # This explicit local closure list participates in is_trading_day(). Keep it
+        # in the calendar identity so an edited setting cannot silently reuse a prior
+        # expected-session projection.
+        from src.platform.runtime.config import Settings
+        payload["extra_closed_dates"] = sorted({
+            item.strip() for item in Settings().tw_extra_closed_dates.split(",") if item.strip()
+        })
+    return {
+        "status": "known",
+        "calendar_version": hashlib.sha256(json.dumps(
+            payload, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")).hexdigest(),
+        "source": source,
+        "timezone": timezone,
+        "confidence": "OFFICIAL",
+        "coverage_start": payload["coverage_start"],
+        "coverage_end": payload["coverage_end"],
     }
 
 

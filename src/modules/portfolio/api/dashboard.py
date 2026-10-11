@@ -394,6 +394,8 @@ def get_dashboard_overview(
             "risk_positions": len(risk_items),
             "win_rate_3d": win_rate_3d,
             "win_sample_3d": sample_3d,
+            "win_rate_3d_population": "legacy-unlabelled",
+            "win_rate_3d_basis": "legacy calendar-day close projection",
             "errors_24h": error_24h,
         },
         "portfolio": {
@@ -413,6 +415,15 @@ def get_dashboard_overview(
             "hot_topics": hot_topics,
         },
         "strategy": {
+            "legacy_outcome_basis": stats.get("legacy_outcome_basis") or {
+                "population": "legacy-unlabelled",
+                "return_basis": "legacy calendar-day close projection",
+            },
+            "outcomes_v2": stats.get("outcomes_v2") or {
+                "basis": "versioned outcome statistics unavailable",
+                "window_days": 45,
+                "partitions": [],
+            },
             "coverage": stats.get("coverage") or {},
             "factor_stats": stats.get("factor_stats") or {},
             "by_market": stats.get("by_market") or [],

@@ -854,6 +854,120 @@ class StrategyOutcome(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class StrategyOutcomeV2(Base):
+    """Versioned, decision-linked signal/candidate/execution outcome projection.
+
+    Stock facts become immutable when evaluation_status reaches COMPLETE or
+    AMBIGUOUS. Benchmark fields are an independently retryable annotation.
+    """
+
+    __tablename__ = "strategy_outcomes_v2"
+    __table_args__ = (
+        UniqueConstraint(
+            "decision_snapshot_id", "outcome_population_id", "horizon_sessions",
+            "evaluation_version", name="uq_strategy_outcome_v2_decision_population_horizon_version",
+        ),
+        Index("ix_strategy_outcome_v2_market_status", "stock_market", "evaluation_status"),
+        Index("ix_strategy_outcome_v2_population_horizon", "outcome_population_id", "horizon_sessions"),
+        Index("ix_strategy_outcome_v2_retry", "stock_retryable", "stock_next_retry_at"),
+        Index("ix_strategy_outcome_v2_decision", "decision_snapshot_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    decision_snapshot_id = Column(
+        String, ForeignKey("ranking_snapshot_items.decision_snapshot_id"), nullable=False
+    )
+    candidate_id = Column(Integer, nullable=True)
+    signal_run_id = Column(Integer, nullable=True)
+    strategy_code = Column(String, nullable=False, default="")
+    stock_symbol = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="")
+    instrument_id = Column(String, nullable=False, default="")
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    session_date = Column(String, nullable=False, default="")
+    decision_at_utc = Column(DateTime, nullable=True)
+    decision_score = Column(Float, nullable=True)
+    decision_capture_hash = Column(String(64), nullable=False, default="")
+    decision_payload = Column(JSON, default={})
+    decision_point_in_time_status = Column(String, nullable=False, default="UNVERIFIABLE")
+    outcome_population_id = Column(String, nullable=False, default="")
+    horizon_sessions = Column(Integer, nullable=False)
+    evaluation_version = Column(String, nullable=False, default="")
+    score_version = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
+    policy_payload = Column(JSON, default={})
+    policy_hash = Column(String(64), nullable=False, default="")
+    calendar_version = Column(String, nullable=False, default="")
+    calendar_source = Column(String, nullable=False, default="")
+    calendar_timezone = Column(String, nullable=False, default="")
+    calendar_confidence = Column(String, nullable=False, default="UNKNOWN")
+    expected_session_dates = Column(JSON, default=[])
+    entry_status = Column(String, nullable=False, default="PENDING")
+    evaluation_status = Column(String, nullable=False, default="PENDING")
+    barrier_order = Column(String, nullable=False, default="NONE")
+    benchmark_status = Column(String, nullable=False, default="PENDING")
+    reason_code = Column(String, nullable=False, default="")
+    cost_reason_code = Column(String, nullable=False, default="")
+    benchmark_reason_code = Column(String, nullable=False, default="")
+    entry_session_date = Column(String, nullable=True)
+    entry_timestamp = Column(DateTime, nullable=True)
+    entry_time_precision = Column(String, nullable=False, default="SESSION_ONLY")
+    exit_session_date = Column(String, nullable=True)
+    entry_price = Column(Float, nullable=True)
+    exit_price = Column(Float, nullable=True)
+    stock_gross_return_pct = Column(Float, nullable=True)
+    stock_net_return_pct = Column(Float, nullable=True)
+    stock_cost_assumption_pct = Column(Float, nullable=True)
+    stock_adjustment_mode = Column(String, nullable=False, default="")
+    quantity = Column(Integer, nullable=True)
+    lot_size = Column(Integer, nullable=True)
+    notional = Column(Float, nullable=True)
+    cost_breakdown = Column(JSON, default={})
+    benchmark_id = Column(String, nullable=True)
+    benchmark_entry_close = Column(Float, nullable=True)
+    benchmark_exit_close = Column(Float, nullable=True)
+    benchmark_gross_return_pct = Column(Float, nullable=True)
+    relative_net_percentage_points = Column(Float, nullable=True)
+    stock_input_hash = Column(String(64), nullable=True)
+    stock_facts_hash = Column(String(64), nullable=True)
+    stock_attempt_count = Column(Integer, nullable=False, default=0)
+    stock_first_attempt_at = Column(DateTime, nullable=True)
+    stock_next_retry_at = Column(DateTime, nullable=True)
+    stock_retry_deadline_at = Column(DateTime, nullable=True)
+    stock_retryable = Column(Boolean, nullable=False, default=True)
+    benchmark_attempt_count = Column(Integer, nullable=False, default=0)
+    benchmark_next_retry_at = Column(DateTime, nullable=True)
+    benchmark_retry_deadline_at = Column(DateTime, nullable=True)
+    benchmark_retryable = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class OutcomeEvaluationAttempt(Base):
+    """Append-only input and result capture for a stock or benchmark attempt."""
+
+    __tablename__ = "outcome_evaluation_attempts"
+    __table_args__ = (
+        Index("ix_outcome_attempt_outcome_kind", "outcome_id", "attempt_kind", "id"),
+        Index("ix_outcome_attempt_input_hash", "input_hash"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    outcome_id = Column(
+        Integer, ForeignKey("strategy_outcomes_v2.id", ondelete="RESTRICT"), nullable=False
+    )
+    attempt_kind = Column(String, nullable=False, default="stock")
+    attempt_number = Column(Integer, nullable=False, default=1)
+    input_hash = Column(String(64), nullable=False, default="")
+    input_snapshot = Column(JSON, default={})
+    result_status = Column(String, nullable=False, default="")
+    reason_code = Column(String, nullable=False, default="")
+    retryable = Column(Boolean, nullable=False, default=True)
+    next_retry_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class BacktestRun(Base):
     """一次可回看的策略歷史回測。"""
 
@@ -1692,8 +1806,14 @@ class RankingSnapshotItem(Base):
     raw_factor_values = Column(JSON, default={})
     factor_versions = Column(JSON, default={})
     entry_price = Column(Float, nullable=True)
+    entry_low = Column(Float, nullable=True)
+    entry_high = Column(Float, nullable=True)
     stop_loss = Column(Float, nullable=True)
     target_price = Column(Float, nullable=True)
+    action = Column(String, nullable=False, default="watch")
+    is_holding_snapshot = Column(Boolean, nullable=False, default=False)
+    candidate_source = Column(String, nullable=False, default="")
+    score_version = Column(String, nullable=False, default="")
     eligibility = Column(JSON, default={})
     ranking_value = Column(Float, nullable=True)
     primary_horizon_sessions = Column(Integer, nullable=True)

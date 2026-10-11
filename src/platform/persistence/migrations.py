@@ -2392,6 +2392,208 @@ CREATE TABLE IF NOT EXISTS instrument_cost_authorities (
         _create_index_if_missing(conn, name, statement)
 
 
+def _m129_point_in_time_outcomes(conn: Connection) -> None:
+    """Separate immutable v2 outcome populations and retain every evaluated input."""
+    for column, sql_type in (
+        ("entry_low", "REAL"),
+        ("entry_high", "REAL"),
+        ("action", "TEXT NOT NULL DEFAULT 'watch'"),
+        ("is_holding_snapshot", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("candidate_source", "TEXT NOT NULL DEFAULT ''"),
+        ("score_version", "TEXT NOT NULL DEFAULT ''"),
+    ):
+        _add_column_if_missing(
+            conn,
+            "ranking_snapshot_items",
+            column,
+            f"ALTER TABLE ranking_snapshot_items ADD COLUMN {column} {sql_type}",
+        )
+
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS strategy_outcomes_v2 (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  decision_snapshot_id TEXT NOT NULL,
+  candidate_id INTEGER,
+  signal_run_id INTEGER,
+  strategy_code TEXT NOT NULL DEFAULT '',
+  stock_symbol TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT '',
+  instrument_id TEXT NOT NULL DEFAULT '',
+  instrument_group TEXT NOT NULL DEFAULT 'UNKNOWN',
+  instrument_authority TEXT DEFAULT '{}',
+  session_date TEXT NOT NULL DEFAULT '',
+  decision_at_utc DATETIME,
+  decision_score REAL,
+  decision_capture_hash TEXT NOT NULL DEFAULT '',
+  decision_payload TEXT DEFAULT '{}',
+  decision_point_in_time_status TEXT NOT NULL DEFAULT 'UNVERIFIABLE',
+  outcome_population_id TEXT NOT NULL DEFAULT '',
+  horizon_sessions INTEGER NOT NULL,
+  evaluation_version TEXT NOT NULL DEFAULT '',
+  score_version TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  policy_payload TEXT DEFAULT '{}',
+  policy_hash TEXT NOT NULL DEFAULT '',
+  calendar_version TEXT NOT NULL DEFAULT '',
+  calendar_source TEXT NOT NULL DEFAULT '',
+  calendar_timezone TEXT NOT NULL DEFAULT '',
+  calendar_confidence TEXT NOT NULL DEFAULT 'UNKNOWN',
+  expected_session_dates TEXT DEFAULT '[]',
+  entry_status TEXT NOT NULL DEFAULT 'PENDING',
+  evaluation_status TEXT NOT NULL DEFAULT 'PENDING',
+  barrier_order TEXT NOT NULL DEFAULT 'NONE',
+  benchmark_status TEXT NOT NULL DEFAULT 'PENDING',
+  reason_code TEXT NOT NULL DEFAULT '',
+  cost_reason_code TEXT NOT NULL DEFAULT '',
+  benchmark_reason_code TEXT NOT NULL DEFAULT '',
+  entry_session_date TEXT,
+  entry_timestamp DATETIME,
+  entry_time_precision TEXT NOT NULL DEFAULT 'SESSION_ONLY',
+  exit_session_date TEXT,
+  entry_price REAL,
+  exit_price REAL,
+  stock_gross_return_pct REAL,
+  stock_net_return_pct REAL,
+  stock_cost_assumption_pct REAL,
+  stock_adjustment_mode TEXT NOT NULL DEFAULT '',
+  quantity INTEGER,
+  lot_size INTEGER,
+  notional REAL,
+  cost_breakdown TEXT DEFAULT '{}',
+  benchmark_id TEXT,
+  benchmark_entry_close REAL,
+  benchmark_exit_close REAL,
+  benchmark_gross_return_pct REAL,
+  relative_net_percentage_points REAL,
+  stock_input_hash TEXT,
+  stock_facts_hash TEXT,
+  stock_attempt_count INTEGER NOT NULL DEFAULT 0,
+  stock_first_attempt_at DATETIME,
+  stock_next_retry_at DATETIME,
+  stock_retry_deadline_at DATETIME,
+  stock_retryable BOOLEAN NOT NULL DEFAULT 1,
+  benchmark_attempt_count INTEGER NOT NULL DEFAULT 0,
+  benchmark_next_retry_at DATETIME,
+  benchmark_retry_deadline_at DATETIME,
+  benchmark_retryable BOOLEAN NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_outcome_v2_decision FOREIGN KEY (decision_snapshot_id)
+    REFERENCES ranking_snapshot_items(decision_snapshot_id),
+  CONSTRAINT uq_strategy_outcome_v2_decision_population_horizon_version
+    UNIQUE(decision_snapshot_id, outcome_population_id, horizon_sessions, evaluation_version)
+)
+"""))
+    _add_column_if_missing(
+        conn, "strategy_outcomes_v2", "stock_adjustment_mode",
+        "ALTER TABLE strategy_outcomes_v2 ADD COLUMN stock_adjustment_mode TEXT NOT NULL DEFAULT ''",
+    )
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS outcome_evaluation_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  outcome_id INTEGER NOT NULL,
+  attempt_kind TEXT NOT NULL DEFAULT 'stock',
+  attempt_number INTEGER NOT NULL DEFAULT 1,
+  input_hash TEXT NOT NULL DEFAULT '',
+  input_snapshot TEXT DEFAULT '{}',
+  result_status TEXT NOT NULL DEFAULT '',
+  reason_code TEXT NOT NULL DEFAULT '',
+  retryable BOOLEAN NOT NULL DEFAULT 1,
+  next_retry_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_outcome_attempt_parent FOREIGN KEY (outcome_id)
+    REFERENCES strategy_outcomes_v2(id) ON DELETE RESTRICT
+)
+"""))
+    for name, statement in (
+        ("ix_strategy_outcome_v2_market_status",
+         "CREATE INDEX ix_strategy_outcome_v2_market_status ON strategy_outcomes_v2(stock_market, evaluation_status)"),
+        ("ix_strategy_outcome_v2_population_horizon",
+         "CREATE INDEX ix_strategy_outcome_v2_population_horizon ON strategy_outcomes_v2(outcome_population_id, horizon_sessions)"),
+        ("ix_strategy_outcome_v2_retry",
+         "CREATE INDEX ix_strategy_outcome_v2_retry ON strategy_outcomes_v2(stock_retryable, stock_next_retry_at)"),
+        ("ix_strategy_outcome_v2_decision",
+         "CREATE INDEX ix_strategy_outcome_v2_decision ON strategy_outcomes_v2(decision_snapshot_id)"),
+        ("ix_outcome_attempt_outcome_kind",
+         "CREATE INDEX ix_outcome_attempt_outcome_kind ON outcome_evaluation_attempts(outcome_id, attempt_kind, id)"),
+        ("ix_outcome_attempt_input_hash",
+         "CREATE INDEX ix_outcome_attempt_input_hash ON outcome_evaluation_attempts(input_hash)"),
+    ):
+        _create_index_if_missing(conn, name, statement)
+
+    conn.execute(text("""
+CREATE TRIGGER IF NOT EXISTS trg_outcome_attempt_no_update
+BEFORE UPDATE ON outcome_evaluation_attempts
+BEGIN SELECT RAISE(ABORT, 'outcome attempts are append-only'); END
+"""))
+    conn.execute(text("""
+CREATE TRIGGER IF NOT EXISTS trg_outcome_attempt_no_delete
+BEFORE DELETE ON outcome_evaluation_attempts
+BEGIN SELECT RAISE(ABORT, 'outcome attempts are append-only'); END
+"""))
+    conn.execute(text("""
+CREATE TRIGGER IF NOT EXISTS trg_outcome_v2_terminal_stock_immutable
+BEFORE UPDATE ON strategy_outcomes_v2
+WHEN (OLD.evaluation_status IN ('COMPLETE', 'AMBIGUOUS') OR
+      (OLD.evaluation_status = 'INSUFFICIENT_DATA' AND OLD.stock_retryable = 0)) AND (
+  NEW.decision_snapshot_id IS NOT OLD.decision_snapshot_id OR
+  NEW.candidate_id IS NOT OLD.candidate_id OR
+  NEW.signal_run_id IS NOT OLD.signal_run_id OR
+  NEW.strategy_code IS NOT OLD.strategy_code OR
+  NEW.stock_symbol IS NOT OLD.stock_symbol OR
+  NEW.stock_market IS NOT OLD.stock_market OR
+  NEW.instrument_id IS NOT OLD.instrument_id OR
+  NEW.instrument_group IS NOT OLD.instrument_group OR
+  NEW.instrument_authority IS NOT OLD.instrument_authority OR
+  NEW.session_date IS NOT OLD.session_date OR
+  NEW.decision_at_utc IS NOT OLD.decision_at_utc OR
+  NEW.decision_score IS NOT OLD.decision_score OR
+  NEW.decision_capture_hash IS NOT OLD.decision_capture_hash OR
+  NEW.decision_payload IS NOT OLD.decision_payload OR
+  NEW.decision_point_in_time_status IS NOT OLD.decision_point_in_time_status OR
+  NEW.outcome_population_id IS NOT OLD.outcome_population_id OR
+  NEW.horizon_sessions IS NOT OLD.horizon_sessions OR
+  NEW.evaluation_version IS NOT OLD.evaluation_version OR
+  NEW.score_version IS NOT OLD.score_version OR
+  NEW.policy_version IS NOT OLD.policy_version OR
+  NEW.policy_payload IS NOT OLD.policy_payload OR
+  NEW.policy_hash IS NOT OLD.policy_hash OR
+  NEW.calendar_version IS NOT OLD.calendar_version OR
+  NEW.calendar_source IS NOT OLD.calendar_source OR
+  NEW.calendar_timezone IS NOT OLD.calendar_timezone OR
+  NEW.calendar_confidence IS NOT OLD.calendar_confidence OR
+  NEW.expected_session_dates IS NOT OLD.expected_session_dates OR
+  NEW.entry_status IS NOT OLD.entry_status OR
+  NEW.evaluation_status IS NOT OLD.evaluation_status OR
+  NEW.barrier_order IS NOT OLD.barrier_order OR
+  NEW.reason_code IS NOT OLD.reason_code OR
+  NEW.cost_reason_code IS NOT OLD.cost_reason_code OR
+  NEW.entry_session_date IS NOT OLD.entry_session_date OR
+  NEW.entry_timestamp IS NOT OLD.entry_timestamp OR
+  NEW.entry_time_precision IS NOT OLD.entry_time_precision OR
+  NEW.exit_session_date IS NOT OLD.exit_session_date OR
+  NEW.entry_price IS NOT OLD.entry_price OR
+  NEW.exit_price IS NOT OLD.exit_price OR
+  NEW.stock_gross_return_pct IS NOT OLD.stock_gross_return_pct OR
+  NEW.stock_net_return_pct IS NOT OLD.stock_net_return_pct OR
+  NEW.stock_cost_assumption_pct IS NOT OLD.stock_cost_assumption_pct OR
+  NEW.stock_adjustment_mode IS NOT OLD.stock_adjustment_mode OR
+  NEW.quantity IS NOT OLD.quantity OR
+  NEW.lot_size IS NOT OLD.lot_size OR
+  NEW.notional IS NOT OLD.notional OR
+  NEW.cost_breakdown IS NOT OLD.cost_breakdown OR
+  NEW.stock_input_hash IS NOT OLD.stock_input_hash OR
+  NEW.stock_facts_hash IS NOT OLD.stock_facts_hash OR
+  NEW.stock_attempt_count IS NOT OLD.stock_attempt_count OR
+  NEW.stock_first_attempt_at IS NOT OLD.stock_first_attempt_at OR
+  NEW.stock_retryable IS NOT OLD.stock_retryable OR
+  NEW.stock_next_retry_at IS NOT OLD.stock_next_retry_at OR
+  NEW.stock_retry_deadline_at IS NOT OLD.stock_retry_deadline_at
+)
+BEGIN SELECT RAISE(ABORT, 'terminal stock outcome facts are immutable'); END
+"""))
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(101, "agent_config_kind_and_visibility", _m101_agent_config_kind),
     Migration(102, "backfill_agent_kind_data", _m102_backfill_agent_kind),
@@ -2421,6 +2623,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(126, "assistant_task_events", _m126_assistant_task_events),
     Migration(127, "calibration_integrity", _m127_calibration_integrity),
     Migration(128, "discovery_coverage", _m128_discovery_coverage),
+    Migration(129, "point_in_time_outcomes", _m129_point_in_time_outcomes),
 )
 
 

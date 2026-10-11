@@ -1,6 +1,6 @@
 # PanWatch Ranking & Calibration Integrity 計劃（V1.3）
 
-建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**PR-0A 已提交；RC-B 已完成本地實作與驗證；RC-D in_progress**。下列 execution board 為最新交付狀態；未啟用 calibration。
+建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**PR-0A 已提交；RC-B、RC-D 已完成本地實作與驗證；RC-C ready**。下列 execution board 為最新交付狀態；未啟用 calibration。
 
 目標：分開 discovery universe、ranking reference、signal-forward outcome、simulated execution outcome 與 calibration cohort；每筆決策可按當時 inputs 重現，同一 cohort 不會因排程重試持續改 weight。
 
@@ -39,10 +39,10 @@ The user's explicit `execute RC-B` request promotes RC-B from the initial pendin
 | PR-0A decision identity prerequisite | completed | coordinator | capture/sealed-catalog regression verified |
 | RC-A full card / PR-3 restart | in_progress | prior work | RC-B, RC-D, RC-C; no activation claim |
 | RC-B | completed | coordinator (worker: rc_b_worker) | PR-0A identity completed; reviewed and verified |
-| RC-D | in_progress | rc_d_worker (GPT-6 Luna/max) | PR-0A identity and RC-B completed |
-| RC-C | pending | unassigned | PR-0A identity, RC-B, RC-D |
+| RC-D | completed | coordinator (worker: rc_d_worker) | PR-0A identity and RC-B completed; reviewed and verified |
+| RC-C | ready | unassigned | PR-0A identity, RC-B, RC-D completed |
 
-RC-B completion evidence: [2026-10-11 review and verification](evidence/2026-10-11-rc-b-verification.md). The user requested `execute rc-d` on 2026-10-11; RC-D is assigned in the current checkout on `codex/rc-d-point-in-time-outcomes`. Prerequisite regressions: immutable capture/sealed catalog — 11 passed; dated cost/capture identity — 2 passed. RC-C and RC-A PR-3 remain dependency-gated. Unrelated local files are preserved; calibration remains contained.
+RC-B completion evidence: [2026-10-11 review and verification](evidence/2026-10-11-rc-b-verification.md). The user requested `execute rc-d` on 2026-10-11; RC-D is locally implemented, independently reviewed and verified on `codex/rc-d-point-in-time-outcomes`. [RC-D verification evidence](evidence/2026-10-11-rc-d-verification.md): backend full suite 1,620 passed / 3 skipped; final relevant regression 250 passed; frontend 127 passed, type check and build passed. RC-C is now ready but has not started. RC-A PR-3 remains gated on RC-C and readiness/shadow evidence. Unrelated local files are preserved; calibration remains FROZEN. Local completion is not deployment or activation.
 
 | card | 內容 | PR / 依賴 |
 | --- | --- | --- |
@@ -102,13 +102,13 @@ PR-0A 凍結會留下現有 drifted weights，這是明示 baseline，不是修�
 | Selection / rank consumers | cap按instrument、duplicate不占budget；tie在constraint前稳定；UI/fallback/AI score version一致 |
 | Rollout / cold start | ALL与未達floor市場保持SHADOW；回退FROZEN不刪audit；window以decision/exit而非created_at |
 
-Backend 相關 regression（按 card 擴充後執行）：
+Backend 相關 regression（按 card 擴充後執行；本地請用 `tests/run_isolated_pytest.py` 綁定 disposable DB，避免共享 fixture 建表到正式 DB）：
 
 ```sh
-.venv/bin/python -m pytest -q tests/test_factor_calibration.py tests/test_factor_calibration_loop.py tests/test_factor_eval.py tests/test_factor_scoring_weights.py tests/test_factor_weights.py tests/test_factors_api.py tests/test_strategy_outcome_efficiency.py tests/test_strategy_signal_candidate_identity.py tests/test_backtest.py tests/test_paper_trading_position.py tests/test_paper_trading_allocation.py tests/test_discovery_routing.py tests/test_taiwan_discovery.py tests/test_pw13_evidence_inventory.py packages/marketdata/tests/test_twmd.py
+.venv/bin/python tests/run_isolated_pytest.py -q tests/test_factor_calibration.py tests/test_factor_calibration_loop.py tests/test_factor_eval.py tests/test_factor_scoring_weights.py tests/test_factor_weights.py tests/test_factors_api.py tests/test_strategy_outcome_efficiency.py tests/test_strategy_signal_candidate_identity.py tests/test_backtest.py tests/test_paper_trading_position.py tests/test_paper_trading_allocation.py tests/test_discovery_routing.py tests/test_taiwan_discovery.py tests/test_pw13_evidence_inventory.py packages/marketdata/tests/test_twmd.py
 ```
 
-新增 integration fixture/module 覆蓋 v2 migrations、service containment、scheduler ordering、atomic concurrency、run linkage 與 dashboard selection；現有 test 名稱不代表新能力已測。`evaluate_once` 現將 strategy evaluation 與 rebalance 併行，須改為 outcome commit 完成後才 sealed cohort/calibration，且仍由 service gate 防並行 caller。
+新增 integration fixture/module 覆蓋 v2 migrations、service containment、scheduler ordering、atomic concurrency、run linkage 與 dashboard selection；現有 test 名稱不代表新能力已測。`evaluate_once` 與 scheduled evaluation 已等待 v2 outcome commit 成功後才呼叫 rebalance/calibration；失敗、沒有 commit 或另一輪執行中時跳過後續呼叫，service gate 仍保持 FROZEN。
 
 Frontend 在 `frontend/`：`pnpm exec vitest run src/components/DiscoveryPanel.test.tsx` + PR新增 dashboard/opportunities tests、`pnpm exec tsc -b`、`pnpm build`。每PR需 `git diff --check`，若計畫仍untracked，用 `git diff --no-index --check /dev/null <file>` 檢查新檔。文件修訂只驗證本地 links、契約一致性與 whitespace；不宣稱已執行上述 implementation tests。
 

@@ -671,6 +671,18 @@ def test_refresh_persists_exact_runs_across_database_reopen_and_empty_failure(tm
     engine.dispose()
     with Session(bind=engine) as reopened:
         frozen = [_discovery_run_detail(reopened, reopened.get(DiscoveryRun, ref["scan_run_id"])) for ref in refs]
+        sealed = reopened.query(RankingSnapshotItem).filter_by(
+            outcome_population_id="candidate-forward-v2",
+        ).one()
+        sealed_id = sealed.decision_snapshot_id
+        sealed_facts = (sealed.capture_hash, sealed.ranking_value, sealed.entry_low,
+                        sealed.entry_high, sealed.stop_loss, sealed.target_price,
+                        sealed.action, sealed.candidate_id, sealed.scan_run_refs)
+        assert sealed.point_in_time_status == "UNVERIFIABLE"
+        projection = reopened.get(EntryCandidate, sealed.candidate_id)
+        projection.score = -999
+        projection.entry_high = 9999
+        reopened.commit()
         for detail, ref in zip(frozen, refs):
             assert detail["manifest_hash"] == ref["manifest_hash"]
             assert detail["items"][0]["instrument_id"] == "TWSE:2330"
@@ -682,6 +694,11 @@ def test_refresh_persists_exact_runs_across_database_reopen_and_empty_failure(tm
     assert len(quote_calls) == 1
     engine.dispose()
     with Session(bind=engine) as reopened:
+        assert reopened.query(EntryCandidate).filter_by(snapshot_date="2026-10-10").count() == 0
+        archived = reopened.query(RankingSnapshotItem).filter_by(decision_snapshot_id=sealed_id).one()
+        assert (archived.capture_hash, archived.ranking_value, archived.entry_low,
+                archived.entry_high, archived.stop_loss, archived.target_price,
+                archived.action, archived.candidate_id, archived.scan_run_refs) == sealed_facts
         latest = reopened.query(DiscoveryRun).filter_by(scan_run_key="empty-failure").one()
         detail = _discovery_run_detail(reopened, latest)
         assert detail["manifest"]["error_reason"] == "catalog_error"
@@ -689,6 +706,41 @@ def test_refresh_persists_exact_runs_across_database_reopen_and_empty_failure(tm
         assert detail["items"] == []
         for old in frozen:
             assert _discovery_run_detail(reopened, reopened.get(DiscoveryRun, old["scan_run_id"]))["manifest_hash"] == old["manifest_hash"]
+    # The outcome producer joins the archive after the daily candidate is gone.
+    from src.modules.strategy import outcomes
+    from src.modules.strategy.outcome_kernel import sha256_json
+    from src.platform.persistence.models import StrategyOutcomeV2
+    monkeypatch.setattr(outcomes, "SessionLocal", lambda: Session(bind=engine, expire_on_commit=False))
+    sessions = ["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-19"]
+    monkeypatch.setattr(outcomes, "_expected_sessions", lambda market, day, count: (
+        sessions[:count], {"status": "known", "calendar_version": "fixture-calendar",
+                           "source": "fixture", "timezone": "Asia/Taipei", "confidence": "OFFICIAL"},
+    ))
+    bars = []
+    for day in sessions:
+        content = dict(date=day, open=100.0, high=101.0, low=99.0, close=100.0,
+                       volume=1000.0, provider="fixture", adjustment_mode="raw",
+                       volume_unit="shares", timeframe="day")
+        bars.append(dict(content, content_sha256=sha256_json(content), capture_id=day,
+                         source_contract="fixture/daily-v1", receipt_at_utc=f"{day}T06:00:00+00:00"))
+    monkeypatch.setattr(outcomes, "_bars_for_decision", lambda *args: bars)
+    monkeypatch.setattr(outcomes, "_benchmark_attempt_payload", lambda *args, **kwargs: (
+        {"reason_code": "fixture unavailable"}, "UNAVAILABLE", "fixture unavailable", False,
+    ))
+    evaluation = outcomes.evaluate_point_in_time_outcomes(
+        horizons=(1,), now=datetime(2026, 10, 20, 11, tzinfo=timezone.utc),
+    )
+    assert evaluation["committed"] is True, evaluation
+    with Session(bind=engine) as reopened:
+        forward = reopened.query(StrategyOutcomeV2).filter_by(
+            decision_snapshot_id=sealed_id, outcome_population_id="candidate-forward-v2",
+            horizon_sessions=3,
+        ).one()
+        assert forward.evaluation_status == "COMPLETE"
+        assert forward.stock_gross_return_pct == 0.0
+        assert forward.decision_score == sealed_facts[1]
+        assert forward.decision_capture_hash == sealed_facts[0]
+        assert forward.decision_point_in_time_status == "UNVERIFIABLE"
     engine.dispose()
 
 

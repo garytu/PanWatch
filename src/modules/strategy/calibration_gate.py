@@ -613,8 +613,14 @@ def _decision_content(row: dict, *, market: str, session_date: str,
         "eligibility": row.get("eligibility") or {},
         "ranking_value": row.get("ranking_value"),
         "entry_price": row.get("entry_price"),
+        "entry_low": row.get("entry_low"),
+        "entry_high": row.get("entry_high"),
         "stop_loss": row.get("stop_loss"),
         "target_price": row.get("target_price"),
+        "action": str(row.get("action") or "watch"),
+        "is_holding_snapshot": bool(row.get("is_holding_snapshot", False)),
+        "candidate_source": str(row.get("candidate_source") or ""),
+        "score_version": str(row.get("score_version") or ""),
         "regime_multiplier": row.get("regime_multiplier", 1.0),
         "candidate_id": row.get("candidate_id"),
         "signal_run_id": row.get("signal_run_id"),
@@ -665,6 +671,7 @@ def _resolve_capture_revision(db, *, capture_id: str, hashes: list[str]) -> tupl
 
 def capture_decision_snapshot(db, **capture) -> dict:
     """Keep a failed capture from leaking its header/items into a later caller commit."""
+    commit = bool(capture.pop("commit", True))
     connection = db.connection()
     # Python's legacy SQLite transaction mode does not BEGIN on SELECT. Without
     # an outer transaction, releasing a SAVEPOINT would prematurely commit it.
@@ -673,7 +680,10 @@ def capture_decision_snapshot(db, **capture) -> dict:
     with db.begin_nested():
         result = _capture_decision_snapshot(db, **capture)
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except Exception:
         db.rollback()
         raise
@@ -847,8 +857,14 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
             eligibility=content["eligibility"],
             ranking_value=content["ranking_value"],
             entry_price=content["entry_price"],
+            entry_low=content["entry_low"],
+            entry_high=content["entry_high"],
             stop_loss=content["stop_loss"],
             target_price=content["target_price"],
+            action=content["action"],
+            is_holding_snapshot=content["is_holding_snapshot"],
+            candidate_source=content["candidate_source"],
+            score_version=content["score_version"],
             regime_multiplier=content["regime_multiplier"],
             candidate_id=content["candidate_id"],
             signal_run_id=content["signal_run_id"],
