@@ -1,10 +1,14 @@
 # RC-C: Unsaturated ranking and stable TW instrument constraints
 
-Priority: P1. Status: ready. Ships in PR-2 after PR-0A, PR-0B and PR-1. Contract: [ranking/calibration sections 5–6](../contracts/ranking-vocabulary-v1.md).
+Priority: P1. Status: in_progress. Owner: rc_c_worker (GPT-6 Luna/max). Ships in PR-2 after PR-0A, PR-0B and PR-1. Contract: [ranking/calibration sections 5–6](../contracts/ranking-vocabulary-v1.md).
 
 ## Readiness checkpoint
 
 2026-10-11: PR-0A identity, RC-B and RC-D are completed in the current checkout. RC-D reviewed verification is recorded in [the evidence report](../evidence/2026-10-11-rc-d-verification.md). RC-C is ready and unassigned; implementation requires a separate user request. Calibration remains FROZEN.
+
+## Assignment checkpoint
+
+2026-10-11: User explicitly requested `execute rc-c`. Board and card were ready; PR-0A identity, RC-B and RC-D are completed. Capture/sealed-catalog prerequisite regression: 11 passed / 66 deselected. Assigned to rc_c_worker (GPT-6 Luna/max) in the current checkout on `codex/rc-c-ranking-constraints`; no worktree is created. Unrelated edits and untracked files are preserved. Calibration remains FROZEN; RC-A PR-3 is outside this assignment.
 
 ## Problem and delivered result
 

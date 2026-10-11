@@ -1,6 +1,6 @@
 # PanWatch Ranking & Calibration Integrity 計劃（V1.3）
 
-建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**PR-0A 已提交；RC-B、RC-D 已完成本地實作與驗證；RC-C ready**。下列 execution board 為最新交付狀態；未啟用 calibration。
+建立／修訂日期：2026-10-10（Asia/Taipei）。狀態：**PR-0A 已提交；RC-B、RC-D 已完成本地實作與驗證；RC-C in_progress**。下列 execution board 為最新交付狀態；未啟用 calibration。
 
 目標：分開 discovery universe、ranking reference、signal-forward outcome、simulated execution outcome 與 calibration cohort；每筆決策可按當時 inputs 重現，同一 cohort 不會因排程重試持續改 weight。
 
@@ -40,9 +40,9 @@ The user's explicit `execute RC-B` request promotes RC-B from the initial pendin
 | RC-A full card / PR-3 restart | in_progress | prior work | RC-B, RC-D, RC-C; no activation claim |
 | RC-B | completed | coordinator (worker: rc_b_worker) | PR-0A identity completed; reviewed and verified |
 | RC-D | completed | coordinator (worker: rc_d_worker) | PR-0A identity and RC-B completed; reviewed and verified |
-| RC-C | ready | unassigned | PR-0A identity, RC-B, RC-D completed |
+| RC-C | in_progress | rc_c_worker (GPT-6 Luna/max) | PR-0A identity, RC-B, RC-D completed |
 
-RC-B completion evidence: [2026-10-11 review and verification](evidence/2026-10-11-rc-b-verification.md). The user requested `execute rc-d` on 2026-10-11; RC-D is locally implemented, independently reviewed and verified on `codex/rc-d-point-in-time-outcomes`. [RC-D verification evidence](evidence/2026-10-11-rc-d-verification.md): backend full suite 1,620 passed / 3 skipped; final relevant regression 250 passed; frontend 127 passed, type check and build passed. RC-C is now ready but has not started. RC-A PR-3 remains gated on RC-C and readiness/shadow evidence. Unrelated local files are preserved; calibration remains FROZEN. Local completion is not deployment or activation.
+RC-B completion evidence: [2026-10-11 review and verification](evidence/2026-10-11-rc-b-verification.md). The user requested `execute rc-d` on 2026-10-11; RC-D is locally implemented, independently reviewed and verified on `codex/rc-d-point-in-time-outcomes`. [RC-D verification evidence](evidence/2026-10-11-rc-d-verification.md): backend full suite 1,620 passed / 3 skipped; final relevant regression 250 passed; frontend 127 passed, type check and build passed. The user requested `execute rc-c` on 2026-10-11; RC-C is assigned to rc_c_worker (GPT-6 Luna/max) on `codex/rc-c-ranking-constraints`. RC-A PR-3 remains gated on RC-C and readiness/shadow evidence. Unrelated local files are preserved; calibration remains FROZEN. Local completion is not deployment or activation.
 
 | card | 內容 | PR / 依賴 |
 | --- | --- | --- |
