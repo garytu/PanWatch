@@ -66,6 +66,53 @@ Playwright version, or set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to an installed Chro
 executable. Taiwan chart exports render twmd OHLCV locally and include the historical
 date, currency, volume unit and adjustment mode.
 
+### Docker startup
+
+The image defaults to `TZ=Asia/Taipei`. Taiwan providers already default to twmd,
+and their HTTP dependencies, timezone data and Chinese fonts are included.
+twmd remains a separate service; its addresses and tokens are supplied at runtime.
+The frontend is served by PanWatch in Docker, so `frontend/.env.local` and
+`PANWATCH_API_TARGET` are only needed for the Vite development server.
+
+Build the current checkout:
+
+```sh
+docker build -t panwatch:local .
+```
+
+For twmd reachable through the host on query port 8000 and control port 9200:
+
+```sh
+docker run -d \
+  --name panwatch \
+  --add-host=host.docker.internal:host-gateway \
+  -p 8001:8000 \
+  -v panwatch_data:/app/data \
+  --env-file .env \
+  -e PANWATCH_PORT=8000 \
+  -e TWMD_BASE_URL=http://host.docker.internal:8000 \
+  -e TWMD_CONTROL_BASE_URL=http://host.docker.internal:9200 \
+  panwatch:local
+```
+
+Open `http://localhost:8001`. The host port avoids twmd's port 8000; PanWatch
+continues listening on port 8000 inside its own container. Explicit address and
+port flags override local-development values in `.env`; keep query/control tokens
+in that private file. On Linux, twmd must listen on an interface reachable from
+the Docker host gateway, rather than only `127.0.0.1`.
+
+For twmd containers on a shared Docker network, add `--network <network-name>`
+and replace the two addresses with their actual service names, for example
+`http://query-service:8000` and `http://control-service:9200`. This connects
+directly to the service ports even if a published host port is bound to loopback.
+Remote services use their reachable
+URLs. The image deliberately does not fix either address or embed credentials.
+
+If you change the internal port with `PANWATCH_PORT`, update the container side
+of `-p` as well; the image health check follows the same setting as the server.
+Chromium is downloaded to `/app/data/playwright` on first startup, so the data
+volume and outbound network access are needed for chart exports.
+
 `TW_DATA_PROVIDER=external` selects the older `/quotes?symbols=...` protocol and
 FinMind daily history. Native twmd integration is the default.
 
