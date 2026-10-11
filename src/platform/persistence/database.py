@@ -1,16 +1,17 @@
 import json
 import logging
 import os
-import shutil
+import sqlite3
+import tempfile
 import time
 from datetime import datetime
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, inspect as sa_inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from src.platform.persistence.migrations import (
-    has_pending_migrations,
+    pending_migration_versions,
     run_versioned_migrations,
 )
 
@@ -82,14 +83,17 @@ def init_db():
 
 
 def _init_db_once() -> None:
+    with engine.connect() as conn:
+        reasons = _pending_migration_work(conn)
+    if reasons:
+        # Back up before the first mutation, including create_all() on an existing DB.
+        _backup_db_before_migration(reasons)
     Base.metadata.create_all(bind=engine)
     _migrate(engine)
     _migrate_old_providers(engine)
     _migrate_settings_to_models(engine)
     _migrate_positions_to_accounts(engine)
     _migrate_remove_stock_enabled(engine)
-    if has_pending_migrations(engine):
-        _backup_db_before_migration()
     run_versioned_migrations(engine)
 
 
@@ -120,6 +124,96 @@ def _has_table(conn, table: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def _row_count(conn, table: str) -> int:
+    try:
+        return int(conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0)
+    except Exception:
+        return 0
+
+
+def _is_fresh_database(conn) -> bool:
+    """A missing, empty, or table-less database needs no pre-migration backup."""
+    try:
+        if not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) == 0:
+            return True
+    except OSError:
+        return True
+    return not sa_inspect(conn).get_table_names()
+
+
+def _pending_migration_work(conn) -> list[str]:
+    """What init_db would change, using the same guards as the migration functions.
+
+    Only SELECTs run here, so deciding whether a backup is required cannot itself
+    modify the database.
+    """
+    if _is_fresh_database(conn):
+        return []
+
+    reasons: list[str] = []
+
+    existing = set(sa_inspect(conn).get_table_names())
+    missing = sorted(set(Base.metadata.tables) - existing)
+    if missing:
+        reasons.append(f"create_all: {', '.join(missing)}")
+
+    for table, column, _sql in _LEGACY_ADD_COLUMN_MIGRATIONS:
+        if not _has_column(conn, table, column):
+            reasons.append(f"add column {table}.{column}")
+
+    if not _has_table(conn, "ai_providers"):
+        for table in _LEGACY_FK_DROP_TABLES:
+            if _has_column(conn, table, "ai_provider_id"):
+                reasons.append(f"dangling FK column {table}.ai_provider_id")
+
+    for table in _LEGACY_SORT_ORDER_TABLES:
+        if _has_column(conn, table, "sort_order"):
+            if conn.execute(
+                text(
+                    f"SELECT 1 FROM {table} WHERE sort_order IS NULL OR sort_order = 0 LIMIT 1"
+                )
+            ).first():
+                reasons.append(f"backfill sort_order in {table}")
+
+    if not _has_table(conn, "suggestion_feedback"):
+        reasons.append("create table suggestion_feedback")
+
+    if _has_table(conn, "ai_providers") and _has_column(conn, "ai_providers", "base_url"):
+        reasons.append("migrate legacy ai_providers")
+
+    if _has_table(conn, "app_settings"):
+        settings = {
+            row[0]: row[1]
+            for row in conn.execute(text("SELECT key, value FROM app_settings")).fetchall()
+        }
+        if (
+            settings.get("ai_base_url")
+            and settings.get("ai_model")
+            and _row_count(conn, "ai_services") == 0
+        ):
+            reasons.append("migrate AI settings")
+        if settings.get("notify_telegram_bot_token") and _row_count(conn, "notify_channels") == 0:
+            reasons.append("migrate Telegram settings")
+        if any(key in settings for key in _LEGACY_SETTING_KEYS):
+            reasons.append("delete legacy app_settings keys")
+
+    if (
+        _has_table(conn, "accounts")
+        and _row_count(conn, "accounts") == 0
+        and _has_column(conn, "stocks", "cost_price")
+    ):
+        reasons.append("migrate positions to accounts")
+
+    if _has_table(conn, "stocks") and _has_column(conn, "stocks", "enabled"):
+        reasons.append("remove stocks.enabled")
+
+    pending = pending_migration_versions(conn)
+    if pending:
+        reasons.append(f"versioned migrations: {', '.join(str(v) for v in pending)}")
+
+    return reasons
 
 
 def _backfill_sort_order(conn, table: str) -> None:
@@ -176,109 +270,138 @@ def _drop_dangling_ai_provider_fk(conn, table: str) -> None:
             pass
 
 
-def _backup_db_before_migration() -> None:
-    """Create a timestamped sqlite backup before versioned migrations."""
+def _backup_db_before_migration(reasons: list[str]) -> str:
+    """Create a timestamped backup before the first mutation.
+
+    Uses the SQLite online-backup API on a separate source connection so committed WAL
+    content is included, which a file copy of the main database can omit. A required
+    backup failure aborts the migration instead of being logged and ignored.
+    """
     if not os.path.exists(DB_PATH):
-        return
-    try:
-        size = os.path.getsize(DB_PATH)
-        if size <= 0:
-            return
-    except Exception:
-        return
+        raise RuntimeError(f"cannot back up a missing database: {DB_PATH}")
+    if os.path.getsize(DB_PATH) == 0:
+        raise RuntimeError(f"cannot back up an empty database file: {DB_PATH}")
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_path = f"{DB_PATH}.bak.{ts}"
+    source = sqlite3.connect(DB_PATH)
     try:
-        shutil.copy2(DB_PATH, backup_path)
-        logger.info(f"資料庫遷移前備份已建立: {backup_path}")
-    except Exception as e:
-        logger.warning(f"資料庫遷移前備份失敗: {e}")
+        # Reserve a unique file exclusively, with mode 0600, before writing data.
+        # Retries within the same second must retain the original snapshot.
+        fd, backup_path = tempfile.mkstemp(
+            prefix=f"{os.path.basename(DB_PATH)}.bak.{ts}.",
+            dir=os.path.dirname(os.path.abspath(DB_PATH)),
+        )
+        os.close(fd)
+        target = sqlite3.connect(backup_path)
+        try:
+            source.backup(target)
+            # The target inherits WAL mode; checkpoint so the backup file alone is
+            # self-contained even if the process exits before closing.
+            target.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        finally:
+            target.close()
+    finally:
+        source.close()
+
+    logger.info(f"資料庫遷移前備份已建立: {backup_path} ({'; '.join(reasons)})")
+    return backup_path
+
+
+_LEGACY_SORT_ORDER_TABLES = ("stocks", "positions")
+_LEGACY_FK_DROP_TABLES = ("agent_configs", "stock_agents")
+_LEGACY_SETTING_KEYS = (
+    "ai_base_url",
+    "ai_api_key",
+    "ai_model",
+    "notify_telegram_bot_token",
+    "notify_telegram_chat_id",
+)
+
+_LEGACY_ADD_COLUMN_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
+    # Phase 1(模擬交易求真):持倉期最高價,移動停損用
+    (
+        "paper_trading_positions",
+        "highest_price",
+        "ALTER TABLE paper_trading_positions ADD COLUMN highest_price REAL",
+    ),
+    (
+        "stock_agents",
+        "schedule",
+        "ALTER TABLE stock_agents ADD COLUMN schedule TEXT DEFAULT ''",
+    ),
+    (
+        "agent_configs",
+        "ai_model_id",
+        "ALTER TABLE agent_configs ADD COLUMN ai_model_id INTEGER REFERENCES ai_models(id) ON DELETE SET NULL",
+    ),
+    (
+        "agent_configs",
+        "notify_channel_ids",
+        "ALTER TABLE agent_configs ADD COLUMN notify_channel_ids TEXT DEFAULT '[]'",
+    ),
+    (
+        "stock_agents",
+        "ai_model_id",
+        "ALTER TABLE stock_agents ADD COLUMN ai_model_id INTEGER REFERENCES ai_models(id) ON DELETE SET NULL",
+    ),
+    (
+        "stock_agents",
+        "notify_channel_ids",
+        "ALTER TABLE stock_agents ADD COLUMN notify_channel_ids TEXT DEFAULT '[]'",
+    ),
+    # Phase 3: 持倉增強
+    (
+        "stocks",
+        "invested_amount",
+        "ALTER TABLE stocks ADD COLUMN invested_amount REAL",
+    ),
+    # Phase 4: Agent 執行模式
+    (
+        "agent_configs",
+        "execution_mode",
+        "ALTER TABLE agent_configs ADD COLUMN execution_mode TEXT DEFAULT 'batch'",
+    ),
+    # Phase 4: 持倉交易風格
+    (
+        "positions",
+        "trading_style",
+        "ALTER TABLE positions ADD COLUMN trading_style TEXT DEFAULT 'swing'",
+    ),
+    # 排序欄位：關注列表/持倉拖拽排序
+    (
+        "stocks",
+        "sort_order",
+        "ALTER TABLE stocks ADD COLUMN sort_order INTEGER DEFAULT 0",
+    ),
+    (
+        "positions",
+        "sort_order",
+        "ALTER TABLE positions ADD COLUMN sort_order INTEGER DEFAULT 0",
+    ),
+    # 資料來源增強
+    (
+        "data_sources",
+        "supports_batch",
+        "ALTER TABLE data_sources ADD COLUMN supports_batch INTEGER DEFAULT 0",
+    ),
+    (
+        "data_sources",
+        "test_symbols",
+        "ALTER TABLE data_sources ADD COLUMN test_symbols TEXT DEFAULT '[]'",
+    ),
+    # Phase 5: 建議池後設資料
+    (
+        "stock_suggestions",
+        "meta",
+        "ALTER TABLE stock_suggestions ADD COLUMN meta TEXT DEFAULT '{}'",
+    ),
+)
 
 
 def _migrate(engine):
     """增量 schema 遷移（SQLite ALTER TABLE ADD COLUMN）"""
-    migrations = [
-        # Phase 1(模擬交易求真):持倉期最高價,移動停損用
-        (
-            "paper_trading_positions",
-            "highest_price",
-            "ALTER TABLE paper_trading_positions ADD COLUMN highest_price REAL",
-        ),
-        (
-            "stock_agents",
-            "schedule",
-            "ALTER TABLE stock_agents ADD COLUMN schedule TEXT DEFAULT ''",
-        ),
-        (
-            "agent_configs",
-            "ai_model_id",
-            "ALTER TABLE agent_configs ADD COLUMN ai_model_id INTEGER REFERENCES ai_models(id) ON DELETE SET NULL",
-        ),
-        (
-            "agent_configs",
-            "notify_channel_ids",
-            "ALTER TABLE agent_configs ADD COLUMN notify_channel_ids TEXT DEFAULT '[]'",
-        ),
-        (
-            "stock_agents",
-            "ai_model_id",
-            "ALTER TABLE stock_agents ADD COLUMN ai_model_id INTEGER REFERENCES ai_models(id) ON DELETE SET NULL",
-        ),
-        (
-            "stock_agents",
-            "notify_channel_ids",
-            "ALTER TABLE stock_agents ADD COLUMN notify_channel_ids TEXT DEFAULT '[]'",
-        ),
-        # Phase 3: 持倉增強
-        (
-            "stocks",
-            "invested_amount",
-            "ALTER TABLE stocks ADD COLUMN invested_amount REAL",
-        ),
-        # Phase 4: Agent 執行模式
-        (
-            "agent_configs",
-            "execution_mode",
-            "ALTER TABLE agent_configs ADD COLUMN execution_mode TEXT DEFAULT 'batch'",
-        ),
-        # Phase 4: 持倉交易風格
-        (
-            "positions",
-            "trading_style",
-            "ALTER TABLE positions ADD COLUMN trading_style TEXT DEFAULT 'swing'",
-        ),
-        # 排序欄位：關注列表/持倉拖拽排序
-        (
-            "stocks",
-            "sort_order",
-            "ALTER TABLE stocks ADD COLUMN sort_order INTEGER DEFAULT 0",
-        ),
-        (
-            "positions",
-            "sort_order",
-            "ALTER TABLE positions ADD COLUMN sort_order INTEGER DEFAULT 0",
-        ),
-        # 資料來源增強
-        (
-            "data_sources",
-            "supports_batch",
-            "ALTER TABLE data_sources ADD COLUMN supports_batch INTEGER DEFAULT 0",
-        ),
-        (
-            "data_sources",
-            "test_symbols",
-            "ALTER TABLE data_sources ADD COLUMN test_symbols TEXT DEFAULT '[]'",
-        ),
-        # Phase 5: 建議池後設資料
-        (
-            "stock_suggestions",
-            "meta",
-            "ALTER TABLE stock_suggestions ADD COLUMN meta TEXT DEFAULT '{}'",
-        ),
-    ]
     with engine.connect() as conn:
-        for table, column, sql in migrations:
+        for table, column, sql in _LEGACY_ADD_COLUMN_MIGRATIONS:
             if not _has_column(conn, table, column):
                 conn.execute(text(sql))
                 conn.commit()

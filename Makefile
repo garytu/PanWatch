@@ -69,10 +69,10 @@ else
 endif
 
 test:
-	@$(VENV_PYTHON) -m pytest tests/ -v
+	@$(VENV_PYTHON) tests/run_isolated_pytest.py tests/ -v
 
 test-notify:
-	@$(VENV_PYTHON) -m pytest tests/ -v --notify
+	@$(VENV_PYTHON) tests/run_isolated_pytest.py tests/ -v --notify
 
 # Agent 过程评测(工具选择/参数/有据性/结构化输出/动作白名单):
 #   - 结构化解析用例纯规则,直接跑

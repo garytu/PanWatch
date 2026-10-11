@@ -10,10 +10,8 @@ from sqlalchemy import create_engine, inspect as sa_inspect, text
 from sqlalchemy.orm import Session
 
 from src.platform.persistence.models import Base
-from src.platform.persistence.database import (
-    has_pending_migrations,
-    run_versioned_migrations,
-)
+from src.platform.persistence.database import run_versioned_migrations
+from src.platform.persistence.migrations import has_pending_migrations
 from src.platform.persistence.models import (
     CalibrationApplication,
     CalibrationBaseline,

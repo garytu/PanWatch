@@ -2,13 +2,24 @@
 
 預設情況下所有通知傳送函式被替換為 no-op，避免單測誤發通知。
 傳入 --notify 引數可恢復真實傳送（用於整合測試）。
+
+共享引擎在收集測試前綁定到可丟棄的測試資料庫，避免使用全域 SessionLocal 的
+用例寫入應用資料庫（data/panwatch.db）。設定 PANWATCH_TEST_DB 可指定專用資料庫。
 """
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from isolated_db import cleanup, isolate
+
+isolate()
 
 
 def pytest_itemcollected(item):
@@ -76,17 +87,18 @@ def _clear_market_caches():
 
 @pytest.fixture(autouse=True, scope="session")
 def _ensure_db_schema():
-    """確保真實 DB 引擎已建表。
+    """在隔離的測試資料庫上冪等建表,會話結束時清理。
 
-    少數用例直接用 SessionLocal 傳給 async 介面(只讀查詢),CI 全新環境的
-    data/panwatch.db 無表會報 'no such table: stocks'。這裡在會話開始時冪等建表
-    (本地已有表則無副作用),與各用例自建的記憶體庫互不影響。
+    少數用例直接用 SessionLocal 傳給 async 介面(只讀查詢),全新環境無表會報
+    'no such table: stocks'。引擎已由 conftest 在收集前綁定到可丟棄資料庫,
+    這裡只確保表存在,並與各用例自建的記憶體庫互不影響。
     """
     import src.platform.persistence.models  # noqa: F401  註冊所有 ORM 模型到 Base.metadata
     from src.platform.persistence.database import Base, engine
 
     Base.metadata.create_all(engine)
     yield
+    cleanup()
 
 
 # ---------------------------------------------------------------------------

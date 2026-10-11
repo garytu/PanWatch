@@ -2765,14 +2765,31 @@ LIMIT 1
     return int(row[0]), str(row[1]), int(row[2])
 
 
+def pending_migration_versions(conn: Connection) -> tuple[int, ...]:
+    """Read-only view of the versions that would be applied.
+
+    Unlike has_pending_migrations(), this does not create schema_migrations, so it can
+    be used to decide whether a backup is required before the first mutation.
+    """
+    try:
+        recorded = conn.execute(text("SELECT 1 FROM schema_migrations LIMIT 1")).first()
+    except Exception:
+        recorded = None
+    if recorded is None:
+        # run_versioned_migrations() will create the table and apply every migration.
+        return tuple(m.version for m in MIGRATIONS)
+    pending = []
+    for m in MIGRATIONS:
+        rec = _get_applied(conn, m.version)
+        if not rec or rec[2] != 1 or rec[1] != m.checksum:
+            pending.append(m.version)
+    return tuple(pending)
+
+
 def has_pending_migrations(engine: Engine) -> bool:
     with engine.begin() as conn:
         _ensure_schema_table(conn)
-        for m in MIGRATIONS:
-            rec = _get_applied(conn, m.version)
-            if not rec or rec[2] != 1 or rec[1] != m.checksum:
-                return True
-    return False
+        return bool(pending_migration_versions(conn))
 
 
 def run_versioned_migrations(engine: Engine) -> None:
