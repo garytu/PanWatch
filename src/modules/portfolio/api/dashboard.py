@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from src.platform.runtime.config import Settings
 from src.modules.strategy.strategy_engine import get_strategy_stats, list_strategy_signals
+from src.modules.strategy.ranking import group_instrument_rows, representative_sort_key
 from src.platform.ai.ai_failover import get_configured_failover_client
 from src.platform.persistence.database import get_db
 from src.platform.persistence.models import (
@@ -59,30 +60,21 @@ def _action_priority(item: dict) -> int:
 
 
 def _group_signals(items: list[dict]) -> list[dict]:
-    grouped: dict[str, dict] = {}
-    for row in items or []:
-        key = f"{row.get('stock_market') or 'CN'}:{row.get('stock_symbol') or ''}"
-        if ":" == key[-1]:
-            continue
-        prev = grouped.get(key)
-        if not prev:
-            row["strategy_count"] = 1
-            grouped[key] = row
-            continue
-        prev["strategy_count"] = int(prev.get("strategy_count") or 1) + 1
-        choose_next = False
-        prev_active = str(prev.get("status") or "inactive") == "active"
-        cur_active = str(row.get("status") or "inactive") == "active"
-        if cur_active and not prev_active:
-            choose_next = True
-        elif _action_priority(row) > _action_priority(prev):
-            choose_next = True
-        elif float(row.get("rank_score") or 0) > float(prev.get("rank_score") or 0):
-            choose_next = True
-        if choose_next:
-            row["strategy_count"] = int(prev.get("strategy_count") or 1)
-            grouped[key] = row
-    return list(grouped.values())
+    grouped: list[dict] = []
+    for representative, members in group_instrument_rows(list(items or [])):
+        row = dict(representative)
+        codes = {
+            str(code)
+            for member in members
+            for code in (member.get("strategy_codes") or [member.get("strategy_code")])
+            if code
+        }
+        row["strategy_codes"] = sorted(codes)
+        row["strategy_count"] = len(codes) or sum(
+            max(1, int(member.get("strategy_count") or 1)) for member in members
+        )
+        grouped.append(row)
+    return grouped
 
 
 def _summarize_topics(raw_topics) -> list[dict]:
@@ -204,21 +196,15 @@ def get_dashboard_overview(
         if str(x.get("action") or "").lower() in ("buy", "add")
         and (x.get("entry_low") is not None or x.get("entry_high") is not None)
     ]
-    executable.sort(key=lambda x: float(x.get("rank_score") or 0.0), reverse=True)
+    executable.sort(key=representative_sort_key)
     if len(executable) < int(action_limit):
         remaining = sorted(
             [x for x in ordinary_unheld if x not in executable],
-            key=lambda x: (
-                0 if str(x.get("status") or "") == "active" else 1,
-                -float(x.get("rank_score") or 0.0),
-            ),
+            key=representative_sort_key,
         )
         executable.extend(remaining[: max(0, int(action_limit) - len(executable))])
     action_items = executable[: int(action_limit)]
-    etf_opportunities.sort(
-        key=lambda x: (0 if str(x.get("action") or "").lower() in ("buy", "add") else 1,
-                       -float(x.get("rank_score") or 0.0))
-    )
+    etf_opportunities.sort(key=representative_sort_key)
     etf_opportunities = etf_opportunities[: int(action_limit)]
 
     # Risk list: held symbols with risk flags.

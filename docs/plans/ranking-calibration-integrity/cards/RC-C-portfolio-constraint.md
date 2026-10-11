@@ -1,6 +1,6 @@
 # RC-C: Unsaturated ranking and stable TW instrument constraints
 
-Priority: P1. Status: in_progress. Owner: rc_c_worker (GPT-6 Luna/max). Ships in PR-2 after PR-0A, PR-0B and PR-1. Contract: [ranking/calibration sections 5–6](../contracts/ranking-vocabulary-v1.md).
+Priority: P1. Status: completed. Owner: coordinator (worker: rc_c_worker, GPT-6 Luna/max). Ships in PR-2 after PR-0A, PR-0B and PR-1. Contract: [ranking/calibration sections 5–6](../contracts/ranking-vocabulary-v1.md).
 
 ## Readiness checkpoint
 
@@ -56,3 +56,12 @@ Delivered result: uncapped ranking_value with explicit display mapping, consiste
 Extend `tests/test_factor_scoring_weights.py`, `tests/test_strategy_signal_candidate_identity.py`, `tests/test_paper_trading_position.py`, `tests/test_paper_trading_allocation.py`; add ranking permutation/tied-reference, Dashboard/fallback dedupe and constraint-unit fixtures. Run backend regression, frontend relevant vitest/tsc/build, then `git diff --check`.
 
 Sigmoid parameters and quotas are initial engineering defaults. Average-rank ties and ordinary-EQUITY/ETF separation change selection and visibility. Shadow report is a rollout gate, not evidence of live execution or improved investment returns; DB currently has no paper trade outcome evidence.
+
+
+## Progress checkpoint and Handoff
+
+2026-10-11: rc_c_worker completed ranker-v2 mapping, tie-aware reference capture, instrument selection/ledger, consumers, migration 130 and deterministic FROZEN synthetic replay. Worker handed off for review without committing; worker targeted regression reported 186 passed. Coordinator independently reviewed the full diff and corrected raw-value frontend ordering, missing-rank fallback, exact threshold boundaries, decision identity ties, group risk visibility, nullable confidence, held-version preservation and missing-ledger duplicate demotion. ETF was restored to its separate legacy 20 ROW cap; CN/HK/US row limits remain unchanged. Coordinator added actual disposable-DB refresh/archive/atomic rollback and paper-entry integration tests.
+
+Final verification: backend **1,646 passed / 3 skipped**, ranking modules **26 passed**, frontend **129 passed**, type check/build and whitespace checks passed. [Review and verification report](../evidence/2026-10-11-rc-c-verification.md) contains exact commands, fixes and limits; [synthetic replay](../evidence/2026-10-11-rc-c-frozen-synthetic-replay.json) reports score spread, ties, filters, cap, quotas and requested sizing ratios. It is not historical PIT or realized-exposure evidence. Calibration remains **FROZEN**; no production DB migration, weight reset, activation, deployment or live execution is claimed.
+
+RC-C is completed locally. Dependencies for RC-A PR-3 implementation are satisfied; PR-3 is ready for a separate user request. Activation still requires eligible v2 cohorts, floors/confidence and readiness/shadow evidence. Unrelated working-tree files are preserved.

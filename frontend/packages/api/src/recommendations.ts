@@ -61,6 +61,9 @@ export interface EntryCandidateItem {
   snapshot_date: string
   status: string
   score: number
+  rank_score?: null
+  score_version?: 'candidate-score-v1' | string
+  ranker_version?: 'candidate-score-v1' | string
   confidence?: number | null
   action: string
   action_label: string
@@ -193,11 +196,20 @@ export interface StrategySignalItem {
   source_pool: string
   source_pool_label: string
   score: number
-  rank_score: number
+  rank_score: number | null
   confidence?: number | null
   status: string
   action: string
   action_label: string
+  ranking_value?: number | null
+  score_version?: string
+  ranker_version?: string
+  scoring_config_version?: string
+  decision_snapshot_id?: string | null
+  selected_for_portfolio?: boolean
+  selection_metadata?: Record<string, unknown>
+  strategy_count?: number
+  strategy_codes?: string[]
   signal: string
   reason: string
   evidence?: string[]
@@ -216,6 +228,9 @@ export interface StrategySignalItem {
   context_quality_score?: number | null
   score_breakdown?: {
     base_score?: number
+    candidate_score?: number | null
+    ranking_value?: number | null
+    ranker_version?: string
     alpha_score?: number
     catalyst_score?: number
     quality_score?: number
@@ -249,6 +264,7 @@ export interface StrategySignalItem {
     volume_pct_rank?: number
     relative_strength_pct?: number
     crowding_risk?: number
+    feature_values?: Record<string, number | null>
   }
   news_metric?: {
     news_count?: number
@@ -270,6 +286,8 @@ export interface StrategySignalItem {
 export interface StrategySignalsResponse {
   snapshot_date: string
   count: number
+  ranker_version?: string
+  legacy_omitted_count?: number
   items: StrategySignalItem[]
   queued?: boolean
   running?: boolean

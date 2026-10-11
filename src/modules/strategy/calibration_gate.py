@@ -512,6 +512,8 @@ def ensure_ranking_capture(db, *, capture_id: str, market: str, session_date: st
                            scan_run_refs_by_item: dict | None = None,
                            calibration_policy_version: str = CALIBRATION_POLICY_VERSION,
                            scoring_config_payload: dict | None = None,
+                           ranking_reference: dict | None = None,
+                           ranking_reference_hash: str = "",
                            commit: bool = True) -> int:
     """Create the capture row when missing; retry of a capture_id reuses the row."""
     existing = (
@@ -533,6 +535,8 @@ def ensure_ranking_capture(db, *, capture_id: str, market: str, session_date: st
         scoring_config_version=scoring_config_version,
         evaluation_version=evaluation_version,
         calibration_policy_version=calibration_policy_version,
+        ranking_reference=dict(ranking_reference or {}),
+        ranking_reference_hash=ranking_reference_hash,
         catalog_authority=dict(catalog_authority or {}),
         scan_run_ids=sorted({int(value) for value in (scan_run_ids or []) if value is not None}),
         scan_run_id=(int(scan_run_ids[0]) if scan_run_ids and len(set(scan_run_ids)) == 1 else None),
@@ -612,6 +616,7 @@ def _decision_content(row: dict, *, market: str, session_date: str,
         "exit_session_complete": row.get("exit_session_complete"),
         "eligibility": row.get("eligibility") or {},
         "ranking_value": row.get("ranking_value"),
+        "ranking_inputs": row.get("ranking_inputs") or {},
         "entry_price": row.get("entry_price"),
         "entry_low": row.get("entry_low"),
         "entry_high": row.get("entry_high"),
@@ -635,7 +640,8 @@ def _decision_content(row: dict, *, market: str, session_date: str,
     }
 
 
-def _resolve_capture_revision(db, *, capture_id: str, hashes: list[str]) -> tuple[str, int | None]:
+def _resolve_capture_revision(db, *, capture_id: str, hashes: list[str],
+                              ranking_reference_hash: str = "") -> tuple[str, int | None]:
     """Return the capture already holding exactly this payload, else the next revision.
 
     A data revision is keyed by the payload identity, so replaying the same correction
@@ -659,7 +665,10 @@ def _resolve_capture_revision(db, *, capture_id: str, hashes: list[str]) -> tupl
             .filter(RankingSnapshotItem.ranking_snapshot_id == int(snap.id))
             .all()
         )
-        if len(items) == len(wanted) and sorted(row.capture_hash or "" for row in items) == wanted:
+        if (len(items) == len(wanted)
+                and sorted(row.capture_hash or "" for row in items) == wanted
+                and str(getattr(snap, "ranking_reference_hash", "") or "")
+                == ranking_reference_hash):
             return name, int(snap.id)
     if capture_id not in used:
         return capture_id, None
@@ -700,6 +709,7 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
                               scan_run_ids: list[int] | None = None,
                               scan_run_refs_by_item: dict | None = None,
                               scoring_config_payload: dict | None = None,
+                              ranking_reference: dict | None = None,
                               population: str = POPULATION_LEGACY_UNLABELLED,
                               calibration_policy_version: str = CALIBRATION_POLICY_VERSION) -> dict:
     """Append-only capture: one header plus one immutable item per decision row.
@@ -718,6 +728,8 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
         if scoring_config_version and scoring_config_version != payload_hash:
             raise ValueError("scoring config payload does not match its version")
         scoring_config_version = payload_hash
+    ranking_reference = dict(ranking_reference or {})
+    ranking_reference_hash = _sha256(_canonical(ranking_reference))
     contents: dict[tuple, dict] = {}
     hashes: dict[tuple, str] = {}
     rows: dict[tuple, dict] = {}
@@ -777,7 +789,8 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
     if scan_run_ids is not None and sorted(set(scan_run_ids)) != captured_scan_run_ids:
         raise ValueError("capture run IDs do not match its decisions")
     chosen, matched_id = _resolve_capture_revision(
-        db, capture_id=capture_id, hashes=[value for value in hashes.values()]
+        db, capture_id=capture_id, hashes=[value for value in hashes.values()],
+        ranking_reference_hash=ranking_reference_hash,
     )
     if matched_id is not None:
         return {
@@ -786,6 +799,8 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
             "written": 0,
             "reused": len(hashes) + duplicate_rows,
             "conflicts": conflicts,
+            "scoring_config_version": scoring_config_version,
+            "ranking_reference_hash": ranking_reference_hash,
             "item_count": (
                 db.query(RankingSnapshotItem)
                 .filter(RankingSnapshotItem.ranking_snapshot_id == matched_id)
@@ -813,6 +828,8 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
         scan_run_ids=captured_scan_run_ids,
         scan_run_refs_by_item=refs_by_item,
         scoring_config_payload=scoring_config_payload,
+        ranking_reference=ranking_reference,
+        ranking_reference_hash=ranking_reference_hash,
         calibration_policy_version=calibration_policy_version,
         commit=False,
     )
@@ -856,6 +873,7 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
             factor_versions={code: content["factor_version"] for code in factors},
             eligibility=content["eligibility"],
             ranking_value=content["ranking_value"],
+            ranking_inputs=content["ranking_inputs"],
             entry_price=content["entry_price"],
             entry_low=content["entry_low"],
             entry_high=content["entry_high"],
@@ -903,9 +921,14 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
                                            ranking_snapshot_id=snapshot_id).all())
         capture.universe_hash = _sha256(_canonical(capture.universe_ids))
         # The header hash identifies the sealed payload set, so a replay can be checked.
-        capture.capture_hash = _sha256(_canonical(sorted(
+        item_hashes = [
             (row.decision_snapshot_id, row.capture_hash or "")
-            for row in db.query(RankingSnapshotItem).filter_by(ranking_snapshot_id=snapshot_id).all()
+            for row in db.query(RankingSnapshotItem).filter_by(
+                ranking_snapshot_id=snapshot_id
+            ).all()
+        ]
+        capture.capture_hash = _sha256(_canonical(sorted(
+            item_hashes + [("ranking_reference_hash", ranking_reference_hash)]
         )))
     return {
         "capture_id": chosen,
@@ -914,6 +937,8 @@ def _capture_decision_snapshot(db, *, capture_id: str, market: str, session_date
         "reused": reused,
         "conflicts": conflicts,
         "item_count": len(hashes),
+        "scoring_config_version": scoring_config_version,
+        "ranking_reference_hash": ranking_reference_hash,
     }
 
 

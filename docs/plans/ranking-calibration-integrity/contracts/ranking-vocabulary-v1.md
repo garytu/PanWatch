@@ -25,7 +25,7 @@ PR-0A 新增 append-only `ranking_snapshots`（一次 capture）與 `ranking_sna
 - `StrategySignalRun` 與舊 factor snapshot 可以繼續作為可變 UI projection；v2 outcome/calibration 只能 join 不可變 item。修訂資料須另建 capture，不能回寫舊 decision。
 - factor/quote availability 必須 `<= decision_at_utc`；事後取得或無可驗證 available time 的輸入標為 `point_in_time_status=UNVERIFIABLE`，不得進 v2 自動標定。receipt time 與 available time 分開保存。
 - 保存當次 pre-constraint、已限定數量的 reference universe id、完整 item ids/hash、market/source partition、scan run id 與 eligibility reasons；不得日後用最新 universe 重算舊 percentile。
-- `_rank_map` 改為 average rank for ties。N > 1 時 percentile = `100 * (N - average_ascending_rank) / (N - 1)`；N = 1 時為 50。未觀測值保持 missing，由 versioned scoring policy 處理，不冒充實際零值。
+- `_rank_map` 改為 average rank for ties。rank position 按所要求的排序方向編號（1 為最強、N 為最弱；`reverse=True` 時數值較大為較強），同值取其 positions 的平均。N > 1 時 percentile = `100 * (N - average_rank_position) / (N - 1)`；N = 1 時為 50。N 只計有限且已觀測的值；未觀測值保持 missing，由 versioned scoring policy 處理，不冒充實際零值。這明確化原文 `average_ascending_rank` 的 position 含義，保留既有 strongest→100 的方向。
 - PR-0A 開始 capture 的資料只有通過 RC-D producer 與 provenance 驗證後才可能合格；新 population 名称不是品質保證。UI projections 的刷新與歷史 outcome 排程不得把已知未来資料加入舊 decision。
 
 ## 3. Atomic calibration application

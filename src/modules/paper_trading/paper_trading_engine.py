@@ -20,6 +20,13 @@ from src.platform.persistence.models import (
     StrategySignalRun,
 )
 from src.modules.strategy.backtest.cost_model import CostModel, cost_model_for_market, trading_lot
+from src.modules.strategy.ranking import (
+    RANKER_VERSION_V1,
+    RANKER_VERSION_V2,
+    SCORE_VERSION_LEGACY,
+    group_instrument_rows,
+    representative_sort_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -236,15 +243,21 @@ def _serialize_trade(trade: PaperTradingTrade) -> dict:
 def _serialize_signal(sig: StrategySignalRun) -> dict:
     """將 ORM Signal 提取為 plain dict。"""
     return {
-        "id": sig.id,
-        "stock_symbol": sig.stock_symbol,
-        "stock_market": sig.stock_market,
-        "stock_name": sig.stock_name or "",
-        "strategy_code": sig.strategy_code or "",
-        "rank_score": sig.rank_score,
-        "entry_low": sig.entry_low,
-        "entry_high": sig.entry_high,
-        "action": sig.action,
+        "id": getattr(sig, "id", None),
+        "stock_symbol": getattr(sig, "stock_symbol", ""),
+        "stock_market": getattr(sig, "stock_market", ""),
+        "stock_name": getattr(sig, "stock_name", "") or "",
+        "strategy_code": getattr(sig, "strategy_code", "") or "",
+        "rank_score": getattr(sig, "rank_score", None),
+        "ranking_value": getattr(sig, "ranking_value", None),
+        "ranker_version": getattr(sig, "ranker_version", RANKER_VERSION_V1),
+        "score_version": getattr(sig, "score_version", SCORE_VERSION_LEGACY),
+        "scoring_config_version": getattr(sig, "scoring_config_version", ""),
+        "decision_snapshot_id": getattr(sig, "decision_snapshot_id", None),
+        "selected_for_portfolio": bool(getattr(sig, "selected_for_portfolio", False)),
+        "entry_low": getattr(sig, "entry_low", None),
+        "entry_high": getattr(sig, "entry_high", None),
+        "action": getattr(sig, "action", "watch"),
     }
 
 
@@ -294,6 +307,8 @@ class PaperTradingEngine:
         self, db: Session, account: PaperTradingAccount,
     ) -> tuple[int, set[tuple[str, str]], list[tuple[PaperTradingPosition, StrategySignalRun | None]]]:
         """檢查可入場的策略訊號，自動建倉。返回 (建倉數, 新建倉股票key集合, 建倉事件列表)。"""
+        from src.modules.strategy.strategy_engine import _current_candidate_identity_filter
+
         # 查詢最新活躍買入訊號
         query = (
             db.query(StrategySignalRun)
@@ -302,6 +317,7 @@ class PaperTradingEngine:
                 StrategySignalRun.action.in_(["buy", "add"]),
                 StrategySignalRun.entry_low.isnot(None),
                 StrategySignalRun.entry_high.isnot(None),
+                _current_candidate_identity_filter(),
             )
         )
         # 按投資比例排除不投入（比例為 0）的市場
@@ -309,7 +325,29 @@ class PaperTradingEngine:
         excluded = [m for m in ALL_MARKETS if alloc.get(m, 0.0) <= 0]
         if excluded:
             query = query.filter(StrategySignalRun.stock_market.notin_(excluded))
-        signals = query.order_by(StrategySignalRun.rank_score.desc()).limit(50).all()
+        latest_dates = dict(
+            db.query(StrategySignalRun.stock_market,
+                     func.max(StrategySignalRun.snapshot_date))
+            .group_by(StrategySignalRun.stock_market)
+            .all()
+        )
+        signals = []
+        for market, latest_date in sorted(latest_dates.items()):
+            if not latest_date:
+                continue
+            market_rows = query.filter(
+                StrategySignalRun.stock_market == market,
+                StrategySignalRun.snapshot_date == latest_date,
+            ).all()
+            v2_rows = [row for row in market_rows
+                       if row.ranker_version == RANKER_VERSION_V2]
+            cohort = ([row for row in v2_rows if bool(row.selected_for_portfolio)]
+                      if v2_rows else [
+                          row for row in market_rows
+                          if row.ranker_version != RANKER_VERSION_V2
+                      ])
+            signals.extend(rep for rep, _ in group_instrument_rows(cohort))
+        signals.sort(key=representative_sort_key)
         entry_events: list[tuple[PaperTradingPosition, StrategySignalRun | None]] = []
         new_keys: set[tuple[str, str]] = set()
         if not signals:
@@ -337,6 +375,7 @@ class PaperTradingEngine:
             seen.add(key)
             candidates.append(sig)
 
+        candidates = candidates[:50]
         if not candidates:
             return 0, new_keys, entry_events
 

@@ -2594,6 +2594,126 @@ BEGIN SELECT RAISE(ABORT, 'terminal stock outcome facts are immutable'); END
 """))
 
 
+def _m130_ranker_v2_portfolio_selection(conn: Connection) -> None:
+    """Persist uncapped ranker-v2 projections and immutable selection evidence."""
+    _add_column_if_missing(
+        conn, "ranking_snapshots", "ranking_reference",
+        "ALTER TABLE ranking_snapshots ADD COLUMN ranking_reference TEXT NOT NULL DEFAULT '{}'",
+    )
+    _add_column_if_missing(
+        conn, "ranking_snapshots", "ranking_reference_hash",
+        "ALTER TABLE ranking_snapshots ADD COLUMN ranking_reference_hash TEXT NOT NULL DEFAULT ''",
+    )
+    for column, sql_type in (
+        ("ranking_value", "REAL"),
+        ("score_version", "TEXT NOT NULL DEFAULT 'legacy-score-v1'"),
+        ("ranker_version", "TEXT NOT NULL DEFAULT 'ranker-v1'"),
+        ("scoring_config_version", "TEXT NOT NULL DEFAULT ''"),
+        ("decision_snapshot_id", "TEXT"),
+        ("selected_for_portfolio", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("constrained", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("constraint_reasons", "TEXT NOT NULL DEFAULT '[]'"),
+        ("selection_metadata", "TEXT NOT NULL DEFAULT '{}'"),
+    ):
+        _add_column_if_missing(
+            conn,
+            "strategy_signal_runs",
+            column,
+            f"ALTER TABLE strategy_signal_runs ADD COLUMN {column} {sql_type}",
+        )
+    _add_column_if_missing(
+        conn,
+        "ranking_snapshot_items",
+        "ranking_inputs",
+        "ALTER TABLE ranking_snapshot_items ADD COLUMN ranking_inputs TEXT NOT NULL DEFAULT '{}'",
+    )
+
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS portfolio_selection_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  selection_run_id TEXT NOT NULL,
+  capture_id TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT '',
+  instrument_group TEXT NOT NULL DEFAULT 'ALL',
+  snapshot_date TEXT NOT NULL DEFAULT '',
+  constraint_unit TEXT NOT NULL DEFAULT 'ROW',
+  ranker_version TEXT NOT NULL DEFAULT 'ranker-v1',
+  scoring_config_version TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  cap INTEGER,
+  high_risk_share REAL,
+  strategy_share REAL,
+  before_row_count INTEGER NOT NULL DEFAULT 0,
+  after_row_count INTEGER NOT NULL DEFAULT 0,
+  before_instrument_count INTEGER NOT NULL DEFAULT 0,
+  after_instrument_count INTEGER NOT NULL DEFAULT 0,
+  quota_metadata TEXT NOT NULL DEFAULT '{}',
+  decision_snapshot_ids TEXT NOT NULL DEFAULT '[]',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_portfolio_selection_run_id UNIQUE(selection_run_id)
+)
+"""))
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS portfolio_constraint_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  selection_run_id TEXT NOT NULL,
+  stock_market TEXT NOT NULL DEFAULT '',
+  snapshot_date TEXT NOT NULL DEFAULT '',
+  instrument_id TEXT NOT NULL DEFAULT '',
+  strategy_code TEXT NOT NULL DEFAULT '',
+  signal_run_id INTEGER NOT NULL,
+  decision_snapshot_id TEXT,
+  is_representative BOOLEAN NOT NULL DEFAULT 0,
+  selected_for_portfolio BOOLEAN NOT NULL DEFAULT 0,
+  constrained BOOLEAN NOT NULL DEFAULT 0,
+  reason_codes TEXT NOT NULL DEFAULT '[]',
+  constraint_unit TEXT NOT NULL DEFAULT 'ROW',
+  before_row_count INTEGER NOT NULL DEFAULT 0,
+  after_row_count INTEGER NOT NULL DEFAULT 0,
+  before_instrument_count INTEGER NOT NULL DEFAULT 0,
+  after_instrument_count INTEGER NOT NULL DEFAULT 0,
+  quota_metadata TEXT NOT NULL DEFAULT '{}',
+  ranker_version TEXT NOT NULL DEFAULT 'ranker-v1',
+  scoring_config_version TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_portfolio_ledger_run_signal UNIQUE(selection_run_id, signal_run_id),
+  CONSTRAINT fk_portfolio_ledger_run FOREIGN KEY(selection_run_id)
+    REFERENCES portfolio_selection_runs(selection_run_id) ON DELETE RESTRICT
+)
+"""))
+    for name, statement in (
+        ("ix_strategy_signal_ranker_version",
+         "CREATE INDEX ix_strategy_signal_ranker_version ON strategy_signal_runs(ranker_version, snapshot_date)"),
+        ("ix_strategy_signal_selected",
+         "CREATE INDEX ix_strategy_signal_selected ON strategy_signal_runs(snapshot_date, selected_for_portfolio)"),
+        ("ix_portfolio_selection_market_date",
+         "CREATE INDEX ix_portfolio_selection_market_date ON portfolio_selection_runs(stock_market, snapshot_date)"),
+        ("ix_portfolio_selection_capture",
+         "CREATE INDEX ix_portfolio_selection_capture ON portfolio_selection_runs(capture_id)"),
+        ("ix_portfolio_ledger_instrument",
+         "CREATE INDEX ix_portfolio_ledger_instrument ON portfolio_constraint_ledger(stock_market, instrument_id, snapshot_date)"),
+        ("ix_portfolio_ledger_decision",
+         "CREATE INDEX ix_portfolio_ledger_decision ON portfolio_constraint_ledger(decision_snapshot_id)"),
+    ):
+        _create_index_if_missing(conn, name, statement)
+
+    for table, prefix in (
+        ("portfolio_selection_runs", "portfolio selection runs"),
+        ("portfolio_constraint_ledger", "portfolio constraint ledger"),
+    ):
+        conn.execute(text(f"""
+CREATE TRIGGER IF NOT EXISTS trg_{table}_no_update
+BEFORE UPDATE ON {table}
+BEGIN SELECT RAISE(ABORT, '{prefix} are append-only'); END
+"""))
+        conn.execute(text(f"""
+CREATE TRIGGER IF NOT EXISTS trg_{table}_no_delete
+BEFORE DELETE ON {table}
+BEGIN SELECT RAISE(ABORT, '{prefix} are append-only'); END
+"""))
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(101, "agent_config_kind_and_visibility", _m101_agent_config_kind),
     Migration(102, "backfill_agent_kind_data", _m102_backfill_agent_kind),
@@ -2624,6 +2744,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(127, "calibration_integrity", _m127_calibration_integrity),
     Migration(128, "discovery_coverage", _m128_discovery_coverage),
     Migration(129, "point_in_time_outcomes", _m129_point_in_time_outcomes),
+    Migration(130, "ranker_v2_portfolio_selection", _m130_ranker_v2_portfolio_selection),
 )
 
 

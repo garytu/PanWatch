@@ -88,14 +88,14 @@ const DEFAULT_FILTERS = {
 
 const toneClass = (item: StrategySignalItem) => {
   const action = (item.action || '').toLowerCase()
-  const score = Number(item.rank_score || item.score || 0)
+  const score = item.rank_score != null ? Number(item.rank_score) : item.score_version === 'candidate-score-v1' ? Number(item.score || 0) : Number.NaN
   if (action === 'buy') {
     return 'border-rose-500/35 bg-[linear-gradient(140deg,hsl(var(--rose-500)/0.14),hsl(var(--card)/0.96),hsl(var(--card)/0.98))]'
   }
   if (action === 'add') {
     return 'border-emerald-500/35 bg-[linear-gradient(140deg,hsl(var(--emerald-500)/0.13),hsl(var(--card)/0.96),hsl(var(--card)/0.98))]'
   }
-  if (score >= 85) {
+  if (item.score_version !== 'candidate-score-v1' && score >= 85) {
     return 'border-primary/35 bg-[linear-gradient(140deg,hsl(var(--primary)/0.12),hsl(var(--card)/0.96),hsl(var(--card)/0.98))]'
   }
   return 'border-border/60 bg-card'
@@ -116,25 +116,22 @@ const displayActionLabel = (item: StrategySignalItem) => {
   return item.action_label || item.action
 }
 
-const scoreOf = (item: StrategySignalItem) => Number(item.rank_score || item.score || 0)
+const scoreOf = (item: StrategySignalItem) => item.rank_score != null
+  ? Number(item.rank_score)
+  : item.score_version === 'candidate-score-v1' ? Number(item.score || 0) : Number.NaN
+
+const scoreLabelOf = (item: StrategySignalItem) => {
+  if (item.score_version === 'candidate-score-v1') return '候選原始分'
+  if (item.ranker_version === 'ranker-v2') return '排名分 v2'
+  return '舊版排名分'
+}
 
 const actionPriority = (item: StrategySignalItem) => {
   const key = (item.action || '').toLowerCase()
-  if (key === 'buy') return 4
-  if (key === 'add') return 3
-  if (key === 'hold') return item.is_holding_snapshot ? 2 : 1
+  if (key === 'buy' || key === 'add') return 3
+  if (key === 'hold') return 2
+  if (key === 'watch') return 1
   return 0
-}
-
-const hasEntryPlan = (item: StrategySignalItem) => {
-  const breakdown = item.score_breakdown || {}
-  if (typeof breakdown.has_entry_plan === 'boolean') return breakdown.has_entry_plan
-  return toNumberOrNull(item.entry_low) != null || toNumberOrNull(item.entry_high) != null
-}
-
-const itemTimestamp = (item: StrategySignalItem) => {
-  const t = Date.parse(item.updated_at || item.created_at || '')
-  return Number.isFinite(t) ? t : 0
 }
 
 const shouldReplacePrimary = (next: StrategySignalItem, current: StrategySignalItem) => {
@@ -142,11 +139,19 @@ const shouldReplacePrimary = (next: StrategySignalItem, current: StrategySignalI
   if (activeDelta !== 0) return activeDelta > 0
   const actionDelta = actionPriority(next) - actionPriority(current)
   if (actionDelta !== 0) return actionDelta > 0
-  const entryDelta = Number(hasEntryPlan(next)) - Number(hasEntryPlan(current))
-  if (entryDelta !== 0) return entryDelta > 0
-  const scoreDelta = scoreOf(next) - scoreOf(current)
-  if (Math.abs(scoreDelta) > 0.001) return scoreDelta > 0
-  return itemTimestamp(next) > itemTimestamp(current)
+  const versionPriority = (item: StrategySignalItem) =>
+    item.ranker_version === 'ranker-v2' ? 0 : item.ranker_version === 'candidate-score-v1' ? 1 : 2
+  const versionDelta = versionPriority(next) - versionPriority(current)
+  if (versionDelta !== 0) return versionDelta < 0
+  const rankValue = (item: StrategySignalItem) => item.ranker_version === 'ranker-v2'
+    ? item.ranking_value ?? Number.NEGATIVE_INFINITY : item.rank_score ?? item.score ?? Number.NEGATIVE_INFINITY
+  const nextRank = rankValue(next)
+  const currentRank = rankValue(current)
+  if (nextRank !== currentRank) return nextRank > currentRank
+  const identity = (item: StrategySignalItem) => `${item.strategy_code || ''}:${item.instrument_id || item.stock_symbol}:${item.decision_snapshot_id || `candidate:${item.source_candidate_id ?? item.id}`}`
+  const stableNext = identity(next)
+  const stableCurrent = identity(current)
+  return stableNext < stableCurrent
 }
 
 const toSignalFromCandidate = (row: EntryCandidateItem): StrategySignalItem => {
@@ -174,7 +179,10 @@ const toSignalFromCandidate = (row: EntryCandidateItem): StrategySignalItem => {
     source_pool: source,
     source_pool_label: sourceLabel,
     score: Number(row.score || 0),
-    rank_score: Number(row.score || 0),
+    rank_score: null,
+    ranking_value: null,
+    score_version: 'candidate-score-v1',
+    ranker_version: 'candidate-score-v1',
     confidence: row.confidence ?? null,
     status: row.status || 'inactive',
     action: row.action || 'watch',
@@ -196,7 +204,7 @@ const toSignalFromCandidate = (row: EntryCandidateItem): StrategySignalItem => {
     is_holding_snapshot: !!row.is_holding_snapshot,
     context_quality_score: null,
     score_breakdown: {
-      weighted_score: Number(row.score || 0),
+      candidate_score: Number(row.score || 0),
       has_entry_plan: !!(row.entry_low != null || row.entry_high != null),
     },
     market_regime: {},
@@ -329,7 +337,9 @@ export default function OpportunitiesPage() {
           const fallback = await recommendationsApi.listEntryCandidates({
             market: req.market,
             status: 'active',
-            min_score: req.min_score,
+            // Candidate score is a separate scale. Keep the original status/action
+            // eligibility gate and do not reinterpret a rank-score threshold.
+            min_score: 0,
             limit: req.limit,
             snapshot_date: '',
             source: source === 'all' ? 'all' : source,
@@ -342,7 +352,7 @@ export default function OpportunitiesPage() {
             count: fallback.count || 0,
             items: (fallback.items || []).map(toSignalFromCandidate),
           }
-          setError('策略層請求超時，已降級展示候選快照')
+          setError('策略層請求超時，已展示候選原始分；排名分門檻在此降級模式下不可用')
         }
       }
       setItems(data.items || [])
@@ -436,7 +446,7 @@ export default function OpportunitiesPage() {
   const groupedItems = useMemo<GroupedSignal[]>(() => {
     const grouped = new Map<string, { primary: StrategySignalItem; members: StrategySignalItem[] }>()
     for (const row of items) {
-      const key = `${row.stock_market || DEFAULT_MARKET}:${row.stock_symbol}`
+      const key = `${row.stock_market || DEFAULT_MARKET}:${row.instrument_id || row.stock_symbol}`
       const prev = grouped.get(key)
       if (!prev) {
         grouped.set(key, { primary: row, members: [row] })
@@ -464,13 +474,8 @@ export default function OpportunitiesPage() {
         topScore,
       })
     }
-    out.sort((a, b) => {
-      const sourceDelta = Number(b.hasMarketScan) - Number(a.hasMarketScan)
-      if (sourceDelta !== 0) return sourceDelta
-      const scoreDelta = b.topScore - a.topScore
-      if (Math.abs(scoreDelta) > 0.001) return scoreDelta
-      return actionPriority(b.primary) - actionPriority(a.primary)
-    })
+    out.sort((a, b) => shouldReplacePrimary(a.primary, b.primary) ? -1
+      : shouldReplacePrimary(b.primary, a.primary) ? 1 : 0)
     return out
   }, [items])
 
@@ -529,7 +534,7 @@ export default function OpportunitiesPage() {
             機會頁
           </h1>
           <p className="text-[12px] text-muted-foreground mt-1">
-            市場池優先，候選必須具備可執行入場計劃
+            依排名排序，建倉候選需具備可執行入場計劃
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -671,12 +676,12 @@ export default function OpportunitiesPage() {
           <Select value={minScore} onValueChange={setMinScore}>
             <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="90">評分90+</SelectItem>
-              <SelectItem value="80">評分80+</SelectItem>
-              <SelectItem value="70">評分70+</SelectItem>
-              <SelectItem value="60">評分60+</SelectItem>
-              <SelectItem value="50">評分50+</SelectItem>
-              <SelectItem value="0">評分不過濾</SelectItem>
+              <SelectItem value="90">排名分90+</SelectItem>
+              <SelectItem value="80">排名分80+</SelectItem>
+              <SelectItem value="70">排名分70+</SelectItem>
+              <SelectItem value="60">排名分60+</SelectItem>
+              <SelectItem value="50">排名分50+</SelectItem>
+              <SelectItem value="0">排名分不過濾</SelectItem>
             </SelectContent>
           </Select>
           <Button size="sm" className="h-8 text-[12px]" onClick={load} disabled={loading}>
@@ -692,6 +697,11 @@ export default function OpportunitiesPage() {
         <div className="card p-3 mb-4 text-[12px] text-amber-500 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" />
           {error}
+        </div>
+      )}
+      {items.length > 0 && (
+        <div className="mb-3 text-[10px] text-muted-foreground">
+          分數尺度：{Array.from(new Set(items.map(scoreLabelOf))).join(' / ')}
         </div>
       )}
 
@@ -713,6 +723,7 @@ export default function OpportunitiesPage() {
           const targetPrice = toNumberOrNull(item.target_price) ?? toNumberOrNull(sourcePlan.target_price)
           const stateKey = `${item.snapshot_date}:${group.key}`
           const inWatchlist = watchlist.has(group.key)
+            || watchlist.has(`${item.stock_market || DEFAULT_MARKET}:${item.stock_symbol}`)
           const breakdown = item.score_breakdown || {}
           const marketRegime = item.market_regime || {}
           const crossFeature = item.cross_feature || {}
@@ -744,8 +755,8 @@ export default function OpportunitiesPage() {
                         {displayActionLabel(item)}
                       </span>
                     </div>
-                    <div className={`text-[12px] font-mono mt-1 ${Number(item.rank_score || item.score || 0) >= 80 ? 'text-primary' : 'text-muted-foreground'}`}>
-                      評分 {Math.round(item.rank_score || item.score || 0)}
+                    <div className={`text-[12px] font-mono mt-1 ${item.score_version !== 'candidate-score-v1' && scoreOf(item) >= 80 ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {scoreLabelOf(item)} {Number.isFinite(scoreOf(item)) ? Math.round(scoreOf(item)) : '--'}
                     </div>
                     {item.ai_score != null && (
                       <div className="mt-1 flex items-center justify-end gap-1">
@@ -757,7 +768,7 @@ export default function OpportunitiesPage() {
                     )}
                   </div>
                 </div>
-                {item.stock_market === 'TW' && <div className="mt-1 text-[10px] text-muted-foreground">{item.instrument_group === 'ETF' ? 'ETF 機會' : item.instrument_group === 'EQUITY' ? '普通股' : '分類未知'}</div>}
+                {item.stock_market === 'TW' && <div className="mt-1 text-[10px] text-muted-foreground">{item.instrument_group === 'ETF' ? 'ETF 機會' : item.instrument_group === 'EQUITY' ? '普通股' : '分類未知'}{item.instrument_group === 'EQUITY' && item.selection_metadata?.constraint_unit === 'INSTRUMENT' ? ` · 台股普通股上限 ${String(item.selection_metadata.cap ?? 5)} 檔，已選 ${String(item.selection_metadata.after_instrument_count ?? 0)} 檔` : ''}</div>}
                 <div className="mt-2 text-[12px] text-foreground line-clamp-2">{item.signal || item.reason || '--'}</div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                   <div>入場: {formatEntryDisplay(item.action, entryLow, entryHigh)}</div>

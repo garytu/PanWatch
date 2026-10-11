@@ -26,6 +26,7 @@ from src.platform.persistence.models import (
     Stock,
     StockSuggestion,
 )
+from src.modules.strategy.ranking import group_instrument_rows
 from marketdata.types import TaiwanDiscoveryPool
 from src.modules.strategy.discovery_coverage import (
     create_discovery_run,
@@ -1320,6 +1321,9 @@ def _format_candidate_row(row: EntryCandidate) -> dict:
         "snapshot_date": row.snapshot_date,
         "status": row.status,
         "score": round(float(row.score or 0), 2),
+        "rank_score": None,
+        "score_version": "candidate-score-v1",
+        "ranker_version": "candidate-score-v1",
         "confidence": round(float(row.confidence or 0), 3) if row.confidence is not None else None,
         "action": row.action,
         "action_label": row.action_label,
@@ -1902,19 +1906,14 @@ def list_entry_candidates(
             elif h == "unheld":
                 q = q.filter(EntryCandidate.is_holding_snapshot.is_(False))
             q = q.filter(EntryCandidate.score >= float(min_score or 0))
-            rows = (
-                q.order_by(
-                    case(
-                        (EntryCandidate.candidate_source == "market_scan", 0),
-                        (EntryCandidate.candidate_source == "mixed", 1),
-                        else_=2,
-                    ),
-                    EntryCandidate.score.desc(),
-                    EntryCandidate.updated_at.desc(),
-                )
-                .limit(max(20, int(limit) * 4))
-                .all()
-            )
+            rows = q.order_by(
+                EntryCandidate.score.desc(),
+                EntryCandidate.stock_market.asc(),
+                EntryCandidate.instrument_group.asc(),
+                EntryCandidate.instrument_id.asc(),
+                EntryCandidate.stock_symbol.asc(),
+                EntryCandidate.id.asc(),
+            ).all()
             return snapshot, rows
         finally:
             db.close()
@@ -1925,8 +1924,11 @@ def list_entry_candidates(
     if tag:
         rows = [r for r in rows if tag in (r.strategy_tags or [])]
 
-    rows = rows[: max(1, int(limit))]
-    items = [_format_candidate_row(r) for r in rows]
+    # Resolve aliases with the common strategy/dashboard/paper representative key
+    # before the page limit. Candidate scores remain explicitly versioned as raw.
+    representatives = [rep for rep, _ in group_instrument_rows(rows)]
+    representatives = representatives[:max(1, int(limit))]
+    items = [_format_candidate_row(r) for r in representatives]
     return {"snapshot_date": snapshot, "count": len(items), "items": items}
 
 

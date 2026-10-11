@@ -228,11 +228,28 @@ def _compact_research_candidate(item: dict[str, Any]) -> dict[str, Any]:
     payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
     source_meta = payload.get("source_meta") if isinstance(payload.get("source_meta"), dict) else {}
     quote = source_meta.get("quote") if isinstance(source_meta.get("quote"), dict) else {}
+    score_version = item.get("score_version") or item.get("ranker_version") or (
+        "legacy-score-v1" if item.get("rank_score") is not None else "candidate-score-v1"
+    )
+    ranker_version = item.get("ranker_version") or (
+        "ranker-v1" if item.get("rank_score") is not None else "candidate-score-v1"
+    )
     compact = {
         "symbol": str(item.get("stock_symbol") or ""),
         "market": str(item.get("stock_market") or "CN"),
         "name": str(item.get("stock_name") or item.get("stock_symbol") or ""),
-        "score": item.get("rank_score", item.get("score")),
+        "score": (item.get("rank_score") if item.get("rank_score") is not None
+                  else None if ranker_version == "ranker-v2" else item.get("score")),
+        "score_version": score_version,
+        "ranker_version": ranker_version,
+        "score_label": (
+            "新版排名分（0–100）"
+            if ranker_version == "ranker-v2"
+            else "舊版排名分（0–100）"
+            if item.get("rank_score") is not None
+            else "候選原始分（非排名分）"
+        ),
+        "ranking_value": item.get("ranking_value"),
         "action": item.get("action_label") or item.get("action") or "觀望",
         "risk": item.get("risk_level_label") or item.get("risk_level") or "未知",
         "source": item.get("source_pool_label") or item.get("source_pool") or "未知",

@@ -656,7 +656,8 @@ export default function DashboardPage() {
             <div className="divide-y divide-border/40">
               {opportunities.length === 0 && <div className="py-3 text-center text-[11px] text-muted-foreground">暫無普通股活躍機會</div>}
               {opportunities.slice(0, 3).map((o) => {
-                const score = Math.max(0, Math.min(100, o.rank_score ?? o.score ?? 0))
+                const score = o.rank_score == null ? null : Math.max(0, Math.min(100, o.rank_score))
+                const scoreLabel = o.ranker_version === 'ranker-v2' ? '新版排名分' : '舊版排名分'
                 return (
                   <div
                     key={`${o.stock_market}:${o.stock_symbol}`}
@@ -669,13 +670,18 @@ export default function DashboardPage() {
                         {o.action_label && <span className="rounded bg-primary/10 px-1 text-[9px] text-primary">{o.action_label}</span>}
                       </div>
                       <div className="truncate font-mono text-[10px] text-muted-foreground">{o.stock_symbol}</div>
+                      {o.stock_market === 'TW' && o.instrument_group === 'EQUITY' && o.selection_metadata?.constraint_unit === 'INSTRUMENT' && (
+                        <div className="truncate text-[9px] text-muted-foreground">
+                          普通股上限 {String(o.selection_metadata?.cap ?? 5)} 檔 · 已選 {String(o.selection_metadata?.after_instrument_count ?? 0)} 檔
+                        </div>
+                      )}
                       {(o.signal || o.reason) && <div className="truncate text-[11px] text-muted-foreground">{o.signal || o.reason}</div>}
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="font-mono text-[13px] text-foreground">{score.toFixed(0)}</div>
-                      <div className="text-[9px] text-muted-foreground">評分</div>
+                      <div className="font-mono text-[13px] text-foreground">{score == null ? '--' : score.toFixed(0)}</div>
+                      <div className="text-[9px] text-muted-foreground">{scoreLabel}</div>
                       <div className="mt-1 h-[3px] w-10 rounded bg-accent/40">
-                        <div className="h-[3px] rounded bg-primary/70" style={{ width: `${score}%` }} />
+                        <div className="h-[3px] rounded bg-primary/70" style={{ width: `${score ?? 0}%` }} />
                       </div>
                     </div>
                   </div>
@@ -691,7 +697,7 @@ export default function DashboardPage() {
                       onClick={() => openStock(o.stock_symbol, o.stock_market, o.stock_name || o.stock_symbol)}
                     >
                       <span className="min-w-0 truncate text-[11px]">{o.stock_name || o.stock_symbol} <span className="font-mono text-muted-foreground">{o.stock_symbol}</span></span>
-                      <span className="shrink-0 font-mono text-[11px]">{Number(o.rank_score || o.score || 0).toFixed(0)}</span>
+                      <span className="shrink-0 font-mono text-[11px]">{o.rank_score == null ? '--' : Number(o.rank_score).toFixed(0)}</span>
                     </div>
                   ))}
                 </div>

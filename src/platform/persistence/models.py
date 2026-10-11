@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -768,6 +769,8 @@ class StrategySignalRun(Base):
         Index("ix_strategy_signal_snapshot_rank", "snapshot_date", "rank_score"),
         Index("ix_strategy_signal_strategy_market", "strategy_code", "stock_market"),
         Index("ix_strategy_signal_status", "status", "updated_at"),
+        Index("ix_strategy_signal_ranker_version", "ranker_version", "snapshot_date"),
+        Index("ix_strategy_signal_selected", "snapshot_date", "selected_for_portfolio"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -784,6 +787,16 @@ class StrategySignalRun(Base):
 
     score = Column(Float, nullable=False, default=0)
     rank_score = Column(Float, nullable=False, default=0)
+    # Legacy score projections stay tagged; new refreshes store ranker-v2 explicitly.
+    ranking_value = Column(Float, nullable=True)
+    score_version = Column(String, nullable=False, default="legacy-score-v1")
+    ranker_version = Column(String, nullable=False, default="ranker-v1")
+    scoring_config_version = Column(String, nullable=False, default="")
+    decision_snapshot_id = Column(String, nullable=True)
+    selected_for_portfolio = Column(Boolean, nullable=False, default=False)
+    constrained = Column(Boolean, nullable=False, default=False)
+    constraint_reasons = Column(JSON, default=[])
+    selection_metadata = Column(JSON, default={})
     confidence = Column(Float, nullable=True)
     status = Column(String, default="active")  # active/inactive/invalidated
     action = Column(String, default="watch")
@@ -1750,6 +1763,8 @@ class RankingSnapshot(Base):
     evaluation_version = Column(String, default="")
     calibration_policy_version = Column(String, default="")
     capture_hash = Column(String(64), default="")
+    ranking_reference = Column(JSON, default={})
+    ranking_reference_hash = Column(String(64), default="")
     meta = Column(JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
 
@@ -1816,6 +1831,7 @@ class RankingSnapshotItem(Base):
     score_version = Column(String, nullable=False, default="")
     eligibility = Column(JSON, default={})
     ranking_value = Column(Float, nullable=True)
+    ranking_inputs = Column(JSON, default={})
     primary_horizon_sessions = Column(Integer, nullable=True)
     exit_session_date = Column(String, default="")
     exit_session_complete = Column(Boolean, nullable=True)
@@ -1827,4 +1843,74 @@ class RankingSnapshotItem(Base):
     scan_run_refs = Column(JSON, default=[])
     instrument_group = Column(String, nullable=False, default="UNKNOWN")
     instrument_authority = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class PortfolioSelectionRun(Base):
+    """Append-only, versioned record of one market/group portfolio selection."""
+
+    __tablename__ = "portfolio_selection_runs"
+    __table_args__ = (
+        UniqueConstraint("selection_run_id", name="uq_portfolio_selection_run_id"),
+        Index("ix_portfolio_selection_market_date", "stock_market", "snapshot_date"),
+        Index("ix_portfolio_selection_capture", "capture_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    selection_run_id = Column(String, nullable=False, default="")
+    capture_id = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="")
+    instrument_group = Column(String, nullable=False, default="ALL")
+    snapshot_date = Column(String, nullable=False, default="")
+    constraint_unit = Column(String, nullable=False, default="ROW")
+    ranker_version = Column(String, nullable=False, default="ranker-v1")
+    scoring_config_version = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
+    cap = Column(Integer, nullable=True)
+    high_risk_share = Column(Float, nullable=True)
+    strategy_share = Column(Float, nullable=True)
+    before_row_count = Column(Integer, nullable=False, default=0)
+    after_row_count = Column(Integer, nullable=False, default=0)
+    before_instrument_count = Column(Integer, nullable=False, default=0)
+    after_instrument_count = Column(Integer, nullable=False, default=0)
+    quota_metadata = Column(JSON, default={})
+    decision_snapshot_ids = Column(JSON, default=[])
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class PortfolioConstraintLedger(Base):
+    """Append-only per-row selection and constraint evidence for one run."""
+
+    __tablename__ = "portfolio_constraint_ledger"
+    __table_args__ = (
+        UniqueConstraint("selection_run_id", "signal_run_id", name="uq_portfolio_ledger_run_signal"),
+        Index("ix_portfolio_ledger_instrument", "stock_market", "instrument_id", "snapshot_date"),
+        Index("ix_portfolio_ledger_decision", "decision_snapshot_id"),
+        ForeignKeyConstraint(
+            ["selection_run_id"], ["portfolio_selection_runs.selection_run_id"],
+            name="fk_portfolio_ledger_run",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    selection_run_id = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="")
+    snapshot_date = Column(String, nullable=False, default="")
+    instrument_id = Column(String, nullable=False, default="")
+    strategy_code = Column(String, nullable=False, default="")
+    signal_run_id = Column(Integer, nullable=False)
+    decision_snapshot_id = Column(String, nullable=True)
+    is_representative = Column(Boolean, nullable=False, default=False)
+    selected_for_portfolio = Column(Boolean, nullable=False, default=False)
+    constrained = Column(Boolean, nullable=False, default=False)
+    reason_codes = Column(JSON, default=[])
+    constraint_unit = Column(String, nullable=False, default="ROW")
+    before_row_count = Column(Integer, nullable=False, default=0)
+    after_row_count = Column(Integer, nullable=False, default=0)
+    before_instrument_count = Column(Integer, nullable=False, default=0)
+    after_instrument_count = Column(Integer, nullable=False, default=0)
+    quota_metadata = Column(JSON, default={})
+    ranker_version = Column(String, nullable=False, default="ranker-v1")
+    scoring_config_version = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
     created_at = Column(DateTime, server_default=func.now())

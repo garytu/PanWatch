@@ -9,6 +9,8 @@ score_breakdown(alpha/catalyst/quality/source_bonus 加分項,risk/crowd penalty
 
 from __future__ import annotations
 
+import math
+
 # 因子中文標籤
 FACTOR_LABELS = {
     "alpha_score": "選股α",
@@ -27,12 +29,14 @@ PENALTY_FACTORS = ("risk_penalty", "crowd_penalty")
 _EPS = 0.01
 
 
-def to_ai_score(rank_score) -> int:
+def to_ai_score(rank_score) -> int | None:
     """rank_score(0-100)→ 1-10 AI Score(clamp 到 [1,10])。"""
     try:
         s = float(rank_score or 0.0)
     except (TypeError, ValueError):
         s = 0.0
+    if not math.isfinite(s):
+        return None
     return max(1, min(10, round(s / 10.0)))
 
 
@@ -73,6 +77,10 @@ def enrich_signal(item: dict) -> dict:
     """給一條訊號 item 注入 ai_score + factor_explain(原地修改並返回)。"""
     if not isinstance(item, dict):
         return item
-    item["ai_score"] = to_ai_score(item.get("rank_score"))
+    score = item.get("rank_score")
+    if score is None or item.get("score_version") == "candidate-score-v1":
+        item["ai_score"] = None
+    else:
+        item["ai_score"] = to_ai_score(score)
     item["factor_explain"] = explain_factors(item.get("score_breakdown"))
     return item

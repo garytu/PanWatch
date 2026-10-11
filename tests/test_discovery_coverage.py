@@ -364,7 +364,7 @@ def test_empty_and_failed_run_can_be_sealed_with_a_measured_missing_state():
         engine.dispose()
 
 
-def test_taiwan_signal_constraints_keep_etf_separate_and_management_for_unknown_holdings():
+def test_taiwan_signal_constraints_cap_equity_instruments_keep_etf_separate_and_holdings():
     rows = [
         StrategySignalRun(
             stock_market="TW", stock_symbol=f"TWSE:{2300 + index}",
@@ -392,11 +392,14 @@ def test_taiwan_signal_constraints_keep_etf_separate_and_management_for_unknown_
     rows.extend([etf, unknown_holding, unknown_opportunity])
 
     stats = _apply_portfolio_constraints(rows=rows)
-    assert sum(row.status == "active" for row in rows[:21]) == 20
+    assert sum(row.status == "active" for row in rows[:21]) == 5
+    assert sum(row.selected_for_portfolio for row in rows[:21]) == 5
+    assert sum("UNHELD_CAP" in row.constraint_reasons for row in rows[:21]) == 16
     assert etf.status == "active"
+    assert etf.selected_for_portfolio is True
     assert unknown_opportunity.status == "inactive"
     assert unknown_holding.status == "active"
-    assert stats["by_reason"]["instrument_group_unknown"] == 1
+    assert stats["by_reason"]["INSTRUMENT_GROUP_UNKNOWN"] == 1
 
 
 def test_twse_and_tpex_same_code_remain_distinct_in_candidate_scan_projection(monkeypatch):
