@@ -1,0 +1,550 @@
+{
+  "query_only": true,
+  "source_checkout_commit": "3acd67ffd98bbcf1713f9484d8a7b77871db6ade",
+  "deployed_commit": null,
+  "limitations": "Direct shared service retained reads; no LLM invocation, DB write, collection or control action. Event samples bounded to first two; full response counts preserved.",
+  "observations": [
+    {
+      "observed_at_utc": "2026-10-07T10:54:52.967686+00:00",
+      "instrument_id": "TWSE:2608",
+      "selectors": {
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "source": "history",
+        "limit": 100
+      },
+      "latency_ms": 1005.923,
+      "block": {
+        "data": {
+          "instrument_id": "TWSE:2608",
+          "source_family": "history",
+          "events": [
+            {
+              "instrument_id": "TWSE:2608",
+              "symbol": "2608",
+              "announcement_date": "2024-03-12",
+              "announced_at": "2024-03-12T19:54:37+08:00",
+              "company_name": "嘉里大榮",
+              "subject": "代子公司嘉里醫藥物流(股)公司公告向關係人取得使用權資產",
+              "clause": "第20款",
+              "fact_date": "2024-03-12",
+              "detail": "1.標的物之名稱及性質（如坐落台中市北區ＸＸ段ＸＸ小段土地）:\r\n新北市汐止區大同路三段213號3樓及4樓\r\n2.事實發生日:113/3/12~113/3/12\r\n3.交易單位數量（如ＸＸ平方公尺，折合ＸＸ坪）、每單位價格及交易總金額:\r\n1.租賃面積：13,651.24平方公尺，折合4,129.5坪\n2.月租金額：新台幣1,731千元(未稅)，租期10年\n3.使用權資產金額：新台幣195,368千元(未稅)\r\n4.交易相對人及其與公司之關係（交易相對人如屬自然人，且非公司之關\r\n係人者，得免揭露其姓名）:\r\n嘉里大榮物流股份有限公司，為間接持有嘉里醫藥物流(股)公司90%股份之母公司\r\n5.交易相對人為關係人者，並應公告選定關係人為交易對象之原因及前次移轉之\r\n所有人、前次移轉之所有人與公司及交易相對人間相互之關係、前次移轉日期\r\n及移轉金額:\r\n1.選定關係人為交易對象之原因：嘉里醫藥物流(股)公司承租其營運所需資產\n2.前次移轉所有人：不適用\r\n6.交易標的最近五年內所有權人曾為公司之關係人者，尚應公告關係\r\n人之取得及處分日期、價格及交易當時與公司之關係:\r\n不適用\r\n7.預計處分利益（或損失）（取得資產者不適用）（遞延者應列表說明\r\n認列情形）:\r\n不適用\r\n8.交付或付款條件（含付款期間及金額）、契約限制條款及其他重要約定\r\n事項:\r\n合約期間：自民國113年5月1日至民國123年4月30日\r\n9.本次交易之決定方式（如招標、比價或議價）、價格決定之參考依據及\r\n決策單位:\r\n參考不動產估價師出具之估價報告，由董事會決議之。\r\n10.專業估價者事務所或公司名稱及其估價金額:\r\n宏邦不動產估價師聯合事務所\n估價金額：約新台幣195,368千元(未稅)\r\n11.專業估價師姓名:\r\n李青塘\r\n12.專業估價師開業證書字號:\r\n(108)北市估字第000278號\r\n13.估價報告是否為限定價格、特定價格或特殊價格:否或不適用\r\n14.是否尚未取得估價報告:否或不適用\r\n15.尚未取得估價報告之原因:\r\n不適用\r\n16.估價結果有重大差異時，其差異原因及會計師意見:\r\n不適用\r\n17.會計師事務所名稱:\r\n不適用\r\n18.會計師姓名:\r\n不適用\r\n19.會計師開業證書字號:\r\n不適用\r\n20.經紀人及經紀費用:\r\n不適用\r\n21.取得或處分之具體目的或用途:\r\n作為營運使用\r\n22.本次交易表示異議之董事之意見:\r\n不適用\r\n23.本次交易為關係人交易:是\r\n24.董事會通過日期:\r\n民國113年3月12日\r\n25.監察人承認或審計委員會同意日期:\r\n民國113年3月12日\r\n26.本次交易係向關係人取得不動產或其使用權資產:是\r\n27.依「公開發行公司取得或處分資產處理準則」第十六條規定\r\n評估之價格:不適用\r\n28.依前項評估之價格較交易價格為低者，依同準則第十七條規\r\n定評估之價格:不適用\r\n29.其他敘明事項:\r\n無",
+              "content_hash": "064b0849859a37ca71f33da193d4d62f24c6be59e4c2a6587a981c9e66ce90f1",
+              "revision": 1,
+              "first_observed_at_utc": "2026-10-04T13:08:20.612236Z",
+              "event_first_observed_at_utc": "2026-10-04T13:08:20.612236Z",
+              "latest_observed_at_utc": "2026-10-04T13:08:20.612236Z",
+              "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+              "acquisition_date": "2026-10-04",
+              "payload_sha256": "717ddb98bf3ed7637d08dd5712a1df3912e1fc0e8521f8bb8aeee35db3e6aa7d",
+              "source_event_id": "sii:2608:1130312:1",
+              "provider_key": "sii:2608:1130312:1",
+              "report_date": null,
+              "row_fingerprint": "f5d5fdc84c512b06b25377330e26eed718fe6cad391528a1c091f1ea05b55010",
+              "detail_subject_raw": "代子公司嘉里醫藥物流(股)公司公告向關係人取得使用權資產                                                                                                                              ",
+              "speaker_name": "阮慧雯                                                                                                                                                                                                  ",
+              "speaker_title": "財務暨行政總處總經理",
+              "speaker_phone": "02-33226888         ",
+              "revision_count": 1,
+              "list_payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+              "source_generated_at": "2026-10-04T21:08:20+08:00",
+              "source_reference": {
+                "label": "MOPS detail request",
+                "method": "POST",
+                "url": "https://mops.twse.com.tw/mops/api/t05st01_detail",
+                "selectors": {
+                  "serialNumber": "1",
+                  "enterDate": "1130312",
+                  "marketKind": "sii",
+                  "companyId": "2608"
+                },
+                "is_navigable_permalink": false
+              }
+            },
+            {
+              "instrument_id": "TWSE:2608",
+              "symbol": "2608",
+              "announcement_date": "2024-03-13",
+              "announced_at": "2024-03-13T18:35:39+08:00",
+              "company_name": "嘉里大榮",
+              "subject": "本公司112年度合併財務報告提報董事會通過",
+              "clause": "第31款",
+              "fact_date": "2024-03-13",
+              "detail": "1.提報董事會或經董事會決議日期:113/03/13\n2.審計委員會通過日期:113/03/12\n3.財務報告或年度自結財務資訊報導期間\n起訖日期(XXX/XX/XX~XXX/XX/XX):112/01/01~112/12/31\n4.1月1日累計至本期止營業收入(仟元):12,032,914\n5.1月1日累計至本期止營業毛利(毛損) (仟元):2,187,134\n6.1月1日累計至本期止營業利益(損失) (仟元):1,538,957\n7.1月1日累計至本期止稅前淨利(淨損) (仟元):2,184,970\n8.1月1日累計至本期止本期淨利(淨損) (仟元):1,832,289\n9.1月1日累計至本期止歸屬於母公司業主淨利(損) (仟元):1,695,695\n10.1月1日累計至本期止基本每股盈餘(損失) (元):3.63\n11.期末總資產(仟元):24,648,489\n12.期末總負債(仟元):11,598,404\n13.期末歸屬於母公司業主之權益(仟元):12,408,051\n14.其他應敘明事項:無\n",
+              "content_hash": "10e3b284fe1df2b0842d13e770c41ab1911b56befc765f01864300ef9b9b7789",
+              "revision": 1,
+              "first_observed_at_utc": "2026-10-04T13:08:22.597638Z",
+              "event_first_observed_at_utc": "2026-10-04T13:08:22.597638Z",
+              "latest_observed_at_utc": "2026-10-04T13:08:22.597638Z",
+              "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+              "acquisition_date": "2026-10-04",
+              "payload_sha256": "87d65ca64c27c11e2292f47406c27c9e1f0b5893c8323faaf10d0d7b2983615a",
+              "source_event_id": "sii:2608:1130313:1",
+              "provider_key": "sii:2608:1130313:1",
+              "report_date": null,
+              "row_fingerprint": "bc77552a043b7e3268802102b47df775f4c02fda70667a3e1b7b4d4961ff905c",
+              "detail_subject_raw": "本公司112年度合併財務報告提報董事會通過                                                                                                                                             ",
+              "speaker_name": "阮慧雯                                                                                                                                                                                                  ",
+              "speaker_title": "財務暨行政總處總經理",
+              "speaker_phone": "02-33226888         ",
+              "revision_count": 1,
+              "list_payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+              "source_generated_at": "2026-10-04T21:08:22+08:00",
+              "source_reference": {
+                "label": "MOPS detail request",
+                "method": "POST",
+                "url": "https://mops.twse.com.tw/mops/api/t05st01_detail",
+                "selectors": {
+                  "serialNumber": "1",
+                  "enterDate": "1130313",
+                  "marketKind": "sii",
+                  "companyId": "2608"
+                },
+                "is_navigable_permalink": false
+              }
+            }
+          ]
+        },
+        "status": "available",
+        "reason": "complete_selected_history_window_with_events",
+        "evidence": {
+          "provider": "twmd",
+          "instrument_id": "TWSE:2608",
+          "endpoint": "/api/v1/material-information",
+          "source_contract": "mops_t05st01_material_information_history/v1",
+          "source_family": "history",
+          "selectors": {
+            "instrument_id": "TWSE:2608",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "source": "history",
+            "limit": 100
+          },
+          "query_date_filter": {
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31"
+          },
+          "dataset_coverage": "AVAILABLE",
+          "history_complete": true,
+          "partial_current_day": false,
+          "retained_count": 26,
+          "returned_count": 26,
+          "truncated": false,
+          "latest_capture": {
+            "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+            "received_at_utc": "2026-10-04T13:08:20.560476Z",
+            "payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+            "byte_length": 6671,
+            "report_date": null,
+            "acquisition_date": null,
+            "row_count": null,
+            "instrument_id": "TWSE:2608",
+            "query_year": 2024,
+            "response_class": "positive",
+            "coverage_through": "2024-12-31T23:59:59+08:00",
+            "source_generated_at": "2026-10-04T21:08:20+08:00",
+            "event_count": 26,
+            "details_complete": true
+          },
+          "acquisitions": [
+            {
+              "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+              "received_at_utc": "2026-10-04T13:08:20.560476Z",
+              "payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+              "byte_length": 6671,
+              "report_date": null,
+              "acquisition_date": null,
+              "row_count": null,
+              "instrument_id": "TWSE:2608",
+              "query_year": 2024,
+              "response_class": "positive",
+              "coverage_through": "2024-12-31T23:59:59+08:00",
+              "source_generated_at": "2026-10-04T21:08:20+08:00",
+              "event_count": 26,
+              "details_complete": true
+            }
+          ],
+          "missing_dates": [],
+          "source_received_at_utc": "2026-10-04T13:08:20.560476Z",
+          "served_at": null,
+          "publication_time": null,
+          "source_link_policy": "MOPS detail references are reconstructed only from the validated provider_key.",
+          "response_headers": {},
+          "history_note": "Complete validated issuer/year bundles only. Annual no-data is unverified; omitted events are retained, without inferred retractions. Unpublished or failed detail bundles establish no coverage; acquisition failures remain in the ingest/control outcome."
+        }
+      },
+      "full_response_count": 26
+    },
+    {
+      "observed_at_utc": "2026-10-07T10:54:53.123403+00:00",
+      "instrument_id": "TWSE:2608",
+      "selectors": {
+        "start_date": "2024-01-01",
+        "end_date": "2024-01-31",
+        "source": "history",
+        "limit": 100
+      },
+      "latency_ms": 155.162,
+      "block": {
+        "data": {
+          "instrument_id": "TWSE:2608",
+          "source_family": "history",
+          "events": []
+        },
+        "status": "empty",
+        "reason": "complete_selected_history_window_without_events",
+        "evidence": {
+          "provider": "twmd",
+          "instrument_id": "TWSE:2608",
+          "endpoint": "/api/v1/material-information",
+          "source_contract": "mops_t05st01_material_information_history/v1",
+          "source_family": "history",
+          "selectors": {
+            "instrument_id": "TWSE:2608",
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-31",
+            "source": "history",
+            "limit": 100
+          },
+          "query_date_filter": {
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-31"
+          },
+          "dataset_coverage": "EMPTY",
+          "history_complete": true,
+          "partial_current_day": false,
+          "retained_count": 0,
+          "returned_count": 0,
+          "truncated": false,
+          "latest_capture": {
+            "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+            "received_at_utc": "2026-10-04T13:08:20.560476Z",
+            "payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+            "byte_length": 6671,
+            "report_date": null,
+            "acquisition_date": null,
+            "row_count": null,
+            "instrument_id": "TWSE:2608",
+            "query_year": 2024,
+            "response_class": "positive",
+            "coverage_through": "2024-12-31T23:59:59+08:00",
+            "source_generated_at": "2026-10-04T21:08:20+08:00",
+            "event_count": 26,
+            "details_complete": true
+          },
+          "acquisitions": [
+            {
+              "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+              "received_at_utc": "2026-10-04T13:08:20.560476Z",
+              "payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+              "byte_length": 6671,
+              "report_date": null,
+              "acquisition_date": null,
+              "row_count": null,
+              "instrument_id": "TWSE:2608",
+              "query_year": 2024,
+              "response_class": "positive",
+              "coverage_through": "2024-12-31T23:59:59+08:00",
+              "source_generated_at": "2026-10-04T21:08:20+08:00",
+              "event_count": 26,
+              "details_complete": true
+            }
+          ],
+          "missing_dates": [],
+          "source_received_at_utc": "2026-10-04T13:08:20.560476Z",
+          "served_at": null,
+          "publication_time": null,
+          "source_link_policy": "MOPS detail references are reconstructed only from the validated provider_key.",
+          "response_headers": {},
+          "history_note": "Complete validated issuer/year bundles only. Annual no-data is unverified; omitted events are retained, without inferred retractions. Unpublished or failed detail bundles establish no coverage; acquisition failures remain in the ingest/control outcome."
+        }
+      },
+      "full_response_count": 0
+    },
+    {
+      "observed_at_utc": "2026-10-07T10:54:53.247141+00:00",
+      "instrument_id": "TWSE:2608",
+      "selectors": {
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "source": "history",
+        "limit": 1
+      },
+      "latency_ms": 123.416,
+      "block": {
+        "data": {
+          "instrument_id": "TWSE:2608",
+          "source_family": "history",
+          "events": [
+            {
+              "instrument_id": "TWSE:2608",
+              "symbol": "2608",
+              "announcement_date": "2024-12-17",
+              "announced_at": "2024-12-17T18:13:44+08:00",
+              "company_name": "嘉里大榮",
+              "subject": "公告本公司召開113年前三季業績發表會",
+              "clause": "第12款",
+              "fact_date": "2024-12-18",
+              "detail": "符合條款第四條第XX款：12\r\n事實發生日：113/12/18\r\n1.召開法人說明會之日期：113/12/18\r\n2.召開法人說明會之時間：14 時 30 分 \r\n3.召開法人說明會之地點：台北遠東香格里拉2樓宴會廳（台北市大安區敦化南路二段201號）\r\n4.法人說明會擇要訊息：113年前三季業績發表會\r\n5.其他應敘明事項：無\r\n完整財務業務資訊請至公開資訊觀測站之法人說明會一覽表或法說會項目下查閱。\r\n",
+              "content_hash": "d35eeeab075a6eb4d1da437e8969413e73aa08ae62a63eec3e159413384b3641",
+              "revision": 1,
+              "first_observed_at_utc": "2026-10-04T13:09:10.761811Z",
+              "event_first_observed_at_utc": "2026-10-04T13:09:10.761811Z",
+              "latest_observed_at_utc": "2026-10-04T13:09:10.761811Z",
+              "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+              "acquisition_date": "2026-10-04",
+              "payload_sha256": "73faefdd578cd2f8353f20f521e107e60f31af732e10aed02a49da22f5da39d2",
+              "source_event_id": "sii:2608:1131217:1",
+              "provider_key": "sii:2608:1131217:1",
+              "report_date": null,
+              "row_fingerprint": "95cf4af266fc2ab8baba5d30131119014541358d42341484eeb544e03bb6566c",
+              "detail_subject_raw": "公告本公司召開113年前三季業績發表會                                                                                                                                                 ",
+              "speaker_name": "阮慧雯                                                                                                                                                                                                  ",
+              "speaker_title": "財務暨行政總處總經理",
+              "speaker_phone": "02-33226888         ",
+              "revision_count": 1,
+              "list_payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+              "source_generated_at": "2026-10-04T21:09:10+08:00",
+              "source_reference": {
+                "label": "MOPS detail request",
+                "method": "POST",
+                "url": "https://mops.twse.com.tw/mops/api/t05st01_detail",
+                "selectors": {
+                  "serialNumber": "1",
+                  "enterDate": "1131217",
+                  "marketKind": "sii",
+                  "companyId": "2608"
+                },
+                "is_navigable_permalink": false
+              }
+            }
+          ]
+        },
+        "status": "partial",
+        "reason": "result_truncated",
+        "evidence": {
+          "provider": "twmd",
+          "instrument_id": "TWSE:2608",
+          "endpoint": "/api/v1/material-information",
+          "source_contract": "mops_t05st01_material_information_history/v1",
+          "source_family": "history",
+          "selectors": {
+            "instrument_id": "TWSE:2608",
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31",
+            "source": "history",
+            "limit": 1
+          },
+          "query_date_filter": {
+            "start_date": "2024-01-01",
+            "end_date": "2024-12-31"
+          },
+          "dataset_coverage": "AVAILABLE",
+          "history_complete": true,
+          "partial_current_day": false,
+          "retained_count": 26,
+          "returned_count": 1,
+          "truncated": true,
+          "latest_capture": {
+            "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+            "received_at_utc": "2026-10-04T13:08:20.560476Z",
+            "payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+            "byte_length": 6671,
+            "report_date": null,
+            "acquisition_date": null,
+            "row_count": null,
+            "instrument_id": "TWSE:2608",
+            "query_year": 2024,
+            "response_class": "positive",
+            "coverage_through": "2024-12-31T23:59:59+08:00",
+            "source_generated_at": "2026-10-04T21:08:20+08:00",
+            "event_count": 26,
+            "details_complete": true
+          },
+          "acquisitions": [
+            {
+              "capture_id": "0b5824d9bb930266e38f71b2bd6dc3103a75e7d14574933526a2dbee29d3c8f2",
+              "received_at_utc": "2026-10-04T13:08:20.560476Z",
+              "payload_sha256": "9958814f4aace6380f9208e6e63e3217d14d70f25b6c03ace89f578d5eb54358",
+              "byte_length": 6671,
+              "report_date": null,
+              "acquisition_date": null,
+              "row_count": null,
+              "instrument_id": "TWSE:2608",
+              "query_year": 2024,
+              "response_class": "positive",
+              "coverage_through": "2024-12-31T23:59:59+08:00",
+              "source_generated_at": "2026-10-04T21:08:20+08:00",
+              "event_count": 26,
+              "details_complete": true
+            }
+          ],
+          "missing_dates": [],
+          "source_received_at_utc": "2026-10-04T13:08:20.560476Z",
+          "served_at": null,
+          "publication_time": null,
+          "source_link_policy": "MOPS detail references are reconstructed only from the validated provider_key.",
+          "response_headers": {},
+          "history_note": "Complete validated issuer/year bundles only. Annual no-data is unverified; omitted events are retained, without inferred retractions. Unpublished or failed detail bundles establish no coverage; acquisition failures remain in the ingest/control outcome."
+        }
+      },
+      "full_response_count": 1
+    },
+    {
+      "observed_at_utc": "2026-10-07T10:54:53.369894+00:00",
+      "instrument_id": "TWSE:2330",
+      "selectors": {
+        "start_date": "2026-10-01",
+        "end_date": "2026-10-07",
+        "source": "current",
+        "limit": 100
+      },
+      "latency_ms": 122.344,
+      "block": {
+        "data": {
+          "instrument_id": "TWSE:2330",
+          "source_family": "current",
+          "events": []
+        },
+        "status": "missing",
+        "reason": "no_retained_current_observation",
+        "evidence": {
+          "provider": "twmd",
+          "instrument_id": "TWSE:2330",
+          "endpoint": "/api/v1/material-information",
+          "source_contract": "twse_openapi_t187ap04_L/v1",
+          "source_family": "current",
+          "selectors": {
+            "instrument_id": "TWSE:2330",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-07",
+            "source": "current",
+            "limit": 100
+          },
+          "query_date_filter": {
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-07"
+          },
+          "dataset_coverage": "MISSING",
+          "history_complete": false,
+          "partial_current_day": true,
+          "retained_count": 0,
+          "returned_count": 0,
+          "truncated": false,
+          "latest_capture": {
+            "capture_id": "7f80bbdb926c108909221184bf5f48a9af23d20250961b270569dc2210b6317b",
+            "received_at_utc": "2026-10-04T13:09:13.271019Z",
+            "payload_sha256": "572da8f65e84d7cf0f5dfd21da49080979bfd02164b544fe3b6c767d8da30c2d",
+            "byte_length": 12573,
+            "report_date": "2026-10-04",
+            "acquisition_date": "2026-10-04",
+            "row_count": 5,
+            "instrument_id": null,
+            "query_year": null,
+            "response_class": null,
+            "coverage_through": null,
+            "source_generated_at": null,
+            "event_count": null,
+            "details_complete": null
+          },
+          "acquisitions": [],
+          "missing_dates": [],
+          "source_received_at_utc": "2026-10-04T13:09:13.271019Z",
+          "served_at": null,
+          "publication_time": null,
+          "source_link_policy": "The response does not provide a per-event source URL.",
+          "response_headers": {},
+          "history_note": "Current TWSE snapshot observations only; the retained source does not establish complete historical coverage or retractions."
+        }
+      },
+      "full_response_count": 0
+    },
+    {
+      "observed_at_utc": "2026-10-07T10:54:53.473598+00:00",
+      "instrument_id": "TPEX:5347",
+      "selectors": {
+        "start_date": "2026-10-01",
+        "end_date": "2026-10-07",
+        "source": "current",
+        "limit": 100
+      },
+      "latency_ms": 103.416,
+      "block": {
+        "data": null,
+        "status": "unsupported",
+        "reason": "twse_four_digit_only",
+        "evidence": {
+          "provider": "twmd",
+          "instrument_id": "TPEX:5347",
+          "endpoint": "/api/v1/material-information",
+          "selectors": {
+            "instrument_id": "TPEX:5347",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-07",
+            "source": "current",
+            "limit": "100"
+          },
+          "source_contract": null,
+          "period": null,
+          "source_report_date": null,
+          "publication_time": null,
+          "source_received_at_utc": null,
+          "served_at": null,
+          "units": {},
+          "dataset_coverage": null,
+          "selected_instrument_presence": null,
+          "revision": null,
+          "capture_id": null,
+          "payload_sha256": null,
+          "provider_scope": "http://127.0.0.1:8000",
+          "http_status": null
+        }
+      },
+      "full_response_count": 0
+    },
+    {
+      "observed_at_utc": "2026-10-07T10:54:53.591436+00:00",
+      "instrument_id": "TWSE:00878",
+      "selectors": {
+        "start_date": "2026-10-01",
+        "end_date": "2026-10-07",
+        "source": "current",
+        "limit": 100
+      },
+      "latency_ms": 117.479,
+      "block": {
+        "data": null,
+        "status": "unsupported",
+        "reason": "twse_four_digit_only",
+        "evidence": {
+          "provider": "twmd",
+          "instrument_id": "TWSE:00878",
+          "endpoint": "/api/v1/material-information",
+          "selectors": {
+            "instrument_id": "TWSE:00878",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-07",
+            "source": "current",
+            "limit": "100"
+          },
+          "source_contract": null,
+          "period": null,
+          "source_report_date": null,
+          "publication_time": null,
+          "source_received_at_utc": null,
+          "served_at": null,
+          "units": {},
+          "dataset_coverage": null,
+          "selected_instrument_presence": null,
+          "revision": null,
+          "capture_id": null,
+          "payload_sha256": null,
+          "provider_scope": "http://127.0.0.1:8000",
+          "http_status": null
+        }
+      },
+      "full_response_count": 0
+    }
+  ],
+  "service": "http://127.0.0.1:8000"
+}

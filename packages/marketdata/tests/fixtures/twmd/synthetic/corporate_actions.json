@@ -1,0 +1,54 @@
+{
+  "contract_label": "synthetic offline fixture; not a captured exchange response",
+  "ex_right_dividend_results": [
+    {
+      "effective_date": "2024-06-25",
+      "instrument_id": "TWSE:123A",
+      "symbol": "123A",
+      "observed_name": "Synthetic Letter Code Co.",
+      "action_kind": "ex_right",
+      "prior_close": "100.00",
+      "reference_price": "98.765",
+      "rights_dividend_value": "1.235",
+      "limit_up_price": "108.60",
+      "limit_down_price": "88.90",
+      "opening_auction_basis": "98.765",
+      "dividend_adjusted_reference_price": "98.765",
+      "provider": "twse_twt49u",
+      "currency": "TWD"
+    },
+    {
+      "effective_date": "2024-06-25",
+      "instrument_id": "TWSE:123A",
+      "symbol": "123A",
+      "observed_name": "Synthetic Letter Code Co.",
+      "action_kind": "ex_dividend",
+      "prior_close": "100.00",
+      "reference_price": "99.125",
+      "rights_dividend_value": "0.875",
+      "limit_up_price": "109.00",
+      "limit_down_price": "89.25",
+      "opening_auction_basis": "99.125",
+      "dividend_adjusted_reference_price": "99.125",
+      "provider": "twse_twt49u",
+      "currency": "TWD"
+    }
+  ],
+  "capital_reduction_results": [
+    {
+      "recovery_date": "2024-07-01",
+      "instrument_id": "TWSE:123A",
+      "symbol": "123A",
+      "observed_name": "Synthetic Letter Code Co.",
+      "reduction_reason": "loss_offset",
+      "pre_suspension_close": "50.00",
+      "recovery_reference_price": "62.5000",
+      "limit_up_price": "68.70",
+      "limit_down_price": "56.30",
+      "opening_auction_basis": "62.5000",
+      "ex_right_reference_price": null,
+      "provider": "twse_twtauu",
+      "currency": "TWD"
+    }
+  ]
+}

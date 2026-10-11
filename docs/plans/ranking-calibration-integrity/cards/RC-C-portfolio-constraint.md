@@ -1,0 +1,67 @@
+# RC-C: Unsaturated ranking and stable TW instrument constraints
+
+Priority: P1. Status: completed. Owner: coordinator (worker: rc_c_worker, GPT-6 Luna/max). Ships in PR-2 after PR-0A, PR-0B and PR-1. Contract: [ranking/calibration sections 5–6](../contracts/ranking-vocabulary-v1.md).
+
+## Readiness checkpoint
+
+2026-10-11: PR-0A identity, RC-B and RC-D are completed in the current checkout. RC-D reviewed verification is recorded in [the evidence report](../evidence/2026-10-11-rc-d-verification.md). RC-C is ready and unassigned; implementation requires a separate user request. Calibration remains FROZEN.
+
+## Assignment checkpoint
+
+2026-10-11: User explicitly requested `execute rc-c`. Board and card were ready; PR-0A identity, RC-B and RC-D are completed. Capture/sealed-catalog prerequisite regression: 11 passed / 66 deselected. Assigned to rc_c_worker (GPT-6 Luna/max) in the current checkout on `codex/rc-c-ranking-constraints`; no worktree is created. Unrelated edits and untracked files are preserved. Calibration remains FROZEN; RC-A PR-3 is outside this assignment.
+
+## Problem and delivered result
+
+Clipping weighted raw scores at 100 destroys order and sends all high scores into maximum sizing. The cap counts strategy rows rather than instruments; Dashboard-only tie changes cannot stabilize which instruments survive earlier constraints.
+
+Delivered result: uncapped ranking_value with explicit display mapping, consistent consumers, pre-constraint instrument representatives and measured TW quotas. Initial cap preserves 5 instruments rather than expanding the legacy 20 rows into 20 instruments.
+
+## Current evidence and reuse
+
+- Five TW dates: active=20 rows, 5 distinct instruments; 746 rows carry cap demotion text, 634 payload flags. These are legacy row constraints, not measured instrument exclusions.
+- MAX_UNHELD_ACTIVE_BY_MARKET / MAX_HIGH_RISK_RATIO_BY_MARKET omit TW; MAX_SINGLE_STRATEGY_SHARE is currently a scalar .42, not a market map.
+- Existing scoring hard-clips at 100; `_position_weight` bands are 85/75/65. Candidate eligibility 62/55 is a separate score axis.
+- Dashboard `_group_signals` selects by active/action/rank with arrival-order ties; active/action priorities must be explicit, not replaced by score-only sorting.
+- Dashboard min_score=55, action_limit=6, slice(0,3), Opportunities minScore=70 and >=80 colour are consumers; fallback limits before grouping can yield duplicate instruments.
+
+## Change scope
+
+- `src/modules/strategy/strategy_engine.py`: rank/display fields, average-rank ties, frozen reference, representative/risk grouping, explicit TW unit/quotas and constraint ledger.
+- `src/modules/portfolio/api/dashboard.py`, recommendation/AI enrichment and serializers: common instrument selection and score-version mapping.
+- `src/modules/paper_trading/paper_trading_engine.py`: consume v2 score bands with one selected instrument/budget input.
+- `src/platform/persistence/{models,migrations}.py`: versioned fields/projections, constrained flag and reason-code list.
+- `frontend/src/pages/{Dashboard,Opportunities}.tsx`, associated API types: score tier/version, cap count/unit and missingness.
+
+## Implementation steps
+
+1. Persist unsaturated ranking_value. Apply the contract's stable sigmoid display mapping (center 100, scale 20), use unrounded ranking_value for ordering, and retain legacy score version on old projections. Do not use win-probability labels.
+2. Implement tie-aware `_rank_map` over the captured pre-constraint reference. Missing features retain missingness; N=1 yields 50, tied equal features share percentiles.
+3. Before cap selection, group TW EQUITY rows by canonical instrument. Choose active/action/ranking/stable-key representative and maximum eligible group risk. Keep duplicate strategy rows for audit without duplicate budget/order input.
+4. Set TW INSTRUMENT cap=5, risk=.32, strategy share=.42; add per-market override for the currently scalar share. Other markets retain existing behavior/unit. Apply final-count integer quotas, deterministic pruning and explicit SMALL_SET_QUOTA_EXCEPTION from the contract.
+5. Surface first-class constrained + code list and ledger with instrument/row before/after counts, quota/unit/version. Only excluded eligible instruments prove cap binding.
+6. Update every consumer together: Dashboard and fallback dedupe before limit, min_score uses v2 display, UI rank tiers/version, AI scale, `_position_weight` v2 band input. Keep list size defaults and band budget ratios; the mapping's actual effects must be reported, not presumed.
+7. Replay frozen inputs while calibration remains SHADOW. Report score spread/ties/filter retention/representatives/cap exclusions/quotas/sizing/exposure; exploratory legacy replay is labelled non-PIT. Initial cap increase and weight resets are outside this PR.
+
+## Acceptance conditions
+
+- Weighted raw 110/130/150 do not all display 100 and span at least two sizing bands; exact formula values and boundaries verified.
+- Permuting identical candidate/reference inputs or changing projection updated_at produces identical percentiles, representatives, selected instruments and constraint reasons.
+- Twenty strategy rows for five instruments use five slots; duplicate strategies create no extra budget allocation. High-risk secondary strategy cannot be hidden by a low-risk representative.
+- Counterfactual fixture with sixth eligible EQUITY instrument reports UNHELD_CAP; active==cap without an excluded instrument reports no binding event.
+- Ratios/quotas use final instrument counts; tiny-set rounding exceptions are visible. Held-management is separate.
+- UI/default filters/fallback/AI all expose the correct scale/version; no mixed legacy/v2 threshold comparison. No blanket reset or unverified increase in exposure.
+
+## Planned verification and risks
+
+Extend `tests/test_factor_scoring_weights.py`, `tests/test_strategy_signal_candidate_identity.py`, `tests/test_paper_trading_position.py`, `tests/test_paper_trading_allocation.py`; add ranking permutation/tied-reference, Dashboard/fallback dedupe and constraint-unit fixtures. Run backend regression, frontend relevant vitest/tsc/build, then `git diff --check`.
+
+Sigmoid parameters and quotas are initial engineering defaults. Average-rank ties and ordinary-EQUITY/ETF separation change selection and visibility. Shadow report is a rollout gate, not evidence of live execution or improved investment returns; DB currently has no paper trade outcome evidence.
+
+
+## Progress checkpoint and Handoff
+
+2026-10-11: rc_c_worker completed ranker-v2 mapping, tie-aware reference capture, instrument selection/ledger, consumers, migration 130 and deterministic FROZEN synthetic replay. Worker handed off for review without committing; worker targeted regression reported 186 passed. Coordinator independently reviewed the full diff and corrected raw-value frontend ordering, missing-rank fallback, exact threshold boundaries, decision identity ties, group risk visibility, nullable confidence, held-version preservation and missing-ledger duplicate demotion. ETF was restored to its separate legacy 20 ROW cap; CN/HK/US row limits remain unchanged. Coordinator added actual disposable-DB refresh/archive/atomic rollback and paper-entry integration tests.
+
+Final verification: backend **1,646 passed / 3 skipped**, ranking modules **26 passed**, frontend **129 passed**, type check/build and whitespace checks passed. [Review and verification report](../evidence/2026-10-11-rc-c-verification.md) contains exact commands, fixes and limits; [synthetic replay](../evidence/2026-10-11-rc-c-frozen-synthetic-replay.json) reports score spread, ties, filters, cap, quotas and requested sizing ratios. It is not historical PIT or realized-exposure evidence. Calibration remains **FROZEN**; no production DB migration, weight reset, activation, deployment or live execution is claimed.
+
+RC-C is completed locally. Dependencies for RC-A PR-3 implementation are satisfied; PR-3 is ready for a separate user request. Activation still requires eligible v2 cohorts, floors/confidence and readiness/shadow evidence. Unrelated working-tree files are preserved.

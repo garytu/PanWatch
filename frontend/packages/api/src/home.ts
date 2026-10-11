@@ -18,9 +18,9 @@ export interface PortfolioTodo {
 }
 
 export const homeApi = {
-  /** 今日(本地时区)全部提醒命中,跨规则聚合。 */
+  /** 今日(本地時區)全部提醒命中,跨規則聚合。 */
   alertHitsToday: () => fetchAPI<AlertHitToday[]>('/price-alerts/hits/today'),
 
-  /** 首页空态待办:持仓未设提醒 / 提醒即将到期。 */
+  /** 首頁空態待辦:持倉未設提醒 / 提醒即將到期。 */
   todos: () => fetchAPI<{ todos: PortfolioTodo[]; count: number }>('/portfolio/todos'),
 }

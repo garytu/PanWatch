@@ -1,4 +1,4 @@
-"""策略目录与权重读取。"""
+"""策略目錄與權重讀取。"""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ class StrategySpec:
 DEFAULT_STRATEGIES: tuple[StrategySpec, ...] = (
     StrategySpec(
         code="trend_follow",
-        name="趋势延续",
-        description="顺势跟随，优先均线多头且动量延续",
+        name="趨勢延續",
+        description="順勢跟隨，優先均線多頭且動量延續",
         risk_level="medium",
         params={"horizon_days": 5},
         default_weight=1.15,
@@ -33,7 +33,7 @@ DEFAULT_STRATEGIES: tuple[StrategySpec, ...] = (
     StrategySpec(
         code="macd_golden",
         name="MACD金叉",
-        description="MACD 金叉确认，偏中短线",
+        description="MACD 金叉確認，偏中短線",
         risk_level="medium",
         params={"horizon_days": 3},
         default_weight=1.10,
@@ -41,39 +41,39 @@ DEFAULT_STRATEGIES: tuple[StrategySpec, ...] = (
     StrategySpec(
         code="volume_breakout",
         name="放量突破",
-        description="放量突破关键位，偏进攻",
+        description="放量突破關鍵位，偏進攻",
         risk_level="high",
         params={"horizon_days": 3},
         default_weight=1.18,
     ),
     StrategySpec(
         code="pullback",
-        name="回踩确认",
-        description="回踩支撑后二次启动",
+        name="回踩確認",
+        description="回踩支撐後二次啟動",
         risk_level="low",
         params={"horizon_days": 5},
         default_weight=1.05,
     ),
     StrategySpec(
         code="rebound",
-        name="超跌反弹",
-        description="超跌后的反弹交易",
+        name="超跌反彈",
+        description="超跌後的反彈交易",
         risk_level="high",
         params={"horizon_days": 3},
         default_weight=0.95,
     ),
     StrategySpec(
         code="watchlist_agent",
-        name="Agent建议",
-        description="来自既有 Agent 的综合建议映射",
+        name="Agent建議",
+        description="來自既有 Agent 的綜合建議對映",
         risk_level="medium",
         params={"horizon_days": 3},
         default_weight=1.00,
     ),
     StrategySpec(
         code="market_scan",
-        name="市场扫描",
-        description="市场池扫描策略（热门与活跃）",
+        name="市場掃描",
+        description="市場池掃描策略（熱門與活躍）",
         risk_level="medium",
         params={"horizon_days": 3},
         default_weight=1.08,
@@ -165,6 +165,29 @@ def list_strategy_catalog(enabled_only: bool = True) -> list[dict]:
 def get_strategy_profile_map() -> dict[str, dict]:
     rows = list_strategy_catalog(enabled_only=False)
     return {x["code"]: x for x in rows}
+
+
+def get_primary_horizon_sessions() -> dict[str, int]:
+    """Catalog params.horizon_days 在 versioned decision 是 session count（explicit reinterpretation）.
+
+    Defaults differ per strategy, so this map is read as-is; no blanket reset.
+    """
+    ensure_strategy_catalog()
+    db = SessionLocal()
+    try:
+        out: dict[str, int] = {}
+        for row in db.query(StrategyCatalog).all():
+            params = row.params or {}
+            raw = params.get("horizon_days", params.get("horizon_sessions"))
+            try:
+                sessions = int(raw)
+            except (TypeError, ValueError):
+                sessions = 0
+            if sessions > 0:
+                out[row.code] = sessions
+        return out
+    finally:
+        db.close()
 
 
 def get_effective_weight_map(*, market: str = "ALL", regime: str = "default") -> dict[str, float]:

@@ -1,0 +1,212 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "PanWatch Strategy Application — How & When",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-strategy-application-20261002-082827/strategy-application.html",
+    "repository": {
+      "url": "https://github.com/garytu/PanWatch.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "dd25e048416c537bbcce33d9afcaee603d4411c8"
+    }
+  },
+  "lanes": [
+    { "id": "trig", "label": "When — triggers" },
+    { "id": "build", "label": "How — candidate pool" },
+    { "id": "score", "label": "How — signal scoring (strategy_engine)" },
+    { "id": "loop", "label": "Self-calibration — every 6h" },
+    { "id": "consume", "label": "Persist & consume" }
+  ],
+  "phases": [
+    { "id": "p-trigger", "label": "Trigger", "fromCol": 0, "toCol": 0 },
+    { "id": "p-candidates", "label": "Candidates", "fromCol": 1, "toCol": 1 },
+    { "id": "p-scoring", "label": "Score → constrain", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "p-consume", "label": "Persist + consume", "fromCol": 4, "toCol": 4 }
+  ],
+  "mainPath": ["sched", "cand", "scoring", "gate", "store", "consumers"],
+  "nodes": [
+    {
+      "id": "sched",
+      "lane": "trig",
+      "col": 0,
+      "yOffset": -60,
+      "type": "backend",
+      "label": "Cron schedule",
+      "sublabel": "09:15 / 13:30 / 22:00",
+      "tag": "skip non-trading days",
+      "width": 112,
+      "sources": [
+        { "path": "src/modules/research/context_scheduler.py", "line": 188, "end_line": 196, "label": "trading-day gate" },
+        { "path": "src/modules/research/context_scheduler.py", "line": 291, "end_line": 300, "label": "cron hours" }
+      ]
+    },
+    {
+      "id": "manual",
+      "lane": "trig",
+      "col": 0,
+      "yOffset": 60,
+      "type": "frontend",
+      "label": "Manual API",
+      "sublabel": "POST /strategy-signals/refresh",
+      "tag": "bg thread or wait=true",
+      "width": 116,
+      "sources": [
+        { "path": "src/modules/research/api/recommendations.py", "line": 285, "end_line": 300, "label": "refresh endpoint" },
+        { "path": "src/modules/research/api/recommendations.py", "line": 74, "end_line": 100, "label": "refresh worker" }
+      ]
+    },
+    {
+      "id": "cand",
+      "lane": "build",
+      "col": 1,
+      "type": "backend",
+      "label": "Rebuild candidates",
+      "sublabel": "watchlist agents + market scan",
+      "tag": "EntryCandidate",
+      "width": 130,
+      "sources": [
+        { "path": "src/modules/strategy/entry_candidates.py", "line": 1259, "label": "refresh_entry_candidates" },
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 1209, "end_line": 1226, "label": "rebuild_candidates=True" }
+      ]
+    },
+    {
+      "id": "scoring",
+      "lane": "score",
+      "col": 2,
+      "type": "backend",
+      "label": "Factor scoring",
+      "sublabel": "regime + cross-section + news",
+      "tag": "× weight × regime × IC weights",
+      "width": 136,
+      "sources": [
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 795, "end_line": 940, "label": "_compute_factor_breakdown" },
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 454, "label": "market regime" },
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 625, "label": "cross-section + 72h news" }
+      ]
+    },
+    {
+      "id": "gate",
+      "lane": "score",
+      "col": 3,
+      "type": "security",
+      "label": "Portfolio constraints",
+      "sublabel": "unheld · high-risk · concentration",
+      "tag": "excess demoted to watch",
+      "width": 152,
+      "sources": [
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 727, "label": "_apply_portfolio_constraints" },
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 204, "end_line": 216, "label": "per-market caps" }
+      ]
+    },
+    {
+      "id": "eval",
+      "lane": "loop",
+      "col": 2,
+      "type": "backend",
+      "label": "Outcome evaluation",
+      "sublabel": "1/3/5/10-day forward returns",
+      "tag": "every 6h · last 60d",
+      "width": 130,
+      "sources": [
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 1587, "label": "evaluate_strategy_outcomes" },
+        { "path": "src/modules/research/context_scheduler.py", "line": 75, "end_line": 92, "label": "6h interval job" }
+      ]
+    },
+    {
+      "id": "rebal",
+      "lane": "loop",
+      "col": 3,
+      "type": "backend",
+      "label": "Weight rebalance",
+      "sublabel": "strategy + per-factor IC/IR",
+      "tag": "α=0.35 · ≥8 samples",
+      "width": 130,
+      "sources": [
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 1786, "label": "rebalance_strategy_weights" },
+        { "path": "src/modules/strategy/factor_calibration.py", "line": 144, "end_line": 152, "label": "calibrate_all_markets" }
+      ]
+    },
+    {
+      "id": "store",
+      "lane": "consume",
+      "col": 4,
+      "yOffset": -70,
+      "type": "database",
+      "label": "StrategySignalRun",
+      "sublabel": "signal + factor / regime / risk",
+      "tag": "per snapshot_date",
+      "width": 132,
+      "sources": [
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 1360, "end_line": 1362, "label": "upsert signal rows" },
+        { "path": "src/modules/strategy/strategy_engine.py", "line": 943, "label": "snapshot sync" }
+      ]
+    },
+    {
+      "id": "consumers",
+      "lane": "consume",
+      "col": 4,
+      "yOffset": 70,
+      "type": "frontend",
+      "label": "Consumers",
+      "sublabel": "UI · assistant · paper trading",
+      "width": 128,
+      "sources": [
+        { "path": "src/modules/research/api/recommendations.py", "line": 223, "end_line": 249, "label": "signals API + explain" },
+        { "path": "src/modules/assistant/tools.py", "line": 216, "label": "assistant tool" },
+        { "path": "src/modules/paper_trading/paper_trading_engine.py", "line": 299, "end_line": 313, "label": "entry signals" }
+      ]
+    }
+  ],
+  "edges": [
+    { "id": "sched-cand", "from": "sched", "to": "cand", "label": "candidates", "variant": "emphasis", "role": "main", "fromSide": "right", "toSide": "top" },
+    { "id": "manual-cand", "from": "manual", "to": "cand", "label": "refresh (thread)", "variant": "dashed" },
+    { "id": "cand-scoring", "from": "cand", "to": "scoring", "label": "snapshot", "role": "main", "fromSide": "bottom", "toSide": "top" },
+    { "id": "scoring-gate", "from": "scoring", "to": "gate", "label": "rank_score ↓", "role": "main" },
+    { "id": "gate-store", "from": "gate", "to": "store", "label": "upsert", "variant": "emphasis", "role": "main" },
+    { "id": "store-consumers", "from": "store", "to": "consumers", "label": "signals", "role": "main", "fromSide": "bottom", "toSide": "top" },
+    { "id": "store-eval", "from": "store", "to": "eval", "label": "60d signals", "variant": "dashed", "role": "async", "fromSide": "top", "toSide": "bottom" },
+    { "id": "eval-rebal", "from": "eval", "to": "rebal", "label": "outcomes", "variant": "dashed" },
+    { "id": "rebal-scoring", "from": "rebal", "to": "scoring", "label": "fresh weights", "variant": "dashed", "role": "return", "fromSide": "top", "toSide": "bottom" }
+  ],
+  "semanticChecks": {
+    "allowedRoots": ["sched", "manual"],
+    "allowedTerminals": ["consumers"],
+    "requiredEdges": [
+      { "from": "gate", "to": "store" },
+      { "from": "rebal", "to": "scoring" }
+    ]
+  },
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "When it runs",
+      "items": [
+        "Cron 09:15 / 13:30 / 22:00 (app TZ, default Asia/Shanghai); skipped when every market is closed",
+        "Manual: POST /strategy-signals/refresh (background thread) or wait=true; POST /entry-candidates/refresh",
+        "Startup: ensure_strategy_catalog() (server.py) plus a bootstrap evaluation at +15s"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "How a strategy applies",
+      "items": [
+        "Context per run: market regime (breadth/change/active), cross-section rank & crowding, 72h news event score (strategy_engine.py)",
+        "Per candidate × strategy tag: base + alpha/catalyst/quality − risk/crowd, then × strategy weight × regime multiplier × IC-calibrated factor weights",
+        "Constraints demote over-quota signals to watch: unheld ≤30 CN / 20 HK / 20 US, high-risk ratio ≤35/32/30%, single-strategy share ≤42%",
+        "Consumers read active signals: Opportunities UI, assistant tools, paper-trading entries (buy/add with entry window)"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Self-calibration loop",
+      "items": [
+        "Every 6h: evaluate 1/3/5/10-day outcomes for the last 60 days of signals",
+        "Rebalance strategy weights (α=0.35, ≥8 samples, 45-day window), then per-factor IC/IR calibration per market",
+        "The new weights feed the next scheduled or manual refresh"
+      ]
+    }
+  ]
+}

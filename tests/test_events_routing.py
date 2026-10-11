@@ -1,4 +1,4 @@
-"""事件取数走 marketdata 包路由测试"""
+"""事件取數走 marketdata 包路由測試"""
 import asyncio
 from datetime import datetime, timedelta
 
@@ -6,7 +6,7 @@ import src.platform.marketdata.collectors.events_collector as ec
 
 
 def test_fetch_events_uses_marketdata(monkeypatch):
-    """走 marketdata 包的 events,转换为 PanWatch EventItem"""
+    """走 marketdata 包的 events,轉換為 PanWatch EventItem"""
     from marketdata.types import EventItem as MdEventItem
 
     now = datetime.now()
@@ -18,7 +18,7 @@ def test_fetch_events_uses_marketdata(monkeypatch):
                     source="eastmoney",
                     external_id="AN001",
                     event_type="earnings",
-                    title="业绩预告",
+                    title="業績預告",
                     publish_time=now,
                     symbols=["600519"],
                     importance=3,
@@ -37,16 +37,16 @@ def test_fetch_events_uses_marketdata(monkeypatch):
     assert item.source == "eastmoney"
     assert item.external_id == "AN001"
     assert item.event_type == "earnings"
-    assert item.title == "业绩预告"
+    assert item.title == "業績預告"
     assert item.symbols == ["600519"]
     assert item.importance == 3
 
 
 def test_fetch_events_no_symbols_returns_empty(monkeypatch):
-    """symbols 为空时短路返回空列表,不触达 marketdata。"""
+    """symbols 為空時短路返回空列表,不觸達 marketdata。"""
 
     def _boom():
-        raise AssertionError("不应调用 get_market_data")
+        raise AssertionError("不應呼叫 get_market_data")
 
     monkeypatch.setattr(ec, "get_market_data", _boom)
 
@@ -56,7 +56,7 @@ def test_fetch_events_no_symbols_returns_empty(monkeypatch):
 
 
 def test_fetch_events_applies_since_filter(monkeypatch):
-    """md.events 按天窗返回的结果仍需用原 since 精确重过滤。"""
+    """md.events 按天窗返回的結果仍需用原 since 精確重過濾。"""
     from marketdata.types import EventItem as MdEventItem
 
     now = datetime.now()
@@ -73,7 +73,7 @@ def test_fetch_events_applies_since_filter(monkeypatch):
                 ),
                 MdEventItem(
                     source="eastmoney", external_id="OLD", event_type="notice",
-                    title="旧公告", publish_time=old_time, symbols=["600519"],
+                    title="舊公告", publish_time=old_time, symbols=["600519"],
                     importance=0, url="",
                 ),
             ]

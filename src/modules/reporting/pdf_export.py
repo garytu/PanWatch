@@ -1,10 +1,10 @@
-"""详情报告导出 PDF —— HTML 保真排版。
+"""詳細資訊報告匯出 PDF —— HTML 保真排版。
 
 markdown → HTML(python-markdown)→ PDF。
-- 主引擎 **WeasyPrint**:真 CSS 排版引擎,自动换行/分页/页码,中文走系统字体,排版接近网页。
-- WeasyPrint 不可用(缺系统库 pango 等)时回退 **xhtml2pdf**(纯库、排版朴素但保底,
-  中文用 reportlab 内置 STSong-Light CID 字体)。
-(Chromium/page.pdf 可作为将来更高保真的备选,但需安装浏览器,这里不默认依赖。)
+- 主引擎 **WeasyPrint**:真 CSS 排版引擎,自動換行/分頁/頁碼,中文走系統字型,排版接近網頁。
+- WeasyPrint 不可用(缺系統庫 pango 等)時回退 **xhtml2pdf**(純庫、排版樸素但保底,
+  中文用 reportlab 內建 STSong-Light CID 字型)。
+(Chromium/page.pdf 可作為將來更高保真的備選,但需安裝瀏覽器,這裡不預設依賴。)
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _REPORT_CSS = """
 @page {
   size: A4; margin: 1.7cm 1.5cm;
-  @bottom-center { content: "仅供参考,不构成投资建议 · 第 " counter(page) " / " counter(pages) " 页";
+  @bottom-center { content: "僅供參考,不構成投資建議 · 第 " counter(page) " / " counter(pages) " 頁";
                    font-size: 8pt; color: #9ca3af; }
 }
 body { font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
@@ -67,7 +67,7 @@ def _render_weasyprint(title: str, body_html: str) -> bytes:
     return HTML(string=doc).write_pdf()
 
 
-# ---- xhtml2pdf(回退,纯库无系统依赖)----
+# ---- xhtml2pdf(回退,純庫無系統依賴)----
 
 _FALLBACK_CSS = """
 @page { size: A4; margin: 1.6cm 1.5cm; }
@@ -95,7 +95,7 @@ def _render_xhtml2pdf(title: str, body_html: str) -> bytes:
         + f'<div class="doc-title">{escape((title or "深度分析").strip())}</div>'
         + body_html
         + '<div style="margin-top:14pt;font-size:8.5pt;color:#9ca3af;">'
-        + "本报告由 AI 生成,仅供参考,不构成投资建议。</div></body></html>"
+        + "本報告由 AI 生成,僅供參考,不構成投資建議。</div></body></html>"
     )
     buf = io.BytesIO()
     pisa.CreatePDF(src=doc, dest=buf, encoding="utf-8")
@@ -103,18 +103,18 @@ def _render_xhtml2pdf(title: str, body_html: str) -> bytes:
 
 
 _ANALYST_SECTIONS = [
-    ("market", "技术分析师"),
-    ("social", "情绪分析师"),
-    ("news", "新闻分析师"),
-    ("fundamentals", "基本面分析师"),
+    ("market", "技術分析師"),
+    ("social", "情緒分析師"),
+    ("news", "新聞分析師"),
+    ("fundamentals", "基本面分析師"),
 ]
 
 
 def assemble_report_markdown(raw_data: dict) -> str:
-    """从 raw_data 拼出与详情页(buildAnalysisSections)同款分节的完整报告 markdown。
+    """從 raw_data 拼出與詳細資訊頁(buildAnalysisSections)同款分節的完整報告 markdown。
 
-    顺序对齐详情页:决策摘要 → PM 决策书(+交易员)→ 4 分析师全文 → 看多看空辩论全文(+研究主管裁决)
-    → 风控辩论全文(+风控裁决)。比 `content` 字段更全(content 省略了 4 分析师与辩论全文)。
+    順序對齊詳細資訊頁:決策摘要 → PM 決策書(+交易員)→ 4 分析師全文 → 看多看空辯論全文(+研究主管裁決)
+    → 風控辯論全文(+風控裁決)。比 `content` 欄位更全(content 省略了 4 分析師與辯論全文)。
     """
     rd = raw_data or {}
     sug = rd.get("suggestion") or {}
@@ -131,15 +131,15 @@ def assemble_report_markdown(raw_data: dict) -> str:
             head += f" · 置信度 {float(conf):.1f}/10"
         except (TypeError, ValueError):
             pass
-    parts.append(f"## 最终决策\n\n{head}\n")
+    parts.append(f"## 最終決策\n\n{head}\n")
 
     final_decision = (rd.get("final_decision") or "").strip()
     trader = (rd.get("trader_plan") or "").strip()
     if final_decision or trader:
         body = final_decision
         if trader:
-            body = (body + "\n\n" if body else "") + f"### 💼 交易员执行计划\n\n{trader}"
-        parts.append(f"## PM 最终决策书\n\n{body}\n")
+            body = (body + "\n\n" if body else "") + f"### 💼 交易員執行計劃\n\n{trader}"
+        parts.append(f"## PM 最終決策書\n\n{body}\n")
 
     for key, title in _ANALYST_SECTIONS:
         txt = (reports.get(key) or "").strip()
@@ -151,25 +151,25 @@ def assemble_report_markdown(raw_data: dict) -> str:
         seg = dh
         jd = (debate.get("judge_decision") or "").strip()
         if jd:
-            seg += f"\n\n### ⚖️ 研究主管裁决\n\n{jd}"
-        parts.append(f"## 看多看空辩论\n\n{seg}\n")
+            seg += f"\n\n### ⚖️ 研究主管裁決\n\n{jd}"
+        parts.append(f"## 看多看空辯論\n\n{seg}\n")
 
     rh = (risk.get("history") or "").strip()
     rjd = (rd.get("risk_judgment") or risk.get("judge_decision") or "").strip()
     if rh or rjd:
         seg = rh
         if rjd:
-            seg += (("\n\n" if seg else "") + f"### 🛡️ 风控裁决\n\n{rjd}")
-        parts.append(f"## 风控辩论\n\n{seg}\n")
+            seg += (("\n\n" if seg else "") + f"### 🛡️ 風控裁決\n\n{rjd}")
+        parts.append(f"## 風控辯論\n\n{seg}\n")
 
     return "\n".join(parts).strip()
 
 
 def render_analysis_pdf(title: str, markdown_text: str) -> bytes:
-    """分析报告 markdown → PDF 字节(中文矢量、可复制)。WeasyPrint 优先,失败回退 xhtml2pdf。"""
+    """分析報告 markdown → PDF 位元組(中文向量、可複製)。WeasyPrint 優先,失敗回退 xhtml2pdf。"""
     body_html = _md_to_html(markdown_text)
     try:
         return _render_weasyprint(title, body_html)
-    except Exception as e:  # WeasyPrint 缺系统库/渲染异常 → 保底
-        logger.warning("[PDF导出] WeasyPrint 不可用,回退 xhtml2pdf: %s", e)
+    except Exception as e:  # WeasyPrint 缺系統庫/渲染異常 → 保底
+        logger.warning("[PDF匯出] WeasyPrint 不可用,回退 xhtml2pdf: %s", e)
         return _render_xhtml2pdf(title, body_html)

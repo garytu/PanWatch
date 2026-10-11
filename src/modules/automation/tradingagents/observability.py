@@ -1,11 +1,11 @@
-"""TradingAgents 进度回调。
+"""TradingAgents 進度回撥。
 
-走一个统一回调链:
-1. LangChain `BaseCallbackHandler`:捕获 LangGraph 节点、LLM 和工具的真实生命周期
-2. `agent.py` 将同一个 handler 注入 `Propagator.get_graph_args(callbacks=...)`，不依赖 debug 文本解析
+走一個統一回呼鏈:
+1. LangChain `BaseCallbackHandler`:捕獲 LangGraph 節點、LLM 和工具的真實生命週期
+2. `agent.py` 將同一個 handler 注入 `Propagator.get_graph_args(callbacks=...)`，不依賴 debug 文本解析
 
-进度写入 PanWatch 的 `log_context`,前端轮询 `/api/agents/runs/{trace_id}/progress`
-聚合返回阶段；同一文件下半部提供成本提取、预算检查和估算入口。
+進度寫入 PanWatch 的 `log_context`,前端輪詢 `/api/agents/runs/{trace_id}/progress`
+聚合返回階段；同一檔案下半部提供成本提取、預算檢查和估算入口。
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from src.platform.persistence.models import AnalysisHistory
 
 logger = logging.getLogger(__name__)
 
-# 进度和预算共用同一套 TradingAgents 运行观测入口；数据库生命周期仍由 agent_runs 负责。
+# 進度和預算共用同一套 TradingAgents 執行觀測入口；資料庫生命週期仍由 agent_runs 負責。
 __all__ = [
     "STAGES_ORDER",
     "PanWatchProgressHandler",
@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-# 默认阶段映射:TradingAgents 4 个 analyst + 辩论 + 风控 + PM
+# 預設階段對映:TradingAgents 4 個 analyst + 辯論 + 風控 + PM
 STAGES_ORDER = [
     "data_collection",
     "market_analyst",
@@ -48,8 +48,8 @@ STAGES_ORDER = [
     "final_decision",
 ]
 
-# TradingAgents 0.5.0 的 LangGraph 节点名不是界面阶段名的一一映射。
-# 这里集中维护别名，而不是在每个 callback 分支里散落字符串判断；上游节点改名时只需改这一张表。
+# TradingAgents 0.5.0 的 LangGraph 節點名不是介面階段名的一一對映。
+# 這裡集中維護別名，而不是在每個 callback 分支裡散落字串判斷；上游節點改名時只需改這一張表。
 NODE_STAGE_ALIASES = {
     "market_analyst": "market_analyst",
     "sentiment_analyst": "social_analyst",
@@ -72,27 +72,27 @@ NODE_STAGE_ALIASES = {
 try:
     from langchain_core.callbacks import BaseCallbackHandler as _LCBaseCallbackHandler
     _LANGCHAIN_AVAILABLE = True
-except ImportError:  # tradingagents 未装时仍允许 import 本模块,测试不依赖
+except ImportError:  # tradingagents 未裝時仍允許 import 本模組,測試不依賴
     _LANGCHAIN_AVAILABLE = False
 
     class _LCBaseCallbackHandler:  # type: ignore[no-redef]
-        """Fallback stub when langchain_core 未安装。"""
+        """Fallback stub when langchain_core 未安裝。"""
         pass
 
 
 class PanWatchProgressHandler(_LCBaseCallbackHandler):
-    """LangChain BaseCallbackHandler 兼容的进度处理器。
+    """LangChain BaseCallbackHandler 相容的進度處理器。
 
-    新版 langchain (1.x) 把 callbacks 字段用 pydantic 校验为 BaseCallbackHandler 实例,
-    所以必须继承上游基类才能被接受。
+    新版 langchain (1.x) 把 callbacks 欄位用 pydantic 校驗為 BaseCallbackHandler 例項,
+    所以必須繼承上游基類才能被接受。
 
-    覆盖核心 hook:
-    - on_llm_start: 某个 LLM 调用开始(可推断当前在哪个 analyst)
-    - on_llm_end: LLM 调用结束,带成本
-    - on_chain_start/end: LangGraph 节点切换
+    覆蓋核心 hook:
+    - on_llm_start: 某個 LLM 呼叫開始(可推斷當前在哪個 analyst)
+    - on_llm_end: LLM 呼叫結束,帶成本
+    - on_chain_start/end: LangGraph 節點切換
 
-    P0 简单实现:把所有事件都 logger.info 出来,带 trace_id 标签。
-    前端通过过滤 log_entries 表的 trace_id + event=ta_progress 拿到时间线。
+    P0 簡單實現:把所有事件都 logger.info 出來,帶 trace_id 標籤。
+    前端透過過濾 log_entries 表的 trace_id + event=ta_progress 拿到時間線。
     """
 
     def __init__(
@@ -101,11 +101,11 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
         agent_name: str = "tradingagents",
         cancel_event: threading.Event | None = None,
     ):
-        # langchain_core BaseCallbackHandler 没有 __init__ 参数,直接 super 安全
+        # langchain_core BaseCallbackHandler 沒有 __init__ 引數,直接 super 安全
         try:
             super().__init__()
         except TypeError:
-            # 某些版本要求无参,某些要求带参,兜底
+            # 某些版本要求無參,某些要求帶參,兜底
             pass
         self.trace_id = trace_id
         self.agent_name = agent_name
@@ -113,13 +113,13 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
         self._started_at = time.monotonic()
         self._total_cost = 0.0
         self._completed_stages: set[str] = set()
-        # LangChain 1.x 的 on_chain_end 不保证携带 name/metadata，因此必须保存
-        # start 时的 run_id -> 节点信息，才能把结束事件关回正确阶段。
+        # LangChain 1.x 的 on_chain_end 不保證攜帶 name/metadata，因此必須儲存
+        # start 時的 run_id -> 節點資訊，才能把結束事件關回正確階段。
         self._chain_runs: dict[str, dict[str, str]] = {}
         self._llm_runs: dict[str, dict[str, str]] = {}
         self._tool_runs: dict[str, dict[str, str]] = {}
-        # OTel 桥接:handler 在异步侧构造(to_thread 之前),此处捕获当前上下文,
-        # 供工作线程里的 callback 把节点/LLM 子 span 挂到 root span 下(关闭时为 None)。
+        # OTel 橋接:handler 在非同步側構造(to_thread 之前),此處捕獲當前上下文,
+        # 供工作執行緒裡的 callback 把節點/LLM 子 span 掛到 root span 下(關閉時為 None)。
         self._otel_parent = otel.capture_context()
         self._otel_stage_spans: dict[str, Any] = {}
         self._otel_llm_span: Any = None
@@ -129,7 +129,7 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
         return time.monotonic() - self._started_at
 
     def _emit(self, stage: str, action: str, **extra):
-        """写一条进度日志。前端按 trace_id + event=ta_progress 拉。"""
+        """寫一條進度日誌。前端按 trace_id + event=ta_progress 拉。"""
         if self.cancel_event is not None and self.cancel_event.is_set():
             return
         with log_context(
@@ -146,15 +146,15 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
         ):
             agent = extra.get("agent") or extra.get("langgraph_node") or ""
             detail = f" agent={agent}" if agent else ""
-            logger.info(f"[TA进度] stage={stage} action={action}{detail} {extra}")
+            logger.info(f"[TA進度] stage={stage} action={action}{detail} {extra}")
 
     def emit(self, stage: str, action: str, **extra) -> None:
-        """向采集等非 LangChain 阶段发出同一格式的进度事件。"""
+        """向採集等非 LangChain 階段發出同一格式的進度事件。"""
         self._emit(stage, action, **extra)
 
-    # ---- LangChain callbacks 接口 ----
+    # ---- LangChain callbacks 介面 ----
 
-    # 关键:LLM 默认按 token 估算成本(deepseek-chat 单价),后续可由调用方注入更精确单价
+    # 關鍵:LLM 預設按 token 估算成本(deepseek-chat 單價),後續可由呼叫方注入更精確單價
     _PRICE_PER_M_PROMPT = 0.14
     _PRICE_PER_M_COMPLETION = 0.28
 
@@ -180,7 +180,7 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
             operation_id=operation_id,
             **({"agent": agent, "langgraph_node": agent} if agent else {}),
         )
-        # OTel:TA 的一次 LLM 调用 -> gen_ai 子 span(遵循 GenAI 语义约定)。
+        # OTel:TA 的一次 LLM 呼叫 -> gen_ai 子 span(遵循 GenAI 語義約定)。
         self._otel_llm_span = otel.start_detached_span(
             f"chat {model}".strip() if model else "chat",
             parent_context=self._otel_parent,
@@ -218,7 +218,7 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
             operation_id=operation_id,
             **({"agent": agent, "langgraph_node": agent} if agent else {}),
         )
-        # OTel:回填 token 用量并结束 gen_ai span。
+        # OTel:回填 token 用量並結束 gen_ai span。
         if self._otel_llm_span is not None:
             otel.set_span_attributes(
                 self._otel_llm_span,
@@ -231,8 +231,8 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
             self._otel_llm_span = None
 
     def on_chain_start(self, serialized, inputs, **kwargs):
-        # LangGraph 节点切换。节点名优先取 kwargs.name/metadata.langgraph_node，
-        # 因为 serialized 在不同 LangChain 版本里可能只有 runnable 类型名称。
+        # LangGraph 節點切換。節點名優先取 kwargs.name/metadata.langgraph_node，
+        # 因為 serialized 在不同 LangChain 版本里可能只有 runnable 型別名稱。
         name = _callback_name(serialized, kwargs)
         stage = _normalize_stage(name)
         if not stage:
@@ -251,8 +251,8 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
             run_id=run_id,
             parent_run_id=_parent_run_id(kwargs),
         )
-        # OTel 节点 span 只保留一个当前阶段，重复的并行/重试节点仍会产生进度事件，
-        # 但不会因为重复 span 让追踪树无限膨胀。
+        # OTel 節點 span 只保留一個當前階段，重複的並行/重試節點仍會產生進度事件，
+        # 但不會因為重複 span 讓追蹤樹無限膨脹。
         if stage not in self._otel_stage_spans:
             span = otel.start_detached_span(
                 f"tradingagents.stage {stage}",
@@ -282,7 +282,7 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
         self._emit("error", "chain_error", error=str(error)[:200], run_id=_run_id(kwargs))
 
     def on_tool_start(self, serialized, input_str, **kwargs):
-        """记录 LangGraph ToolNode 当前正在执行的工具。"""
+        """記錄 LangGraph ToolNode 當前正在執行的工具。"""
         name = ""
         try:
             name = kwargs.get("name") or (serialized or {}).get("name") or "unknown"
@@ -336,7 +336,7 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
         return _normalize_stage(name) or "unknown"
 
     def _finish_chain(self, action: str, kwargs: dict, **extra: Any) -> None:
-        """按 run_id 找回节点并发出结束事件；上游未携带节点名时也能正确闭环。"""
+        """按 run_id 找回節點併發出結束事件；上游未攜帶節點名時也能正確閉環。"""
         run_id = _run_id(kwargs)
         record = self._chain_runs.pop(run_id, None) if run_id else None
         name = (record or {}).get("name") or _callback_name(None, kwargs)
@@ -359,7 +359,7 @@ class PanWatchProgressHandler(_LCBaseCallbackHandler):
 
 
 def _normalize_stage(name: str) -> str:
-    """把 LangGraph 节点名标准化到 STAGES_ORDER 里的一个值。"""
+    """把 LangGraph 節點名標準化到 STAGES_ORDER 裡的一個值。"""
     n = "_".join(str(name or "").strip().lower().replace("-", " ").split())
     if not n:
         return ""
@@ -372,7 +372,7 @@ def _normalize_stage(name: str) -> str:
 
 
 def _callback_name(serialized: Any, kwargs: dict[str, Any]) -> str:
-    """兼容 LangChain callback 的 name/metadata/serialized 三种节点来源。"""
+    """相容 LangChain callback 的 name/metadata/serialized 三種節點來源。"""
     metadata = kwargs.get("metadata") or {}
     return str(
         kwargs.get("name")
@@ -400,13 +400,13 @@ def _callback_agent(kwargs: dict[str, Any], chain_runs: dict[str, dict[str, str]
 
 
 def aggregate_progress(log_entries: list[dict]) -> dict:
-    """读 log_entries 表里 event=ta_progress 的记录,聚合成阶段进度。
+    """讀 log_entries 表裡 event=ta_progress 的記錄,聚合成階段進度。
 
-    log_entries 行结构(参考 src/web/log_handler.py):
+    log_entries 行結構(參考 src/web/log_handler.py):
     {timestamp, level, logger_name, message, trace_id, agent_name, event, tags, ...}
     tags 是 dict,含 stage / action / elapsed_sec / total_cost_usd 等。
 
-    返回结构(给前端):
+    返回結構(給前端):
     {
         "current_stage": "bull_bear_debate",
         "completed_stages": [...],
@@ -436,20 +436,20 @@ def aggregate_progress(log_entries: list[dict]) -> dict:
             started_at = ts
 
         if not stage or stage not in stage_state:
-            # LLM/工具事件不属于独立阶段，但需要保留当前活动操作，
-            # 这样外部数据请求卡住时 UI 能显示具体工具名。
+            # LLM/工具事件不屬於獨立階段，但需要保留當前活動操作，
+            # 這樣外部資料請求卡住時 UI 能顯示具體工具名。
             if stage == "llm_call":
                 kind = "tool" if action.startswith("tool_") else "llm"
                 name = tags.get("tool") if kind == "tool" else tags.get("model")
                 operation_id = str(tags.get("operation_id") or f"{kind}:{name or action}")
                 agent = str(tags.get("agent") or tags.get("langgraph_node") or "")
                 if action == "llm_start":
-                    operation = {"kind": "llm", "name": tags.get("model") or "LLM 调用"}
+                    operation = {"kind": "llm", "name": tags.get("model") or "LLM 呼叫"}
                     if agent:
                         operation["agent"] = agent
                     active_operations[operation_id] = operation
                 elif action == "tool_start":
-                    operation = {"kind": "tool", "name": tags.get("tool") or "工具调用"}
+                    operation = {"kind": "tool", "name": tags.get("tool") or "工具呼叫"}
                     if agent:
                         operation["agent"] = agent
                     active_operations[operation_id] = operation
@@ -457,9 +457,9 @@ def aggregate_progress(log_entries: list[dict]) -> dict:
                     if tags.get("operation_id"):
                         active_operations.pop(operation_id, None)
                     else:
-                        # 兼容旧日志/上游未传 run_id 的回调：只移除同类型同名称
-                        # 的一个操作，不影响并行执行的其它工具。
-                        expected_name = name or ("工具调用" if kind == "tool" else "LLM 调用")
+                        # 相容舊日誌/上游未傳 run_id 的回撥：只移除同型別同名稱
+                        # 的一個操作，不影響並行執行的其它工具。
+                        expected_name = name or ("工具呼叫" if kind == "tool" else "LLM 呼叫")
                         for key, operation in list(active_operations.items()):
                             if operation["kind"] == kind and operation["name"] == expected_name:
                                 active_operations.pop(key, None)
@@ -480,7 +480,7 @@ def aggregate_progress(log_entries: list[dict]) -> dict:
                 if tags.get("error"):
                     source_state["error"] = str(tags["error"])[:200]
 
-        # cost 累积取最后一条的 total_cost_usd
+        # cost 累積取最後一條的 total_cost_usd
         cost = tags.get("total_cost_usd")
         if cost is not None:
             total_cost = max(total_cost, float(cost))
@@ -492,7 +492,7 @@ def aggregate_progress(log_entries: list[dict]) -> dict:
         elif action == "stage_end":
             stage_state[stage]["status"] = "done"
             if "started_at" in stage_state[stage] and ts:
-                # 简略时长(实际 ts 是 datetime,这里依赖调用方转换)
+                # 簡略時長(實際 ts 是 datetime,這裡依賴呼叫方轉換)
                 pass
 
     return {
@@ -517,19 +517,19 @@ def aggregate_progress(log_entries: list[dict]) -> dict:
 
 
 def check_budget(monthly_budget_usd: float, agent_name: str = "tradingagents") -> dict:
-    """统计本月已用美元 + 剩余,供触发前校验。
+    """統計本月已用美元 + 剩餘,供觸發前校驗。
 
     Returns:
         {
             "used": float,           # 本月已用(美元)
-            "remaining": float,      # 剩余(美元)
+            "remaining": float,      # 剩餘(美元)
             "limit": float,          # 配置上限
             "exceeded": bool,        # 是否超限
-            "runs_this_month": int,  # 本月运行次数
+            "runs_this_month": int,  # 本月執行次數
         }
     """
     now = datetime.now(timezone.utc)
-    # AnalysisHistory.analysis_date 是 "YYYY-MM-DD" 字符串
+    # AnalysisHistory.analysis_date 是 "YYYY-MM-DD" 字串
     month_prefix = now.strftime("%Y-%m")
 
     db = SessionLocal()
@@ -559,7 +559,7 @@ def check_budget(monthly_budget_usd: float, agent_name: str = "tradingagents") -
             "runs_this_month": len(records),
         }
     except Exception as e:
-        logger.warning(f"[TA成本] 预算查询失败,默认放行: {e}")
+        logger.warning(f"[TA成本] 預算查詢失敗,預設放行: {e}")
         return {
             "used": 0.0,
             "remaining": float(monthly_budget_usd),
@@ -572,7 +572,7 @@ def check_budget(monthly_budget_usd: float, agent_name: str = "tradingagents") -
 
 
 def _extract_cost(raw_data) -> float:
-    """从 AnalysisHistory.raw_data 提取 cost_usd。"""
+    """從 AnalysisHistory.raw_data 提取 cost_usd。"""
     if not isinstance(raw_data, dict):
         return 0.0
     cost = raw_data.get("cost_usd")
@@ -590,19 +590,19 @@ def estimate_cost(
     selected_analysts: list[str],
     model: str = "deepseek-chat",
 ) -> dict:
-    """单次分析的成本估算(粗略,实际可能 ±50%)。
+    """單次分析的成本估算(粗略,實際可能 ±50%)。
 
-    用于触发前给用户预估。公式假设:
-    - 每分析师 ~5k input + 2k output token
-    - 辩论每轮 ~12k input + 4k output token
-    - 风控 + PM ~15k input + 3k output token
-    - LangGraph 累积上下文实际比理论高 2-5 倍
+    用於觸發前給使用者預估。公式假設:
+    - 每分析師 ~5k input + 2k output token
+    - 辯論每輪 ~12k input + 4k output token
+    - 風控 + PM ~15k input + 3k output token
+    - LangGraph 累積上下文實際比理論高 2-5 倍
     """
     n_analysts = len(selected_analysts or [])
     prompt_tokens = n_analysts * 5000 + max(1, debate_rounds) * 12000 + 15000
     completion_tokens = n_analysts * 2000 + max(1, debate_rounds) * 4000 + 3000
 
-    # 单价表(美元/百万 token)
+    # 單價表(美元/百萬 token)
     PRICING = {
         "deepseek-chat": (0.14, 0.28),
         "deepseek-reasoner": (0.55, 2.19),
@@ -626,6 +626,6 @@ def estimate_cost(
 
 
 def get_today_cache_key(symbol: str, market: str, debate_rounds: int, model: str) -> str:
-    """生成同标的同日的缓存键,用于跳过重复 LLM 调用。"""
+    """生成同標的同日的快取鍵,用於跳過重複 LLM 呼叫。"""
     today = date.today().isoformat()
     return f"{market}:{symbol}:{today}:r{debate_rounds}:{model}"

@@ -1,4 +1,4 @@
-"""TradingAgents 适配目录的模块边界契约。"""
+"""TradingAgents 適配目錄的模組邊界契約。"""
 
 from __future__ import annotations
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, case, func, or_
@@ -13,9 +14,10 @@ from src.platform.persistence.json_safe import to_jsonable
 from src.platform.marketdata.marketdata_client import md_stock_data
 from src.platform.notifications.notifier import get_global_proxy
 from src.platform.scheduling.timezone import to_iso_with_tz, utc_now
-from src.platform.marketdata.models import MarketCode
+from src.platform.marketdata.models import MarketCode, enabled_market_codes, is_market_enabled
 from src.platform.persistence.database import SessionLocal
 from src.platform.persistence.models import (
+    DiscoveryRun,
     EntryCandidate,
     EntryCandidateFeedback,
     EntryCandidateOutcome,
@@ -23,6 +25,14 @@ from src.platform.persistence.models import (
     Position,
     Stock,
     StockSuggestion,
+)
+from src.modules.strategy.ranking import group_instrument_rows
+from marketdata.types import TaiwanDiscoveryPool
+from src.modules.strategy.discovery_coverage import (
+    create_discovery_run,
+    finalize_discovery_run,
+    prune_discovery_runs,
+    run_reference,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,29 +50,29 @@ ACTION_BASE_SCORE: dict[str, float] = {
 }
 
 AGENT_LABELS: dict[str, str] = {
-    "premarket_outlook": "盘前分析",
-    "intraday_monitor": "盘中监测",
-    "daily_report": "收盘复盘",
-    "news_digest": "新闻速递",
-    "market_scan": "市场扫描",
+    "premarket_outlook": "盤前分析",
+    "intraday_monitor": "盤中監測",
+    "daily_report": "收盤覆盤",
+    "news_digest": "新聞速遞",
+    "market_scan": "市場掃描",
 }
 
 
 CANDIDATE_SOURCE_LABELS: dict[str, str] = {
-    "watchlist": "关注池",
-    "market_scan": "市场池",
-    "mixed": "市场+关注",
+    "watchlist": "關注池",
+    "market_scan": "市場池",
+    "mixed": "市場+關注",
 }
 
 
 STRATEGY_LABELS: dict[str, str] = {
-    "trend_follow": "趋势延续",
+    "trend_follow": "趨勢延續",
     "macd_golden": "MACD金叉",
     "volume_breakout": "放量突破",
-    "momentum": "动量强化",
-    "pullback": "回踩确认",
-    "rebound": "超跌反弹",
-    "watchlist_agent": "Agent建议",
+    "momentum": "動量強化",
+    "pullback": "回踩確認",
+    "rebound": "超跌反彈",
+    "watchlist_agent": "Agent建議",
 }
 
 MARKET_SCAN_SEED_SYMBOLS: dict[str, list[str]] = {
@@ -394,28 +404,28 @@ def _score_suggestion(
     evidence: list[str] = []
 
     if suggestion.signal:
-        evidence.append(f"建议信号: {suggestion.signal}")
+        evidence.append(f"建議訊號: {suggestion.signal}")
     if suggestion.reason:
-        evidence.append(f"建议依据: {suggestion.reason}")
+        evidence.append(f"建議依據: {suggestion.reason}")
 
     if quote:
         pct = _safe_float(quote.get("change_pct"))
         if pct is not None:
             if 0.5 <= abs(pct) <= 6:
                 score += 2
-                evidence.append(f"当日波动适中({pct:+.2f}%)")
+                evidence.append(f"當日波動適中({pct:+.2f}%)")
             elif abs(pct) >= 10:
                 score -= 3
-                evidence.append(f"当日波动过大({pct:+.2f}%)")
+                evidence.append(f"當日波動過大({pct:+.2f}%)")
 
     if kline:
         trend = (kline.get("trend") or "").strip()
-        if trend == "多头排列":
+        if trend == "多頭排列":
             score += 8
-            evidence.append("均线多头排列")
-        elif trend == "空头排列":
+            evidence.append("均線多頭排列")
+        elif trend == "空頭排列":
             score -= 8
-            evidence.append("均线空头排列")
+            evidence.append("均線空頭排列")
 
         macd = (kline.get("macd_cross") or "").strip()
         if macd == "金叉":
@@ -426,10 +436,10 @@ def _score_suggestion(
             evidence.append("MACD 死叉")
 
         rsi_status = (kline.get("rsi_status") or "").strip()
-        if rsi_status in ("超卖", "偏弱"):
+        if rsi_status in ("超賣", "偏弱"):
             score += 2
             evidence.append(f"RSI {rsi_status}")
-        elif rsi_status in ("超买",):
+        elif rsi_status in ("超買",):
             score -= 3
             evidence.append(f"RSI {rsi_status}")
 
@@ -448,14 +458,14 @@ def _score_suggestion(
                 evidence.append(f"量比放大({vol_ratio:.1f}x)")
             elif vol_ratio >= 1.3:
                 score += 2
-                evidence.append(f"量比温和放大({vol_ratio:.1f}x)")
+                evidence.append(f"量比溫和放大({vol_ratio:.1f}x)")
 
     q = suggestion.meta or {}
     quality = _safe_float((q.get("context_quality_score") if isinstance(q, dict) else None))
     if quality is not None:
         quality_bonus = _clamp((quality - 60.0) / 10.0, -3.0, 5.0)
         score += quality_bonus
-        evidence.append(f"上下文质量分 {quality:.0f}")
+        evidence.append(f"上下文質量分 {quality:.0f}")
 
     created_at = suggestion.created_at
     if created_at:
@@ -465,10 +475,10 @@ def _score_suggestion(
             hours = (utc_now() - created_at).total_seconds() / 3600.0
             if hours <= 6:
                 score += 3
-                evidence.append("建议新鲜度高(6h内)")
+                evidence.append("建議新鮮度高(6h內)")
             elif hours >= 48:
                 score -= 3
-                evidence.append("建议时效偏旧(48h+)")
+                evidence.append("建議時效偏舊(48h+)")
         except Exception:
             pass
 
@@ -524,13 +534,13 @@ def _build_plan(
                 target_price = resistance * 0.99
             else:
                 target_price = price * 1.06
-            invalidation = f"若跌破 {stop_loss:.2f} 则失效"
+            invalidation = f"若跌破 {stop_loss:.2f} 則失效"
         elif action in ("hold", "watch"):
             stop_loss = (support * 0.98) if support else (price * 0.94)
             target_price = (resistance * 0.99) if resistance else (price * 1.04)
-            invalidation = f"若跌破 {stop_loss:.2f} 则转防守"
+            invalidation = f"若跌破 {stop_loss:.2f} 則轉防守"
         else:
-            invalidation = "当前以风险控制为主，不建议新开仓"
+            invalidation = "當前以風險控制為主，不建議新開倉"
 
     return {
         "entry_low": entry_low,
@@ -632,11 +642,11 @@ def _derive_market_scan_decision(quote: dict | None, kline: dict | None) -> dict
     reasons: list[str] = []
 
     trend = (k.get("trend") or "").strip()
-    if trend == "多头排列":
+    if trend == "多頭排列":
         points += 2
         tags.append("trend_follow")
-        reasons.append("均线多头排列")
-    elif trend == "空头排列":
+        reasons.append("均線多頭排列")
+    elif trend == "空頭排列":
         points -= 2
 
     macd = (k.get("macd_cross") or "").strip()
@@ -661,35 +671,35 @@ def _derive_market_scan_decision(quote: dict | None, kline: dict | None) -> dict
         if 1.5 <= pct <= 8.5:
             points += 1
             tags.append("momentum")
-            reasons.append(f"涨幅{pct:+.2f}%")
+            reasons.append(f"漲幅{pct:+.2f}%")
         elif pct >= 10.5:
             points -= 2
         elif pct <= -5.5:
             points += 1
             tags.append("rebound")
-            reasons.append("短线超跌")
+            reasons.append("短線超跌")
 
     support = _safe_float(k.get("support_m")) or _safe_float(k.get("support"))
     last_close = _safe_float(k.get("last_close")) or _safe_float(q.get("current_price"))
     if support and last_close and 0 < support < last_close <= support * 1.03:
         points += 1
         tags.append("pullback")
-        reasons.append("回踩支撑附近")
+        reasons.append("回踩支撐附近")
 
     action = "watch"
-    action_label = "观望"
+    action_label = "觀望"
     if points >= 4:
         action = "buy"
-        action_label = "建仓"
+        action_label = "建倉"
     elif points >= 3:
         action = "add"
-        action_label = "准备加仓"
+        action_label = "準備加碼"
     elif points <= -3:
         action = "avoid"
-        action_label = "回避"
+        action_label = "迴避"
 
-    signal = "，".join(_strategy_labels(tags[:3])) if tags else "暂无明确信号"
-    reason = "，".join(reasons[:3]) if reasons else "等待更高确定性信号后介入"
+    signal = "，".join(_strategy_labels(tags[:3])) if tags else "暫無明確訊號"
+    reason = "，".join(reasons[:3]) if reasons else "等待更高確定性訊號後介入"
     return {
         "action": action,
         "action_label": action_label,
@@ -712,32 +722,32 @@ def _score_market_scan_candidate(
 
     if tags:
         score += min(8, len(tags) * 2)
-        evidence.append("策略信号: " + " / ".join(_strategy_labels(tags[:3])))
+        evidence.append("策略訊號: " + " / ".join(_strategy_labels(tags[:3])))
 
     pct = _safe_float(q.get("change_pct"))
     if pct is not None:
         if 1 <= pct <= 7:
             score += 2
-            evidence.append(f"价格动量({pct:+.2f}%)")
+            evidence.append(f"價格動量({pct:+.2f}%)")
         elif pct >= 10:
             score -= 3
-            evidence.append(f"涨幅过热({pct:+.2f}%)")
+            evidence.append(f"漲幅過熱({pct:+.2f}%)")
 
     turnover = _safe_float(q.get("turnover"))
     if turnover is not None:
         if turnover >= 3e9:
             score += 3
-            evidence.append("成交额高")
+            evidence.append("成交額高")
         elif turnover >= 1e9:
             score += 1
 
     trend = (k.get("trend") or "").strip()
-    if trend == "多头排列":
+    if trend == "多頭排列":
         score += 5
-        evidence.append("均线多头排列")
-    elif trend == "空头排列":
+        evidence.append("均線多頭排列")
+    elif trend == "空頭排列":
         score -= 6
-        evidence.append("均线空头排列")
+        evidence.append("均線空頭排列")
 
     score = _clamp(score, 0.0, 100.0)
     return score, evidence[:8]
@@ -897,7 +907,7 @@ def _load_market_scan_seed_inputs(*, market: str, limit: int) -> dict[str, dict]
     try:
         rows = md_stock_data(symbols, _to_market(mkt).value)
     except Exception as e:
-        logger.warning(f"市场扫描种子池拉取失败({mkt}): {e}")
+        logger.warning(f"市場掃描種子池拉取失敗({mkt}): {e}")
         rows = []
     out: dict[str, dict] = {}
     for row in rows or []:
@@ -910,6 +920,10 @@ def _load_market_scan_seed_inputs(*, market: str, limit: int) -> dict[str, dict]
             "change_pct": _safe_float(getattr(row, "change_pct", None)),
             "turnover": _safe_float(getattr(row, "turnover", None)),
             "volume": _safe_float(getattr(row, "volume", None)),
+            "price_kind": getattr(row, "price_kind", None),
+            "trade_date": getattr(row, "trade_date", None),
+            "freshness": getattr(row, "freshness", None),
+            "usable_for_trading": False if market == "TW" else None,
         }
         if quote["current_price"] is None:
             continue
@@ -947,9 +961,13 @@ def _merge_market_scan_seed(
         if not key.startswith(f"{mkt}:"):
             continue
         if key in base:
+            existing = base[key]
+            existing_run_keys = list(existing.get("scan_run_keys") or [])
+            incoming_run_keys = list(item.get("scan_run_keys") or [])
+            merged_run_keys = list(dict.fromkeys(existing_run_keys + incoming_run_keys))
             exist_quote = (
-                base[key].get("quote_seed")
-                if isinstance(base[key].get("quote_seed"), dict)
+                existing.get("quote_seed")
+                if isinstance(existing.get("quote_seed"), dict)
                 else {}
             )
             item_quote = (
@@ -960,7 +978,14 @@ def _merge_market_scan_seed(
             if (_safe_float(exist_quote.get("turnover")) or 0.0) < (
                 _safe_float(item_quote.get("turnover")) or 0.0
             ):
-                base[key] = item
+                replacement = dict(item)
+                replacement["scan_run_keys"] = merged_run_keys
+                for field in ("instrument_id", "instrument_group", "instrument_authority"):
+                    if existing.get(field) is not None:
+                        replacement[field] = existing[field]
+                base[key] = replacement
+            else:
+                existing["scan_run_keys"] = merged_run_keys
             continue
         base[key] = item
         added += 1
@@ -974,41 +999,103 @@ def _merge_market_scan_seed(
     return added
 
 
-def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
+def _empty_taiwan_discovery_pool(reason: str) -> TaiwanDiscoveryPool:
+    now = to_iso_with_tz(utc_now())
+    stage_names = {
+        "catalog": {"unique": [], "eligible": [], "excluded": []},
+        "universe_bound": {"requested": [], "not_requested_due_to_limit": []},
+        "dispatch": {"attempted": [], "unattempted": []},
+        "price_validation": {"valid": [], "invalid": [], "missing_or_failed": [], "pending": []},
+        "ranking": {"eligible": [], "excluded": []},
+        "pool_selection": {"selected": [], "ranked_not_selected": []},
+        "candidate_selection": {"selected": [], "excluded": [], "not_selected": []},
+    }
+    return TaiwanDiscoveryPool(
+        items=[], status="collector_error", catalog_count=0,
+        eligible_catalog_count=0, scanned_instrument_count=0,
+        price_snapshot_count=0, catalog_request_count=0,
+        price_snapshot_request_count=0, provider_scope="twmd",
+        error_reason=reason, stage_id_sets=stage_names,
+        stage_reason_id_sets={"catalog": {"collector_error": []}},
+        stage_reason_counts={"catalog": {"collector_error": 1}},
+        catalog_source="twmd:/api/v1/instruments",
+        catalog_authority_status="UNKNOWN", scan_coverage_state="MISSING",
+        coverage_scope="UNKNOWN", run_started_at_utc=now,
+        run_completed_at_utc=now,
+    )
+
+
+def _load_market_scan_inputs_with_runs(
+    limit_per_market: int = 60,
+) -> tuple[dict[str, dict], list[dict]]:
     collector = EastMoneyDiscoveryCollector(
         proxy=_resolve_market_scan_proxy(),
     )
     result: dict[str, dict] = {}
+    discovery_runs: list[dict] = []
     safe_limit = max(20, int(limit_per_market))
     min_required = min(max(12, int(safe_limit * 0.55)), safe_limit)
 
-    for market in ("CN", "HK", "US"):
+    for market in enabled_market_codes():
+        mode_items: dict[str, list] = {}
+        mode_run_keys: dict[str, str] = {}
         try:
-            turnover = _run_async(
-                collector.fetch_hot_stocks(
-                    market=market,
-                    mode="turnover",
-                    limit=safe_limit,
-                )
-            )
+            structured_fetch = getattr(collector, "fetch_taiwan_discovery", None)
+            if market == "TW" and callable(structured_fetch):
+                pool = _run_async(structured_fetch(mode="turnover", limit=safe_limit))
+                run_key = uuid.uuid4().hex
+                discovery_runs.append({"run_key": run_key, "mode": "turnover", "pool": pool})
+                mode_run_keys["turnover"] = run_key
+                mode_items["turnover"] = list(pool.items or [])
+            else:
+                mode_items["turnover"] = _run_async(
+                    collector.fetch_hot_stocks(market=market, mode="turnover", limit=safe_limit)
+                ) or []
         except Exception as e:
-            logger.warning(f"市场扫描成交榜失败({market}): {e}")
-            turnover = []
+            logger.warning(f"市場掃描成交榜失敗({market}): {e}")
+            if market == "TW" and callable(getattr(collector, "fetch_taiwan_discovery", None)):
+                pool = _empty_taiwan_discovery_pool(f"turnover:{type(e).__name__}")
+                run_key = uuid.uuid4().hex
+                discovery_runs.append({"run_key": run_key, "mode": "turnover", "pool": pool})
+                mode_run_keys["turnover"] = run_key
+            mode_items["turnover"] = []
         try:
-            gainers = _run_async(
-                collector.fetch_hot_stocks(
-                    market=market,
-                    mode="gainers",
-                    limit=safe_limit,
-                )
-            )
+            structured_fetch = getattr(collector, "fetch_taiwan_discovery", None)
+            if market == "TW" and callable(structured_fetch):
+                pool = _run_async(structured_fetch(mode="gainers", limit=safe_limit))
+                run_key = uuid.uuid4().hex
+                discovery_runs.append({"run_key": run_key, "mode": "gainers", "pool": pool})
+                mode_run_keys["gainers"] = run_key
+                mode_items["gainers"] = list(pool.items or [])
+            else:
+                mode_items["gainers"] = _run_async(
+                    collector.fetch_hot_stocks(market=market, mode="gainers", limit=safe_limit)
+                ) or []
         except Exception as e:
-            logger.warning(f"市场扫描涨幅榜失败({market}): {e}")
-            gainers = []
+            logger.warning(f"市場掃描漲幅榜失敗({market}): {e}")
+            if market == "TW" and callable(getattr(collector, "fetch_taiwan_discovery", None)):
+                pool = _empty_taiwan_discovery_pool(f"gainers:{type(e).__name__}")
+                run_key = uuid.uuid4().hex
+                discovery_runs.append({"run_key": run_key, "mode": "gainers", "pool": pool})
+                mode_run_keys["gainers"] = run_key
+            mode_items["gainers"] = []
 
-        merged = list(turnover or []) + list(gainers or [])
-        for row in merged:
-            symbol = (getattr(row, "symbol", "") or "").strip()
+        merged = [
+            (row, mode_run_keys.get(mode))
+            for mode in ("turnover", "gainers")
+            for row in (mode_items.get(mode) or [])
+        ]
+        for row, row_run_key in merged:
+            raw_symbol = (getattr(row, "symbol", "") or "").strip()
+            instrument_id = (getattr(row, "instrument_id", None) or "").strip() or None
+            if market == "TW" and not instrument_id and ":" in raw_symbol:
+                instrument_id = raw_symbol if raw_symbol.split(":", 1)[0] in {"TWSE", "TPEX"} else None
+            symbol = raw_symbol
+            if market == "TW" and instrument_id:
+                # Preserve the existing venue-qualified market key/symbol so a
+                # same-code TWSE and TPEX listing remains two distinct inputs.
+                symbol = instrument_id
+            symbol = symbol.strip()
             if not symbol:
                 continue
             key = f"{market}:{symbol}"
@@ -1017,12 +1104,31 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
                 "change_pct": _safe_float(getattr(row, "change_pct", None)),
                 "turnover": _safe_float(getattr(row, "turnover", None)),
                 "volume": _safe_float(getattr(row, "volume", None)),
+                "price_kind": getattr(row, "price_kind", None),
+                "trade_date": getattr(row, "trade_date", None),
+                "freshness": getattr(row, "freshness", None),
+                "usable_for_trading": False if market == "TW" else None,
             }
             if key in result:
                 exist_quote = result[key].get("quote_seed") or {}
                 if _safe_float(exist_quote.get("turnover")) is None and quote.get("turnover") is not None:
                     result[key]["quote_seed"] = quote
+                if row_run_key:
+                    result[key]["scan_run_keys"] = list(dict.fromkeys(
+                        list(result[key].get("scan_run_keys") or []) + [row_run_key]
+                    ))
                 continue
+            if len([k for k in result if k.startswith(f"{market}:")]) >= safe_limit:
+                continue
+            authority = {}
+            run_pool = None
+            if row_run_key:
+                run_pool = next((entry["pool"] for entry in discovery_runs if entry["run_key"] == row_run_key), None)
+                authority = (run_pool.authority_by_instrument_id or {}).get(instrument_id, {}) if run_pool else {}
+            group = str(authority.get("security_type") or "UNKNOWN").upper()
+            if (authority.get("authority_status") != "LATEST_ONLY"
+                    or authority.get("is_active") is not True or group not in {"EQUITY", "ETF"}):
+                group = "UNKNOWN"
             result[key] = {
                 "symbol": symbol,
                 "market": market,
@@ -1032,13 +1138,15 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
                 "source_suggestion_id": None,
                 "source_trace_id": "",
                 "quote_seed": quote,
+                "instrument_id": instrument_id,
+                "instrument_group": group,
+                "instrument_authority": authority,
+                "scan_run_keys": [row_run_key] if row_run_key else [],
                 "meta": {
                     "source": "market_scan",
                     "collected_at": to_iso_with_tz(utc_now()),
                 },
             }
-            if len([k for k in result if k.startswith(f"{market}:")]) >= safe_limit:
-                break
 
         market_count = len([k for k in result if k.startswith(f"{market}:")])
         if market_count < min_required:
@@ -1055,7 +1163,7 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
             )
             if added > 0:
                 logger.info(
-                    "市场扫描回退补全: market=%s added=%s current=%s",
+                    "市場掃描回退補全: market=%s added=%s current=%s",
                     market,
                     added,
                     len([k for k in result if k.startswith(f"{market}:")]),
@@ -1076,7 +1184,7 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
             )
             if snap_added > 0:
                 logger.info(
-                    "市场扫描快照补全: market=%s added=%s current=%s",
+                    "市場掃描快照補全: market=%s added=%s current=%s",
                     market,
                     snap_added,
                     len([k for k in result if k.startswith(f'{market}:')]),
@@ -1096,14 +1204,14 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
             )
             if seed_added > 0:
                 logger.info(
-                    "市场扫描种子补全: market=%s added=%s current=%s",
+                    "市場掃描種子補全: market=%s added=%s current=%s",
                     market,
                     seed_added,
                     len([k for k in result if k.startswith(f"{market}:")]),
                 )
 
     # Final per-market cap and stable ordering.
-    for market in ("CN", "HK", "US"):
+    for market in enabled_market_codes():
         keys = [k for k in result.keys() if k.startswith(f"{market}:")]
         if len(keys) <= safe_limit:
             continue
@@ -1113,13 +1221,25 @@ def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
             if key not in keep:
                 result.pop(key, None)
 
-    return result
+    return result, discovery_runs
 
 
-def _persist_market_scan_snapshot(snapshot: str, market_scan_map: dict[str, dict]) -> None:
+def _load_market_scan_inputs(limit_per_market: int = 60) -> dict[str, dict]:
+    """Compatibility projection for existing callers that only need rows."""
+    return _load_market_scan_inputs_with_runs(limit_per_market)[0]
+
+
+def _persist_market_scan_snapshot(
+    snapshot: str,
+    market_scan_map: dict[str, dict],
+    *,
+    db=None,
+    discovery_runs_by_key: dict[str, DiscoveryRun] | None = None,
+) -> None:
     if not snapshot:
         return
-    db = SessionLocal()
+    own_session = db is None
+    db = db or SessionLocal()
     try:
         db.query(MarketScanSnapshot).filter(
             MarketScanSnapshot.snapshot_date == snapshot
@@ -1138,6 +1258,17 @@ def _persist_market_scan_snapshot(snapshot: str, market_scan_map: dict[str, dict
                 continue
             quote = item.get("quote_seed") if isinstance(item.get("quote_seed"), dict) else {}
             meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+            run_ids = [
+                int(discovery_runs_by_key[key].id)
+                for key in (item.get("scan_run_keys") or [])
+                if discovery_runs_by_key and key in discovery_runs_by_key
+            ]
+            run_refs = [
+                run_reference(discovery_runs_by_key[key])
+                for key in (item.get("scan_run_keys") or [])
+                if discovery_runs_by_key and key in discovery_runs_by_key
+            ]
+            snapshot_meta = {**meta, "scan_run_refs": run_refs} if run_refs else dict(meta)
             db.add(
                 MarketScanSnapshot(
                     snapshot_date=snapshot,
@@ -1147,15 +1278,25 @@ def _persist_market_scan_snapshot(snapshot: str, market_scan_map: dict[str, dict
                     source=str(meta.get("source") or "market_scan"),
                     score_seed=float(_safe_float(item.get("score_seed")) or 0.0),
                     quote=to_jsonable(quote),
-                    meta=to_jsonable(meta),
+                    meta=to_jsonable(snapshot_meta),
+                    instrument_id=item.get("instrument_id"),
+                    instrument_group=str(item.get("instrument_group") or "UNKNOWN"),
+                    instrument_authority=to_jsonable(item.get("instrument_authority") or {}),
+                    scan_run_ids=run_ids,
+                    scan_run_refs=to_jsonable(run_refs),
                 )
             )
-        db.commit()
+        if own_session:
+            db.commit()
     except Exception as e:
-        db.rollback()
-        logger.warning(f"写入市场池快照失败: {e}")
+        if own_session:
+            db.rollback()
+        logger.warning(f"寫入市場池快照失敗: {e}")
+        if not own_session:
+            raise
     finally:
-        db.close()
+        if own_session:
+            db.close()
 
 
 def _format_candidate_row(row: EntryCandidate) -> dict:
@@ -1180,6 +1321,9 @@ def _format_candidate_row(row: EntryCandidate) -> dict:
         "snapshot_date": row.snapshot_date,
         "status": row.status,
         "score": round(float(row.score or 0), 2),
+        "rank_score": None,
+        "score_version": "candidate-score-v1",
+        "ranker_version": "candidate-score-v1",
         "confidence": round(float(row.confidence or 0), 3) if row.confidence is not None else None,
         "action": row.action,
         "action_label": row.action_label,
@@ -1202,6 +1346,12 @@ def _format_candidate_row(row: EntryCandidate) -> dict:
         ),
         "source_suggestion_id": row.source_suggestion_id,
         "source_trace_id": row.source_trace_id or "",
+        "instrument_id": row.instrument_id,
+        "instrument_group": row.instrument_group or "UNKNOWN",
+        "instrument_authority": row.instrument_authority or {},
+        "scan_run_id": row.scan_run_id,
+        "scan_run_ids": row.scan_run_ids or [],
+        "scan_run_refs": row.scan_run_refs or [],
         "evidence": row.evidence or [],
         "plan": row.plan or {},
         "meta": row.meta or {},
@@ -1257,13 +1407,16 @@ def refresh_entry_candidates(
 ) -> dict:
     snapshot = (snapshot_date or date.today().strftime("%Y-%m-%d")).strip()
     suggestions = _load_latest_suggestions(limit=max_inputs)
-    market_scan_map = _load_market_scan_inputs(limit_per_market=max(20, int(market_scan_limit)))
-    _persist_market_scan_snapshot(snapshot, market_scan_map)
+    market_scan_map, discovery_run_entries = _load_market_scan_inputs_with_runs(
+        limit_per_market=max(20, int(market_scan_limit))
+    )
     holding_keys = _load_holding_keys()
 
     input_map: dict[str, dict] = dict(market_scan_map)
     for s in suggestions:
         market = _to_market(s.stock_market).value
+        if not is_market_enabled(market):
+            continue
         symbol = (s.stock_symbol or "").strip()
         if not symbol:
             continue
@@ -1279,12 +1432,16 @@ def refresh_entry_candidates(
             "source_trace_id": str((s.meta or {}).get("trace_id") or ""),
             "quote_seed": seed_quote,
             "action": (s.action or "watch").strip().lower(),
-            "action_label": (s.action_label or "观望").strip(),
+            "action_label": (s.action_label or "觀望").strip(),
             "signal": (s.signal or "").strip(),
             "reason": (s.reason or "").strip(),
             "meta": to_jsonable(s.meta or {}),
             "suggestion_obj": s,
             "strategy_tags_seed": ["watchlist_agent"],
+            "instrument_id": input_map.get(key, {}).get("instrument_id"),
+            "instrument_group": input_map.get(key, {}).get("instrument_group", "UNKNOWN"),
+            "instrument_authority": input_map.get(key, {}).get("instrument_authority", {}),
+            "scan_run_keys": list(input_map.get(key, {}).get("scan_run_keys") or []),
         }
         if key in input_map:
             base = input_map[key]
@@ -1306,9 +1463,6 @@ def refresh_entry_candidates(
             )
         input_map[key] = seed
 
-    if not input_map:
-        return {"snapshot_date": snapshot, "count": 0, "items": []}
-
     key_set = set(input_map.keys())
     by_market: dict[MarketCode, list[str]] = {}
     for key in key_set:
@@ -1323,7 +1477,7 @@ def refresh_entry_candidates(
         try:
             rows = md_stock_data(uniq, market.value)
         except Exception as e:
-            logger.warning(f"入场候选行情采集失败({market.value}): {e}")
+            logger.warning(f"入場候選行情采集失敗({market.value}): {e}")
             rows = []
         for q in rows or []:
             quotes[f"{market.value}:{q.symbol}"] = {
@@ -1375,10 +1529,27 @@ def refresh_entry_candidates(
     db = SessionLocal()
     items: list[dict] = []
     try:
+        prune_discovery_runs(db, now=utc_now())
+        discovery_runs_by_key: dict[str, DiscoveryRun] = {}
+        for run_entry in discovery_run_entries:
+            discovery_runs_by_key[run_entry["run_key"]] = create_discovery_run(
+                db,
+                run_entry["pool"],
+                mode=run_entry["mode"],
+                scan_run_key=run_entry["run_key"],
+            )
+        for inp in input_map.values():
+            inp["scan_run_ids"] = [
+                int(discovery_runs_by_key[key].id)
+                for key in (inp.get("scan_run_keys") or [])
+                if key in discovery_runs_by_key
+            ]
+
         db.query(EntryCandidate).filter(
             EntryCandidate.snapshot_date == snapshot
         ).delete(synchronize_session=False)
 
+        candidate_rows: list[EntryCandidate] = []
         for key, inp in input_map.items():
             market, symbol = key.split(":", 1)
             quote = dict(quotes.get(key, {}) or {})
@@ -1398,7 +1569,7 @@ def refresh_entry_candidates(
             strategy_tags: list[str] = list(inp.get("strategy_tags_seed") or [])
             if suggestion_obj is not None:
                 action = (inp.get("action") or "watch").strip().lower()
-                action_label = (inp.get("action_label") or "观望").strip()
+                action_label = (inp.get("action_label") or "觀望").strip()
                 signal = (inp.get("signal") or "").strip()
                 reason = (inp.get("reason") or "").strip()
                 score, evidence = _score_suggestion(
@@ -1407,7 +1578,7 @@ def refresh_entry_candidates(
                     quote=quote,
                     kline=kline,
                 )
-                if (kline.get("trend") or "").strip() == "多头排列":
+                if (kline.get("trend") or "").strip() == "多頭排列":
                     strategy_tags.append("trend_follow")
                 if (kline.get("macd_cross") or "").strip() == "金叉":
                     strategy_tags.append("macd_golden")
@@ -1418,7 +1589,7 @@ def refresh_entry_candidates(
                 decision = _derive_market_scan_decision(quote=quote, kline=kline)
                 if seeded_action in ACTION_BASE_SCORE:
                     action = seeded_action
-                    action_label = (inp.get("action_label") or decision.get("action_label") or "观望").strip()
+                    action_label = (inp.get("action_label") or decision.get("action_label") or "觀望").strip()
                     signal = (inp.get("signal") or decision.get("signal") or "").strip()
                     reason = (inp.get("reason") or decision.get("reason") or "").strip()
                     strategy_tags = list(
@@ -1449,10 +1620,10 @@ def refresh_entry_candidates(
 
             if is_holding and action == "buy":
                 action = "add"
-                action_label = "准备加仓"
+                action_label = "準備加碼"
             if (not is_holding) and action == "add":
                 action = "buy"
-                action_label = "建仓"
+                action_label = "建倉"
 
             strategy_tags = list(dict.fromkeys([x for x in strategy_tags if x]))
             plan = _build_plan(
@@ -1478,6 +1649,14 @@ def refresh_entry_candidates(
             threshold = 62 if candidate_source in ("market_scan", "mixed") else 55
             if action in ("buy", "add") and quality >= 90 and score >= threshold:
                 status = "active"
+            # Taiwan listings with no captured, current catalog classification stay
+            # visible for auditing, but cannot enter an unheld opportunity path.
+            # ETFs remain active candidates in their own group; the strategy and
+            # dashboard consumers keep them separate from ordinary EQUITY capacity.
+            if market == "TW" and not is_holding and str(
+                inp.get("instrument_group") or "UNKNOWN"
+            ).upper() not in {"EQUITY", "ETF"}:
+                status = "inactive"
 
             row = EntryCandidate(
                 stock_symbol=symbol,
@@ -1521,16 +1700,141 @@ def refresh_entry_candidates(
                         "strategy_tags": strategy_tags,
                         "is_holding_snapshot": bool(is_holding),
                         "source_meta": inp.get("meta") or {},
+                        "instrument_id": inp.get("instrument_id"),
+                        "instrument_group": inp.get("instrument_group") or "UNKNOWN",
+                        "instrument_authority": inp.get("instrument_authority") or {},
+                        "scan_run_keys": inp.get("scan_run_keys") or [],
                     }
                 ),
+                instrument_id=inp.get("instrument_id"),
+                instrument_group=str(inp.get("instrument_group") or "UNKNOWN"),
+                instrument_authority=to_jsonable(inp.get("instrument_authority") or {}),
+                scan_run_id=None,
+                scan_run_ids=list(inp.get("scan_run_ids") or []),
+                scan_run_refs=[],
             )
             db.add(row)
-            items.append(_format_candidate_row(row))
+            candidate_rows.append(row)
+
+        db.flush()
+        candidate_by_instrument_id = {
+            str(row.instrument_id): row
+            for row in candidate_rows
+            if row.instrument_id
+        }
+        for run_entry in discovery_run_entries:
+            run = discovery_runs_by_key[run_entry["run_key"]]
+            finalize_discovery_run(
+                db,
+                run,
+                run_entry["pool"],
+                candidate_rows=candidate_rows,
+                candidate_by_instrument_id=candidate_by_instrument_id,
+            )
+
+        _persist_market_scan_snapshot(
+            snapshot,
+            market_scan_map,
+            db=db,
+            discovery_runs_by_key=discovery_runs_by_key,
+        )
+        db.flush()
+
+        # Preserve the candidate's actual entry plan before the mutable daily
+        # projection is committed. The capture stays UNVERIFIABLE for calibration
+        # until the candidate quote itself carries source-time evidence; the RC-D
+        # outcome populations can still evaluate later, trusted daily bars.
+        from src.modules.strategy.calibration_gate import capture_decision_snapshot
+        from src.modules.strategy.outcome_kernel import (
+            EVALUATOR_CANDIDATE_FORWARD_V2,
+            POPULATION_CANDIDATE_FORWARD_V2,
+            SCORE_VERSION_CANDIDATE_V1,
+        )
+
+        capture_by_market: dict[str, list[dict]] = {}
+        for row in candidate_rows:
+            market = (row.stock_market or "").strip().upper()
+            symbol = (row.stock_symbol or "").strip()
+            instrument_id = (row.instrument_id or "").strip()
+            if not market or not symbol:
+                continue
+            if market != "TW":
+                instrument_id = instrument_id or f"{market}:{symbol}"
+            if market == "TW" and instrument_id.split(":", 1)[0] not in {"TWSE", "TPEX"}:
+                continue
+            capture_by_market.setdefault(market, []).append({
+                "instrument_id": instrument_id,
+                "symbol": symbol,
+                "strategy_code": "candidate_forward",
+                "raw_factor_values": {
+                    "candidate_score": float(row.score or 0),
+                    "plan_quality": float(row.plan_quality or 0),
+                },
+                "ranking_value": float(row.score or 0),
+                "primary_horizon_sessions": 3,
+                "candidate_id": int(row.id),
+                "signal_run_id": None,
+                "instrument_group": row.instrument_group or "UNKNOWN",
+                "instrument_authority": row.instrument_authority or {},
+                "scan_run_ids": list(row.scan_run_ids or []),
+                "scan_run_refs": list(row.scan_run_refs or []),
+                "entry_price": row.entry_high or row.entry_low,
+                "entry_low": row.entry_low,
+                "entry_high": row.entry_high,
+                "stop_loss": row.stop_loss,
+                "target_price": row.target_price,
+                "action": row.action or "watch",
+                "is_holding_snapshot": bool(row.is_holding_snapshot),
+                "candidate_source": row.candidate_source or "",
+                "score_version": SCORE_VERSION_CANDIDATE_V1,
+                "eligibility": {
+                    "status": row.status,
+                    "action": row.action,
+                    "candidate_source": row.candidate_source,
+                    "plan_quality": row.plan_quality,
+                },
+                "point_in_time_status": "UNVERIFIABLE",
+            })
+        for market, decisions in sorted(capture_by_market.items()):
+            ordered_ids = sorted(int(item["candidate_id"]) for item in decisions)
+            token = uuid.uuid5(uuid.NAMESPACE_URL, f"{market}:{snapshot}:{ordered_ids}").hex[:12]
+            capture_scan_run_ids = sorted({
+                int(scan_id)
+                for decision in decisions
+                for scan_id in (decision.get("scan_run_ids") or [])
+                if scan_id is not None
+            })
+            refs_by_item = {
+                f"{decision['instrument_id']}|{decision['strategy_code']}":
+                    decision.get("scan_run_refs") or []
+                for decision in decisions
+            }
+            capture_decision_snapshot(
+                db,
+                capture_id=f"candidate-{market}-{snapshot}-{token}",
+                market=market,
+                session_date=snapshot,
+                decisions=decisions,
+                ranker_version=SCORE_VERSION_CANDIDATE_V1,
+                evaluation_version=EVALUATOR_CANDIDATE_FORWARD_V2,
+                population=POPULATION_CANDIDATE_FORWARD_V2,
+                decision_at_utc=utc_now(),
+                captured_at_utc=utc_now(),
+                scoring_config_payload={
+                    "score_version": SCORE_VERSION_CANDIDATE_V1,
+                    "population": POPULATION_CANDIDATE_FORWARD_V2,
+                    "candidate_ids": ordered_ids,
+                },
+                scan_run_ids=capture_scan_run_ids,
+                scan_run_refs_by_item=refs_by_item,
+                commit=False,
+            )
+        items = [_format_candidate_row(row) for row in candidate_rows]
 
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.error(f"刷新入场候选失败: {e}")
+        logger.error(f"重新整理入場候選失敗: {e}")
         raise
     finally:
         db.close()
@@ -1560,6 +1864,7 @@ def list_entry_candidates(
     source: str = "",
     holding: str = "",
     strategy: str = "",
+    instrument_group: str = "",
 ) -> dict:
     def _query_rows():
         db = SessionLocal()
@@ -1579,6 +1884,11 @@ def list_entry_candidates(
             mkt = (market or "").strip().upper()
             if mkt:
                 q = q.filter(EntryCandidate.stock_market == mkt)
+            group = (instrument_group or "").strip().upper()
+            if group == "ORDINARY":
+                q = q.filter(or_(EntryCandidate.stock_market != "TW", EntryCandidate.instrument_group == "EQUITY"))
+            elif group in {"EQUITY", "ETF", "UNKNOWN"}:
+                q = q.filter(EntryCandidate.instrument_group == group)
             st = (status or "").strip().lower()
             if st and st != "all":
                 q = q.filter(EntryCandidate.status == st)
@@ -1596,19 +1906,14 @@ def list_entry_candidates(
             elif h == "unheld":
                 q = q.filter(EntryCandidate.is_holding_snapshot.is_(False))
             q = q.filter(EntryCandidate.score >= float(min_score or 0))
-            rows = (
-                q.order_by(
-                    case(
-                        (EntryCandidate.candidate_source == "market_scan", 0),
-                        (EntryCandidate.candidate_source == "mixed", 1),
-                        else_=2,
-                    ),
-                    EntryCandidate.score.desc(),
-                    EntryCandidate.updated_at.desc(),
-                )
-                .limit(max(20, int(limit) * 4))
-                .all()
-            )
+            rows = q.order_by(
+                EntryCandidate.score.desc(),
+                EntryCandidate.stock_market.asc(),
+                EntryCandidate.instrument_group.asc(),
+                EntryCandidate.instrument_id.asc(),
+                EntryCandidate.stock_symbol.asc(),
+                EntryCandidate.id.asc(),
+            ).all()
             return snapshot, rows
         finally:
             db.close()
@@ -1619,8 +1924,11 @@ def list_entry_candidates(
     if tag:
         rows = [r for r in rows if tag in (r.strategy_tags or [])]
 
-    rows = rows[: max(1, int(limit))]
-    items = [_format_candidate_row(r) for r in rows]
+    # Resolve aliases with the common strategy/dashboard/paper representative key
+    # before the page limit. Candidate scores remain explicitly versioned as raw.
+    representatives = [rep for rep, _ in group_instrument_rows(rows)]
+    representatives = representatives[:max(1, int(limit))]
+    items = [_format_candidate_row(r) for r in representatives]
     return {"snapshot_date": snapshot, "count": len(items), "items": items}
 
 
@@ -1656,7 +1964,7 @@ def save_entry_candidate_feedback(
         return True
     except Exception as e:
         db.rollback()
-        logger.warning(f"保存候选反馈失败: {e}")
+        logger.warning(f"儲存候選回饋失敗: {e}")
         return False
     finally:
         db.close()
@@ -1706,7 +2014,7 @@ def evaluate_entry_candidate_outcomes(
 
         today = date.today()
         kline_cache: dict[tuple[str, str], list] = {}
-        pending = 0  # 分批提交计数,缩短写事务窗口
+        pending = 0  # 分批提交計數,縮短寫事務視窗
 
         for c in candidates:
             snap_day = _parse_day(c.snapshot_date)
@@ -1804,7 +2112,7 @@ def evaluate_entry_candidate_outcomes(
                 existing.add((c.id, horizon))
                 pending += 1
 
-            # 分批提交:累计到阈值即落盘,缩短写事务,避免与 60s 调度器并发写长时间持锁
+            # 分批提交:累計到閾值即落盤,縮短寫事務,避免與 60s 排程器併發寫長時間持鎖
             if pending >= 50:
                 db.commit()
                 pending = 0
@@ -1813,7 +2121,7 @@ def evaluate_entry_candidate_outcomes(
         return stats
     except Exception as e:
         db.rollback()
-        logger.warning(f"候选后验评估失败: {e}")
+        logger.warning(f"候選後驗評估失敗: {e}")
         return stats
     finally:
         db.close()
@@ -2047,6 +2355,8 @@ def get_entry_candidate_stats(*, days: int = 30) -> dict:
             outcome_summary.append(
                 {
                     "horizon_days": int(h or 0),
+                    "population": "legacy-unlabelled",
+                    "return_basis": "legacy calendar-day close projection",
                     "source": src or "watchlist",
                     "source_label": _candidate_source_label(src or "watchlist"),
                     "total": total_eval,
@@ -2057,8 +2367,14 @@ def get_entry_candidate_stats(*, days: int = 30) -> dict:
             )
         outcome_summary.sort(key=lambda x: (x["horizon_days"], x["total"]), reverse=True)
 
+        from src.modules.strategy.outcomes import point_in_time_outcome_stats
         return {
             "window_days": days,
+            "legacy_outcome_basis": {
+                "population": "legacy-unlabelled",
+                "return_basis": "legacy calendar-day close projection",
+            },
+            "outcomes_v2": point_in_time_outcome_stats(days=days, db=db),
             "feedback": {
                 "total": total,
                 "useful": useful,

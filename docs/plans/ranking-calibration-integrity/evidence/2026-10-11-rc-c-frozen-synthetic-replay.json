@@ -1,0 +1,96 @@
+{
+  "calibration_mode": "FROZEN",
+  "calibration_writes": false,
+  "exposure": {
+    "cash_or_lot_simulation": false,
+    "comparison": "same v2 selected instruments; legacy capped display only, not a historical portfolio",
+    "delta": -0.2,
+    "measure": "sum of requested per-position target budget ratios; not executed allocation",
+    "selected_position_budget_ratio_legacy_capped": 1.25,
+    "selected_position_budget_ratio_v2": 1.05
+  },
+  "filter_retention": {
+    "55": {
+      "delta": -5,
+      "legacy_count": 12,
+      "ranker_v2_count": 7
+    },
+    "70": {
+      "delta": -6,
+      "legacy_count": 11,
+      "ranker_v2_count": 5
+    },
+    "80": {
+      "delta": -6,
+      "legacy_count": 10,
+      "ranker_v2_count": 4
+    },
+    "90": {
+      "delta": -7,
+      "legacy_count": 9,
+      "ranker_v2_count": 2
+    }
+  },
+  "fixture": "rc-c-frozen-synthetic-v1",
+  "reference": {
+    "candidate_count": 13,
+    "display_tie_groups": 1,
+    "feature_tie_groups": 1,
+    "finite_percentile_count": 13,
+    "rank_score_max": 95.25741268,
+    "rank_score_median": 62.24593312,
+    "rank_score_min": 7.585818,
+    "ranking_value_max": 160,
+    "ranking_value_min": 50
+  },
+  "selection": {
+    "after_instrument_count": 5,
+    "before_instrument_count": 13,
+    "cap": 5,
+    "constraint_unit": "INSTRUMENT",
+    "excluded_instrument_count": 8,
+    "exclusion_reasons": {
+      "HIGH_RISK_RATIO": 0,
+      "STRATEGY_SHARE": 0,
+      "UNHELD_CAP": 8
+    },
+    "high_risk_actual_ratio": 0.2,
+    "high_risk_quota": 1,
+    "selected_instruments": [
+      "TWSE:2312",
+      "TWSE:2311",
+      "TWSE:2310",
+      "TWSE:2309",
+      "TWSE:2308"
+    ],
+    "small_set_quota_exceptions": [],
+    "strategy_quotas": {
+      "strategy-0": 2,
+      "strategy-1": 2,
+      "strategy-2": 2,
+      "strategy-3": 2,
+      "strategy-4": 2
+    }
+  },
+  "sizing_examples": [
+    {
+      "legacy_budget_ratio_after_cap": 0.25,
+      "rank_score": 62.24593312,
+      "ranking_value": 110,
+      "v2_budget_ratio": 0.08
+    },
+    {
+      "legacy_budget_ratio_after_cap": 0.25,
+      "rank_score": 81.75744762,
+      "ranking_value": 130,
+      "v2_budget_ratio": 0.18
+    },
+    {
+      "legacy_budget_ratio_after_cap": 0.25,
+      "rank_score": 92.414182,
+      "ranking_value": 150,
+      "v2_budget_ratio": 0.25
+    }
+  ],
+  "source_data": "deterministic synthetic inputs only; no live or historical rows"
+}

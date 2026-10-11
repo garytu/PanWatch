@@ -1,8 +1,8 @@
-"""组合 vs 基准对比(M2):超额收益 / 信息比率 / 相对回撤 + 归一化净值曲线。
+"""組合 vs 基準對比(M2):超額收益 / 資訊比率 / 相對回檔 + 歸一化淨值曲線。
 
-净值序列由各持仓的日K(KlineCollector,带缓存)按**当前持仓量**重构 —— 近似假设
-区间内持仓不变(忽略区间内加减仓),用于"当前这篮子相对大盘"的对比视角。
-基准默认沪深300;指数需显式腾讯前缀(cn_symbol 会把 000300 误判成 sz)。
+淨值序列由各持倉的日K(KlineCollector,帶快取)按**當前持倉量**重構 —— 近似假設
+區間內持倉不變(忽略區間內加減碼),用於"當前這籃子相對大盤"的對比視角。
+基準預設滬深300;指數需顯式騰訊字首(cn_symbol 會把 000300 誤判成 sz)。
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ from src.platform.marketdata.models import MarketCode
 
 logger = logging.getLogger(__name__)
 
-# 腾讯日K接口(与 kline_collector.TENCENT_KLINE_URL 同源,本地化以解除对其内部符号的依赖)
+# 騰訊日K介面(與 kline_collector.TENCENT_KLINE_URL 同源,本地化以解除對其內部符號的依賴)
 _TENCENT_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 
 
 def _parse_tencent_kline(text: str, tencent_sym: str) -> list[KlineData]:
-    """解析腾讯 K 线 JS 变量响应(kline_dayqfq={...})为 KlineData;空/异常返回 []。"""
+    """解析騰訊 K 線 JS 變數回應(kline_dayqfq={...})為 KlineData;空/異常返回 []。"""
     if not text or "=" not in text:
         return []
     json_str = text.split("=", 1)[1].strip()
@@ -57,16 +57,16 @@ def _parse_tencent_kline(text: str, tencent_sym: str) -> list[KlineData]:
                 continue
     return out
 
-# 常见指数 → (腾讯行情符号, 中文名);指数前缀特殊,不能走 cn_symbol 自动判断
+# 常見指數 → (騰訊行情符號, 中文名);指數字首特殊,不能走 cn_symbol 自動判斷
 INDEX_TENCENT: dict[str, tuple[str, str]] = {
-    "000300": ("sh000300", "沪深300"),
-    "000905": ("sh000905", "中证500"),
-    "000016": ("sh000016", "上证50"),
-    "399006": ("sz399006", "创业板指"),
-    "000001": ("sh000001", "上证指数"),
+    "000300": ("sh000300", "滬深300"),
+    "000905": ("sh000905", "中證500"),
+    "000016": ("sh000016", "上證50"),
+    "399006": ("sz399006", "創業板指"),
+    "000001": ("sh000001", "上證指數"),
 }
 DEFAULT_BENCHMARK = "000300"
-_ANNUALIZE = 242  # A股年化交易日数
+_ANNUALIZE = 242  # A股年化交易日數
 
 
 def benchmark_label(code: str) -> str:
@@ -80,9 +80,9 @@ def compute_benchmark_metrics(
     *,
     annualize: int = _ANNUALIZE,
 ) -> dict | None:
-    """两条等长、按日期对齐的净值序列 → 对比指标 + 归一化曲线(归一到 100)。
+    """兩條等長、按日期對齊的淨值序列 → 對比指標 + 歸一化曲線(歸一到 100)。
 
-    无效(长度 <2 / 不等长 / 起点非正)返回 None。
+    無效(長度 <2 / 不等長 / 起點非正)返回 None。
     """
     n = len(portfolio_values)
     if n < 2 or len(benchmark_values) != n or len(dates) != n:
@@ -104,7 +104,7 @@ def compute_benchmark_metrics(
     std = var**0.5
     info_ratio = (mean_excess / std * (annualize**0.5)) if std > 0 else 0.0
 
-    # 相对回撤:组合/基准 归一比值序列的最大回撤
+    # 相對回檔:組合/基準 歸一比值序列的最大回檔
     ratio = [pn / bn for pn, bn in zip(pnorm, bnorm)]
     peak, max_dd = ratio[0], 0.0
     for r in ratio:
@@ -127,7 +127,7 @@ def compute_benchmark_metrics(
 
 
 def _fetch_benchmark_series(code: str, days: int) -> tuple[list[str], list[float]]:
-    """取基准指数日K → (dates, closes);失败返回 ([], [])。"""
+    """取基準指數日K → (dates, closes);失敗返回 ([], [])。"""
     tsym = INDEX_TENCENT.get(
         code, (code if code.startswith(("sh", "sz")) else f"sh{code}", code)
     )[0]
@@ -138,7 +138,7 @@ def _fetch_benchmark_series(code: str, days: int) -> tuple[list[str], list[float
         min_interval_s=0.15,
         parse="text",
         raise_for_status=False,
-        log_label="基准指数",
+        log_label="基準指數",
         symbol=tsym,
     )
     if not text:
@@ -148,7 +148,7 @@ def _fetch_benchmark_series(code: str, days: int) -> tuple[list[str], list[float
 
 
 def _ffill_closes(bars: list[KlineData], dates: list[str]) -> list[float]:
-    """把持仓日K前向填充到给定(升序)交易日序列上。dates 均 >= bars 首日。"""
+    """把持倉日K前向填充到給定(升序)交易日序列上。dates 均 >= bars 首日。"""
     series = sorted(((b.date, b.close) for b in bars), key=lambda x: x[0])
     out: list[float] = []
     last = series[0][1]
@@ -168,9 +168,9 @@ def build_portfolio_benchmark(
     benchmark_code: str = DEFAULT_BENCHMARK,
     kline_fetch=None,
 ) -> dict | None:
-    """holdings: [{symbol, market, quantity, fx}] → 基准对比结果(含归一化曲线)。
+    """holdings: [{symbol, market, quantity, fx}] → 基準對比結果(含歸一化曲線)。
 
-    kline_fetch(symbol, market) -> list[KlineData];默认用 KlineCollector(带缓存)。
+    kline_fetch(symbol, market) -> list[KlineData];預設用 KlineCollector(帶快取)。
     """
     bench_dates, bench_closes = _fetch_benchmark_series(benchmark_code, days)
     if len(bench_dates) < 2:
@@ -192,9 +192,9 @@ def build_portfolio_benchmark(
     if not holding_series:
         return None
 
-    # 所有持仓都有数据的起点,避免早期持仓缺数导致 NAV 失真;
-    # 但覆盖极差的单只持仓(坏源/新股,只有最近 1-2 根)不许一票否决整个窗口:
-    # 保底窗口 = max(10, 基准天数一半),覆盖不到保底窗口起点的持仓剔除出 NAV(记入 excluded)。
+    # 所有持倉都有資料的起點,避免早期持倉缺數導致 NAV 失真;
+    # 但覆蓋極差的單隻持倉(壞源/新股,只有最近 1-2 根)不許一票否決整個視窗:
+    # 保底視窗 = max(10, 基準天數一半),覆蓋不到保底視窗起點的持倉剔除出 NAV(記入 excluded)。
     min_window = max(10, len(bench_dates) // 2)
     floor_date = bench_dates[-min_window] if len(bench_dates) >= min_window else bench_dates[0]
     kept = [hs for hs in holding_series if hs[2] <= floor_date]
@@ -221,7 +221,7 @@ def build_portfolio_benchmark(
         metrics["benchmark_code"] = benchmark_code
         metrics["benchmark_label"] = benchmark_label(benchmark_code)
         if excluded:
-            # 覆盖不足被剔除的持仓(如坏源/新股),供上层展示"基于 N-x 只计算"
+            # 覆蓋不足被剔除的持倉(如壞源/新股),供上層展示"基於 N-x 只計算"
             metrics["excluded"] = excluded
     return metrics
 
@@ -233,9 +233,9 @@ def build_attribution(
     benchmark_code: str = DEFAULT_BENCHMARK,
     kline_fetch=None,
 ) -> list[dict]:
-    """近 days 日各持仓对组合收益的贡献(weight×return),按贡献降序。
+    """近 days 日各持倉對組合收益的貢獻(weight×return),按貢獻降序。
 
-    contribution_i ≈ 起始权重_i × 区间收益_i;和≈组合收益。用于"谁拖累/贡献"。
+    contribution_i ≈ 起始權重_i × 區間收益_i;和≈組合收益。用於"誰拖累/貢獻"。
     """
     bench_dates, _ = _fetch_benchmark_series(benchmark_code, days)
     if len(bench_dates) < 2:

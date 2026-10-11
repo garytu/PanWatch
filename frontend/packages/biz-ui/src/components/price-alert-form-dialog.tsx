@@ -59,9 +59,9 @@ interface ChannelOption {
 }
 
 const TYPE_LABEL: Record<ConditionType, string> = {
-  price: '价格',
-  change_pct: '涨跌幅%',
-  turnover: '成交额',
+  price: '價格',
+  change_pct: '漲跌幅%',
+  turnover: '成交額',
   volume: '成交量',
   volume_ratio: '量比',
 }
@@ -221,7 +221,7 @@ export default function PriceAlertFormDialog(props: {
             <div>
               <div className="text-[12px] text-muted-foreground mb-1">股票</div>
               <Select value={String(form.stock_id || '')} onValueChange={(v) => setForm(prev => ({ ...prev, stock_id: Number(v) }))}>
-                <SelectTrigger><SelectValue placeholder="选择股票" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="選擇股票" /></SelectTrigger>
                 <SelectContent>
                   {stockOptions.map(s => (
                     <SelectItem key={s.id} value={String(s.id)}>{s.name} ({s.symbol})</SelectItem>
@@ -230,14 +230,14 @@ export default function PriceAlertFormDialog(props: {
               </Select>
             </div>
             <div>
-              <div className="text-[12px] text-muted-foreground mb-1">规则名称</div>
+              <div className="text-[12px] text-muted-foreground mb-1">規則名稱</div>
               <Input value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} placeholder="例如：突破120提醒" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
-              <div className="text-[12px] text-muted-foreground mb-1">条件关系</div>
+              <div className="text-[12px] text-muted-foreground mb-1">條件關係</div>
               <Select value={form.op} onValueChange={(v) => setForm(prev => ({ ...prev, op: v as RuleOp }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -247,17 +247,17 @@ export default function PriceAlertFormDialog(props: {
               </Select>
             </div>
             <div>
-              <div className="text-[12px] text-muted-foreground mb-1">生效时段</div>
+              <div className="text-[12px] text-muted-foreground mb-1">生效時段</div>
               <Select value={form.market_hours_mode} onValueChange={(v) => setForm(prev => ({ ...prev, market_hours_mode: v as any }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="trading_only">仅交易时段</SelectItem>
+                  <SelectItem value="trading_only">僅交易時段</SelectItem>
                   <SelectItem value="always">全天</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <div className="text-[12px] text-muted-foreground mb-1">冷却(分钟)</div>
+              <div className="text-[12px] text-muted-foreground mb-1">冷卻(分鐘)</div>
               <Input type="number" value={String(form.cooldown_minutes)} onChange={e => setForm(prev => ({ ...prev, cooldown_minutes: Number(e.target.value || 0) }))} />
             </div>
             <div>
@@ -268,17 +268,17 @@ export default function PriceAlertFormDialog(props: {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <div className="text-[12px] text-muted-foreground mb-1">触发模式</div>
+              <div className="text-[12px] text-muted-foreground mb-1">觸發模式</div>
               <Select value={form.repeat_mode} onValueChange={(v) => setForm(prev => ({ ...prev, repeat_mode: v as any }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="repeat">可重复触发</SelectItem>
-                  <SelectItem value="once">仅触发一次</SelectItem>
+                  <SelectItem value="repeat">可重複觸發</SelectItem>
+                  <SelectItem value="once">僅觸發一次</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <div className="text-[12px] text-muted-foreground mb-1">到期时间（可选）</div>
+              <div className="text-[12px] text-muted-foreground mb-1">到期時間（可選）</div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative">
                   <Button
@@ -288,7 +288,7 @@ export default function PriceAlertFormDialog(props: {
                     onClick={() => setCalendarOpen(v => !v)}
                   >
                     <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
-                    {selectedDate || '选择日期'}
+                    {selectedDate || '選擇日期'}
                   </Button>
                   {calendarOpen && (
                     <div className="absolute z-50 mt-1 w-[260px] rounded-xl border border-border/60 bg-card shadow-xl p-2">
@@ -361,14 +361,14 @@ export default function PriceAlertFormDialog(props: {
                   onChange={e => updateExpirePart(expireDatePart, e.target.value)}
                 />
               </div>
-              <div className="mt-1 text-[10px] text-muted-foreground/70">留空表示永不过期</div>
+              <div className="mt-1 text-[10px] text-muted-foreground/70">留空表示永不過期</div>
             </div>
           </div>
 
           <div className="rounded-lg border border-border/40 p-3">
-            <div className="text-[12px] text-muted-foreground mb-2">通知渠道（不选=系统默认）</div>
+            <div className="text-[12px] text-muted-foreground mb-2">通知管道（不選=系統預設）</div>
             {enabledChannels.length === 0 ? (
-              <div className="text-[12px] text-muted-foreground/70">暂无可用渠道</div>
+              <div className="text-[12px] text-muted-foreground/70">暫無可用管道</div>
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
                 {enabledChannels.map(ch => {
@@ -385,7 +385,7 @@ export default function PriceAlertFormDialog(props: {
                       }`}
                     >
                       {ch.name}
-                      {ch.is_default ? ' · 默认' : ''}
+                      {ch.is_default ? ' · 預設' : ''}
                     </button>
                   )
                 })}
@@ -395,8 +395,8 @@ export default function PriceAlertFormDialog(props: {
 
           <div className="rounded-lg border border-border/40 p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-[12px] text-muted-foreground">条件列表</div>
-              <Button variant="secondary" size="sm" className="h-7 text-[11px]" onClick={addCond}>添加条件</Button>
+              <div className="text-[12px] text-muted-foreground">條件列表</div>
+              <Button variant="secondary" size="sm" className="h-7 text-[11px]" onClick={addCond}>新增條件</Button>
             </div>
             {form.items.map((it, idx) => (
               <div key={idx} className="grid grid-cols-12 gap-2">
@@ -466,7 +466,7 @@ export default function PriceAlertFormDialog(props: {
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={() => props.onOpenChange(false)}>取消</Button>
             <Button onClick={submit} disabled={props.submitting}>
-              {props.submitting ? '保存中...' : (props.submitLabel || '保存规则')}
+              {props.submitting ? '儲存中...' : (props.submitLabel || '儲存規則')}
             </Button>
           </div>
         </div>

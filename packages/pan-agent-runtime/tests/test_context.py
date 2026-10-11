@@ -27,10 +27,10 @@ def test_context_engine_compacts_older_messages_and_preserves_recent_window():
     messages = [
         ModelMessage(role="system", content="trusted instructions"),
         *[
-                ModelMessage(role="user", content=f"历史问题 {index} " + "x" * 900)
+                ModelMessage(role="user", content=f"歷史問題 {index} " + "x" * 900)
             for index in range(5)
         ],
-        ModelMessage(role="user", content="当前问题"),
+        ModelMessage(role="user", content="當前問題"),
     ]
     result = asyncio.run(
         ContextEngine().prepare(
@@ -47,24 +47,24 @@ def test_context_engine_compacts_older_messages_and_preserves_recent_window():
     assert result.compressed is True
     assert result.compressed_message_count == 4
     assert result.messages[0].content == "trusted instructions"
-    assert result.messages[-1].content == "当前问题"
+    assert result.messages[-1].content == "當前問題"
     assert result.summary is not None
 
 
 def test_context_engine_uses_existing_summary_without_compressing_small_history():
-    summary = ContextSummary(goal=["保留目标"])
+    summary = ContextSummary(goal=["保留目標"])
     result = asyncio.run(
         ContextEngine().prepare(
-            [ModelMessage(role="user", content="短问题")],
+            [ModelMessage(role="user", content="短問題")],
             existing_summary=summary,
-            page_context="来自详情页",
+            page_context="來自詳細資訊頁",
             budget=ContextBudget(max_tokens=400, soft_limit_tokens=200, hard_limit_tokens=300),
         )
     )
 
     assert result.compressed is False
-    assert any("保留目标" in message.content for message in result.messages)
-    assert any("来自详情页" in message.content for message in result.messages)
+    assert any("保留目標" in message.content for message in result.messages)
+    assert any("來自詳細資訊頁" in message.content for message in result.messages)
     assert result.usage_after.total_tokens > result.usage_before.total_tokens
 
 
@@ -77,10 +77,10 @@ def test_context_engine_falls_back_when_model_summarizer_fails():
         ContextEngine(BrokenSummarizer()).prepare(
             [
                 *[
-                    ModelMessage(role="user", content=f"目标是保留当前筛选条件 {index} " + "x" * 500)
+                    ModelMessage(role="user", content=f"目標是保留當前篩選條件 {index} " + "x" * 500)
                     for index in range(4)
                 ],
-                ModelMessage(role="user", content="现在继续"),
+                ModelMessage(role="user", content="現在繼續"),
             ],
             budget=ContextBudget(max_tokens=400, soft_limit_tokens=128, hard_limit_tokens=256, keep_recent_messages=1),
             mode=ContextCompressionMode.PRESERVE_DETAILS,
@@ -89,13 +89,13 @@ def test_context_engine_falls_back_when_model_summarizer_fails():
 
     assert result.compressed is True
     assert result.summary is not None
-    assert result.summary.goal[0].startswith("目标是保留当前筛选条件")
+    assert result.summary.goal[0].startswith("目標是保留當前篩選條件")
 
 
 def test_context_engine_keeps_original_history_when_summary_has_no_gain():
     messages = [
-        ModelMessage(role="user", content="很短的历史"),
-        ModelMessage(role="user", content="当前问题"),
+        ModelMessage(role="user", content="很短的歷史"),
+        ModelMessage(role="user", content="當前問題"),
     ]
     result = asyncio.run(
         ContextEngine().prepare(
@@ -118,13 +118,13 @@ def test_context_engine_keeps_original_history_when_summary_has_no_gain():
 
 def test_context_usage_includes_tool_definition_estimate():
     usage = ContextEngine().measure(
-        [ModelMessage(role="user", content="查询")],
+        [ModelMessage(role="user", content="查詢")],
         tool_schemas=[
             {
                 "type": "function",
                 "function": {
                     "name": "get_quote",
-                    "description": "查询行情并返回最新价格",
+                    "description": "查詢行情並返回最新價格",
                     "parameters": {"type": "object", "properties": {}},
                 },
             }

@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 def _format_datetime(dt) -> str:
-    """格式化时间为当前时区的 ISO 格式（naive datetime 视为 UTC）。"""
+    """格式化時間為當前時區的 ISO 格式（naive datetime 視為 UTC）。"""
     if not dt:
         return ""
     tz_name = Settings().app_timezone or "UTC"
@@ -33,7 +33,7 @@ def _format_datetime(dt) -> str:
 class AlertConditionItem(BaseModel):
     type: str = Field(..., description="price/change_pct/turnover/volume/volume_ratio")
     op: str = Field(..., description=">=/<=/>/</==/between")
-    value: float | list[float] = Field(..., description="阈值")
+    value: float | list[float] = Field(..., description="閾值")
 
 
 class AlertConditionGroup(BaseModel):
@@ -131,7 +131,7 @@ def update_alert_rule(rule_id: int, body: PriceAlertUpdate, db: Session = Depend
     try:
         row = price_alert_service.update_alert_rule(db, rule_id, updates)
     except LookupError as exc:
-        raise HTTPException(404, "规则不存在") from exc
+        raise HTTPException(404, "規則不存在") from exc
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     return _to_response(row)
@@ -141,7 +141,7 @@ def update_alert_rule(rule_id: int, body: PriceAlertUpdate, db: Session = Depend
 def toggle_alert_rule(rule_id: int, body: ToggleBody, db: Session = Depends(get_db)):
     row = db.query(PriceAlertRule).filter(PriceAlertRule.id == rule_id).first()
     if not row:
-        raise HTTPException(404, "规则不存在")
+        raise HTTPException(404, "規則不存在")
     row.enabled = bool(body.enabled)
     db.commit()
     db.refresh(row)
@@ -153,13 +153,13 @@ def delete_alert_rule(rule_id: int, db: Session = Depends(get_db)):
     try:
         price_alert_service.delete_alert_rule(db, rule_id)
     except LookupError as exc:
-        raise HTTPException(404, "规则不存在") from exc
+        raise HTTPException(404, "規則不存在") from exc
     return {"ok": True}
 
 
 @router.get("/hits/today")
 def list_today_hits(limit: int = 50, db: Session = Depends(get_db)):
-    """今日(本地时区)全部命中,跨规则聚合 —— 供首页"今日要紧事"。"""
+    """今日(本地時區)全部命中,跨規則聚合 —— 供首頁"今日要緊事"。"""
     tz_name = Settings().app_timezone or "UTC"
     try:
         tzinfo = ZoneInfo(tz_name)
@@ -236,7 +236,7 @@ async def scan_alert_rules(dry_run: bool = False, bypass_market_hours: bool = Tr
         from server import price_alert_scheduler
 
         if price_alert_scheduler:
-            # 手动扫描默认绕过交易时段门禁，便于即时验证规则
+            # 手動掃描預設繞過交易時段門禁，便於即時驗證規則
             if bypass_market_hours:
                 return await price_alert_scheduler.trigger_once(dry_run=dry_run)
             return await ENGINE.scan_once(dry_run=dry_run, bypass_market_hours=False)

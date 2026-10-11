@@ -1,0 +1,129 @@
+{
+  "task": "PW-07",
+  "observation_kind": "bounded read-only query contract smoke",
+  "service": "http://127.0.0.1:8000",
+  "source_checkout_commit": "3acd67ffd98bbcf1713f9484d8a7b77871db6ade",
+  "deployed_commit": null,
+  "limitations": [
+    "Source checkout commit is not proof of deployed service version.",
+    "Retained data observations only; not full-market coverage or collection/session acceptance.",
+    "No upstream ingestion, scheduler, subscription or control mutation was performed.",
+    "Summary stores one source row per call; TDCC had one retained report and no previous-week evidence."
+  ],
+  "cases": [
+    {
+      "observed_at": "2026-10-07T08:46:05.626508+00:00",
+      "endpoint": "margin-short-sale",
+      "instrument_id": "TWSE:2330",
+      "start": "2026-10-02",
+      "end": "2026-10-06",
+      "http_status": 200,
+      "elapsed_ms": 21.2,
+      "rows": 3,
+      "dates": [
+        "2026-10-02",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "variants": [],
+      "sample": [
+        {
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-02",
+          "margin_balance_previous": 30658,
+          "margin_purchase": 704,
+          "margin_sale": 387,
+          "margin_cash_redemption": 36,
+          "margin_balance": 30939,
+          "margin_securities_finance_balance": null,
+          "margin_utilization_rate": null,
+          "margin_quota": 6483092,
+          "short_sale_balance_previous": 20,
+          "short_sale": 0,
+          "short_cover": 2,
+          "short_stock_redemption": 0,
+          "short_sale_balance": 18,
+          "short_sale_securities_finance_balance": null,
+          "short_sale_utilization_rate": null,
+          "short_sale_quota": 6483092,
+          "offsetting": 0,
+          "note": null
+        }
+      ]
+    },
+    {
+      "observed_at": "2026-10-07T08:46:05.634657+00:00",
+      "endpoint": "margin-short-sale",
+      "instrument_id": "TPEX:5347",
+      "start": "2026-10-02",
+      "end": "2026-10-06",
+      "http_status": 200,
+      "elapsed_ms": 7.96,
+      "rows": 3,
+      "dates": [
+        "2026-10-02",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "variants": [],
+      "sample": [
+        {
+          "instrument_id": "TPEX:5347",
+          "symbol": "5347",
+          "trade_date": "2026-10-02",
+          "margin_balance_previous": 12491,
+          "margin_purchase": 967,
+          "margin_sale": 797,
+          "margin_cash_redemption": 4,
+          "margin_balance": 12657,
+          "margin_securities_finance_balance": 273,
+          "margin_utilization_rate": "2.69",
+          "margin_quota": 469625,
+          "short_sale_balance_previous": 483,
+          "short_sale": 27,
+          "short_cover": 44,
+          "short_stock_redemption": 0,
+          "short_sale_balance": 466,
+          "short_sale_securities_finance_balance": 4,
+          "short_sale_utilization_rate": "0.09",
+          "short_sale_quota": 469625,
+          "offsetting": 8,
+          "note": null
+        }
+      ]
+    },
+    {
+      "observed_at": "2026-10-07T08:46:05.649902+00:00",
+      "endpoint": "shareholder-distribution",
+      "instrument_id": "TWSE:2330",
+      "start": "2026-09-01",
+      "end": "2026-10-06",
+      "http_status": 200,
+      "elapsed_ms": 15.2,
+      "rows": 17,
+      "dates": [
+        "2026-09-04"
+      ],
+      "variants": [
+        "bulk_current"
+      ],
+      "sample": [
+        {
+          "report_date": "2026-09-04",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "report_variant": "bulk_current",
+          "row_kind": "bucket",
+          "source_level": 1,
+          "source_tier_label": null,
+          "holder_count": 2503823,
+          "share_count": 292113655,
+          "share_percentage_points": "1.12",
+          "provider": "tdcc_open_data_1_5",
+          "native_unit": "shares"
+        }
+      ]
+    }
+  ]
+}

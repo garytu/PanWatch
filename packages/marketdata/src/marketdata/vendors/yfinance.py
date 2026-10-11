@@ -1,4 +1,4 @@
-"""YFinance 行情 vendor(可选,HK/US)。无状态 + 惰性 import;缺库抛 VendorError。"""
+"""YFinance 行情 vendor(可選,HK/US)。無狀態 + 惰性 import;缺庫拋 VendorError。"""
 
 from __future__ import annotations
 
@@ -14,14 +14,13 @@ logger = logging.getLogger(__name__)
 
 
 def _yf_ticker(sym: Symbol) -> str:
-    if sym.market == Market.HK:
-        return f"{int(sym.code):04d}.HK" if sym.code.isdigit() else f"{sym.code}.HK"
-    return sym.code
+    return sym.to_yfinance()
 
 
 class YFinanceQuoteVendor(QuoteVendor):
     name = "yfinance"
-    supports_markets = {"HK", "US"}
+    supports_markets = {"HK", "US", "TW"}
+
 
     def fetch(self, symbols: list[Symbol], config: dict) -> list[Quote]:
         if not symbols:
@@ -29,7 +28,7 @@ class YFinanceQuoteVendor(QuoteVendor):
         try:
             import yfinance as yf
         except ImportError as e:
-            raise VendorError("yfinance 未安装,执行 `pip install yfinance` 后启用") from e
+            raise VendorError("yfinance 未安裝,執行 `pip install yfinance` 後啟用") from e
 
         out: list[Quote] = []
         for s in symbols:
@@ -37,7 +36,7 @@ class YFinanceQuoteVendor(QuoteVendor):
                 info = yf.Ticker(_yf_ticker(s)).fast_info
                 last = float(info["last_price"]) if info.get("last_price") else None
                 if last is None:
-                    record_error(f"yfinance {_yf_ticker(s)}: 返回空(last_price 缺失,可能 Yahoo 不可达/被限流/需要代理)")
+                    record_error(f"yfinance {_yf_ticker(s)}: 返回空(last_price 缺失,可能 Yahoo 不可達/被限流/需要代理)")
                     continue
                 prev = float(info["previous_close"]) if info.get("previous_close") else None
                 chg = last - prev if prev else 0.0
@@ -52,6 +51,6 @@ class YFinanceQuoteVendor(QuoteVendor):
                     volume=float(info.get("last_volume") or 0),
                 ))
             except Exception as e:
-                logger.debug(f"yfinance 拉取 {s.code} 失败: {e}")
+                logger.debug(f"yfinance 拉取 {s.code} 失敗: {e}")
                 record_error(f"yfinance {_yf_ticker(s)}: {type(e).__name__}: {e}")
         return out

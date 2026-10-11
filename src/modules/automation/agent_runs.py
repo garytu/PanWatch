@@ -1,4 +1,4 @@
-"""Agent 运行记录 - 写入 agent_runs 表（供 UI 查询）"""
+"""Agent 執行記錄 - 寫入 agent_runs 表（供 UI 查詢）"""
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -9,8 +9,8 @@ from src.platform.persistence.models import AgentRun, LogEntry
 
 logger = logging.getLogger(__name__)
 
-# 采集阶段可能在外部数据源限流/重试时暂时没有进度日志，不能沿用
-# “5 分钟无日志即 stale”的规则；但服务重启后也不能无限恢复旧任务。
+# 採集階段可能在外部資料來源限流/重試時暫時沒有進度日誌，不能沿用
+# “5 分鐘無日誌即 stale”的規則；但服務重啟後也不能無限恢復舊任務。
 ACTIVE_RUN_TTL_SEC = 45 * 60
 
 
@@ -28,9 +28,9 @@ def start_agent_run(
     trigger_source: str = "",
     model_label: str = "",
 ) -> None:
-    """在任务真正开始前写入 running 生命周期记录。
+    """在任務真正開始前寫入 running 生命週期記錄。
 
-    同一 trace 可能同时从 API 包装器和执行入口调用，因此写入是幂等的。
+    同一 trace 可能同時從 API 包裝器和執行入口呼叫，因此寫入是冪等的。
     """
     if not trace_id:
         return
@@ -53,7 +53,7 @@ def start_agent_run(
         ))
         db.commit()
     except Exception as e:
-        logger.warning(f"写入 AgentRun running 状态失败: {e}")
+        logger.warning(f"寫入 AgentRun running 狀態失敗: {e}")
         db.rollback()
     finally:
         db.close()
@@ -72,20 +72,20 @@ def record_agent_run(
     context_chars: int = 0,
     model_label: str = "",
 ) -> None:
-    """记录一次 Agent 运行结果到数据库。
+    """記錄一次 Agent 執行結果到資料庫。
 
     Args:
-        agent_name: Agent 名称
+        agent_name: Agent 名稱
         status: success / failed
-        result: 简要结果（会截断）
-        error: 错误信息（会截断）
-        duration_ms: 执行耗时（毫秒）
-        trace_id: 运行链路追踪 id
+        result: 簡要結果（會截斷）
+        error: 錯誤資訊（會截斷）
+        duration_ms: 執行耗時（毫秒）
+        trace_id: 執行鏈路追蹤 id
         trigger_source: schedule / manual / api
-        notify_attempted: 是否尝试发送通知
-        notify_sent: 通知是否发送成功
-        context_chars: prompt/context 字符数
-        model_label: 本次运行使用的模型标识
+        notify_attempted: 是否嘗試傳送通知
+        notify_sent: 通知是否傳送成功
+        context_chars: prompt/context 字元數
+        model_label: 本次執行使用的模型標識
     """
     db = SessionLocal()
     try:
@@ -117,22 +117,22 @@ def record_agent_run(
             db.add(AgentRun(**values))
         db.commit()
     except Exception as e:
-        logger.warning(f"写入 AgentRun 失败: {e}")
+        logger.warning(f"寫入 AgentRun 失敗: {e}")
         db.rollback()
     finally:
         db.close()
 
 
 def find_active_tradingagents_trace(db: Session, stock_symbol: str) -> str | None:
-    """返回标的仍在执行的 TradingAgents trace，用于跨模块幂等触发。
+    """返回標的仍在執行的 TradingAgents trace，用於跨模組冪等觸發。
 
-    运行状态属于自动化模块，市场模块只能通过这个公开查询判断是否需要创建新任务，
-    不应导入自动化 HTTP router 或直接查询其内部实现。
+    執行狀態屬於自動化模組，市場模組只能透過這個公開查詢判斷是否需要建立新任務，
+    不應匯入自動化 HTTP router 或直接查詢其內部實現。
     """
     now = datetime.now(timezone.utc)
 
-    # 生命周期记录是首选数据源：采集阶段还没有 ta_progress 时也能恢复，
-    # 且不会因为某个外部源 5 分钟没有日志就重复触发任务。
+    # 生命週期記錄是首選資料來源：採集階段還沒有 ta_progress 時也能恢復，
+    # 且不會因為某個外部源 5 分鐘沒有日誌就重複觸發任務。
     active_run = (
         db.query(AgentRun)
         .filter(
@@ -147,7 +147,7 @@ def find_active_tradingagents_trace(db: Session, stock_symbol: str) -> str | Non
         created_at = _as_utc(active_run.created_at)
         if created_at is None or (now - created_at).total_seconds() <= ACTIVE_RUN_TTL_SEC:
             return active_run.trace_id
-        # 已超过整个任务安全窗口时，不能再被旧日志重新判成 running。
+        # 已超過整個任務安全視窗時，不能再被舊日誌重新判成 running。
         return None
 
     cutoff = now - timedelta(minutes=30)

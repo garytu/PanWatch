@@ -1,13 +1,13 @@
-"""发现(东财热门榜)vendor:单源、市场级、非 symbol 模型。
+"""發現(東財熱門榜)vendor:單源、市場級、非 symbol 模型。
 
 移植自 PanWatch src/collectors/discovery_collector.py 的
 fetch_hot_stocks(L55-105)/fetch_hot_boards(L107-149)/fetch_board_stocks(L151-196)/
-_get_json(L198-248):fid/fields/fs/params 计算与 f-code 字段映射(f12/f14/f2/f3/f4/f5/f6)
-逐一照搬。原实现是 async(httpx.AsyncClient);此处改为同步 market_get。
+_get_json(L198-248):fid/fields/fs/params 計算與 f-code 欄位對映(f12/f14/f2/f3/f4/f5/f6)
+逐一照搬。原實現是 async(httpx.AsyncClient);此處改為同步 market_get。
 
-不继承 marketdata.vendors.base.Vendor —— discovery 是市场级、单源、非 symbol 的取数,
-硬套 symbol-based 失败转移 Engine 是设计错配,故不进 Engine/不进 DataSource taxonomy。
-vendor 内不做缓存(TTL 缓存留宿主 collector)。
+不繼承 marketdata.vendors.base.Vendor —— discovery 是市場級、單源、非 symbol 的取數,
+硬套 symbol-based 失敗轉移 Engine 是設計錯配,故不進 Engine/不進 DataSource taxonomy。
+vendor 內不做快取(TTL 快取留宿主 collector)。
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ _HEADERS = {
 
 
 def _normalize_diff(data: dict | None) -> list[dict]:
-    """东财 clist 的 diff 字段可能是 list,也可能是 dict(按 index 为 key)。统一成 list。"""
+    """東財 clist 的 diff 欄位可能是 list,也可能是 dict(按 index 為 key)。統一成 list。"""
     diff = ((data or {}).get("data") or {}).get("diff") or []
     if isinstance(diff, dict):
         return list(diff.values())
@@ -41,7 +41,7 @@ def _normalize_diff(data: dict | None) -> list[dict]:
 
 
 class DiscoveryVendor:
-    """东财热门榜(股票/板块/板块成分)。不继承 Vendor(市场级、非 symbol)。"""
+    """東財熱門榜(股票/板塊/板塊成分)。不繼承 Vendor(市場級、非 symbol)。"""
 
     def hot_stocks(
         self,
@@ -198,6 +198,6 @@ class DiscoveryVendor:
             retries=1,
             timeout=10,
             min_interval_s=0.0,
-            log_label="发现榜单",
+            log_label="發現榜單",
         )
         return data or {}

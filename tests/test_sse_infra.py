@@ -1,4 +1,4 @@
-"""SSE 基建单测：事件编码 / 流缓冲续推 / 中间件直通。"""
+"""SSE 基建單測：事件編碼 / 流緩衝續推 / 中介軟體直通。"""
 
 import asyncio
 import json
@@ -8,7 +8,7 @@ from src.web.response import ResponseWrapperMiddleware
 
 
 def test_format_sse_event():
-    """SSE 事件编码：带 id/event/data，dict 自动 JSON 化"""
+    """SSE 事件編碼：帶 id/event/data，dict 自動 JSON 化"""
     text = format_sse_event(3, "token", {"text": "你好"})
     assert "id: 3\n" in text
     assert "event: token\n" in text
@@ -17,13 +17,13 @@ def test_format_sse_event():
 
 
 def test_format_sse_event_multiline():
-    """SSE 事件编码：data 含换行时拆成多个 data: 行"""
+    """SSE 事件編碼：data 含換行時拆成多個 data: 行"""
     text = format_sse_event(1, "token", "a\nb")
     assert "data: a\ndata: b\n" in text
 
 
 def test_stream_replay_and_resume():
-    """事件流：先发布后订阅可重放全部事件；带 after_seq 只续推之后的"""
+    """事件流：先發布後訂閱可重放全部事件；帶 after_seq 只續推之後的"""
 
     async def run():
         stream = SSEStream()
@@ -32,12 +32,12 @@ def test_stream_replay_and_resume():
         await stream.publish("done", {})
         await stream.finish()
 
-        # 从头订阅：3 条全收到
+        # 從頭訂閱：3 條全收到
         all_events = [ev async for ev in stream.subscribe(after_seq=0)]
         assert len(all_events) == 3
         assert "id: 1\n" in all_events[0]
 
-        # 断线重连：Last-Event-ID=2 → 只收到第 3 条
+        # 斷線重連：Last-Event-ID=2 → 只收到第 3 條
         resumed = [ev async for ev in stream.subscribe(after_seq=2)]
         assert len(resumed) == 1
         assert "id: 3\n" in resumed[0]
@@ -47,7 +47,7 @@ def test_stream_replay_and_resume():
 
 
 def test_stream_live_subscribe():
-    """事件流：订阅者阻塞等待，生产者发布后立即收到，finish 后退出"""
+    """事件流：訂閱者阻塞等待，生產者釋出後立即收到，finish 後退出"""
 
     async def run():
         stream = SSEStream()
@@ -73,7 +73,7 @@ def test_hub_create_get_prune():
     """Hub：create/get 正常，超 TTL 的流被清理"""
     hub = SSEHub(ttl_sec=0.0)  # TTL=0 → 下次 prune 即清理
     stream = hub.create()
-    # TTL 为 0，get 时触发 prune 已经清掉
+    # TTL 為 0，get 時觸發 prune 已經清掉
     assert hub.get(stream.stream_id) is None
 
     hub2 = SSEHub(ttl_sec=60)
@@ -86,7 +86,7 @@ def _make_scope(path="/api/chat/x"):
 
 
 def test_middleware_sse_passthrough():
-    """中间件：text/event-stream 响应逐块直通，不缓冲"""
+    """中介軟體：text/event-stream 回應逐塊直通，不緩衝"""
 
     async def run():
         sent_during_app: list[int] = []
@@ -98,7 +98,7 @@ def test_middleware_sse_passthrough():
                 "headers": [(b"content-type", b"text/event-stream; charset=utf-8")],
             })
             await send({"type": "http.response.body", "body": b"id: 1\n\n", "more_body": True})
-            # 记录此刻下游已收到多少条消息——直通模式下应该已实时转发
+            # 記錄此刻下游已收到多少條訊息——直通模式下應該已即時轉發
             sent_during_app.append(len(sent_messages))
             await send({"type": "http.response.body", "body": b"id: 2\n\n", "more_body": False})
 
@@ -110,7 +110,7 @@ def test_middleware_sse_passthrough():
         mw = ResponseWrapperMiddleware(app)
         await mw(_make_scope(), None, send)
 
-        # app 发送第二块前，start + 第一块已经转发到下游（证明未缓冲）
+        # app 傳送第二塊前，start + 第一塊已經轉發到下游（證明未緩衝）
         assert sent_during_app == [2]
         assert len(sent_messages) == 3
         assert sent_messages[1]["body"] == b"id: 1\n\n"
@@ -119,7 +119,7 @@ def test_middleware_sse_passthrough():
 
 
 def test_middleware_json_still_wrapped():
-    """中间件：普通 JSON 响应仍被包装为 {code, success, data, message}"""
+    """中介軟體：普通 JSON 回應仍被包裝為 {code, success, data, message}"""
 
     async def run():
         async def app(scope, receive, send):

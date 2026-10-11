@@ -130,7 +130,7 @@ class ToolResearchPlugin:
         query = str(context.call.arguments.get("query") or "").strip()
         if not query:
             return ToolResult.failure(
-                summary="工具搜索需要提供 query。", error_code="invalid_tool_search_query"
+                summary="工具搜尋需要提供 query。", error_code="invalid_tool_search_query"
             )
         try:
             result = await self._service.research(
@@ -148,7 +148,7 @@ class ToolResearchPlugin:
                 {"reason": "search_failed", "error_type": type(exc).__name__},
             )
             return ToolResult.success(
-                summary="工具搜索暂时不可用，继续使用当前已提供的工具。",
+                summary="工具搜尋暫時不可用，繼續使用當前已提供的工具。",
                 data={"loaded_tools": [], "candidates": [], "fallback": True},
                 sources=[],
                 observed_at=datetime.now(UTC),
@@ -165,9 +165,9 @@ class ToolResearchPlugin:
         )
         return ToolResult.success(
             summary=(
-                f"已找到并加载 {len(result.selected_tools)} 个工具。"
+                f"已找到並載入 {len(result.selected_tools)} 個工具。"
                 if result.selected_tools
-                else "没有找到匹配的可用工具。"
+                else "沒有找到匹配的可用工具。"
             ),
             data={
                 "loaded_tools": result.selected_tools,
@@ -189,10 +189,10 @@ class ToolResearchPlugin:
     def _search_tool_spec(cls) -> ToolSpec:
         return ToolSpec(
             name=cls.search_tool_name,
-            title="搜索可用工具",
+            title="搜尋可用工具",
             description=(
-                "当当前工具列表中没有直接匹配的能力时，搜索并加载可用工具。"
-                "返回的工具会在下一轮模型调用中提供完整参数定义。"
+                "噹噹前工具列表中沒有直接匹配的能力時，搜尋並載入可用工具。"
+                "返回的工具會在下一輪模型呼叫中提供完整引數定義。"
             ),
             input_schema={
                 "type": "object",
@@ -200,7 +200,7 @@ class ToolResearchPlugin:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "要完成的能力或任务，例如查询龙虎榜、分析基本面",
+                        "description": "要完成的能力或任務，例如查詢龍虎榜、分析基本面",
                     },
                     "limit": {
                         "type": "integer",

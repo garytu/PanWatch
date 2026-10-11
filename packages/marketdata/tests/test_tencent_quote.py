@@ -4,7 +4,7 @@ from marketdata.symbol import Symbol
 
 def _fake_line() -> str:
     parts = ["0"] * 50
-    parts[1] = "贵州茅台"
+    parts[1] = "貴州茅臺"
     parts[2] = "600519"
     parts[3] = "1700.0"      # current
     parts[4] = "1680.0"      # prev_close
@@ -29,7 +29,7 @@ def test_tencent_parses_quote(monkeypatch):
     out = v.fetch([Symbol.parse("600519")], {})
     assert len(out) == 1
     q = out[0]
-    assert q.symbol == "600519" and q.name == "贵州茅台" and q.market == "CN"
+    assert q.symbol == "600519" and q.name == "貴州茅臺" and q.market == "CN"
     assert q.current_price == 1700.0 and q.change_pct == 1.19
     assert q.turnover == 6789.0 and q.volume_ratio == 1.2 and q.pe_ratio == 35.0
 

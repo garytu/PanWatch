@@ -1,7 +1,7 @@
-"""采集层批量整治 P1:共享 market_http(节流/重试/来源)+ 各 collector 缓存。
+"""採集層批次整治 P1:共享 market_http(節流/重試/來源)+ 各 collector 快取。
 
-价格提醒所需的量比直接从腾讯报价 parts[49] 取,免再拉 K线;
-报价/资金流/异动加 TTL 缓存,避免调度任务每轮重复联网触发限流。
+價格提醒所需的量比直接從騰訊報價 parts[49] 取,免再拉 K線;
+報價/資金流/異動加 TTL 快取,避免排程任務每輪重複聯網觸發限流。
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from src.platform.marketdata.models import MarketCode
 
 
 def test_capital_flow_cached(monkeypatch):
-    """资金流为日级数据,同一只在 TTL 内应命中缓存,不重复调用 marketdata 包。"""
+    """資金流為日級資料,同一只在 TTL 內應命中快取,不重複呼叫 marketdata 包。"""
     from marketdata.types import CapitalFlow as MdCF
 
     calls = {"n": 0}
@@ -22,7 +22,7 @@ def test_capital_flow_cached(monkeypatch):
         def capital_flow(self, symbol, *, market="CN"):
             calls["n"] += 1
             return MdCF(
-                symbol=symbol, name="贵州茅台",
+                symbol=symbol, name="貴州茅臺",
                 main_net_inflow=100.0, main_net_inflow_pct=1.0,
                 super_net_inflow=4.0, big_net_inflow=3.0,
                 mid_net_inflow=2.0, small_net_inflow=1.0,
@@ -33,11 +33,11 @@ def test_capital_flow_cached(monkeypatch):
     c = capital_flow_collector.CapitalFlowCollector(MarketCode.CN)
     assert c.get_capital_flow("600519") is not None
     assert c.get_capital_flow("600519") is not None
-    assert calls["n"] == 1, f"第二次应命中资金流缓存,实际调用 {calls['n']} 次"
+    assert calls["n"] == 1, f"第二次應命中資金流快取,實際呼叫 {calls['n']} 次"
 
 
 def test_market_get_retries_and_logs_source(monkeypatch, caplog):
-    """market_get 失败应退避重试,并在日志带上 [src=...] 调用来源。"""
+    """market_get 失敗應退避重試,並在日誌帶上 [src=...] 呼叫來源。"""
     calls = {"n": 0}
 
     class _FakeClient:
@@ -60,11 +60,11 @@ def test_market_get_retries_and_logs_source(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING):
         with market_http.fetch_source("unit_src"):
             out = market_http.market_get(
-                "http://x", host_key="x", retries=2, log_label="测试"
+                "http://x", host_key="x", retries=2, log_label="測試"
             )
 
     assert out is None
-    assert calls["n"] == 3, f"应 1 次 + 重试 2 次 = 3 次,实际 {calls['n']}"
+    assert calls["n"] == 3, f"應 1 次 + 重試 2 次 = 3 次,實際 {calls['n']}"
     assert any(
         "[src=unit_src]" in r.getMessage() for r in caplog.records
     ), caplog.text

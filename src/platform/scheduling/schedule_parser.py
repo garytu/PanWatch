@@ -135,7 +135,7 @@ def normalize_cron_day_of_week_field(day_of_week: str) -> str:
 def parse_cron(cron: str, timezone: str = "UTC") -> CronTrigger:
     parts = cron.split()
     if len(parts) != 5:
-        raise ValueError(f"无效的 cron 表达式: {cron}")
+        raise ValueError(f"無效的 cron 表示式: {cron}")
 
     dow = normalize_cron_day_of_week_field(parts[4])
     return CronTrigger(
@@ -159,7 +159,7 @@ def parse_interval(expr: str) -> IntervalTrigger:
     if value.endswith("h"):
         hours = int(value[:-1])
         return IntervalTrigger(hours=hours)
-    raise ValueError(f"无效的 interval 表达式: {expr}")
+    raise ValueError(f"無效的 interval 表示式: {expr}")
 
 
 def parse_schedule(schedule: str, timezone: str = "UTC"):

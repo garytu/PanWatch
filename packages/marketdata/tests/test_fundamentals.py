@@ -1,4 +1,4 @@
-"""fundamentals(基本面/财务)vendor + client 方法测试。离线 monkeypatch market_get,不实抓。"""
+"""fundamentals(基本面/財務)vendor + client 方法測試。離線 monkeypatch market_get,不實抓。"""
 
 import marketdata.vendors.fundamentals as fv
 from marketdata.client import MarketData
@@ -8,17 +8,17 @@ from marketdata.symbol import Symbol
 from marketdata.types import Fundamentals
 
 
-def _tencent_line(code: str = "600519", name: str = "贵州茅台") -> str:
-    """构造腾讯 qt.gtimg `~` 数组样例行,索引对齐 fv._parse_fundamentals_line:
+def _tencent_line(code: str = "600519", name: str = "貴州茅臺") -> str:
+    """構造騰訊 qt.gtimg `~` 陣列樣例行,索引對齊 fv._parse_fundamentals_line:
     idx1=name idx2=code idx39=pe_ttm idx44=circulating_market_value idx45=total_market_value
-    idx46=pb idx52=pe_static。其余位置填占位空串,保证下标存在。
+    idx46=pb idx52=pe_static。其餘位置填佔位空串,保證下標存在。
     """
     parts = [""] * 53
     parts[1] = name
     parts[2] = code
     parts[39] = "28.5"     # pe_ttm
-    parts[44] = "18000.3"  # circulating_market_value(亿)
-    parts[45] = "21000.5"  # total_market_value(亿)
+    parts[44] = "18000.3"  # circulating_market_value(億)
+    parts[45] = "21000.5"  # total_market_value(億)
     parts[46] = "9.8"      # pb
     parts[52] = "30.1"     # pe_static
     return f'v_{code}="1~' + "~".join(parts[1:]) + '";'
@@ -31,13 +31,13 @@ class TestTencentFundamentals:
         out = fv.TencentFundamentalsVendor().fetch([Symbol.parse("600519", market="CN")], {})
         assert len(out) == 1 and isinstance(out[0], Fundamentals)
         f = out[0]
-        assert f.symbol == "600519" and f.name == "贵州茅台" and f.market == "CN"
+        assert f.symbol == "600519" and f.name == "貴州茅臺" and f.market == "CN"
         assert f.pe_ttm == 28.5
         assert f.pe_static == 30.1
         assert f.pb == 9.8
         assert f.total_market_value == 21000.5
         assert f.circulating_market_value == 18000.3
-        # 财报类字段该源不提供,一律 None
+        # 財報類欄位該源不提供,一律 None
         assert f.eps is None and f.roe is None and f.report_date == ""
 
     def test_empty_response_returns_empty(self, monkeypatch):
@@ -59,13 +59,13 @@ class TestTencentFundamentals:
 
 
 class TestEastmoneyFundamentalsCN:
-    def _payload(self, code="600519", name="贵州茅台"):
+    def _payload(self, code="600519", name="貴州茅臺"):
         return {"data": {
             "f57": code, "f58": name,
-            "f84": 1256197800,     # 总股本(股)
+            "f84": 1256197800,     # 總股本(股)
             "f85": 1256197800,     # 流通股本(股)
-            "f116": 2100050000000,  # 总市值(raw 元) → /1e8 = 21000.5(亿)
-            "f117": 2100050000000,  # 流通市值(raw 元) → /1e8 = 21000.5(亿)
+            "f116": 2100050000000,  # 總市值(raw 元) → /1e8 = 21000.5(億)
+            "f117": 2100050000000,  # 流通市值(raw 元) → /1e8 = 21000.5(億)
         }}
 
     def test_parses_shares_and_market_value(self, monkeypatch):
@@ -73,12 +73,12 @@ class TestEastmoneyFundamentalsCN:
         out = fv.EastmoneyFundamentalsVendor().fetch([Symbol.parse("600519", market="CN")], {})
         assert len(out) == 1
         f = out[0]
-        assert f.symbol == "600519" and f.name == "贵州茅台" and f.market == "CN"
+        assert f.symbol == "600519" and f.name == "貴州茅臺" and f.market == "CN"
         assert f.total_shares == 1256197800.0
         assert f.float_shares == 1256197800.0
         assert f.total_market_value == 21000.5
         assert f.circulating_market_value == 21000.5
-        # push2 该端点未提供 PE/PB,一律 None
+        # push2 該端點未提供 PE/PB,一律 None
         assert f.pe_ttm is None and f.pb is None
 
     def test_empty_response_returns_empty(self, monkeypatch):
@@ -123,7 +123,7 @@ class TestEastmoneyFundamentalsUS:
         assert f.net_margin == 25.31
         assert f.revenue_yoy == 2.02
         assert f.report_date == "2025-09-30"
-        # 首试 .O 即命中,不应再尝试 .N
+        # 首試 .O 即命中,不應再嘗試 .N
         assert len(calls) == 1
 
     def test_falls_back_to_nyse_when_nasdaq_empty(self, monkeypatch):
@@ -140,7 +140,7 @@ class TestEastmoneyFundamentalsUS:
         out = fv.EastmoneyFundamentalsVendor().fetch([Symbol.parse("GE", market="US")], {})
         assert len(out) == 1
         assert out[0].symbol == "GE"
-        # 先试 .O(空)再试 .N(命中)
+        # 先試 .O(空)再試 .N(命中)
         assert len(calls) == 2
 
     def test_both_empty_returns_empty(self, monkeypatch):
@@ -193,7 +193,7 @@ class TestEastmoneyFundamentalsMisc:
 
     def test_exception_on_one_symbol_skipped_not_raised(self, monkeypatch):
         def fake_market_get(*a, **k):
-            raise RuntimeError("网络异常")
+            raise RuntimeError("網路異常")
 
         monkeypatch.setattr(fv, "market_get", fake_market_get)
         out = fv.EastmoneyFundamentalsVendor().fetch([Symbol.parse("600519", market="CN")], {})
@@ -201,8 +201,8 @@ class TestEastmoneyFundamentalsMisc:
 
 
 def test_client_fundamentals_via_single_source_engine(monkeypatch):
-    """MarketData.fundamentals() 走单源(tencent)Engine,能正确分组、汇总、出数。"""
-    line = _tencent_line("600519", "贵州茅台")
+    """MarketData.fundamentals() 走單源(tencent)Engine,能正確分組、彙總、出數。"""
+    line = _tencent_line("600519", "貴州茅臺")
     monkeypatch.setattr(fv, "_fetch_lines", lambda codes: [line])
 
     md = MarketData(config=StaticConfigProvider({

@@ -1,4 +1,4 @@
-"""首页聚合 API（轻量版：不包含机会消息中心）。"""
+"""首頁聚合 API（輕量版：不包含機會訊息中心）。"""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from src.platform.runtime.config import Settings
 from src.modules.strategy.strategy_engine import get_strategy_stats, list_strategy_signals
+from src.modules.strategy.ranking import group_instrument_rows, representative_sort_key
 from src.platform.ai.ai_failover import get_configured_failover_client
 from src.platform.persistence.database import get_db
 from src.platform.persistence.models import (
@@ -44,7 +45,7 @@ def _format_datetime(dt) -> str:
 
 def _to_market(market: str) -> str:
     m = (market or "ALL").strip().upper()
-    return m if m in ("ALL", "CN", "HK", "US") else "ALL"
+    return m if m in ("ALL", "CN", "HK", "US", "TW") else "ALL"
 
 
 def _action_priority(item: dict) -> int:
@@ -59,30 +60,21 @@ def _action_priority(item: dict) -> int:
 
 
 def _group_signals(items: list[dict]) -> list[dict]:
-    grouped: dict[str, dict] = {}
-    for row in items or []:
-        key = f"{row.get('stock_market') or 'CN'}:{row.get('stock_symbol') or ''}"
-        if ":" == key[-1]:
-            continue
-        prev = grouped.get(key)
-        if not prev:
-            row["strategy_count"] = 1
-            grouped[key] = row
-            continue
-        prev["strategy_count"] = int(prev.get("strategy_count") or 1) + 1
-        choose_next = False
-        prev_active = str(prev.get("status") or "inactive") == "active"
-        cur_active = str(row.get("status") or "inactive") == "active"
-        if cur_active and not prev_active:
-            choose_next = True
-        elif _action_priority(row) > _action_priority(prev):
-            choose_next = True
-        elif float(row.get("rank_score") or 0) > float(prev.get("rank_score") or 0):
-            choose_next = True
-        if choose_next:
-            row["strategy_count"] = int(prev.get("strategy_count") or 1)
-            grouped[key] = row
-    return list(grouped.values())
+    grouped: list[dict] = []
+    for representative, members in group_instrument_rows(list(items or [])):
+        row = dict(representative)
+        codes = {
+            str(code)
+            for member in members
+            for code in (member.get("strategy_codes") or [member.get("strategy_code")])
+            if code
+        }
+        row["strategy_codes"] = sorted(codes)
+        row["strategy_count"] = len(codes) or sum(
+            max(1, int(member.get("strategy_count") or 1)) for member in members
+        )
+        grouped.append(row)
+    return grouped
 
 
 def _summarize_topics(raw_topics) -> list[dict]:
@@ -112,9 +104,9 @@ def _summarize_topics(raw_topics) -> list[dict]:
 def _load_latest_insights(db: Session) -> list[dict]:
     out = []
     agents = (
-        ("premarket_outlook", "盘前分析"),
-        ("daily_report", "收盘复盘"),
-        ("news_digest", "新闻速递"),
+        ("premarket_outlook", "盤前分析"),
+        ("daily_report", "收盤覆盤"),
+        ("news_digest", "新聞速遞"),
     )
     for agent_name, label in agents:
         row = (
@@ -144,7 +136,7 @@ def _load_latest_insights(db: Session) -> list[dict]:
 
 @router.get("/overview")
 def get_dashboard_overview(
-    market: str = Query("ALL", description="市场过滤: ALL/CN/HK/US"),
+    market: str = Query("ALL", description="市場過濾: ALL/CN/HK/US/TW"),
     action_limit: int = Query(6, ge=3, le=20),
     risk_limit: int = Query(6, ge=3, le=20),
     days: int = Query(45, ge=7, le=365),
@@ -158,36 +150,62 @@ def get_dashboard_overview(
     snapshot_date = str(coverage.get("snapshot_date") or "")
 
     # Action list: unheld, active, executable first.
-    unheld = list_strategy_signals(
-        market=market_filter,
-        status="active",
-        min_score=55,
-        limit=max(30, int(action_limit) * 10),
-        snapshot_date=snapshot_date,
-        source_pool="all",
-        holding="unheld",
-        strategy_code="",
-        risk_level="all",
-        include_payload=False,
-    )
-    grouped_unheld = _group_signals(list(unheld.get("items") or []))
+    opportunity_query_limit = max(30, int(action_limit) * 10)
+
+    def _unheld_items(*, requested_market: str, instrument_group: str = "") -> list[dict]:
+        result = list_strategy_signals(
+            market=requested_market,
+            status="active",
+            min_score=55,
+            limit=opportunity_query_limit,
+            snapshot_date=snapshot_date,
+            source_pool="all",
+            holding="unheld",
+            strategy_code="",
+            risk_level="all",
+            instrument_group=instrument_group,
+            include_payload=False,
+        )
+        return list(result.get("items") or [])
+
+    if mkt == "TW":
+        # Query each captured instrument group independently so a full ETF page
+        # cannot consume the SQL limit before ordinary EQUITY opportunities load.
+        unheld_items = _unheld_items(requested_market="TW", instrument_group="EQUITY")
+        unheld_items.extend(_unheld_items(requested_market="TW", instrument_group="ETF"))
+    elif mkt == "ALL":
+        unheld_items = _unheld_items(requested_market="", instrument_group="ORDINARY")
+        unheld_items.extend(_unheld_items(requested_market="TW", instrument_group="ETF"))
+    else:
+        unheld_items = _unheld_items(requested_market=market_filter)
+    grouped_unheld = _group_signals(unheld_items)
+    def _tw_group(row: dict) -> str:
+        return str(row.get("instrument_group") or "UNKNOWN").strip().upper()
+
+    etf_opportunities = [
+        row for row in grouped_unheld
+        if str(row.get("stock_market") or "").upper() == "TW" and _tw_group(row) == "ETF"
+    ]
+    ordinary_unheld = [
+        row for row in grouped_unheld
+        if str(row.get("stock_market") or "").upper() != "TW" or _tw_group(row) == "EQUITY"
+    ]
     executable = [
         x
-        for x in grouped_unheld
+        for x in ordinary_unheld
         if str(x.get("action") or "").lower() in ("buy", "add")
         and (x.get("entry_low") is not None or x.get("entry_high") is not None)
     ]
-    executable.sort(key=lambda x: float(x.get("rank_score") or 0.0), reverse=True)
+    executable.sort(key=representative_sort_key)
     if len(executable) < int(action_limit):
         remaining = sorted(
-            [x for x in grouped_unheld if x not in executable],
-            key=lambda x: (
-                0 if str(x.get("status") or "") == "active" else 1,
-                -float(x.get("rank_score") or 0.0),
-            ),
+            [x for x in ordinary_unheld if x not in executable],
+            key=representative_sort_key,
         )
         executable.extend(remaining[: max(0, int(action_limit) - len(executable))])
     action_items = executable[: int(action_limit)]
+    etf_opportunities.sort(key=representative_sort_key)
+    etf_opportunities = etf_opportunities[: int(action_limit)]
 
     # Risk list: held symbols with risk flags.
     held = list_strategy_signals(
@@ -207,13 +225,13 @@ def get_dashboard_overview(
     for row in grouped_held:
         flags: list[str] = []
         if bool(row.get("constrained")):
-            flags.append("组合约束")
+            flags.append("組合約束")
         if str(row.get("risk_level") or "").lower() == "high":
-            flags.append("高风险")
+            flags.append("高風險")
         if str(row.get("status") or "").lower() != "active":
-            flags.append("非活跃状态")
+            flags.append("非活躍狀態")
         if float(row.get("rank_score") or 0.0) < 68:
-            flags.append("信号转弱")
+            flags.append("訊號轉弱")
         if not flags:
             continue
         risk_items.append({**row, "risk_flags": flags})
@@ -225,7 +243,7 @@ def get_dashboard_overview(
     )
     risk_items = risk_items[: int(risk_limit)]
 
-    # Portfolio quick stats (DB-only, no实时行情请求).
+    # Portfolio quick stats (DB-only, no即時行情請求).
     positions = (
         db.query(Position, Stock)
         .join(Stock, Position.stock_id == Stock.id)
@@ -258,7 +276,7 @@ def get_dashboard_overview(
         or 0.0
     )
 
-    # Market pulse from latest market scan snapshot (stable even without外网).
+    # Market pulse from latest market scan snapshot (stable even without外網).
     pulse_query = db.query(MarketScanSnapshot)
     if snapshot_date:
         pulse_query = pulse_query.filter(MarketScanSnapshot.snapshot_date == snapshot_date)
@@ -362,6 +380,8 @@ def get_dashboard_overview(
             "risk_positions": len(risk_items),
             "win_rate_3d": win_rate_3d,
             "win_sample_3d": sample_3d,
+            "win_rate_3d_population": "legacy-unlabelled",
+            "win_rate_3d_basis": "legacy calendar-day close projection",
             "errors_24h": error_24h,
         },
         "portfolio": {
@@ -373,6 +393,7 @@ def get_dashboard_overview(
         },
         "action_center": {
             "opportunities": action_items,
+            "etf_opportunities": etf_opportunities,
             "risk_items": risk_items,
         },
         "market_pulse": {
@@ -380,6 +401,15 @@ def get_dashboard_overview(
             "hot_topics": hot_topics,
         },
         "strategy": {
+            "legacy_outcome_basis": stats.get("legacy_outcome_basis") or {
+                "population": "legacy-unlabelled",
+                "return_basis": "legacy calendar-day close projection",
+            },
+            "outcomes_v2": stats.get("outcomes_v2") or {
+                "basis": "versioned outcome statistics unavailable",
+                "window_days": 45,
+                "partitions": [],
+            },
             "coverage": stats.get("coverage") or {},
             "factor_stats": stats.get("factor_stats") or {},
             "by_market": stats.get("by_market") or [],
@@ -392,7 +422,7 @@ def get_dashboard_overview(
 logger = logging.getLogger(__name__)
 
 
-# ── 今日必读 AI 策展(Phase C)────────────────────────────────────────────
+# ── 今日必讀 AI 策展(Phase C)────────────────────────────────────────────
 class CurateCandidate(BaseModel):
     type: str
     symbol: str = ""
@@ -409,7 +439,7 @@ class CurateRequest(BaseModel):
 
 @router.post("/curate")
 async def curate_today(req: CurateRequest, db: Session = Depends(get_db)):
-    """把首页候选事件交 AI 排序+精炼,返回 [{index, importance, why}];AI 失败按原序兜底。"""
+    """把首頁候選事件交 AI 排序+精煉,返回 [{index, importance, why}];AI 失敗按原序兜底。"""
     cands = req.candidates[:20]
     if not cands:
         return {"items": []}
@@ -421,11 +451,11 @@ async def curate_today(req: CurateRequest, db: Session = Depends(get_db)):
         for i, c in enumerate(cands)
     )
     system_prompt = (
-        "你是盯盘助手。从用户今日候选事件里挑出最值得关注的,按重要度排序,"
-        "重点关照:已触发的提醒、持仓的大幅异动、组合风险。"
-        "只输出每条一行,格式: 序号|重要度(0-100整数)|一句话说明为什么值得看。不解释、不臆造。"
+        "你是盯盤助手。從使用者今日候選事件裡挑出最值得關注的,按重要度排序,"
+        "重點關照:已觸發的提醒、持倉的大幅異動、組合風險。"
+        "只輸出每條一行,格式: 序號|重要度(0-100整數)|一句話說明為什麼值得看。不解釋、不臆造。"
     )
-    user_content = f"今日候选(均来自该用户的持仓/自选/提醒/机会):\n{listing}"
+    user_content = f"今日候選(均來自該使用者的持倉/自選/提醒/機會):\n{listing}"
 
     items: list[dict] = []
     try:
@@ -444,9 +474,9 @@ async def curate_today(req: CurateRequest, db: Session = Depends(get_db)):
                         imp = 0
                     items.append({"index": i, "importance": imp, "why": parts[2].strip()})
     except Exception as e:
-        logger.debug(f"curate AI 失败,按原序兜底: {e}")
+        logger.debug(f"curate AI 失敗,按原序兜底: {e}")
 
-    if not items:  # 兜底:原序 + 递减重要度
+    if not items:  # 兜底:原序 + 遞減重要度
         items = [
             {"index": i, "importance": max(0, 100 - i * 5), "why": c.signal or ""}
             for i, c in enumerate(cands)
@@ -457,9 +487,9 @@ async def curate_today(req: CurateRequest, db: Session = Depends(get_db)):
 
 @router.get("/brief")
 def get_brief(type: str = Query("eod", description="premarket | eod"), db: Session = Depends(get_db)):
-    """盘前/盘后 AI 简报(复用 premarket_outlook / daily_report agent 的最新报告)。"""
+    """盤前/盤後 AI 簡報(複用 premarket_outlook / daily_report agent 的最新報告)。"""
     agent = "premarket_outlook" if type == "premarket" else "daily_report"
-    label = "盘前分析" if type == "premarket" else "收盘复盘"
+    label = "盤前分析" if type == "premarket" else "收盤覆盤"
     row = (
         db.query(AnalysisHistory)
         .filter(AnalysisHistory.agent_name == agent)

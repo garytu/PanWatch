@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class AIClient:
-    """OpenAI 协议兼容的 AI 客户端"""
+    """OpenAI 協議相容的 AI 使用者端"""
 
     def __init__(self, base_url: str, api_key: str, model: str = "", proxy: str = ""):
         kwargs = {
@@ -21,8 +21,8 @@ class AIClient:
         if proxy:
             kwargs["http_client"] = None  # TODO: 如需代理，用 httpx 配置
         self.client = AsyncOpenAI(**kwargs)
-        # 保留原始配置作为实例属性,供需要桥接到第三方 LLM 框架的 agent 使用
-        # (e.g. TradingAgents 需要 base_url+api_key 重新构造 langchain 的 LLM)
+        # 保留原始配置作為例項屬性,供需要橋接到第三方 LLM 框架的 agent 使用
+        # (e.g. TradingAgents 需要 base_url+api_key 重新構造 langchain 的 LLM)
         self.base_url = base_url
         self.api_key = api_key
         self.model = model
@@ -37,19 +37,19 @@ class AIClient:
         temperature: float | None = 0.4,
     ) -> str:
         """
-        调用 LLM 获取文本回复。
+        呼叫 LLM 獲取文本回復。
 
         Args:
-            system_prompt: 系统提示词
-            user_content: 用户输入内容
-            images: 图片路径列表（用于多模态，可选）
-            temperature: 生成温度
+            system_prompt: 系統提示詞
+            user_content: 使用者輸入內容
+            images: 圖片路徑列表（用於多模態，可選）
+            temperature: 生成溫度
         """
         messages = [
             {"role": "system", "content": system_prompt},
         ]
 
-        # 构建 user message
+        # 構建 user message
         if images:
             content_parts = [{"type": "text", "text": user_content}]
             for img_path in images:
@@ -67,10 +67,10 @@ class AIClient:
             create_kwargs = {"model": self.model, "messages": messages}
             if temperature is not None:
                 create_kwargs["temperature"] = temperature
-            # OTel gen_ai span(默认关闭时为 no-op);token 用量在拿到 usage 后回填。
+            # OTel gen_ai span(預設關閉時為 no-op);token 用量在拿到 usage 後回填。
             with otel.llm_span(self.model, operation="chat") as _span:
                 response = await self.client.chat.completions.create(**create_kwargs)
-                # 记录 token 用量
+                # 記錄 token 用量
                 if response.usage:
                     self.last_usage = normalize_provider_usage(response.usage, model=self.model)
                     self.total_tokens_used += response.usage.total_tokens
@@ -87,7 +87,7 @@ class AIClient:
             return response.choices[0].message.content or ""
 
         except Exception as e:
-            logger.error(f"AI 调用失败: {e}")
+            logger.error(f"AI 呼叫失敗: {e}")
             raise
 
     async def chat_multi(
@@ -97,12 +97,12 @@ class AIClient:
         max_tokens: int | None = None,
     ) -> str:
         """
-        多轮对话：传入完整 messages 列表。
+        多輪對話：傳入完整 messages 列表。
 
         Args:
             messages: [{"role": "system"/"user"/"assistant", "content": "..."}]
-            temperature: 生成温度；传 None 时不下发该参数
-                （用于 failover 对"参数不兼容"错误的摘参重试）
+            temperature: 生成溫度；傳 None 時不下發該引數
+                （用於 failover 對"引數不相容"錯誤的摘參重試）
         """
         try:
             create_kwargs: dict = {"model": self.model, "messages": messages}
@@ -126,7 +126,7 @@ class AIClient:
                     )
             return response.choices[0].message.content or ""
         except Exception as e:
-            logger.error(f"AI 多轮对话调用失败: {e}")
+            logger.error(f"AI 多輪對話呼叫失敗: {e}")
             raise
 
     async def chat_with_tools(
@@ -135,9 +135,9 @@ class AIClient:
         tools: list[dict],
         temperature: float | None = 0.4,
     ):
-        """带 tool use 的对话调用，返回原始 message 对象。
+        """帶 tool use 的對話呼叫，返回原始 message 物件。
 
-        temperature 传 None 时不下发该参数（供 failover 摘参重试）。
+        temperature 傳 None 時不下發該引數（供 failover 摘參重試）。
         """
         try:
             create_kwargs: dict = {
@@ -159,7 +159,7 @@ class AIClient:
                     )
             return response.choices[0].message
         except Exception as e:
-            logger.error(f"AI tool use 调用失败: {e}")
+            logger.error(f"AI tool use 呼叫失敗: {e}")
             raise
 
     async def chat_stream(
@@ -169,15 +169,15 @@ class AIClient:
         temperature: float | None = 0.4,
         tool_choice: str | None = None,
     ):
-        """流式对话通道（stream=True），支持可选 tool use。
+        """流式對話通道（stream=True），支援可選 tool use。
 
-        异步生成器，产出二元组事件：
-        - ("token", str)：增量文本片段，边生成边产出；
-        - ("message", dict)：流结束后产出一次完整消息，
+        非同步生成器，產出二元組事件：
+        - ("token", str)：增量文本片段，邊生成邊產出；
+        - ("message", dict)：流結束後產出一次完整訊息，
           形如 {"content": 全量文本, "tool_calls": [{"id", "name", "arguments"}, ...]}，
-          无工具调用时 tool_calls 为空列表。
+          無工具呼叫時 tool_calls 為空列表。
 
-        调用方（如 chat SSE 端点）根据 tool_calls 是否为空决定继续工具循环还是结束。
+        呼叫方（如 chat SSE 端點）根據 tool_calls 是否為空決定繼續工具迴圈還是結束。
         """
         create_kwargs: dict = {
             "model": self.model,
@@ -208,19 +208,19 @@ class AIClient:
                 try:
                     stream = await self.client.chat.completions.create(**create_kwargs)
                 except Exception:
-                    logger.error(f"AI 流式调用失败: {e}")
+                    logger.error(f"AI 流式呼叫失敗: {e}")
                     raise
             else:
-                logger.error(f"AI 流式调用失败: {e}")
+                logger.error(f"AI 流式呼叫失敗: {e}")
                 raise
 
         content_parts: list[str] = []
-        # OpenAI 流式协议下 tool_calls 按 index 分片下发（arguments 逐段拼接）
+        # OpenAI 流式協議下 tool_calls 按 index 分片下發（arguments 逐段拼接）
         tool_calls_acc: dict[int, dict] = {}
         provider_usage = None
 
         async for chunk in stream:
-            # 部分兼容服务会在末尾单发一个只含 usage 的 chunk
+            # 部分相容服務會在末尾單發一個只含 usage 的 chunk
             usage = getattr(chunk, "usage", None)
             if usage:
                 self.total_tokens_used += usage.total_tokens
@@ -256,15 +256,15 @@ class AIClient:
         )
 
     async def list_models(self) -> list[str]:
-        """通过 OpenAI 兼容的 /v1/models 拉取可用模型 id 列表。"""
+        """透過 OpenAI 相容的 /v1/models 拉取可用模型 id 列表。"""
         resp = await self.client.models.list()
         return sorted(m.id for m in resp.data)
 
     def _encode_image(self, image_path: str) -> str | None:
-        """将图片文件编码为 base64"""
+        """將圖片檔案編碼為 base64"""
         path = Path(image_path)
         if not path.exists():
-            logger.warning(f"图片不存在: {image_path}")
+            logger.warning(f"圖片不存在: {image_path}")
             return None
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")

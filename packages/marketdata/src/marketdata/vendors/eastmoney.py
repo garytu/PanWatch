@@ -1,9 +1,9 @@
-"""东财 CN 报价 vendor(quote 第二源)。push2 stock/get,单只查询,逐只循环取批量。
+"""東財 CN 報價 vendor(quote 第二源)。push2 stock/get,單隻查詢,逐只迴圈取批次。
 
-字段映射经交叉核对 akshare `stock_ask_bid_em.py`(同一 push2 stock/get 端点,
-fltt=2 预格式化模式下的字段含义)+ 本仓 kline.py/capital_flow.py 东财现有惯例。
-本 vendor 不传 fltt/invt,取原始未格式化值,价格类字段需 /10^f59 还原,
-百分比类字段(涨跌幅/换手率/量比)固定 /100 还原。
+欄位對映經交叉核對 akshare `stock_ask_bid_em.py`(同一 push2 stock/get 端點,
+fltt=2 預格式化模式下的欄位含義)+ 本倉 kline.py/capital_flow.py 東財現有慣例。
+本 vendor 不傳 fltt/invt,取原始未格式化值,價格類欄位需 /10^f59 還原,
+百分比類欄位(漲跌幅/周轉率/量比)固定 /100 還原。
 """
 
 from __future__ import annotations
@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 _URL = "https://push2.eastmoney.com/api/qt/stock/get"
 _HOST = "push2.eastmoney.com"
 _MIN_INTERVAL_S = 0.2
-# f43 最新价 / f44 最高 / f45 最低 / f46 今开 / f47 成交量 / f48 成交额 / f50 量比 /
-# f55(备用,CN 主用 f168) / f57 代码 / f58 名称 / f59 小数位数 / f60 昨收 /
-# f116 总市值 / f117 流通市值 / f168 换手率 / f169 涨跌额 / f170 涨跌幅 / f171 振幅(未映射)
+# f43 最新價 / f44 最高 / f45 最低 / f46 今開 / f47 成交量 / f48 成交額 / f50 量比 /
+# f55(備用,CN 主用 f168) / f57 程式碼 / f58 名稱 / f59 小數位數 / f60 昨收 /
+# f116 總市值 / f117 流通市值 / f168 周轉率 / f169 漲跌額 / f170 漲跌幅 / f171 振幅(未對映)
 _FIELDS = "f43,f44,f45,f46,f47,f48,f50,f55,f57,f58,f59,f60,f116,f117,f168,f169,f170,f171"
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -40,7 +40,7 @@ def _to_float(value) -> float | None:
 
 
 def _scaled(value, decimals: int) -> float | None:
-    """价格类字段还原:raw / 10^decimals。"""
+    """價格類欄位還原:raw / 10^decimals。"""
     v = _to_float(value)
     if v is None:
         return None
@@ -51,7 +51,7 @@ def _scaled(value, decimals: int) -> float | None:
 
 
 def _pct(value) -> float | None:
-    """百分比类字段还原:raw / 100(涨跌幅/换手率/量比,与小数位数无关)。"""
+    """百分比類欄位還原:raw / 100(漲跌幅/周轉率/量比,與小數位數無關)。"""
     v = _to_float(value)
     if v is None:
         return None
@@ -88,7 +88,7 @@ def _parse_one(data: dict | None, market: str, fallback_code: str) -> Quote | No
         turnover=_to_float(data.get("f48")),
         turnover_rate=turnover_rate,
         volume_ratio=_pct(data.get("f50")),
-        pe_ratio=None,  # 未确认稳定字段(f162 猜测,未经真实响应验证),宁缺毋错
+        pe_ratio=None,  # 未確認穩定欄位(f162 猜測,未經真實回應驗證),寧缺毋錯
         circulating_market_value=(circ_mv / 1e8) if circ_mv is not None else None,
         total_market_value=(total_mv / 1e8) if total_mv is not None else None,
     )
@@ -114,7 +114,7 @@ class EastmoneyQuoteVendor(QuoteVendor):
                 timeout=8,
                 retries=2,
                 parse="json",
-                log_label="东财报价",
+                log_label="東財報價",
                 symbol=sym.code,
             )
             if not payload:

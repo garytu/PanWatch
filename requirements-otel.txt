@@ -1,12 +1,12 @@
-# OpenTelemetry 导出(可选依赖组)
+# OpenTelemetry 匯出(可選依賴組)
 #
-# PanWatch 的自建可观测(log_context / agent_runs / progress)不依赖这些包;
-# 仅当你想把 trace 导出到标准 APM(Jaeger / Tempo / Langfuse OTLP 等)时才需安装:
+# PanWatch 的自建可觀測(log_context / agent_runs / progress)不依賴這些包;
+# 僅當你想把 trace 匯出到標準 APM(Jaeger / Tempo / Langfuse OTLP 等)時才需安裝:
 #
 #   pip install -r requirements-otel.txt
 #
-# 安装后再配置环境变量 OTEL_EXPORTER_OTLP_ENDPOINT 即可启用(见 README「OTel 导出」)。
-# 未安装或未配置 endpoint 时,src/core/otel.py 全程 no-op,零副作用。
+# 安裝後再配置環境變數 OTEL_EXPORTER_OTLP_ENDPOINT 即可啟用(見 README「OTel 匯出」)。
+# 未安裝或未配置 endpoint 時,src/core/otel.py 全程 no-op,零副作用。
 
 opentelemetry-sdk>=1.20.0
 opentelemetry-exporter-otlp>=1.20.0

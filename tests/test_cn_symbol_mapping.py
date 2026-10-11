@@ -9,7 +9,7 @@ from src.platform.marketdata.models import MarketCode
 
 class TestCnSymbolMapping(unittest.TestCase):
     def test_cn_exchange_core(self):
-        """交易所识别 — SZ/SH/BJ 判断"""
+        """交易所識別 — SZ/SH/BJ 判斷"""
         self.assertEqual(get_cn_exchange("000738"), "SZ")
         self.assertEqual(get_cn_exchange("600519"), "SH")
         self.assertEqual(get_cn_exchange("300750"), "SZ")
@@ -18,7 +18,7 @@ class TestCnSymbolMapping(unittest.TestCase):
         self.assertEqual(get_cn_exchange("920001"), "BJ")
 
     def test_cn_prefix_core(self):
-        """代码前缀 — 小写/大写前缀"""
+        """程式碼字首 — 小寫/大寫字首"""
         self.assertEqual(get_cn_prefix("000738"), "sz")
         self.assertEqual(get_cn_prefix("600519"), "sh")
         self.assertEqual(get_cn_prefix("920001"), "bj")
@@ -27,15 +27,15 @@ class TestCnSymbolMapping(unittest.TestCase):
         self.assertFalse(is_cn_sh("000738"))
 
     def test_capital_flow_secid(self):
-        """东方财富 secid — SZ 用 0 前缀，SH 用 1 前缀（marketdata 包 Symbol）"""
+        """東方財富 secid — SZ 用 0 字首，SH 用 1 字首（marketdata 包 Symbol）"""
         self.assertEqual(Symbol.parse("000738", market="CN").to_eastmoney_secid(), "0.000738")
         self.assertEqual(Symbol.parse("600519", market="CN").to_eastmoney_secid(), "1.600519")
 
-    # 雪球新闻 symbol 前缀映射测试已随 XueqiuNewsCollector 收口进 marketdata 包，
-    # 对应用例见 packages/marketdata/tests/test_news.py::test_xueqiu_symbol_id_prefix_rules。
+    # 雪球新聞 symbol 字首對映測試已隨 XueqiuNewsCollector 收口進 marketdata 包，
+    # 對應用例見 packages/marketdata/tests/test_news.py::test_xueqiu_symbol_id_prefix_rules。
 
     def test_screenshot_urls(self):
-        """截图 URL — 新浪/雪球/东方财富"""
+        """截圖 URL — 新浪/雪球/東方財富"""
         collector = ScreenshotCollector()
         self.assertEqual(
             collector._get_sina_url("000738", "CN"),

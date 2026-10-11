@@ -46,13 +46,15 @@ export async function fetchAPI<T>(path: string, options?: ApiRequestOptions): Pr
     headers['Content-Type'] = 'application/json'
   }
 
-  const timeoutController = options?.signal ? null : new AbortController()
+  const timeoutController = new AbortController()
+  const callerSignal = options?.signal
+  const abortFromCaller = () => timeoutController.abort(callerSignal?.reason)
+  if (callerSignal?.aborted) abortFromCaller()
+  else callerSignal?.addEventListener('abort', abortFromCaller, { once: true })
   const timeoutMs = typeof options?.timeoutMs === 'number' && options.timeoutMs > 0
     ? options.timeoutMs
     : DEFAULT_TIMEOUT_MS
-  const timeoutId = timeoutController
-    ? window.setTimeout(() => timeoutController.abort(), timeoutMs)
-    : null
+  const timeoutId = window.setTimeout(() => timeoutController.abort(), timeoutMs)
 
   let res: Response
   try {
@@ -63,22 +65,21 @@ export async function fetchAPI<T>(path: string, options?: ApiRequestOptions): Pr
         ...headers,
         ...(requestOptions.headers as Record<string, string> | undefined),
       },
-      signal: requestOptions.signal || timeoutController?.signal,
+      signal: timeoutController.signal,
     })
   } catch (error: any) {
     if (error?.name === 'AbortError') {
-      throw new Error('请求超时，请稍后重试')
+      throw new Error('請求超時，請稍後重試')
     }
     throw error
   } finally {
-    if (timeoutId !== null) {
-      window.clearTimeout(timeoutId)
-    }
+    window.clearTimeout(timeoutId)
+    callerSignal?.removeEventListener('abort', abortFromCaller)
   }
 
   if (res.status === 401) {
     logout()
-    throw new Error('登录已过期')
+    throw new Error('登入已過期')
   }
 
   const body: ApiResponse<T> = await res.json().catch(() => ({

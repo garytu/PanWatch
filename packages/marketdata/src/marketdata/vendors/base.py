@@ -1,4 +1,4 @@
-"""Vendor 抽象:每个 vendor 只负责"一家源怎么抓 + 解析成标准类型",内部无 fallback。"""
+"""Vendor 抽象:每個 vendor 只負責"一家源怎麼抓 + 解析成標準型別",內部無 fallback。"""
 
 from __future__ import annotations
 
@@ -8,84 +8,84 @@ from marketdata.symbol import Symbol
 
 
 class Vendor(ABC):
-    #: 注册名,与 SourceConfig.vendor / DataSource.provider 对齐
+    #: 註冊名,與 SourceConfig.vendor / DataSource.provider 對齊
     name: str = ""
-    #: 支持的市场集合(空集=全部);Engine 会按市场过滤
+    #: 支援的市場集合(空集=全部);Engine 會按市場過濾
     supports_markets: set[str] = set()
 
     @abstractmethod
     def fetch(self, symbols: list[Symbol], config: dict) -> list:
-        """抓取并解析。失败应抛异常(Engine 捕获后转移),空结果返回 []。"""
+        """抓取並解析。失敗應拋異常(Engine 捕獲後轉移),空結果返回 []。"""
         ...
 
 
 class QuoteVendor(Vendor):
-    """报价 vendor:fetch 返回 list[Quote]。"""
+    """報價 vendor:fetch 返回 list[Quote]。"""
 
     pass
 
 
 class KlineVendor(Vendor):
-    """K 线 vendor:fetch 返回 list[Bar]。单 symbol。"""
+    """K 線 vendor:fetch 返回 list[Bar]。單 symbol。"""
 
     pass
 
 
 class CapitalFlowVendor(Vendor):
-    """资金流向 vendor:fetch 返回 list[CapitalFlow]。单 symbol。"""
+    """資金流向 vendor:fetch 返回 list[CapitalFlow]。單 symbol。"""
 
     pass
 
 
 class EventsVendor(Vendor):
-    """事件 vendor:fetch 返回 list[EventItem]。批量(多 symbol)。"""
+    """事件 vendor:fetch 返回 list[EventItem]。批次(多 symbol)。"""
 
     pass
 
 
 class FlashNewsVendor(Vendor):
-    """快讯 vendor:fetch 返回 list[FlashNews]。市场级,symbols 可空。"""
+    """快訊 vendor:fetch 返回 list[FlashNews]。市場級,symbols 可空。"""
 
     pass
 
 
 class NewsVendor(Vendor):
-    """新闻 vendor:返回 list[NewsArticle],按 symbol。"""
+    """新聞 vendor:返回 list[NewsArticle],按 symbol。"""
 
     pass
 
 
 class FundamentalsVendor(Vendor):
-    """基本面/财务 vendor:fetch 返回 list[Fundamentals]。按 symbol(批量)。"""
+    """基本面/財務 vendor:fetch 返回 list[Fundamentals]。按 symbol(批次)。"""
 
     pass
 
 
 class DragonTigerVendor(Vendor):
-    """龙虎榜 vendor:fetch 返回 list[DragonTigerItem]。市场级(symbols 恒空),按 date 过滤。"""
+    """龍虎榜 vendor:fetch 返回 list[DragonTigerItem]。市場級(symbols 恆空),按 date 過濾。"""
 
     pass
 
 
 class MarginVendor(Vendor):
-    """融资融券 vendor:fetch 返回 list[MarginItem]。按 symbol(逐只取最新快照)。"""
+    """融資融券 vendor:fetch 返回 list[MarginItem]。按 symbol(逐只取最新快照)。"""
 
     pass
 
 
 class ShareholdersVendor(Vendor):
-    """股东户数 vendor:fetch 返回 list[ShareholderItem]。按 symbol(逐只取最新一期)。"""
+    """股東戶數 vendor:fetch 返回 list[ShareholderItem]。按 symbol(逐只取最新一期)。"""
 
     pass
 
 
 class DividendVendor(Vendor):
-    """分红 vendor:fetch 返回 list[DividendItem]。按 symbol(逐只返回全部历史)。"""
+    """分紅 vendor:fetch 返回 list[DividendItem]。按 symbol(逐只返回全部歷史)。"""
 
     pass
 
 
 class NorthboundVendor(Vendor):
-    """北向资金 vendor:fetch 返回 list[NorthboundItem]。市场级(symbols 可空)。"""
+    """北向資金 vendor:fetch 返回 list[NorthboundItem]。市場級(symbols 可空)。"""
 
     pass

@@ -1,9 +1,9 @@
-"""新浪(Sina)US/HK 行情 vendor(HTTP,GBK)。免 key 免代理,作腾讯之后的 US/HK 备源。
+"""新浪(Sina)US/HK 行情 vendor(HTTP,GBK)。免 key 免代理,作騰訊之後的 US/HK 備源。
 
-端点:
-- US: GET https://hq.sinajs.cn/list=gb_{code.lower()},多个逗号拼接。
-- HK: GET https://hq.sinajs.cn/list=rt_hk{code},多个逗号拼接。
-Header 必带 Referer + UA,响应 GBK 编码,多行 `var hq_str_XXX_yyy="...";`。
+端點:
+- US: GET https://hq.sinajs.cn/list=gb_{code.lower()},多個逗號拼接。
+- HK: GET https://hq.sinajs.cn/list=rt_hk{code},多個逗號拼接。
+Header 必帶 Referer + UA,回應 GBK 編碼,多行 `var hq_str_XXX_yyy="...";`。
 """
 
 from __future__ import annotations
@@ -109,7 +109,7 @@ class SinaQuoteVendor(QuoteVendor):
             retries=2,
             timeout=8,
             min_interval_s=0.0,
-            log_label="新浪报价",
+            log_label="新浪報價",
         )
         if not text:
             return []
@@ -126,7 +126,7 @@ class SinaQuoteVendor(QuoteVendor):
                 else:
                     q = _parse_hk_line(code, content)
             except (ValueError, IndexError) as e:
-                logger.debug(f"解析新浪行情失败: {e}")
+                logger.debug(f"解析新浪行情失敗: {e}")
                 continue
             if q:
                 out.append(q)

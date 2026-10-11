@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PositionInfo:
-    """单个持仓信息"""
+    """單個持倉資訊"""
 
     account_id: int
     account_name: str
@@ -27,17 +27,17 @@ class PositionInfo:
     cost_price: float
     quantity: int
     invested_amount: float | None = None
-    trading_style: str = "swing"  # short: 短线, swing: 波段, long: 长线
+    trading_style: str = "swing"  # short: 短線, swing: 波段, long: 長線
 
     @property
     def cost_value(self) -> float:
-        """持仓成本"""
+        """持倉成本"""
         return self.cost_price * self.quantity
 
 
 @dataclass
 class AccountInfo:
-    """账户信息"""
+    """帳戶資訊"""
 
     id: int
     name: str
@@ -46,41 +46,41 @@ class AccountInfo:
 
     @property
     def total_cost(self) -> float:
-        """账户总持仓成本"""
+        """帳戶總持倉成本"""
         return sum(p.cost_value for p in self.positions)
 
 
 @dataclass
 class PortfolioInfo:
-    """持仓组合信息"""
+    """持倉組合資訊"""
 
     accounts: list[AccountInfo] = field(default_factory=list)
 
     @property
     def total_available_funds(self) -> float:
-        """总可用资金"""
+        """總可用資金"""
         return sum(a.available_funds for a in self.accounts)
 
     @property
     def total_cost(self) -> float:
-        """总持仓成本"""
+        """總持倉成本"""
         return sum(a.total_cost for a in self.accounts)
 
     @property
     def all_positions(self) -> list[PositionInfo]:
-        """所有持仓列表"""
+        """所有持倉列表"""
         result = []
         for acc in self.accounts:
             result.extend(acc.positions)
         return result
 
     def get_positions_for_stock(self, symbol: str) -> list[PositionInfo]:
-        """获取某只股票在各账户的持仓"""
+        """獲取某隻股票在各帳戶的持倉"""
         return [p for p in self.all_positions if p.symbol == symbol]
 
     def get_aggregated_position(self, symbol: str) -> dict | None:
         """
-        获取某只股票的汇总持仓（合并所有账户）
+        獲取某隻股票的彙總持倉（合併所有帳戶）
         返回: {"symbol", "name", "total_quantity", "avg_cost", "total_cost", "trading_style", "positions"}
         """
         positions = self.get_positions_for_stock(symbol)
@@ -90,7 +90,7 @@ class PortfolioInfo:
         total_quantity = sum(p.quantity for p in positions)
         total_cost = sum(p.cost_value for p in positions)
         avg_cost = total_cost / total_quantity if total_quantity > 0 else 0
-        # 取第一个持仓的交易风格（如果同一股票在多个账户有不同风格，优先取短线）
+        # 取第一個持倉的交易風格（如果同一股票在多個帳戶有不同風格，優先取短線）
         trading_style = positions[0].trading_style
         for p in positions:
             if p.trading_style == "short":
@@ -109,12 +109,12 @@ class PortfolioInfo:
         }
 
     def has_position(self, symbol: str) -> bool:
-        """是否持有某只股票"""
+        """是否持有某隻股票"""
         return any(p.symbol == symbol for p in self.all_positions)
 
 
 class AgentContext:
-    """Agent 运行时上下文"""
+    """Agent 執行時上下文"""
 
     def __init__(
         self,
@@ -130,18 +130,18 @@ class AgentContext:
         self.notifier = notifier
         self.config = config
         self.portfolio = portfolio if portfolio is not None else PortfolioInfo()
-        # 主模型标签(初始);实际使用模型由 ai_client 在 failover 后覆盖。
+        # 主模型標籤(初始);實際使用模型由 ai_client 在 failover 後覆蓋。
         self._primary_model_label = model_label
         self.notify_policy = notify_policy
         self.suppress_notify = suppress_notify
 
     @property
     def model_label(self) -> str:
-        """实际使用的模型标签。
+        """實際使用的模型標籤。
 
-        failover 客户端会把真正跑通的候选记在 used_model_label;若不存在(普通
-        AIClient)则回退到路由选定的主模型标签。这样 footer 与 agent_runs 落库
-        都能反映"实际用了哪个模型",路由过程透明可观测。
+        failover 使用者端會把真正跑通的候選記在 used_model_label;若不存在(普通
+        AIClient)則回退到路由選定的主模型標籤。這樣 footer 與 agent_runs 落庫
+        都能反映"實際用了哪個模型",路由過程透明可觀測。
         """
         used = getattr(self.ai_client, "used_model_label", "")
         return used or self._primary_model_label
@@ -153,13 +153,13 @@ class AgentContext:
 
 @dataclass
 class AnalysisResult:
-    """分析结果"""
+    """分析結果"""
 
     agent_name: str
     title: str
     content: str
-    # 通知专用内容(完整、不截断);为空时通知回退用 content。
-    # 深度分析用它推送完整四位分析师观点,而弹窗 content 保持精简。
+    # 通知專用內容(完整、不截斷);為空時通知回退用 content。
+    # 深度分析用它推送完整四位分析師觀點,而彈跳視窗 content 保持精簡。
     notify_content: str | None = None
     raw_data: dict = field(default_factory=dict)
     images: list[str] = field(default_factory=list)
@@ -167,7 +167,7 @@ class AnalysisResult:
 
 
 class BaseAgent(ABC):
-    """Agent 抽象基类"""
+    """Agent 抽象基類"""
 
     name: str = ""
     display_name: str = ""
@@ -175,13 +175,13 @@ class BaseAgent(ABC):
 
     @abstractmethod
     async def collect(self, context: AgentContext) -> dict:
-        """采集数据"""
+        """採集資料"""
         ...
 
     @abstractmethod
     def build_prompt(self, data: dict, context: AgentContext) -> tuple[str, str]:
         """
-        构建 prompt。
+        構建 prompt。
 
         Returns:
             (system_prompt, user_content)
@@ -189,17 +189,17 @@ class BaseAgent(ABC):
         ...
 
     async def analyze(self, context: AgentContext, data: dict) -> AnalysisResult:
-        """调用 AI 分析"""
+        """呼叫 AI 分析"""
         system_prompt, user_content = self.build_prompt(data, context)
         content = await context.ai_client.chat(system_prompt, user_content)
 
-        # 标题含股票信息
+        # 標題含股票資訊
         stock_names = "、".join(s.name for s in context.watchlist[:5])
         if len(context.watchlist) > 5:
             stock_names += f" 等{len(context.watchlist)}只"
         title = f"【{self.display_name}】{stock_names}"
 
-        # 结尾附 AI 模型信息
+        # 結尾附 AI 模型資訊
         if context.model_label:
             content = content.rstrip() + f"\n\n---\nAI: {context.model_label}"
 
@@ -211,7 +211,7 @@ class BaseAgent(ABC):
         )
 
     async def should_notify(self, result: AnalysisResult) -> bool:
-        """是否需要通知，子类可重写"""
+        """是否需要通知，子類可重寫"""
         return True
 
     def _notify_dedupe_ttl_minutes(self, context: AgentContext) -> int:
@@ -230,7 +230,7 @@ class BaseAgent(ABC):
         elif self.name == "intraday_monitor":
             default = 30
         elif self.name == "tradingagents":
-            # 深度分析单次成本高,同标的 12 小时内不重复推送
+            # 深度分析單次成本高,同標的 12 小時內不重複推送
             default = 12 * 60
         else:
             default = 60
@@ -244,8 +244,8 @@ class BaseAgent(ABC):
         return default
 
     async def run(self, context: AgentContext) -> AnalysisResult:
-        """标准执行流程"""
-        logger.info(f"Agent [{self.display_name}] 开始执行")
+        """標準執行流程"""
+        logger.info(f"Agent [{self.display_name}] 開始執行")
 
         try:
             data = await self.collect(context)
@@ -257,7 +257,7 @@ class BaseAgent(ABC):
                     notify_status="skipped",
                     notify_reason="suppressed",
                 ):
-                    logger.info(f"Agent [{self.display_name}] 本次触发已禁用通知")
+                    logger.info(f"Agent [{self.display_name}] 本次觸發已停用通知")
                 result.raw_data["notified"] = False
                 result.raw_data["notify_skipped"] = "suppressed"
                 return result
@@ -274,7 +274,7 @@ class BaseAgent(ABC):
                                 notify_status="skipped",
                                 notify_reason="quiet_hours",
                             ):
-                                logger.info(f"Agent [{self.display_name}] 静默时段跳过通知")
+                                logger.info(f"Agent [{self.display_name}] 靜默時段跳過通知")
                             result.raw_data["notified"] = False
                             result.raw_data["notify_skipped"] = "quiet_hours"
                             return result
@@ -301,14 +301,14 @@ class BaseAgent(ABC):
                         notify_reason="deduped",
                     ):
                         logger.info(
-                            f"Agent [{self.display_name}] 通知去重命中，跳过发送 (ttl={ttl}m)"
+                            f"Agent [{self.display_name}] 通知去重命中，跳過傳送 (ttl={ttl}m)"
                         )
                     result.raw_data["notified"] = False
                     result.raw_data["notify_skipped"] = "deduped"
                     return result
 
                 with log_context(event="notify_send", notify_status="attempted"):
-                    logger.info(f"Agent [{self.display_name}] 开始发送通知")
+                    logger.info(f"Agent [{self.display_name}] 開始傳送通知")
                 notify_result = await context.notifier.notify_with_result(
                     result.title,
                     result.notify_content or result.content,
@@ -321,7 +321,7 @@ class BaseAgent(ABC):
                         notify_reason=str(notify_result.get("skipped") or ""),
                     ):
                         logger.info(
-                            f"Agent [{self.display_name}] 通知已跳过: {notify_result.get('skipped')}"
+                            f"Agent [{self.display_name}] 通知已跳過: {notify_result.get('skipped')}"
                         )
                     result.raw_data["notified"] = False
                     result.raw_data["notify_skipped"] = notify_result.get("skipped")
@@ -333,7 +333,7 @@ class BaseAgent(ABC):
                         event="notify_sent",
                         notify_status="sent",
                     ):
-                        logger.info(f"Agent [{self.display_name}] 通知已发送")
+                        logger.info(f"Agent [{self.display_name}] 通知已傳送")
                     # Mark dedupe only after a successful send.
                     check_and_mark_notify(
                         agent_name=self.name,
@@ -342,23 +342,23 @@ class BaseAgent(ABC):
                         mark=True,
                     )
                 else:
-                    notify_error = notify_result.get("error") or "未知错误"
+                    notify_error = notify_result.get("error") or "未知錯誤"
                     with log_context(
                         event="notify_failed",
                         notify_status="failed",
                         notify_reason=str(notify_error),
                     ):
                         logger.error(
-                            f"Agent [{self.display_name}] 通知发送失败: {notify_error}"
+                            f"Agent [{self.display_name}] 通知傳送失敗: {notify_error}"
                         )
                     result.raw_data["notify_error"] = notify_error
             else:
-                logger.info(f"Agent [{self.display_name}] 无需通知")
+                logger.info(f"Agent [{self.display_name}] 無需通知")
 
-            # 记录是否发送了通知
+            # 記錄是否傳送了通知
             result.raw_data["notified"] = notified
             return result
 
         except Exception as e:
-            logger.error(f"Agent [{self.display_name}] 执行失败: {e}")
+            logger.error(f"Agent [{self.display_name}] 執行失敗: {e}")
             raise

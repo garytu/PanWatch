@@ -32,21 +32,21 @@ export interface PortfolioBenchmark {
 }
 
 export const portfolioApi = {
-  /** 真实持仓组合诊断(集中度/分布/风险提示)。 */
+  /** 真實持倉組合診斷(集中度/分佈/風險提示)。 */
   diagnostics: () => fetchAPI<PortfolioDiagnostics>('/portfolio/diagnostics'),
 
-  /** 组合 vs 基准(超额/信息比率/相对回撤 + 归一化曲线)。 */
+  /** 組合 vs 基準(超額/資訊比率/相對回檔 + 歸一化曲線)。 */
   benchmark: (params?: { days?: number; benchmark?: string }) =>
     fetchAPI<PortfolioBenchmark>(
       `/portfolio/benchmark?days=${params?.days ?? 60}&benchmark=${encodeURIComponent(params?.benchmark ?? '000300')}`,
       { timeoutMs: 60000 },
     ),
 
-  /** 个股对组合收益的贡献(谁拖累/贡献)。 */
+  /** 個股對組合收益的貢獻(誰拖累/貢獻)。 */
   attribution: (days = 60) =>
     fetchAPI<{ items: AttributionItem[] }>(`/portfolio/attribution?days=${days}`, { timeoutMs: 60000 }),
 
-  /** 组合 AI 体检(叙述结论 + 调仓建议)。 */
+  /** 組合 AI 體檢(敘述結論 + 調倉建議)。 */
   aiReview: () => fetchAPI<PortfolioAiReview>('/portfolio/ai-review', { method: 'POST', timeoutMs: 60000 }),
 }
 

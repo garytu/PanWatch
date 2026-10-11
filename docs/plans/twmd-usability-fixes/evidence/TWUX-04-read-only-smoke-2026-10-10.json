@@ -1,0 +1,163 @@
+{
+  "date": "2026-10-10",
+  "calendar_evidence": "Existing cached 2026 TWSE annual calendar loaded into memory only; no refresh or writes",
+  "requests": [
+    {
+      "query": "timeframe=5m&limit=54&date_mode=auto",
+      "http_status": 200,
+      "seconds": 0.107,
+      "response": {
+        "instrument_id": "TWSE:2330",
+        "timeframe": "5m",
+        "returned_count": 54,
+        "total_count": 54,
+        "truncated": false,
+        "coverage_complete": true,
+        "display_coverage_complete": true,
+        "date_selection": {
+          "mode": "auto",
+          "requested_date": null,
+          "selected_date": "2026-10-08",
+          "reason": "latest_known_completed_priced_session",
+          "calendar_status": "known_open",
+          "calendar": {
+            "status": "known",
+            "date": "2026-10-08",
+            "source": "TWSE annual schedule",
+            "is_trading_day": true,
+            "coverage_start": "2026-01-01",
+            "coverage_end": "2026-12-31"
+          },
+          "as_of_date": "2026-10-10",
+          "as_of_calendar": {
+            "status": "known",
+            "date": "2026-10-10",
+            "source": "TWSE annual schedule",
+            "is_trading_day": false,
+            "coverage_start": "2026-01-01",
+            "coverage_end": "2026-12-31"
+          },
+          "coverage_status": "available",
+          "display_coverage_complete": true,
+          "coverage_calendar_status": "observed_open",
+          "coverage_window": {
+            "start_date": "2026-09-10",
+            "end_date": "2026-10-09"
+          },
+          "bar_request_count": 1,
+          "bar_request_budget": 3
+        },
+        "live_collection": false,
+        "usable_for_trading": false
+      },
+      "row_status_counts": {
+        "observed": 54
+      }
+    },
+    {
+      "query": "timeframe=1m&limit=270&date_mode=selected&start_date=2026-10-08&end_date=2026-10-08",
+      "http_status": 200,
+      "seconds": 0.05,
+      "response": {
+        "instrument_id": "TWSE:2330",
+        "timeframe": "1m",
+        "returned_count": 270,
+        "total_count": 270,
+        "truncated": false,
+        "coverage_complete": true,
+        "display_coverage_complete": true,
+        "date_selection": {
+          "mode": "selected",
+          "requested_date": "2026-10-08",
+          "selected_date": "2026-10-08",
+          "reason": "manual_selection",
+          "calendar_status": "known",
+          "calendar": {
+            "status": "known",
+            "date": "2026-10-08",
+            "source": "TWSE annual schedule",
+            "is_trading_day": true,
+            "coverage_start": "2026-01-01",
+            "coverage_end": "2026-12-31"
+          },
+          "coverage_status": "available",
+          "coverage_calendar_status": "observed_open"
+        },
+        "live_collection": false,
+        "usable_for_trading": false
+      },
+      "row_status_counts": {
+        "observed": 266,
+        "no_trade": 4
+      }
+    },
+    {
+      "query": "timeframe=5m&limit=54&date_mode=selected&start_date=2026-10-09&end_date=2026-10-09",
+      "http_status": 200,
+      "seconds": 0.022,
+      "response": {
+        "instrument_id": "TWSE:2330",
+        "timeframe": "5m",
+        "returned_count": 54,
+        "total_count": 54,
+        "truncated": false,
+        "coverage_complete": false,
+        "display_coverage_complete": false,
+        "date_selection": {
+          "mode": "selected",
+          "requested_date": "2026-10-09",
+          "selected_date": "2026-10-09",
+          "reason": "manual_selection",
+          "calendar_status": "known",
+          "calendar": {
+            "status": "known",
+            "date": "2026-10-09",
+            "source": "TWSE annual schedule",
+            "is_trading_day": false,
+            "coverage_start": "2026-01-01",
+            "coverage_end": "2026-12-31"
+          },
+          "coverage_status": "incomplete",
+          "coverage_calendar_status": "unknown"
+        },
+        "live_collection": false,
+        "usable_for_trading": false
+      },
+      "row_status_counts": {
+        "no_trade": 53,
+        "incomplete": 1
+      }
+    }
+  ],
+  "logical_http_reads": {
+    "/api/v1/bars/coverage": 1,
+    "/api/v1/bars": 3
+  },
+  "transport_settings": [
+    {
+      "path": "/api/v1/bars/coverage",
+      "retries": 0,
+      "timeout": 3.0
+    },
+    {
+      "path": "/api/v1/bars",
+      "retries": 0,
+      "timeout": 7.941635624971241
+    },
+    {
+      "path": "/api/v1/bars",
+      "retries": 1,
+      "timeout": 5.0
+    },
+    {
+      "path": "/api/v1/bars",
+      "retries": 1,
+      "timeout": 5.0
+    }
+  ],
+  "limitations": [
+    "Current checkout API adapter against the existing query service; new PanWatch not deployed",
+    "Manual legacy bars transport keeps existing retry behavior; auto get_response uses retries0"
+  ],
+  "query_service_image": "sha256:c6bfd31e9fc2d65f1abfa95dffab789e648e7a0a37d8292df3eeb99d77543795"
+}

@@ -1,6 +1,6 @@
-"""Agent 建议后验复盘的纯计算逻辑。
+"""Agent 建議後驗覆盤的純計算邏輯。
 
-这里集中维护“什么算命中”与 horizon 记录聚合，API 与前端都不自行复制规则。
+這裡集中維護“什麼算命中”與 horizon 記錄聚合，API 與前端都不自行復制規則。
 """
 
 from __future__ import annotations
@@ -15,13 +15,13 @@ EVALUATION_POLICY = {
     "horizon_unit": "trading_days",
     "flat_threshold_pct": FLAT_THRESHOLD_PCT,
     "actions": {
-        "buy": "后续收益大于 0 记为命中",
-        "add": "后续收益大于 0 记为命中",
-        "sell": "后续收益小于 0 记为命中",
-        "reduce": "后续收益小于 0 记为命中",
-        "avoid": "后续收益小于 0 记为命中",
-        "hold": "后续绝对收益小于 2% 记为命中",
-        "watch": "后续绝对收益小于 2% 记为命中",
+        "buy": "後續收益大於 0 記為命中",
+        "add": "後續收益大於 0 記為命中",
+        "sell": "後續收益小於 0 記為命中",
+        "reduce": "後續收益小於 0 記為命中",
+        "avoid": "後續收益小於 0 記為命中",
+        "hold": "後續絕對收益小於 2% 記為命中",
+        "watch": "後續絕對收益小於 2% 記為命中",
     },
 }
 
@@ -31,7 +31,7 @@ _FLAT_ACTIONS = {"hold", "watch"}
 
 
 def classify_prediction_hit(action: str, return_pct: float | None) -> bool | None:
-    """按公开政策判断建议方向是否命中；无可判定结果时返回 None。"""
+    """按公開政策判斷建議方向是否命中；無可判定結果時返回 None。"""
     if return_pct is None:
         return None
     try:
@@ -62,10 +62,10 @@ def _legacy_group_base_key(row: Any) -> str:
 
 
 def _legacy_group_ids(rows: Sequence[Any]) -> dict[int, str]:
-    """为无持久化分组 ID 的历史行按旧写入顺序配对 horizon。
+    """為無持久化分組 ID 的歷史行按舊寫入順序配對 horizon。
 
-    旧实现按 1/5 日逐条提交，创建时间既可能相同也可能跨秒，不能作为身份。
-    以数据库自增 ID 的写入顺序将同一建议的不同 horizon 归入同一个临时组。
+    舊實現按 1/5 日逐條提交，建立時間既可能相同也可能跨秒，不能作為身份。
+    以資料庫自增 ID 的寫入順序將同一建議的不同 horizon 歸入同一個臨時組。
     """
     result: dict[int, str] = {}
 
@@ -101,8 +101,8 @@ def _legacy_group_ids(rows: Sequence[Any]) -> dict[int, str]:
                 "key": f"legacy:{base_key}:{record_id or index}",
                 "horizons": set(),
                 "last_id": record_id,
-                # 同一键未凑齐至少两个 horizon 又出现新记录时，无法知道
-                # 后续结果属于哪次建议；宁可不配对，也不能交叉污染结果。
+                # 同一鍵未湊齊至少兩個 horizon 又出現新記錄時，無法知道
+                # 後續結果屬於哪次建議；寧可不配對，也不能交叉汙染結果。
                 "ambiguous": bool(
                     same_base_as_previous
                     and (previous["ambiguous"] or len(previous["horizons"]) < 2)
@@ -139,7 +139,7 @@ def _outcome_payload(row: Any) -> dict[str, Any]:
 
 
 def group_prediction_outcomes(rows: Sequence[Any]) -> list[dict[str, Any]]:
-    """把一条建议的多个 horizon 记录 pivot 成单行复盘数据。"""
+    """把一條建議的多個 horizon 記錄 pivot 成單行覆盤資料。"""
     grouped: dict[str, dict[str, Any]] = {}
     legacy_group_ids = _legacy_group_ids(rows)
 
@@ -179,7 +179,7 @@ def group_prediction_outcomes(rows: Sequence[Any]) -> list[dict[str, Any]]:
 
 
 def summarize_prediction_groups(groups: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """统计默认交易日口径的覆盖、命中和收益，样本不足时明确标记。"""
+    """統計預設交易日口徑的覆蓋、命中和收益，樣本不足時明確標記。"""
     horizon_stats: dict[str, dict[str, Any]] = {}
     pending_count = 0
 

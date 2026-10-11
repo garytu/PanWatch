@@ -1,24 +1,24 @@
-"""OpenTelemetry 导出层(可选,默认关闭)。
+"""OpenTelemetry 匯出層(可選,預設關閉)。
 
-在**不改动** PanWatch 自建可观测体系(``log_context`` / ``agent_runs`` /
-``tradingagents.observability``)的前提下,额外挂一层标准 OTel 导出,让"自建 + 标准栈"
-都能拿到实证。三类桥接:
+在**不改動** PanWatch 自建可觀測體系(``log_context`` / ``agent_runs`` /
+``tradingagents.observability``)的前提下,額外掛一層標準 OTel 匯出,讓"自建 + 標準棧"
+都能拿到實證。三類橋接:
 
-- Agent 一次运行        -> root span(复用 ``agent_runs`` 的 ``trace_id`` 作关联)
-- 单次 LLM 调用         -> gen_ai 子 span(复用 ``ai_client`` 已有的 token 用量)
-- TradingAgents 节点    -> 子 span(复用 ``observability.py`` 的节点/LLM 事件)
+- Agent 一次執行        -> root span(複用 ``agent_runs`` 的 ``trace_id`` 作關聯)
+- 單次 LLM 呼叫         -> gen_ai 子 span(複用 ``ai_client`` 已有的 token 用量)
+- TradingAgents 節點    -> 子 span(複用 ``observability.py`` 的節點/LLM 事件)
 
-设计原则(生产项目,增量可回退):
+設計原則(生產專案,增量可回退):
 
-1. **默认零副作用**:未配置 ``OTEL_EXPORTER_OTLP_ENDPOINT``,或未安装 opentelemetry
-   SDK 时,``init_otel()`` 直接返回 False,后续所有 span 接口降级为 no-op —— 不抛错、
-   不引入运行时依赖、不改变任何既有行为。
-2. **薄桥接**:只在既有埋点处包一层 context manager;埋点本身不感知 OTel 细节。
-3. **懒加载**:本模块顶层**不** import opentelemetry,只有 ``init_otel()`` 被调用且
-   endpoint 已配置时才尝试导入,因此 ``import src.platform.observability.otel`` 永远安全、零成本。
+1. **預設零副作用**:未配置 ``OTEL_EXPORTER_OTLP_ENDPOINT``,或未安裝 opentelemetry
+   SDK 時,``init_otel()`` 直接返回 False,後續所有 span 介面降級為 no-op —— 不拋錯、
+   不引入執行時依賴、不改變任何既有行為。
+2. **薄橋接**:只在既有埋點處包一層 context manager;埋點本身不感知 OTel 細節。
+3. **懶載入**:本模組頂層**不** import opentelemetry,只有 ``init_otel()`` 被呼叫且
+   endpoint 已配置時才嘗試匯入,因此 ``import src.platform.observability.otel`` 永遠安全、零成本。
 
-GenAI 语义约定(OpenTelemetry Semantic Conventions for Generative AI)让 span 能被
-Jaeger / Tempo / Langfuse(OTLP)等标准 APM 直接识别为"一次模型调用"。
+GenAI 語義約定(OpenTelemetry Semantic Conventions for Generative AI)讓 span 能被
+Jaeger / Tempo / Langfuse(OTLP)等標準 APM 直接識別為"一次模型呼叫"。
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ from typing import Any, Iterator, Optional
 logger = logging.getLogger(__name__)
 
 
-# ---- GenAI 语义约定属性名 -------------------------------------------------
-# 参考: OpenTelemetry Semantic Conventions for Generative AI
+# ---- GenAI 語義約定屬性名 -------------------------------------------------
+# 參考: OpenTelemetry Semantic Conventions for Generative AI
 GEN_AI_SYSTEM = "gen_ai.system"
 GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
 GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
@@ -40,7 +40,7 @@ GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
 GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
 GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
 
-# PanWatch 自定义属性(桥接自建 trace 模型,便于在 APM 里与 agent_runs 对齐)
+# PanWatch 自定義屬性(橋接自建 trace 模型,便於在 APM 裡與 agent_runs 對齊)
 ATTR_AGENT_NAME = "panwatch.agent.name"
 ATTR_TRACE_ID = "panwatch.trace_id"
 ATTR_TRIGGER_SOURCE = "panwatch.trigger_source"
@@ -49,7 +49,7 @@ ATTR_TA_STAGE = "panwatch.tradingagents.stage"
 _SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "panwatch")
 _INSTRUMENTATION_SCOPE = "panwatch.otel"
 
-# 模块级状态(单进程内单例)
+# 模組級狀態(單程式內單例)
 _enabled: bool = False
 _initialized: bool = False
 _provider: Any = None
@@ -57,12 +57,12 @@ _tracer: Any = None
 
 
 def is_enabled() -> bool:
-    """OTel 导出当前是否已启用(endpoint 已配置且 SDK 可用且初始化成功)。"""
+    """OTel 匯出當前是否已啟用(endpoint 已配置且 SDK 可用且初始化成功)。"""
     return _enabled
 
 
 def _import_sdk():
-    """尝试导入 OTel SDK。未安装则返回 None(优雅降级)。"""
+    """嘗試匯入 OTel SDK。未安裝則返回 None(優雅降級)。"""
     try:
         from opentelemetry import trace
         from opentelemetry.sdk.resources import Resource
@@ -70,16 +70,16 @@ def _import_sdk():
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         return trace, Resource, TracerProvider, BatchSpanProcessor
-    except Exception:  # pragma: no cover - 仅在未装 SDK 时命中
+    except Exception:  # pragma: no cover - 僅在未裝 SDK 時命中
         return None
 
 
 def _build_otlp_exporter():
-    """构造 OTLP span exporter。
+    """構造 OTLP span exporter。
 
-    优先 HTTP(``proto/http``,端口约定 4318),回退 gRPC(``proto/grpc``,4317)。
-    两者都会自动读取 ``OTEL_EXPORTER_OTLP_ENDPOINT`` 等标准环境变量,因此这里不显式
-    传 endpoint,交给 SDK 按标准约定解析(最少惊讶原则)。
+    優先 HTTP(``proto/http``,埠約定 4318),回退 gRPC(``proto/grpc``,4317)。
+    兩者都會自動讀取 ``OTEL_EXPORTER_OTLP_ENDPOINT`` 等標準環境變數,因此這裡不顯式
+    傳 endpoint,交給 SDK 按標準約定解析(最少驚訝原則)。
     """
     try:
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -89,7 +89,7 @@ def _build_otlp_exporter():
         return OTLPSpanExporter()
     except Exception:
         pass
-    try:  # pragma: no cover - 环境相关
+    try:  # pragma: no cover - 環境相關
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
             OTLPSpanExporter as GrpcOTLPSpanExporter,
         )
@@ -100,10 +100,10 @@ def _build_otlp_exporter():
 
 
 def init_otel(*, force: bool = False) -> bool:
-    """从环境变量初始化 OTel 导出。幂等;返回是否成功启用。
+    """從環境變數初始化 OTel 匯出。冪等;返回是否成功啟用。
 
-    仅当 ``OTEL_EXPORTER_OTLP_ENDPOINT`` 非空**且** opentelemetry SDK/exporter 均可
-    导入时才真正启用;任一缺失都静默降级为 no-op(不影响现有部署)。
+    僅當 ``OTEL_EXPORTER_OTLP_ENDPOINT`` 非空**且** opentelemetry SDK/exporter 均可
+    匯入時才真正啟用;任一缺失都靜默降級為 no-op(不影響現有部署)。
     """
     global _enabled, _initialized, _provider, _tracer
 
@@ -112,7 +112,7 @@ def init_otel(*, force: bool = False) -> bool:
 
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
     if not endpoint:
-        # 未配置 endpoint —— 默认关闭,零副作用。
+        # 未配置 endpoint —— 預設關閉,零副作用。
         _initialized = True
         _enabled = False
         return False
@@ -120,8 +120,8 @@ def init_otel(*, force: bool = False) -> bool:
     mods = _import_sdk()
     if mods is None:
         logger.warning(
-            "OTEL_EXPORTER_OTLP_ENDPOINT 已配置(%s),但未安装 opentelemetry SDK,"
-            "OTel 导出跳过。安装: pip install -r requirements-otel.txt",
+            "OTEL_EXPORTER_OTLP_ENDPOINT 已配置(%s),但未安裝 opentelemetry SDK,"
+            "OTel 匯出跳過。安裝: pip install -r requirements-otel.txt",
             endpoint,
         )
         _initialized = True
@@ -132,8 +132,8 @@ def init_otel(*, force: bool = False) -> bool:
     exporter = _build_otlp_exporter()
     if exporter is None:
         logger.warning(
-            "opentelemetry SDK 已装但缺少 OTLP exporter,OTel 导出跳过。"
-            "安装: pip install -r requirements-otel.txt"
+            "opentelemetry SDK 已裝但缺少 OTLP exporter,OTel 匯出跳過。"
+            "安裝: pip install -r requirements-otel.txt"
         )
         _initialized = True
         _enabled = False
@@ -143,27 +143,27 @@ def init_otel(*, force: bool = False) -> bool:
         resource = Resource.create({"service.name": _SERVICE_NAME})
         provider = TracerProvider(resource=resource)
         provider.add_span_processor(BatchSpanProcessor(exporter))
-        # 设为全局 provider(供上下文传播);span 创建仍走本模块持有的 tracer。
+        # 設為全域性 provider(供上下文傳播);span 建立仍走本模組持有的 tracer。
         trace.set_tracer_provider(provider)
         _provider = provider
         _tracer = provider.get_tracer(_INSTRUMENTATION_SCOPE)
         _enabled = True
         _initialized = True
-        logger.info("OTel 导出已启用,endpoint=%s service=%s", endpoint, _SERVICE_NAME)
+        logger.info("OTel 匯出已啟用,endpoint=%s service=%s", endpoint, _SERVICE_NAME)
         return True
-    except Exception as e:  # pragma: no cover - 初始化异常兜底
-        logger.warning("OTel 初始化失败,降级为 no-op: %s", e)
+    except Exception as e:  # pragma: no cover - 初始化異常兜底
+        logger.warning("OTel 初始化失敗,降級為 no-op: %s", e)
         _enabled = False
         _initialized = True
         return False
 
 
-# ---- 供测试:用 InMemorySpanExporter 同步导出 -----------------------------
+# ---- 供測試:用 InMemorySpanExporter 同步匯出 -----------------------------
 
 def install_test_exporter():
-    """测试专用:重置并安装 InMemorySpanExporter(SimpleSpanProcessor 同步导出)。
+    """測試專用:重置並安裝 InMemorySpanExporter(SimpleSpanProcessor 同步匯出)。
 
-    返回 exporter 实例,可直接 ``get_finished_spans()`` 断言。生产代码不应调用。
+    返回 exporter 例項,可直接 ``get_finished_spans()`` 斷言。生產程式碼不應呼叫。
     """
     global _enabled, _initialized, _provider, _tracer
 
@@ -179,8 +179,8 @@ def install_test_exporter():
     resource = Resource.create({"service.name": _SERVICE_NAME})
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    # 测试内可能重复安装:直接覆盖本模块持有的 provider/tracer;
-    # 全局 provider 只在首次设置(OTel 不允许覆盖,重复设置会告警),故不强设全局。
+    # 測試內可能重複安裝:直接覆蓋本模組持有的 provider/tracer;
+    # 全域性 provider 只在首次設定(OTel 不允許覆蓋,重複設定會告警),故不強設全域性。
     try:
         trace.set_tracer_provider(provider)
     except Exception:
@@ -193,7 +193,7 @@ def install_test_exporter():
 
 
 def reset() -> None:
-    """重置模块状态(测试 teardown 用)。"""
+    """重置模組狀態(測試 teardown 用)。"""
     global _enabled, _initialized, _provider, _tracer
     _enabled = False
     _initialized = False
@@ -201,7 +201,7 @@ def reset() -> None:
     _tracer = None
 
 
-# ---- span 接口(全部在关闭时 no-op) --------------------------------------
+# ---- span 介面(全部在關閉時 no-op) --------------------------------------
 
 @contextmanager
 def agent_run_span(
@@ -209,9 +209,9 @@ def agent_run_span(
     trace_id: str = "",
     trigger_source: str = "",
 ) -> Iterator[Any]:
-    """一次 Agent 运行的 root span。关闭时 no-op(yield None)。
+    """一次 Agent 執行的 root span。關閉時 no-op(yield None)。
 
-    复用 ``agent_runs`` 的 ``trace_id`` 作为 span 属性,方便在 APM 里与 run 表对齐。
+    複用 ``agent_runs`` 的 ``trace_id`` 作為 span 屬性,方便在 APM 裡與 run 表對齊。
     """
     if not _enabled or _tracer is None:
         yield None
@@ -229,7 +229,7 @@ def agent_run_span(
 
 
 class _LLMSpan:
-    """gen_ai span 的薄句柄:调用返回后回填 token 用量/响应模型。"""
+    """gen_ai span 的薄控制程式碼:呼叫返回後回填 token 用量/回應模型。"""
 
     __slots__ = ("_span",)
 
@@ -263,10 +263,10 @@ def llm_span(
     system: str = "openai",
     operation: str = "chat",
 ) -> Iterator[_LLMSpan]:
-    """单次 LLM 调用的 gen_ai 子 span。关闭时 yield 一个 no-op 句柄。
+    """單次 LLM 呼叫的 gen_ai 子 span。關閉時 yield 一個 no-op 控制程式碼。
 
-    span 名遵循 GenAI 约定 ``{operation} {model}``;请求侧属性在进入时写入,响应侧
-    (token/响应模型)由调用方拿到 usage 后通过返回句柄回填。
+    span 名遵循 GenAI 約定 ``{operation} {model}``;請求側屬性在進入時寫入,回應側
+    (token/回應模型)由呼叫方拿到 usage 後透過返回控制程式碼回填。
     """
     if not _enabled or _tracer is None:
         yield _LLMSpan(None)
@@ -284,10 +284,10 @@ def llm_span(
 
 
 def capture_context() -> Any:
-    """捕获当前 OTel 上下文(供跨线程传播 root span 关系)。关闭时返回 None。
+    """捕獲當前 OTel 上下文(供跨執行緒傳播 root span 關係)。關閉時返回 None。
 
-    TradingAgents 在 ``asyncio.to_thread`` 里同步执行,OTel 上下文不会自动跨线程,
-    需在异步侧捕获、在工作线程侧显式作为 parent 传入。
+    TradingAgents 在 ``asyncio.to_thread`` 裡同步執行,OTel 上下文不會自動跨執行緒,
+    需在非同步側捕獲、在工作執行緒側顯式作為 parent 傳入。
     """
     if not _enabled:
         return None
@@ -305,11 +305,11 @@ def start_detached_span(
     parent_context: Any = None,
     attributes: Optional[dict] = None,
 ) -> Any:
-    """启动一个"游离" span(不设为 current,需手动 ``end``)。关闭时返回 None。
+    """啟動一個"遊離" span(不設為 current,需手動 ``end``)。關閉時返回 None。
 
-    用于 callback 式埋点(如 TradingAgents 节点)——start/end 分处两次回调、且可能
-    运行在工作线程,无法用 with 语法。传入 ``capture_context()`` 的结果作为 parent
-    以挂到 root span 下。
+    用於 callback 式埋點(如 TradingAgents 節點)——start/end 分處兩次回撥、且可能
+    執行在工作執行緒,無法用 with 語法。傳入 ``capture_context()`` 的結果作為 parent
+    以掛到 root span 下。
     """
     if not _enabled or _tracer is None:
         return None
@@ -327,7 +327,7 @@ def start_detached_span(
 
 
 def set_span_attributes(span: Any, attributes: dict) -> None:
-    """给游离 span 补属性。span 为 None 时 no-op。"""
+    """給遊離 span 補屬性。span 為 None 時 no-op。"""
     if span is None:
         return
     for k, v in attributes.items():
@@ -338,7 +338,7 @@ def set_span_attributes(span: Any, attributes: dict) -> None:
 
 
 def end_span(span: Any) -> None:
-    """结束一个游离 span。span 为 None 时 no-op。"""
+    """結束一個遊離 span。span 為 None 時 no-op。"""
     if span is None:
         return
     try:

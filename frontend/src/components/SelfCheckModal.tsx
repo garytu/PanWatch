@@ -31,10 +31,10 @@ interface CheckRow {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  system: '系统',
-  datasource: '数据源',
+  system: '系統',
+  datasource: '資料來源',
   ai: 'AI模型',
-  notify: '通知渠道',
+  notify: '通知管道',
 }
 const CATEGORY_ORDER = ['system', 'datasource', 'ai', 'notify']
 const CONCURRENCY = 4
@@ -45,7 +45,7 @@ const STATUS_META: Record<RowStatus, {
   className: string
   Icon: typeof CheckCircle2
 }> = {
-  checking: { label: '检查中', variant: 'secondary', className: 'text-muted-foreground', Icon: Loader2 },
+  checking: { label: '檢查中', variant: 'secondary', className: 'text-muted-foreground', Icon: Loader2 },
   ok: { label: '通', variant: 'success', className: '', Icon: CheckCircle2 },
   slow: {
     label: '慢',
@@ -53,7 +53,7 @@ const STATUS_META: Record<RowStatus, {
     className: 'border-amber-500/30 bg-amber-500/10 text-amber-600',
     Icon: AlertTriangle,
   },
-  fail: { label: '断', variant: 'destructive', className: '', Icon: XCircle },
+  fail: { label: '斷', variant: 'destructive', className: '', Icon: XCircle },
 }
 
 function StatusBadge({ status }: { status: RowStatus }) {
@@ -96,11 +96,11 @@ function ItemRow({ item }: { item: CheckRow }) {
   )
 }
 
-/** 按服务商(group)分组,保留出现顺序。 */
+/** 按服務商(group)分組,保留出現順序。 */
 function groupByService(rows: CheckRow[]): Array<[string, CheckRow[]]> {
   const map = new Map<string, CheckRow[]>()
   for (const r of rows) {
-    const svc = r.group || '未分组'
+    const svc = r.group || '未分組'
     if (!map.has(svc)) map.set(svc, [])
     map.get(svc)!.push(r)
   }
@@ -108,7 +108,7 @@ function groupByService(rows: CheckRow[]): Array<[string, CheckRow[]]> {
 }
 
 export default function SelfCheckModal({ open, onClose }: SelfCheckModalProps) {
-  // 先按清单渲染分组骨架(检查中),每项出结果就回填它的状态。
+  // 先按清單渲染分組骨架(檢查中),每項出結果就回填它的狀態。
   const [rows, setRows] = useState<CheckRow[]>([])
   const [running, setRunning] = useState(false)
   const [notifySend, setNotifySend] = useState(false)
@@ -134,7 +134,7 @@ export default function SelfCheckModal({ open, onClose }: SelfCheckModalProps) {
       items = res.items || []
     } catch (e) {
       if (runId !== runIdRef.current) return
-      setListError(e instanceof Error ? e.message : '获取自检清单失败')
+      setListError(e instanceof Error ? e.message : '獲取自檢清單失敗')
       setRunning(false)
       return
     }
@@ -166,9 +166,9 @@ export default function SelfCheckModal({ open, onClose }: SelfCheckModalProps) {
           const probed = res.items?.[0]
           merge(it.key, probed
             ? { status: probed.status, latency_ms: probed.latency_ms, error: probed.error, hint: probed.hint, note: probed.note }
-            : { status: 'fail', error: '未返回检查结果', hint: '检查请求失败,稍后重试' })
+            : { status: 'fail', error: '未返回檢查結果', hint: '檢查請求失敗,稍後重試' })
         } catch (e) {
-          merge(it.key, { status: 'fail', error: e instanceof Error ? e.message : '请求失败', hint: '检查请求失败,稍后重试' })
+          merge(it.key, { status: 'fail', error: e instanceof Error ? e.message : '請求失敗', hint: '檢查請求失敗,稍後重試' })
         }
       }
     }
@@ -222,14 +222,14 @@ export default function SelfCheckModal({ open, onClose }: SelfCheckModalProps) {
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>系统自检</DialogTitle>
+          <DialogTitle>系統自檢</DialogTitle>
         </DialogHeader>
 
-        {/* 渐变 Hero:进度条 + 总数/正常/异常 */}
+        {/* 漸變 Hero:進度條 + 總數/正常/異常 */}
         <div className={`relative overflow-hidden rounded-2xl ${heroGradient} p-4 text-white shadow-lg`}>
           <div className="flex items-center justify-between gap-2">
             <div className="text-[13px] font-semibold">
-              {running ? '正在检查…' : finished ? '检查完成' : '准备检查'}
+              {running ? '正在檢查…' : finished ? '檢查完成' : '準備檢查'}
             </div>
             <div className="text-[12px] font-mono opacity-90">{progress}%</div>
           </div>
@@ -242,7 +242,7 @@ export default function SelfCheckModal({ open, onClose }: SelfCheckModalProps) {
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
             <div>
               <div className="text-[22px] font-bold leading-none tabular-nums">{total}</div>
-              <div className="mt-1 text-[11px] opacity-80">总数</div>
+              <div className="mt-1 text-[11px] opacity-80">總數</div>
             </div>
             <div>
               <div className="text-[22px] font-bold leading-none tabular-nums">{okCount}</div>
@@ -250,36 +250,36 @@ export default function SelfCheckModal({ open, onClose }: SelfCheckModalProps) {
             </div>
             <div>
               <div className="text-[22px] font-bold leading-none tabular-nums">{failCount}</div>
-              <div className="mt-1 text-[11px] opacity-80">异常</div>
+              <div className="mt-1 text-[11px] opacity-80">異常</div>
             </div>
           </div>
           {finished && failCount > 0 && (
             <div className="mt-3 rounded-lg bg-white/15 px-3 py-1.5 text-[11px]">
-              发现 {failCount} 项异常,请查看下方修复建议。
+              發現 {failCount} 項異常,請檢視下方修復建議。
             </div>
           )}
         </div>
 
-        {/* 操作区 */}
+        {/* 操作區 */}
         <div className="mt-4 flex items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-[12px] text-muted-foreground cursor-pointer select-none">
             <Switch checked={notifySend} disabled={running} onCheckedChange={setNotifySend} />
-            含真实发送通知
+            含真實傳送通知
           </label>
           <Button size="sm" className="h-8" onClick={() => void runCheck()} disabled={running}>
             <RefreshCw className={`w-3.5 h-3.5 ${running ? 'animate-spin' : ''}`} />
-            重新检查
+            重新檢查
           </Button>
         </div>
 
         {listError && <div className="mt-3 text-[12px] text-rose-600">{listError}</div>}
         {!listError && total === 0 && !running && (
           <div className="mt-4 rounded-xl border border-border/40 bg-accent/20 p-4 text-center text-[12px] text-muted-foreground">
-            未配置 数据源 / AI / 通知,先去设置里配置后再自检。
+            未配置 資料來源 / AI / 通知,先去設定裡配置後再自檢。
           </div>
         )}
 
-        {/* 分组明细:数据源 / AI模型(服务商→模型)/ 通知渠道 */}
+        {/* 分組明細:資料來源 / AI模型(服務商→模型)/ 通知管道 */}
         <div className="mt-4 space-y-4">{CATEGORY_ORDER.map(renderCategory)}</div>
       </DialogContent>
     </Dialog>

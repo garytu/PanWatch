@@ -1,0 +1,252 @@
+{
+  "observed_at_utc": "2026-10-07T14:06:38.586662+00:00",
+  "service": "http://127.0.0.1:8000",
+  "source_checkout": "5f79d4452b823cf3187fc019c37be909676ce3bd",
+  "deployed_commit": null,
+  "instrument_id": "TWSE:2330",
+  "selectors": {
+    "start_date": "2026-10-02",
+    "end_date": "2026-10-02",
+    "start_month": "2026-07",
+    "end_month": "2026-08",
+    "fiscal_year": 2024,
+    "fiscal_quarter": 4
+  },
+  "aggregate_latency_ms": 13548.789,
+  "blocks": {
+    "valuation": {
+      "status": "available",
+      "reason": "selected_record_present"
+    },
+    "margin_short_sale": {
+      "status": "available",
+      "reason": "selected_record_present"
+    },
+    "institutional_flows": {
+      "status": "available",
+      "reason": "selected_record_present"
+    },
+    "monthly_revenues": {
+      "status": "partial",
+      "reason": "some_requested_months_missing"
+    },
+    "shareholder_distribution": {
+      "status": "available",
+      "reason": "selected_record_present"
+    },
+    "broker_flow": {
+      "status": "partial",
+      "reason": "broker_flow_source_scope_limited"
+    },
+    "financial_statements": {
+      "status": "available",
+      "reason": "report_retained"
+    },
+    "company_profile": {
+      "status": "available",
+      "reason": "selected_profile_present"
+    }
+  },
+  "financial_statements": {
+    "qualification": {
+      "status": "qualified",
+      "reason": "twse_equity_industry_24",
+      "industry_code": "24",
+      "catalog_evidence": {
+        "acquired_at": "2026-10-04 06:00:11",
+        "dataset": "twse_instruments",
+        "instrument_id": "TWSE:2330",
+        "is_active": true,
+        "listing_date": "1994-09-05",
+        "partition_key": "2026-10-04",
+        "record_count": 37095,
+        "security_type": "EQUITY",
+        "sha256": null,
+        "status": "AVAILABLE",
+        "symbol": "2330",
+        "venue": "TWSE"
+      },
+      "profile_evidence": {
+        "capture_id": "862dded4514be003e28d472200cc8ef89966144b796961c3309ee346f16a6078",
+        "industry_code": "24",
+        "instrument_id": "TWSE:2330",
+        "listed_on": "1994-09-05",
+        "mapping_version": "twse.company_profile/v1",
+        "raw_sha256": "c9028b40687aca3e9c0b733f75c67ff19baa2785d6341977c9936a9daa20b63c",
+        "received_at_utc": "2026-10-04T13:07:03.960501Z",
+        "report_date": "2026-10-03",
+        "source_contract": "twse_openapi_t187ap03_L/v1"
+      }
+    },
+    "coverage": {
+      "status": "AVAILABLE",
+      "reason": "report_retained",
+      "latest_discovery_presence": "present",
+      "capture_id": "89d94f31fe7666a3c0854f0aedffda447ce91149bfad72f5d85379b05c79a383",
+      "original_received_at_utc": "2026-10-04T13:07:30.293240Z"
+    },
+    "report": {
+      "document_id": "7b2677a89c30b45f477f759364ee15edc9bc64220e399181f3d617fd98fc4fd2",
+      "capture_id": "89d94f31fe7666a3c0854f0aedffda447ce91149bfad72f5d85379b05c79a383",
+      "semantic_revision_id": "cd2ed27a046181c2c58e1a73d7620a601745750b180a7d0e2869b634dcb726fe",
+      "member_filename": "tifrs-fr1-m1-ci-cr-2330-2024Q4.html",
+      "source_url": "https://mopsov.twse.com.tw/server-java/t164sb01?step=3&SYEAR=2024&file_name=tifrs-fr1-m1-ci-cr-2330-2024Q4.html",
+      "raw_sha256": "1deba772079ed08cef1ccaf0430f40b4d36819ae5e5405073e793e6dc1932677",
+      "source_contract": "mops.financial-statements/v1",
+      "parser_contract": "mops.inline-xbrl-financial-statements/v1",
+      "original_received_at_utc": "2026-10-04T13:07:32.532836Z",
+      "document_first_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+      "semantic_revision_first_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+      "latest_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+      "published_at_utc": null,
+      "amendment_status": "unknown"
+    },
+    "total_fact_count": 394,
+    "returned_fact_count": 394,
+    "truncated": false
+  },
+  "reads_at_response": [
+    {
+      "endpoint": "instruments",
+      "selectors": {},
+      "http_status": 200,
+      "latency_ms": 757.75
+    },
+    {
+      "endpoint": "valuations",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-10-02",
+        "end": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 27.777
+    },
+    {
+      "endpoint": "margin-short-sale",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-10-02",
+        "end": "2026-10-02",
+        "parse": "json_decimal"
+      },
+      "http_status": 200,
+      "latency_ms": 10.159
+    },
+    {
+      "endpoint": "coverage",
+      "selectors": {
+        "dataset": "twse_margin_short_sale",
+        "start": "2026-10-02",
+        "end": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 9.357
+    },
+    {
+      "endpoint": "institutional-flows",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start_date": "2026-10-02",
+        "end_date": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 52.196
+    },
+    {
+      "endpoint": "monthly-revenues",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "http_status": 200,
+      "latency_ms": 63.002
+    },
+    {
+      "endpoint": "broker-flow/quantities",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-10-02",
+        "end": "2026-10-02",
+        "parse": "json_decimal"
+      },
+      "http_status": 200,
+      "latency_ms": 28.884
+    },
+    {
+      "endpoint": "shareholder-distribution",
+      "selectors": {
+        "parse": "json_decimal",
+        "instrument_id": "TWSE:2330",
+        "start": "2026-07-09",
+        "end": "2026-10-06"
+      },
+      "http_status": 200,
+      "latency_ms": 38.418
+    },
+    {
+      "endpoint": "coverage",
+      "selectors": {
+        "dataset": "tdcc_shareholder_distribution",
+        "start": "2026-07-09",
+        "end": "2026-10-06"
+      },
+      "http_status": 200,
+      "latency_ms": 10.952
+    },
+    {
+      "endpoint": "broker-flow/coverage",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-10-02",
+        "end": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 12.069
+    },
+    {
+      "endpoint": "coverage",
+      "selectors": {
+        "dataset": "tdcc_shareholder_distribution_history",
+        "start": "TWSE:2330|2026-07-09",
+        "end": "TWSE:2330|2026-10-06"
+      },
+      "http_status": 200,
+      "latency_ms": 7.568
+    },
+    {
+      "endpoint": "broker-flow/price-levels",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "date": "2026-10-02",
+        "parse": "json_decimal"
+      },
+      "error": "TwmdReadError",
+      "reason": "http_409",
+      "http_status": 409,
+      "latency_ms": 8.415
+    },
+    {
+      "endpoint": "financial-statements",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
+        "report_scope": "consolidated",
+        "limit": 1000
+      },
+      "http_status": 200,
+      "latency_ms": 12567.448
+    },
+    {
+      "endpoint": "company-profiles",
+      "selectors": {
+        "instrument_id": "TWSE:2330"
+      },
+      "http_status": 200,
+      "latency_ms": 12654.325
+    }
+  ],
+  "note": "Bounded query-only check; no ingestion, control, scheduling, deployment or DB access. Running transport can finish after the aggregate deadline."
+}

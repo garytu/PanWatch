@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "65f4325e-8ac6-4c47-904a-b6b597d6bb4a",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/garytu/works/oss/PanWatch/.archify/workflow-strategy-application-20261002-082827/candidate.json",
+  "output": "/Users/garytu/works/oss/PanWatch/.archify/workflow-strategy-application-20261002-082827/strategy-application.html",
+  "specification": {
+    "sha256": "df1a4f3a59d0b1809593eda0b94f48a6f8e742dcaca7d571618c9dc01b9a4e3b",
+    "bytes": 9037
+  },
+  "artifact": {
+    "sha256": "c534016d929fd18197ffaf34433546eb34bf6a0fbe5f5ed393333f5a08e9b5a2",
+    "bytes": 769809
+  }
+}

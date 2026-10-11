@@ -1,0 +1,382 @@
+{
+  "task": "PW-07",
+  "observation_kind": "shared six-block research service, read-only retained data smoke",
+  "service": "http://127.0.0.1:8000",
+  "deployed_commit": null,
+  "source_checkout_commit": "3acd67ffd98bbcf1713f9484d8a7b77871db6ade",
+  "cases": [
+    {
+      "instrument_id": "TWSE:2330",
+      "observed_at_utc": "2026-10-07T09:03:45.747601+00:00",
+      "elapsed_ms": 12956.19,
+      "statuses": {
+        "valuation": {
+          "status": "available",
+          "reason": "selected_record_present"
+        },
+        "institutional_flows": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing"
+        },
+        "monthly_revenues": {
+          "status": "partial",
+          "reason": "some_requested_months_missing"
+        },
+        "margin_short_sale": {
+          "status": "available",
+          "reason": "selected_record_present"
+        },
+        "shareholder_distribution": {
+          "status": "available",
+          "reason": "selected_record_present"
+        },
+        "company_profile": {
+          "status": "available",
+          "reason": "selected_profile_present"
+        }
+      },
+      "margin": {
+        "latest": {
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-06",
+          "margin_balance_previous": 30135,
+          "margin_purchase": 1125,
+          "margin_sale": 740,
+          "margin_cash_redemption": 20,
+          "margin_balance": 30500,
+          "margin_securities_finance_balance": null,
+          "margin_utilization_rate": null,
+          "margin_quota": 6483092,
+          "short_sale_balance_previous": 46,
+          "short_sale": 7,
+          "short_cover": 4,
+          "short_stock_redemption": 0,
+          "short_sale_balance": 49,
+          "short_sale_securities_finance_balance": null,
+          "short_sale_utilization_rate": null,
+          "short_sale_quota": 6483092,
+          "offsetting": 0,
+          "note": null,
+          "native_unit": "trading_units"
+        },
+        "previous_trade_date": "2026-10-05",
+        "changes": {
+          "margin_balance": 365,
+          "short_sale_balance": 3
+        },
+        "freshness": {
+          "frequency": "daily",
+          "data_period": "2026-10-06",
+          "report_date": null,
+          "publication_time": null,
+          "source_received_at_utc": null,
+          "source_receipt_age_seconds": null,
+          "data_period_age_days": 1,
+          "first_observed_at": null,
+          "source_served_at": null,
+          "evaluated_at_utc": "2026-10-07T09:03:32.791200Z",
+          "publisher_sla": null,
+          "age_status": "age_unknown",
+          "frequency_hint": "日資料；按來源交易日期顯示，尚未核對交易日曆或來源更新期限。來源未提供逐列接收時間或修訂資訊。",
+          "coverage": {
+            "block_status": "available",
+            "dataset_coverage": [
+              {
+                "dataset": "twse_margin_short_sale",
+                "partition_key": "2026-10-02",
+                "status": "AVAILABLE",
+                "record_count": 1297,
+                "acquired_at": "2026-10-05T17:59:28",
+                "checksum": null
+              },
+              {
+                "dataset": "twse_margin_short_sale",
+                "partition_key": "2026-10-03",
+                "status": "EMPTY",
+                "record_count": 0,
+                "acquired_at": "2026-10-05T17:59:29",
+                "checksum": null
+              },
+              {
+                "dataset": "twse_margin_short_sale",
+                "partition_key": "2026-10-04",
+                "status": "EMPTY",
+                "record_count": 0,
+                "acquired_at": "2026-10-05T17:59:29",
+                "checksum": null
+              },
+              {
+                "dataset": "twse_margin_short_sale",
+                "partition_key": "2026-10-05",
+                "status": "AVAILABLE",
+                "record_count": 1297,
+                "acquired_at": "2026-10-05T17:59:29",
+                "checksum": null
+              },
+              {
+                "dataset": "twse_margin_short_sale",
+                "partition_key": "2026-10-06",
+                "status": "AVAILABLE",
+                "record_count": 1298,
+                "acquired_at": "2026-10-06T13:15:01",
+                "checksum": null
+              }
+            ],
+            "selected_instrument_presence": "present",
+            "requested_scope": {
+              "instrument_id": "TWSE:2330",
+              "start": "2026-10-02",
+              "end": "2026-10-06"
+            },
+            "calendar_assessed": false,
+            "reported_partition_count": 5,
+            "reported_status_counts": {
+              "AVAILABLE": 3,
+              "EMPTY": 2
+            },
+            "interpretation": "Coverage describes source partitions only; it does not establish a trading calendar or selected-issuer absence."
+          }
+        }
+      },
+      "tdcc": {
+        "report_date": "2026-09-04",
+        "report_variant": "bulk_current",
+        "large_holding": {
+          "threshold": ">400,000 shares",
+          "minimum_shares": 400001,
+          "source_levels": [
+            12,
+            13,
+            14,
+            15
+          ],
+          "share_count": 22692595122,
+          "percentage_of_official_total": "87.50683051094220681591663791",
+          "denominator_share_count": 25932370067,
+          "denominator_source_level": 17,
+          "formula": "sum levels 12-15 shares / official total-row shares * 100"
+        },
+        "comparison_reason": "previous_week_unavailable_or_variant_changed",
+        "changes": null,
+        "freshness": {
+          "frequency": "weekly",
+          "data_period": "2026-09-04",
+          "report_date": "2026-09-04",
+          "publication_time": null,
+          "source_received_at_utc": null,
+          "source_receipt_age_seconds": null,
+          "data_period_age_days": 33,
+          "first_observed_at": null,
+          "source_served_at": null,
+          "evaluated_at_utc": "2026-10-07T09:03:32.791200Z",
+          "publisher_sla": null,
+          "age_status": "age_unknown",
+          "frequency_hint": "週資料；保管帳戶分級不是實際投資人身分。來源未提供逐列接收時間或更新期限。",
+          "coverage": {
+            "block_status": "available",
+            "dataset_coverage": [
+              {
+                "dataset": "tdcc_shareholder_distribution",
+                "partition_key": "2026-09-04",
+                "status": "AVAILABLE",
+                "record_count": 18632,
+                "acquired_at": "2026-10-05T17:53:40",
+                "checksum": null
+              }
+            ],
+            "selected_instrument_presence": "present",
+            "requested_scope": {
+              "instrument_id": "TWSE:2330",
+              "start": "2026-07-09",
+              "end": "2026-10-06",
+              "report_variant": null
+            },
+            "calendar_assessed": false,
+            "reported_partition_count": 1,
+            "reported_status_counts": {
+              "AVAILABLE": 1
+            },
+            "interpretation": "Coverage describes source partitions only; it does not establish a trading calendar or selected-issuer absence."
+          }
+        }
+      }
+    },
+    {
+      "instrument_id": "TPEX:5347",
+      "observed_at_utc": "2026-10-07T09:03:56.043829+00:00",
+      "elapsed_ms": 10295.98,
+      "statuses": {
+        "shareholder_distribution": {
+          "status": "unsupported",
+          "reason": "tdcc_contract_is_twse_four_digit_only"
+        },
+        "monthly_revenues": {
+          "status": "partial",
+          "reason": "some_requested_months_missing"
+        },
+        "valuation": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing_or_absent"
+        },
+        "institutional_flows": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing"
+        },
+        "margin_short_sale": {
+          "status": "available",
+          "reason": "selected_record_present"
+        },
+        "company_profile": {
+          "status": "available",
+          "reason": "selected_profile_present"
+        }
+      },
+      "margin": {
+        "latest": {
+          "instrument_id": "TPEX:5347",
+          "symbol": "5347",
+          "trade_date": "2026-10-06",
+          "margin_balance_previous": 12174,
+          "margin_purchase": 1079,
+          "margin_sale": 1476,
+          "margin_cash_redemption": 0,
+          "margin_balance": 11777,
+          "margin_securities_finance_balance": 265,
+          "margin_utilization_rate": "2.5",
+          "margin_quota": 469625,
+          "short_sale_balance_previous": 445,
+          "short_sale": 161,
+          "short_cover": 6,
+          "short_stock_redemption": 0,
+          "short_sale_balance": 600,
+          "short_sale_securities_finance_balance": 6,
+          "short_sale_utilization_rate": "0.12",
+          "short_sale_quota": 469625,
+          "offsetting": 18,
+          "note": null,
+          "native_unit": "trading_units"
+        },
+        "previous_trade_date": "2026-10-05",
+        "changes": {
+          "margin_balance": -397,
+          "short_sale_balance": 155
+        },
+        "freshness": {
+          "frequency": "daily",
+          "data_period": "2026-10-06",
+          "report_date": null,
+          "publication_time": null,
+          "source_received_at_utc": null,
+          "source_receipt_age_seconds": null,
+          "data_period_age_days": 1,
+          "first_observed_at": null,
+          "source_served_at": null,
+          "evaluated_at_utc": "2026-10-07T09:03:45.747683Z",
+          "publisher_sla": null,
+          "age_status": "age_unknown",
+          "frequency_hint": "日資料；按來源交易日期顯示，尚未核對交易日曆或來源更新期限。來源未提供逐列接收時間或修訂資訊。",
+          "coverage": {
+            "block_status": "available",
+            "dataset_coverage": [
+              {
+                "dataset": "tpex_margin_short_sale",
+                "partition_key": "2026-10-02",
+                "status": "AVAILABLE",
+                "record_count": 919,
+                "acquired_at": "2026-10-05T17:59:29",
+                "checksum": null
+              },
+              {
+                "dataset": "tpex_margin_short_sale",
+                "partition_key": "2026-10-03",
+                "status": "EMPTY",
+                "record_count": 0,
+                "acquired_at": "2026-10-05T17:59:29",
+                "checksum": null
+              },
+              {
+                "dataset": "tpex_margin_short_sale",
+                "partition_key": "2026-10-04",
+                "status": "EMPTY",
+                "record_count": 0,
+                "acquired_at": "2026-10-05T17:59:29",
+                "checksum": null
+              },
+              {
+                "dataset": "tpex_margin_short_sale",
+                "partition_key": "2026-10-05",
+                "status": "AVAILABLE",
+                "record_count": 918,
+                "acquired_at": "2026-10-05T17:59:29",
+                "checksum": null
+              },
+              {
+                "dataset": "tpex_margin_short_sale",
+                "partition_key": "2026-10-06",
+                "status": "AVAILABLE",
+                "record_count": 918,
+                "acquired_at": "2026-10-06T13:15:04",
+                "checksum": null
+              }
+            ],
+            "selected_instrument_presence": "present",
+            "requested_scope": {
+              "instrument_id": "TPEX:5347",
+              "start": "2026-10-02",
+              "end": "2026-10-06"
+            },
+            "calendar_assessed": false,
+            "reported_partition_count": 5,
+            "reported_status_counts": {
+              "AVAILABLE": 3,
+              "EMPTY": 2
+            },
+            "interpretation": "Coverage describes source partitions only; it does not establish a trading calendar or selected-issuer absence."
+          }
+        }
+      },
+      "tdcc": {
+        "report_date": null,
+        "report_variant": null,
+        "large_holding": null,
+        "comparison_reason": null,
+        "changes": null,
+        "freshness": {
+          "frequency": "weekly",
+          "data_period": null,
+          "report_date": null,
+          "publication_time": null,
+          "source_received_at_utc": null,
+          "source_receipt_age_seconds": null,
+          "data_period_age_days": null,
+          "first_observed_at": null,
+          "source_served_at": null,
+          "evaluated_at_utc": "2026-10-07T09:03:45.747683Z",
+          "publisher_sla": null,
+          "age_status": "age_unknown",
+          "frequency_hint": "週資料；保管帳戶分級不是實際投資人身分。來源未提供逐列接收時間或更新期限。",
+          "coverage": {
+            "block_status": "unsupported",
+            "dataset_coverage": null,
+            "selected_instrument_presence": null,
+            "requested_scope": {
+              "instrument_id": "TPEX:5347",
+              "start": "2026-07-09",
+              "end": "2026-10-06"
+            },
+            "calendar_assessed": false,
+            "reported_partition_count": 0,
+            "reported_status_counts": {},
+            "interpretation": "Coverage describes source partitions only; it does not establish a trading calendar or selected-issuer absence."
+          }
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "No full-market, upstream scheduling, collection or trading-session acceptance.",
+    "Source checkout commit is not proof of the deployed version.",
+    "No ingestion, control, subscription, scheduler, deployment or user DB mutation."
+  ]
+}

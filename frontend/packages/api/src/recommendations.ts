@@ -1,6 +1,59 @@
 import { fetchAPI } from './client'
 
+export interface OutcomeEvaluationResponse {
+  total_candidates?: number
+  total_signals?: number
+  eligible: number
+  evaluated: number
+  skipped_not_due: number
+  skipped_no_price: number
+  skipped_no_base_price: number
+  population: 'legacy-unlabelled'
+  return_basis: string
+  point_in_time_outcomes_v2: Record<string, number | boolean | string>
+}
+
+export interface PointInTimeOutcomeStats {
+  basis: string
+  window_days: number
+  partitions: Array<{
+    market: string
+    population: 'signal-forward-v2' | 'candidate-forward-v2' | 'strategy-execution-v2'
+    horizon_sessions: number
+    evaluator_version: string
+    score_version: string
+    raw_outcome_rows: number
+    distinct_units: number
+    decision_date_count: number
+    entry_count: number
+    not_filled: number
+    ambiguous: number
+    insufficient_data: number
+    pending: number
+    complete: number
+    gross_row_denominator: number
+    net_row_denominator: number
+    relative_row_denominator: number
+    benchmark_gross_row_denominator: number
+    gross_denominator_units: number
+    net_denominator_units: number
+    relative_denominator_units: number
+    benchmark_gross_denominator_units: number
+    benchmark_availability_denominator_units: number
+    gross_win_rate_pct: number | null
+    net_win_rate_pct: number | null
+    relative_win_rate_pct: number | null
+    [metric: string]: unknown
+  }>
+}
+
 export interface EntryCandidateItem {
+  instrument_id?: string | null
+  instrument_group?: 'EQUITY' | 'ETF' | 'UNKNOWN' | string
+  instrument_authority?: Record<string, unknown>
+  scan_run_id?: number | null
+  scan_run_ids?: number[]
+  scan_run_refs?: Array<{ scan_run_id: number; revision: number; manifest_hash: string; source_mode: string }>
   id: number
   stock_symbol: string
   stock_market: string
@@ -8,6 +61,9 @@ export interface EntryCandidateItem {
   snapshot_date: string
   status: string
   score: number
+  rank_score?: null
+  score_version?: 'candidate-score-v1' | string
+  ranker_version?: 'candidate-score-v1' | string
   confidence?: number | null
   action: string
   action_label: string
@@ -52,6 +108,8 @@ export interface EntryCandidateFeedbackPayload {
 
 export interface EntryCandidateStatsResponse {
   window_days: number
+  legacy_outcome_basis?: { population: 'legacy-unlabelled'; return_basis: string }
+  outcomes_v2?: PointInTimeOutcomeStats
   feedback: {
     total: number
     useful: number
@@ -95,6 +153,8 @@ export interface EntryCandidateStatsResponse {
   }
   outcomes?: Array<{
     horizon_days: number
+    population?: 'legacy-unlabelled'
+    return_basis?: string
     source: string
     source_label: string
     total: number
@@ -121,6 +181,12 @@ export interface StrategySignalItem {
   snapshot_date: string
   stock_symbol: string
   stock_market: string
+  instrument_id?: string | null
+  instrument_group?: 'EQUITY' | 'ETF' | 'UNKNOWN' | string
+  instrument_authority?: Record<string, unknown>
+  scan_run_id?: number | null
+  scan_run_ids?: number[]
+  scan_run_refs?: Array<{ scan_run_id: number; revision: number; manifest_hash: string; source_mode: string }>
   stock_name: string
   strategy_code: string
   strategy_name: string
@@ -130,11 +196,20 @@ export interface StrategySignalItem {
   source_pool: string
   source_pool_label: string
   score: number
-  rank_score: number
+  rank_score: number | null
   confidence?: number | null
   status: string
   action: string
   action_label: string
+  ranking_value?: number | null
+  score_version?: string
+  ranker_version?: string
+  scoring_config_version?: string
+  decision_snapshot_id?: string | null
+  selected_for_portfolio?: boolean
+  selection_metadata?: Record<string, unknown>
+  strategy_count?: number
+  strategy_codes?: string[]
   signal: string
   reason: string
   evidence?: string[]
@@ -153,6 +228,9 @@ export interface StrategySignalItem {
   context_quality_score?: number | null
   score_breakdown?: {
     base_score?: number
+    candidate_score?: number | null
+    ranking_value?: number | null
+    ranker_version?: string
     alpha_score?: number
     catalyst_score?: number
     quality_score?: number
@@ -186,6 +264,7 @@ export interface StrategySignalItem {
     volume_pct_rank?: number
     relative_strength_pct?: number
     crowding_risk?: number
+    feature_values?: Record<string, number | null>
   }
   news_metric?: {
     news_count?: number
@@ -207,6 +286,8 @@ export interface StrategySignalItem {
 export interface StrategySignalsResponse {
   snapshot_date: string
   count: number
+  ranker_version?: string
+  legacy_omitted_count?: number
   items: StrategySignalItem[]
   queued?: boolean
   running?: boolean
@@ -289,6 +370,8 @@ export interface StrategyFactorSnapshot {
 
 export interface StrategyStatsResponse {
   window_days: number
+  legacy_outcome_basis?: { population: 'legacy-unlabelled'; return_basis: string }
+  outcomes_v2?: PointInTimeOutcomeStats
   coverage: {
     snapshot_date: string
     total_signals: number
@@ -319,6 +402,8 @@ export interface StrategyStatsResponse {
     risk_level: string
     risk_level_label: string
     horizon_days: number
+    population?: 'legacy-unlabelled'
+    return_basis?: string
     sample_size: number
     wins: number
     win_rate: number
@@ -328,6 +413,8 @@ export interface StrategyStatsResponse {
   }>
   by_market: Array<{
     market: string
+    population?: 'legacy-unlabelled'
+    return_basis?: string
     total: number
     wins: number
     win_rate: number
@@ -386,6 +473,7 @@ export const recommendationsApi = {
     snapshot_date?: string
     source?: 'market_scan' | 'watchlist' | 'mixed' | 'all'
     holding?: 'held' | 'unheld' | 'all'
+    instrument_group?: 'ORDINARY' | 'EQUITY' | 'ETF' | 'UNKNOWN'
     strategy?: string
     timeoutMs?: number
   }) => {
@@ -398,6 +486,7 @@ export const recommendationsApi = {
     if (params?.snapshot_date) q.set('snapshot_date', params.snapshot_date)
     if (params?.source) q.set('source', params.source)
     if (params?.holding) q.set('holding', params.holding)
+    if (params?.instrument_group) q.set('instrument_group', params.instrument_group)
     if (params?.strategy) q.set('strategy', params.strategy)
     const qs = q.toString()
     return fetchAPI<EntryCandidatesResponse>(
@@ -426,7 +515,7 @@ export const recommendationsApi = {
     fetchAPI<EntryCandidateStatsResponse>(`/recommendations/entry-candidates/stats?days=${encodeURIComponent(String(days))}`),
 
   evaluateEntryCandidateOutcomes: (limit = 400, snapshotDays = 45) =>
-    fetchAPI<Record<string, number>>(
+    fetchAPI<OutcomeEvaluationResponse>(
       `/recommendations/entry-candidates/outcomes/evaluate?limit=${encodeURIComponent(String(limit))}&snapshot_days=${encodeURIComponent(String(snapshotDays))}`,
       {
         method: 'POST',
@@ -446,6 +535,7 @@ export const recommendationsApi = {
     snapshot_date?: string
     source_pool?: 'market_scan' | 'watchlist' | 'mixed' | 'all'
     holding?: 'held' | 'unheld' | 'all'
+    instrument_group?: 'ORDINARY' | 'EQUITY' | 'ETF' | 'UNKNOWN'
     strategy_code?: string
     risk_level?: 'low' | 'medium' | 'high' | 'all'
     include_payload?: boolean
@@ -459,6 +549,7 @@ export const recommendationsApi = {
     appendQuery(q, 'snapshot_date', params?.snapshot_date)
     appendQuery(q, 'source_pool', params?.source_pool)
     appendQuery(q, 'holding', params?.holding)
+    appendQuery(q, 'instrument_group', params?.instrument_group)
     appendQuery(q, 'strategy_code', params?.strategy_code)
     appendQuery(q, 'risk_level', params?.risk_level)
     appendQuery(q, 'include_payload', params?.include_payload)
@@ -531,7 +622,7 @@ export const recommendationsApi = {
     fetchAPI<StrategyRefreshStatusResponse>('/recommendations/strategy-signals/refresh-status'),
 
   evaluateStrategyOutcomes: (limit = 800, snapshotDays = 60) =>
-    fetchAPI<Record<string, number>>(
+    fetchAPI<OutcomeEvaluationResponse>(
       `/recommendations/strategy-signals/outcomes/evaluate?limit=${encodeURIComponent(String(limit))}&snapshot_days=${encodeURIComponent(String(snapshotDays))}`,
       {
         method: 'POST',

@@ -1,4 +1,4 @@
-"""数据源管理端点新增能力:is_orphan 标记 + POST /reset-to-seed 温和对账。"""
+"""資料來源管理端點新增能力:is_orphan 標記 + POST /reset-to-seed 溫和對帳。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import src.modules.administration.api.datasources as ds
-import src.platform.persistence.models as M  # noqa: F401  确保模型注册到 Base.metadata
+import src.platform.persistence.models as M  # noqa: F401  確保模型註冊到 Base.metadata
 from src.platform.persistence.database import Base, get_db
 from src.platform.persistence.models import DataSource
 
@@ -37,15 +37,15 @@ def _client():
 
 
 def test_is_orphan_flags_orphan_and_normal_rows_correctly():
-    """is_orphan: 孤儿 provider(news/cls)标 True,正常 seed provider(quote/tencent)标 False。"""
+    """is_orphan: 孤兒 provider(news/cls)標 True,正常 seed provider(quote/tencent)標 False。"""
     from types import SimpleNamespace
 
     orphan_row = SimpleNamespace(
-        id=1, name="财联社电报", type="news", provider="cls",
+        id=1, name="財聯社電報", type="news", provider="cls",
         config={}, enabled=True, priority=0, supports_batch=False, test_symbols=[],
     )
     normal_row = SimpleNamespace(
-        id=2, name="腾讯行情", type="quote", provider="tencent",
+        id=2, name="騰訊行情", type="quote", provider="tencent",
         config={}, enabled=True, priority=0, supports_batch=True, test_symbols=[],
     )
 
@@ -54,13 +54,13 @@ def test_is_orphan_flags_orphan_and_normal_rows_correctly():
 
 
 def test_reset_to_seed_endpoint_deletes_orphan_and_returns_summary():
-    """POST /reset-to-seed: 冒烟 —— 删孤儿行、返回 summary(经中间件包裹前的原始 dict)。"""
+    """POST /reset-to-seed: 冒煙 —— 刪孤兒行、返回 summary(經中介軟體包裹前的原始 dict)。"""
     client, Session = _client()
 
     db = Session()
     db.add(
         DataSource(
-            name="财联社电报", type="news", provider="cls", config={},
+            name="財聯社電報", type="news", provider="cls", config={},
             enabled=True, priority=0, supports_batch=False, test_symbols=[],
         )
     )
@@ -78,6 +78,6 @@ def test_reset_to_seed_endpoint_deletes_orphan_and_returns_summary():
     db2 = Session()
     remaining = {(s.type, s.provider) for s in db2.query(DataSource).all()}
     assert ("news", "cls") not in remaining
-    # 缺失的默认(如东财K线)应被补回
+    # 缺失的預設(如東財K線)應被補回
     assert ("kline", "eastmoney") in remaining
     db2.close()

@@ -87,7 +87,7 @@ def create_service(body: ServiceCreate, db: Session = Depends(get_db)):
 def update_service(service_id: int, body: ServiceUpdate, db: Session = Depends(get_db)):
     service = db.query(AIService).filter(AIService.id == service_id).first()
     if not service:
-        raise HTTPException(404, "AI 服务商不存在")
+        raise HTTPException(404, "AI 服務商不存在")
 
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(service, key, value)
@@ -101,7 +101,7 @@ def update_service(service_id: int, body: ServiceUpdate, db: Session = Depends(g
 def delete_service(service_id: int, db: Session = Depends(get_db)):
     service = db.query(AIService).filter(AIService.id == service_id).first()
     if not service:
-        raise HTTPException(404, "AI 服务商不存在")
+        raise HTTPException(404, "AI 服務商不存在")
     db.delete(service)
     db.commit()
     return {"ok": True}
@@ -143,7 +143,7 @@ def list_models(db: Session = Depends(get_db)):
 def create_model(body: ModelCreate, db: Session = Depends(get_db)):
     service = db.query(AIService).filter(AIService.id == body.service_id).first()
     if not service:
-        raise HTTPException(400, "AI 服务商不存在")
+        raise HTTPException(400, "AI 服務商不存在")
 
     if body.is_default:
         db.query(AIModel).update({"is_default": False})
@@ -194,7 +194,7 @@ async def test_model(model_id: int, db: Session = Depends(get_db)):
 
     service = db.query(AIService).filter(AIService.id == model.service_id).first()
     if not service:
-        raise HTTPException(400, "关联的服务商不存在")
+        raise HTTPException(400, "關聯的服務商不存在")
 
     try:
         client = AIClient(
@@ -202,8 +202,8 @@ async def test_model(model_id: int, db: Session = Depends(get_db)):
             api_key=service.api_key,
             model=model.model,
         )
-        # 测试连通性时不下发 temperature:部分模型(如 o1/claude-opus 等)不接受该参数,
-        # 省略后对所有模型都安全,避免因 temperature 报错而误判模型不可用。
+        # 測試連通性時不下發 temperature:部分模型(如 o1/claude-opus 等)不接受該引數,
+        # 省略後對所有模型都安全,避免因 temperature 報錯而誤判模型不可用。
         reply = await client.chat(
             system_prompt="You are a helpful assistant.",
             user_content="Say 'OK' in one word.",
@@ -211,26 +211,26 @@ async def test_model(model_id: int, db: Session = Depends(get_db)):
         )
         return {"ok": True, "reply": reply.strip()}
     except Exception as e:
-        raise HTTPException(400, f"测试失败: {e}")
+        raise HTTPException(400, f"測試失敗: {e}")
 
 
 @router.post("/services/{service_id}/discover-models")
 async def discover_models(service_id: int, db: Session = Depends(get_db)):
     service = db.query(AIService).filter(AIService.id == service_id).first()
     if not service:
-        raise HTTPException(404, "AI 服务商不存在")
+        raise HTTPException(404, "AI 服務商不存在")
     try:
         client = AIClient(base_url=service.base_url, api_key=service.api_key)
         models = await client.list_models()
         return {"models": models}
     except Exception as e:
-        raise HTTPException(400, f"嗅探失败: {e}")
+        raise HTTPException(400, f"嗅探失敗: {e}")
 
 
 def _batch_add_models_once(service_id: int, body: BatchModelCreate, db: Session):
     service = db.query(AIService).filter(AIService.id == service_id).first()
     if not service:
-        raise HTTPException(404, "AI 服务商不存在")
+        raise HTTPException(404, "AI 服務商不存在")
 
     existing = {m.model for m in service.models}
     added = 0
@@ -257,7 +257,7 @@ def _batch_add_models_once(service_id: int, body: BatchModelCreate, db: Session)
 def batch_add_models(
     service_id: int, body: BatchModelCreate, db: Session = Depends(get_db)
 ):
-    """批量写入模型；本地 SQLite 短暂争用时重试并快速返回可读错误。"""
+    """批次寫入模型；本地 SQLite 短暫爭用時重試並快速返回可讀錯誤。"""
     for attempt in range(3):
         try:
             return _batch_add_models_once(service_id, body, db)
@@ -269,6 +269,6 @@ def batch_add_models(
             )
             if not locked or attempt == 2:
                 if locked:
-                    raise HTTPException(409, "数据库正忙，请稍后重试。") from exc
+                    raise HTTPException(409, "資料庫正忙，請稍後重試。") from exc
                 raise
             time.sleep(0.05 * (attempt + 1))

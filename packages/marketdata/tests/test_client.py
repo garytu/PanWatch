@@ -18,7 +18,7 @@ class _Cfg:
 
 def _md():
     md = MarketData(config=_Cfg())
-    md._quote_engine.vendors = {"fake": _OneVendor()}   # 注入假 vendor(测试缝)
+    md._quote_engine.vendors = {"fake": _OneVendor()}   # 注入假 vendor(測試縫)
     return md
 
 
@@ -28,7 +28,7 @@ def test_quotes_returns_typed():
 
 
 def test_quotes_groups_mixed_markets():
-    out = _md().quotes(["600519", "00700", "AAPL"])   # 自动识别 → 3 个市场
+    out = _md().quotes(["600519", "00700", "AAPL"])   # 自動識別 → 3 個市場
     assert {(q.symbol, q.market) for q in out} == {("600519", "CN"), ("00700", "HK"), ("AAPL", "US")}
 
 

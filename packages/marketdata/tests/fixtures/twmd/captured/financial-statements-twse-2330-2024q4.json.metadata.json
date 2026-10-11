@@ -1,0 +1,69 @@
+{
+  "observed_at_utc": "2026-10-07T11:26:06.974035+00:00",
+  "http_status": 200,
+  "latency_ms": 19610.907,
+  "selectors": {
+    "instrument_id": "TWSE:2330",
+    "fiscal_year": 2024,
+    "fiscal_quarter": 4,
+    "report_scope": "consolidated",
+    "limit": 1000
+  },
+  "probe_timeout_sec": 60,
+  "qualification": {
+    "status": "qualified",
+    "reason": "twse_equity_industry_24",
+    "industry_code": "24",
+    "catalog_evidence": {
+      "acquired_at": "2026-10-04 06:00:11",
+      "dataset": "twse_instruments",
+      "instrument_id": "TWSE:2330",
+      "is_active": true,
+      "listing_date": "1994-09-05",
+      "partition_key": "2026-10-04",
+      "record_count": 37095,
+      "security_type": "EQUITY",
+      "sha256": null,
+      "status": "AVAILABLE",
+      "symbol": "2330",
+      "venue": "TWSE"
+    },
+    "profile_evidence": {
+      "capture_id": "862dded4514be003e28d472200cc8ef89966144b796961c3309ee346f16a6078",
+      "industry_code": "24",
+      "instrument_id": "TWSE:2330",
+      "listed_on": "1994-09-05",
+      "mapping_version": "twse.company_profile/v1",
+      "raw_sha256": "c9028b40687aca3e9c0b733f75c67ff19baa2785d6341977c9936a9daa20b63c",
+      "received_at_utc": "2026-10-04T13:07:03.960501Z",
+      "report_date": "2026-10-03",
+      "source_contract": "twse_openapi_t187ap03_L/v1"
+    }
+  },
+  "coverage": {
+    "status": "AVAILABLE",
+    "reason": "report_retained",
+    "latest_discovery_presence": "present",
+    "capture_id": "89d94f31fe7666a3c0854f0aedffda447ce91149bfad72f5d85379b05c79a383",
+    "original_received_at_utc": "2026-10-04T13:07:30.293240Z"
+  },
+  "report": {
+    "document_id": "7b2677a89c30b45f477f759364ee15edc9bc64220e399181f3d617fd98fc4fd2",
+    "capture_id": "89d94f31fe7666a3c0854f0aedffda447ce91149bfad72f5d85379b05c79a383",
+    "semantic_revision_id": "cd2ed27a046181c2c58e1a73d7620a601745750b180a7d0e2869b634dcb726fe",
+    "member_filename": "tifrs-fr1-m1-ci-cr-2330-2024Q4.html",
+    "source_url": "https://mopsov.twse.com.tw/server-java/t164sb01?step=3&SYEAR=2024&file_name=tifrs-fr1-m1-ci-cr-2330-2024Q4.html",
+    "raw_sha256": "1deba772079ed08cef1ccaf0430f40b4d36819ae5e5405073e793e6dc1932677",
+    "source_contract": "mops.financial-statements/v1",
+    "parser_contract": "mops.inline-xbrl-financial-statements/v1",
+    "original_received_at_utc": "2026-10-04T13:07:32.532836Z",
+    "document_first_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+    "semantic_revision_first_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+    "latest_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+    "published_at_utc": null,
+    "amendment_status": "unknown"
+  },
+  "total_fact_count": 394,
+  "returned_fact_count": 394,
+  "truncated": false
+}

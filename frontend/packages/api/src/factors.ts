@@ -21,10 +21,10 @@ export interface FactorWeightUpdatePayload {
 }
 
 export const factorsApi = {
-  /** 因子权重列表(每因子按市场区分,含最近 IC/IR 标定结果)。 */
+  /** 因子權重列表(每因子按市場區分,含最近 IC/IR 標定結果)。 */
   list: () => fetchAPI<{ items: FactorWeight[] }>('/factors/weights'),
 
-  /** 更新单个因子权重(手动权重 / 锁定 / 自动标定开关)。 */
+  /** 更新單個因子權重(手動權重 / 鎖定 / 自動標定開關)。 */
   update: (factorCode: string, market: string, patch: FactorWeightUpdatePayload) =>
     fetchAPI<FactorWeight>(`/factors/weights/${factorCode}/${market}`, {
       method: 'POST',

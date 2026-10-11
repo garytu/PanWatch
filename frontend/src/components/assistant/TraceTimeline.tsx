@@ -13,14 +13,14 @@ function describeExtensionEvent(event: AssistantTraceEvent): { label: string; ic
   switch (event.data.event) {
     case 'started': return { label: '研究可用工具', icon: Search }
     case 'exposure': return {
-      label: `工具目录已准备：${data.direct_tools?.length || 0} 个直达，${data.loaded_tools?.length || 0} 个已加载`,
+      label: `工具目錄已準備：${data.direct_tools?.length || 0} 個直達，${data.loaded_tools?.length || 0} 個已載入`,
       icon: Search,
     }
-    case 'candidates_scored': return { label: `筛选工具候选：${data.candidates?.length || 0} 个`, icon: Search }
-    case 'completed': return { label: `工具研究完成：选出 ${data.selected_tools?.length || 0} 个`, icon: Search }
-    case 'searched': return { label: `工具搜索完成：加载 ${data.selected_tools?.length || 0} 个`, icon: Search }
-    case 'fallback': return { label: '工具研究回退，继续使用默认工具集', icon: AlertCircle }
-    default: return { label: `扩展事件：${event.data.event || 'unknown'}`, icon: FileClock }
+    case 'candidates_scored': return { label: `篩選工具候選：${data.candidates?.length || 0} 個`, icon: Search }
+    case 'completed': return { label: `工具研究完成：選出 ${data.selected_tools?.length || 0} 個`, icon: Search }
+    case 'searched': return { label: `工具搜尋完成：載入 ${data.selected_tools?.length || 0} 個`, icon: Search }
+    case 'fallback': return { label: '工具研究回退，繼續使用預設工具集', icon: AlertCircle }
+    default: return { label: `擴充套件事件：${event.data.event || 'unknown'}`, icon: FileClock }
   }
 }
 
@@ -29,16 +29,16 @@ function describe(event: AssistantTraceEvent): { label: string; icon: typeof Fil
   const extension = event.event === 'extension_event' ? describeExtensionEvent(event) : null
   if (extension) return extension
   switch (event.event) {
-    case 'context_prepared': return { label: event.data.compressed ? '上下文已压缩并准备' : '上下文已准备', icon: FileClock }
-    case 'step_updated': return { label: `执行步骤 ${event.data.step || ''}`, icon: ListTree }
-    case 'tool_call_start': return { label: `调用工具：${name}`, icon: Wrench }
-    case 'tool_result': return { label: event.data.ok ? `工具完成：${name}` : `工具失败：${name}`, icon: event.data.ok ? CheckCircle2 : AlertCircle }
-    case 'model_usage': return { label: `模型用量：输入 ${event.data.input_tokens || 0}，输出 ${event.data.output_tokens || 0}`, icon: Gauge }
-    case 'approval_required': return { label: '等待用户审批', icon: PauseCircle }
-    case 'paused': return { label: '任务已暂停', icon: PauseCircle }
-    case 'done': return { label: '任务完成', icon: CheckCircle2 }
-    case 'error': return { label: '任务失败', icon: AlertCircle }
-    default: return { label: '任务已启动', icon: FileClock }
+    case 'context_prepared': return { label: event.data.compressed ? '上下文已壓縮並準備' : '上下文已準備', icon: FileClock }
+    case 'step_updated': return { label: `執行步驟 ${event.data.step || ''}`, icon: ListTree }
+    case 'tool_call_start': return { label: `呼叫工具：${name}`, icon: Wrench }
+    case 'tool_result': return { label: event.data.ok ? `工具完成：${name}` : `工具失敗：${name}`, icon: event.data.ok ? CheckCircle2 : AlertCircle }
+    case 'model_usage': return { label: `模型用量：輸入 ${event.data.input_tokens || 0}，輸出 ${event.data.output_tokens || 0}`, icon: Gauge }
+    case 'approval_required': return { label: '等待使用者審批', icon: PauseCircle }
+    case 'paused': return { label: '任務已暫停', icon: PauseCircle }
+    case 'done': return { label: '任務完成', icon: CheckCircle2 }
+    case 'error': return { label: '任務失敗', icon: AlertCircle }
+    default: return { label: '任務已啟動', icon: FileClock }
   }
 }
 
@@ -58,11 +58,11 @@ function summary(events: AssistantTraceEvent[]): string {
   const status = latest?.event === 'done'
     ? '已完成'
     : latest?.event === 'error'
-    ? '已失败'
+    ? '已失敗'
     : latest?.event === 'paused'
-    ? '等待继续'
-    : '执行中'
-  return toolCalls > 0 ? `${status} · ${toolCalls} 次工具调用` : status
+    ? '等待繼續'
+    : '執行中'
+  return toolCalls > 0 ? `${status} · ${toolCalls} 次工具呼叫` : status
 }
 
 export function TraceTimeline({ events, live = false }: TraceTimelineProps) {
@@ -77,7 +77,7 @@ export function TraceTimeline({ events, live = false }: TraceTimelineProps) {
         onClick={() => setExpanded((value) => !value)}
       >
         <FileClock className="h-3.5 w-3.5 shrink-0" />
-        <span>执行记录</span>
+        <span>執行記錄</span>
         <span className="min-w-0 flex-1 truncate text-[10px] font-normal">{summary(events)}</span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>

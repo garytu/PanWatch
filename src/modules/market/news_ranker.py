@@ -6,34 +6,34 @@ from datetime import datetime
 
 
 POSITIVE_HINTS = (
-    "签约",
-    "中标",
-    "增长",
-    "上调",
-    "创新高",
+    "簽約",
+    "中標",
+    "增長",
+    "上調",
+    "創新高",
     "利好",
     "增持",
-    "回购",
-    "扭亏",
-    "超预期",
+    "回購",
+    "扭虧",
+    "超預期",
 )
 
 NEGATIVE_HINTS = (
-    "下调",
-    "减持",
-    "亏损",
+    "下調",
+    "減持",
+    "虧損",
     "暴跌",
-    "诉讼",
-    "风险",
-    "违规",
-    "处罚",
+    "訴訟",
+    "風險",
+    "違規",
+    "處罰",
     "利空",
     "退市",
 )
 
 
 def _to_naive_local(dt: datetime) -> datetime:
-    """统一转为本地时区的 naive datetime，便于与 datetime.now() 比较。"""
+    """統一轉為本地時區的 naive datetime，便於與 datetime.now() 比較。"""
     if dt.tzinfo is None:
         return dt
     return dt.astimezone().replace(tzinfo=None)
@@ -69,7 +69,7 @@ def parse_news_time(value: str | datetime | int | float | None) -> datetime | No
         except Exception:
             continue
 
-    # 常见月日格式（无年份），按当前年份补齐。
+    # 常見月日格式（無年份），按當前年份補齊。
     for fmt in ("%m-%d %H:%M:%S", "%m-%d %H:%M", "%m/%d %H:%M:%S", "%m/%d %H:%M"):
         try:
             partial = datetime.strptime(normalized, fmt)
@@ -119,7 +119,7 @@ def rank_news_items(items: list[dict], symbol: str = "") -> list[dict]:
 
         if symbol and symbol in str(it.get("symbols") or []):
             s += 2.0
-        if any(k in title for k in ("重大", "业绩", "增持", "减持", "停牌", "解禁", "回购", "分红", "快报")):
+        if any(k in title for k in ("重大", "業績", "增持", "減持", "停牌", "解禁", "回購", "分紅", "快報")):
             s += 2.0
         if "公告" in title:
             s += 1.0
@@ -134,7 +134,7 @@ def rank_news_items(items: list[dict], symbol: str = "") -> list[dict]:
 def summarize_news_topics(items: list[dict], max_topics: int = 6) -> dict:
     if not items:
         return {
-            "summary": "近期无显著新闻主题",
+            "summary": "近期無顯著新聞主題",
             "topics": [],
             "sentiment": "neutral",
             "counts": {"positive": 0, "negative": 0, "neutral": 0},
@@ -152,7 +152,7 @@ def summarize_news_topics(items: list[dict], max_topics: int = 6) -> dict:
 
         words = re.findall(r"[\u4e00-\u9fa5A-Za-z0-9]{2,}", title)
         for w in words:
-            if w in ("公司", "公告", "今日", "消息", "显示", "发布", "表示", "相关"):
+            if w in ("公司", "公告", "今日", "訊息", "顯示", "釋出", "表示", "相關"):
                 continue
             word_counter[w] += 1
 
@@ -165,9 +165,9 @@ def summarize_news_topics(items: list[dict], max_topics: int = 6) -> dict:
         senti = "neutral"
 
     if topics:
-        summary = f"主题集中在：{'、'.join(topics[: max_topics])}；整体情绪{('偏多' if senti == 'positive' else '偏空' if senti == 'negative' else '中性')}"
+        summary = f"主題集中在：{'、'.join(topics[: max_topics])}；整體情緒{('偏多' if senti == 'positive' else '偏空' if senti == 'negative' else '中性')}"
     else:
-        summary = f"可用新闻较少，整体情绪{('偏多' if senti == 'positive' else '偏空' if senti == 'negative' else '中性')}"
+        summary = f"可用新聞較少，整體情緒{('偏多' if senti == 'positive' else '偏空' if senti == 'negative' else '中性')}"
 
     return {
         "summary": summary,

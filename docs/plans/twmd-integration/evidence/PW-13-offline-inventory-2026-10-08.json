@@ -1,0 +1,2360 @@
+{
+  "corporate_action_coverage": {
+    "capital_reduction": "unknown",
+    "ex_right_dividend": "unknown",
+    "instrument_id": "TWSE:2330",
+    "interpretation": "empty results have unknown coverage and are not proof of no company action",
+    "known_event_count": 0,
+    "selectors": {
+      "end_date": "2026-10-02",
+      "end_month": "2026-08",
+      "fiscal_quarter": 4,
+      "fiscal_year": 2024,
+      "start_date": "2026-10-02",
+      "start_month": "2026-07",
+      "statement": null
+    }
+  },
+  "coverage_gaps": [
+    "PW-05 daily valuation/flow selectors are only 2026-10-02..05 calendar bounds; 2026-10-03/04 MISSING is not a verified session gap.",
+    "The selected TWSE:2330 and TPEX:5347 monthly-revenue window covers 2026-07..08 with July missing and August present; it does not provide a multi-year YoY factor history.",
+    "The reviewed upstream contracts do not establish a retained historical TPEX revenue series; exclude TPEX revenue-based historical scope until versioned receipts exist.",
+    "Profile observations are latest-only. They cannot reconstruct a point-in-time historical security universe.",
+    "TAIEX benchmark evidence is a bounded 24-observation capture; TPEX benchmark evidence has four latest-only observations. Neither is a complete calendar/session history.",
+    "Corporate-action endpoints report unknown coverage. Raw-price outcomes cannot be interpreted as total returns.",
+    "Only the bounded 2026-10-06 captured response retains exact factor values. The fixed decision grid audits availability but has no preregistered PW-06 thresholds or matched forward outcomes; it is inventory_only, not an efficacy evaluation."
+  ],
+  "daily_research_windows": [
+    {
+      "age_status": "age_unknown",
+      "data_period": "2026-10-05",
+      "dataset": "valuation",
+      "dataset_coverage": null,
+      "first_observed_at": null,
+      "instrument_id": "TWSE:2330",
+      "months": [],
+      "publication_time": null,
+      "reason": "selected_record_present",
+      "report_date": null,
+      "requested_scope": {
+        "end": "2026-10-05",
+        "instrument_id": "TWSE:2330",
+        "start": "2026-10-02"
+      },
+      "selected_instrument_presence": "present",
+      "source_contract": null,
+      "source_received_at_utc": null,
+      "source_served_at": null,
+      "status": "available",
+      "trade_dates": [
+        "2026-10-02",
+        "2026-10-05"
+      ]
+    },
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-10-02",
+      "dataset": "institutional_flows",
+      "dataset_coverage": [
+        "AVAILABLE",
+        "MISSING",
+        "MISSING",
+        "MISSING"
+      ],
+      "first_observed_at": "2026-10-04T13:09:26.439985Z",
+      "instrument_id": "TWSE:2330",
+      "months": [],
+      "publication_time": null,
+      "reason": "some_requested_dates_missing",
+      "report_date": null,
+      "requested_scope": {
+        "end_date": "2026-10-05",
+        "instrument_id": "TWSE:2330",
+        "start_date": "2026-10-02"
+      },
+      "selected_instrument_presence": [
+        "present",
+        "missing",
+        "missing",
+        "missing"
+      ],
+      "source_contract": "twse_t86_v1",
+      "source_received_at_utc": "2026-10-04T13:09:26.439985Z",
+      "source_served_at": null,
+      "status": "partial",
+      "trade_dates": [
+        "2026-10-02"
+      ]
+    },
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-10-02",
+      "dataset": "valuation",
+      "dataset_coverage": "available=1;missing=3;selected=present",
+      "first_observed_at": null,
+      "instrument_id": "TPEX:5347",
+      "months": [],
+      "publication_time": null,
+      "reason": "some_requested_dates_missing_or_absent",
+      "report_date": null,
+      "requested_scope": {
+        "end": "2026-10-05",
+        "instrument_id": "TPEX:5347",
+        "start": "2026-10-02"
+      },
+      "selected_instrument_presence": "present",
+      "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+      "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+      "source_served_at": null,
+      "status": "partial",
+      "trade_dates": [
+        "2026-10-02"
+      ]
+    },
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-10-02",
+      "dataset": "institutional_flows",
+      "dataset_coverage": [
+        "AVAILABLE",
+        "MISSING",
+        "MISSING",
+        "MISSING"
+      ],
+      "first_observed_at": null,
+      "instrument_id": "TPEX:5347",
+      "months": [],
+      "publication_time": null,
+      "reason": "some_requested_dates_missing",
+      "report_date": null,
+      "requested_scope": {
+        "end_date": "2026-10-05",
+        "instrument_id": "TPEX:5347",
+        "start_date": "2026-10-02"
+      },
+      "selected_instrument_presence": [
+        "present",
+        "missing",
+        "missing",
+        "missing"
+      ],
+      "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+      "source_received_at_utc": "2026-10-04T13:09:28.555661Z",
+      "source_served_at": null,
+      "status": "partial",
+      "trade_dates": [
+        "2026-10-02"
+      ]
+    },
+    {
+      "age_status": "age_unknown",
+      "data_period": null,
+      "dataset": "valuation",
+      "dataset_coverage": null,
+      "first_observed_at": null,
+      "instrument_id": "TWSE:00878",
+      "months": [],
+      "publication_time": null,
+      "reason": "coverage_not_returned",
+      "report_date": null,
+      "requested_scope": {
+        "end": "2026-10-05",
+        "instrument_id": "TWSE:00878",
+        "start": "2026-10-02"
+      },
+      "selected_instrument_presence": "unknown",
+      "source_contract": null,
+      "source_received_at_utc": null,
+      "source_served_at": null,
+      "status": "unknown",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-10-02",
+      "dataset": "institutional_flows",
+      "dataset_coverage": [
+        "AVAILABLE",
+        "MISSING",
+        "MISSING",
+        "MISSING"
+      ],
+      "first_observed_at": "2026-10-04T13:09:26.439985Z",
+      "instrument_id": "TWSE:00878",
+      "months": [],
+      "publication_time": null,
+      "reason": "some_requested_dates_missing",
+      "report_date": null,
+      "requested_scope": {
+        "end_date": "2026-10-05",
+        "instrument_id": "TWSE:00878",
+        "start_date": "2026-10-02"
+      },
+      "selected_instrument_presence": [
+        "present",
+        "missing",
+        "missing",
+        "missing"
+      ],
+      "source_contract": "twse_t86_v1",
+      "source_received_at_utc": "2026-10-04T13:09:26.439985Z",
+      "source_served_at": null,
+      "status": "partial",
+      "trade_dates": [
+        "2026-10-02"
+      ]
+    },
+    {
+      "age_status": "age_unknown",
+      "data_period": null,
+      "dataset": "valuation",
+      "dataset_coverage": null,
+      "first_observed_at": null,
+      "instrument_id": "TPEX:006201",
+      "months": [],
+      "publication_time": null,
+      "reason": "unsupported_valuation_selector",
+      "report_date": null,
+      "requested_scope": {
+        "end": "2026-10-05",
+        "instrument_id": "TPEX:006201",
+        "start": "2026-10-02"
+      },
+      "selected_instrument_presence": null,
+      "source_contract": null,
+      "source_received_at_utc": null,
+      "source_served_at": null,
+      "status": "unsupported",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-10-02",
+      "dataset": "institutional_flows",
+      "dataset_coverage": [
+        "AVAILABLE",
+        "MISSING",
+        "MISSING",
+        "MISSING"
+      ],
+      "first_observed_at": null,
+      "instrument_id": "TPEX:006201",
+      "months": [],
+      "publication_time": null,
+      "reason": "some_requested_dates_missing",
+      "report_date": null,
+      "requested_scope": {
+        "end_date": "2026-10-05",
+        "instrument_id": "TPEX:006201",
+        "start_date": "2026-10-02"
+      },
+      "selected_instrument_presence": [
+        "present",
+        "missing",
+        "missing",
+        "missing"
+      ],
+      "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+      "source_received_at_utc": "2026-10-04T13:09:28.555661Z",
+      "source_served_at": null,
+      "status": "partial",
+      "trade_dates": [
+        "2026-10-02"
+      ]
+    }
+  ],
+  "decision_and_cost_policy": {
+    "cost_scenario": {
+      "entry_cost_bps": "5",
+      "exit_cost_bps": "5",
+      "interpretation": "sensitivity assumption only; omits TW commissions, tax, minimum fees, lot sizing and impact",
+      "market_rules_supported": false,
+      "unit": "basis_points_per_side"
+    },
+    "decision_grid_taipei": [
+      "2026-10-02T17:00:00+08:00",
+      "2026-10-05T17:00:00+08:00",
+      "2026-10-07T09:00:00+08:00"
+    ],
+    "end_date": "2026-10-07",
+    "entry_rule": "first retained official close strictly after the decision date",
+    "eval_end_date": "2026-10-07",
+    "eval_start_date": "2026-10-07",
+    "minimum_eval_samples": 30,
+    "minimum_train_samples": 30,
+    "outcome_horizon_sessions": 5,
+    "start_date": "2026-10-02",
+    "train_end_date": "2026-10-05",
+    "train_start_date": "2026-10-02"
+  },
+  "evaluation": {
+    "availability_audit": [
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TPEX:006201",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:33.499001Z",
+              "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+              "source_dataset": "valuation",
+              "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+              "unit": "percent"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:28.555661Z",
+              "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "dd5ec8507a75208bd64576f850462c21d4f6d33a909997cc5d0b4c0fcc50cafa",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+              "source_dataset": "institutional_flows",
+              "source_received_at_utc": "2026-10-04T13:09:28.555661Z",
+              "unit": "shares"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:33.499001Z",
+              "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+              "source_dataset": "valuation",
+              "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+              "unit": "ratio"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:33.499001Z",
+              "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+              "source_dataset": "valuation",
+              "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+              "unit": "ratio"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": "2026-08-31",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:19.479749Z",
+              "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+              "data_period": "2026-08",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "f00e3fdd7060db0db943b79dc53d732df940d038ef208a1b075363e06660bd92",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+              "source_dataset": "monthly_revenue",
+              "source_received_at_utc": "2026-10-04T13:09:19.479749Z",
+              "unit": "percent"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TPEX:5347",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TWSE:00878",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "percent"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:26.439985Z",
+              "capture_id": null,
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "92073057250b7329f67246b108f831e74185b288a3406725564daaa2fd022bd9",
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "twse_t86_v1",
+              "source_dataset": "institutional_flows",
+              "source_received_at_utc": "2026-10-04T13:09:26.439985Z",
+              "unit": "shares"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": "2026-08-31",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:22.189587Z",
+              "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+              "data_period": "2026-08",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "779e4edca1dbbc3cf256b8ada92f39fa600625509e9bf2da067b86a4c21c3357",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "mops_t21_sii_monthly_revenue/v1",
+              "source_dataset": "monthly_revenue",
+              "source_received_at_utc": "2026-10-04T13:09:22.189587Z",
+              "unit": "percent"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TWSE:2330",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TPEX:006201",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:33.499001Z",
+              "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+              "source_dataset": "valuation",
+              "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+              "unit": "percent"
+            },
+            "status": "available_by_decision",
+            "value": "2.39"
+          },
+          "institutional_net_min_shares": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:28.555661Z",
+              "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "dd5ec8507a75208bd64576f850462c21d4f6d33a909997cc5d0b4c0fcc50cafa",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+              "source_dataset": "institutional_flows",
+              "source_received_at_utc": "2026-10-04T13:09:28.555661Z",
+              "unit": "shares"
+            },
+            "status": "available_by_decision",
+            "value": "1232412"
+          },
+          "pb_max": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:33.499001Z",
+              "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+              "source_dataset": "valuation",
+              "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+              "unit": "ratio"
+            },
+            "status": "available_by_decision",
+            "value": "5.58"
+          },
+          "pe_max": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:33.499001Z",
+              "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+              "source_dataset": "valuation",
+              "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+              "unit": "ratio"
+            },
+            "status": "available_by_decision",
+            "value": "40.48"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": "2026-08",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:19.479749Z",
+              "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+              "data_period": "2026-08",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "f00e3fdd7060db0db943b79dc53d732df940d038ef208a1b075363e06660bd92",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+              "source_dataset": "monthly_revenue",
+              "source_received_at_utc": "2026-10-04T13:09:19.479749Z",
+              "unit": "percent"
+            },
+            "status": "available_by_decision",
+            "value": "40.47646040957919"
+          }
+        },
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TPEX:5347",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TWSE:00878",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "percent"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": "2026-10-02",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:26.439985Z",
+              "capture_id": null,
+              "data_period": "2026-10-02",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "92073057250b7329f67246b108f831e74185b288a3406725564daaa2fd022bd9",
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "twse_t86_v1",
+              "source_dataset": "institutional_flows",
+              "source_received_at_utc": "2026-10-04T13:09:26.439985Z",
+              "unit": "shares"
+            },
+            "status": "available_by_decision",
+            "value": "-5343414"
+          },
+          "pb_max": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "reason": "future_revision_or_receipt",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": "2026-08",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:22.189587Z",
+              "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+              "data_period": "2026-08",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "779e4edca1dbbc3cf256b8ada92f39fa600625509e9bf2da067b86a4c21c3357",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "mops_t21_sii_monthly_revenue/v1",
+              "source_dataset": "monthly_revenue",
+              "source_received_at_utc": "2026-10-04T13:09:22.189587Z",
+              "unit": "percent"
+            },
+            "status": "available_by_decision",
+            "value": "53.320053714712955"
+          }
+        },
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TWSE:2330",
+        "split": "train"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TPEX:006201",
+        "split": "evaluation"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TPEX)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "percent"
+            },
+            "reason": "latest_admissible_value_missing",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+              "source_dataset": "institutional_flows",
+              "source_received_at_utc": null,
+              "unit": "shares"
+            },
+            "reason": "latest_admissible_value_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TPEX)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "reason": "latest_admissible_value_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TPEX)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "reason": "latest_admissible_value_missing",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": "2026-08",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:19.479749Z",
+              "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+              "data_period": "2026-08",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "f00e3fdd7060db0db943b79dc53d732df940d038ef208a1b075363e06660bd92",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+              "source_dataset": "monthly_revenue",
+              "source_received_at_utc": "2026-10-04T13:09:19.479749Z",
+              "unit": "percent"
+            },
+            "status": "available_by_decision",
+            "value": "40.47646040957919"
+          }
+        },
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TPEX:5347",
+        "split": "evaluation"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "institutional_net_min_shares": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pe_max": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": null,
+            "provenance": null,
+            "reason": "condition_observation_missing",
+            "status": "unavailable_by_decision"
+          }
+        },
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TWSE:00878",
+        "split": "evaluation"
+      },
+      {
+        "conditions": {
+          "dividend_yield_min_pct": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "percent"
+            },
+            "status": "available_by_decision",
+            "value": "0.85"
+          },
+          "institutional_net_min_shares": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "twse_t86_v1",
+              "source_dataset": "institutional_flows",
+              "source_received_at_utc": null,
+              "unit": "shares"
+            },
+            "reason": "latest_admissible_value_missing",
+            "status": "unavailable_by_decision"
+          },
+          "pb_max": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "status": "available_by_decision",
+            "value": "10.38"
+          },
+          "pe_max": {
+            "data_period": "2026-10-05",
+            "provenance": {
+              "available_at_utc": "2026-10-06T15:57:48Z",
+              "capture_id": null,
+              "data_period": "2026-10-05",
+              "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+              "payload_sha256": null,
+              "revision": null,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+              "source_contract": "GET /api/v1/valuations (TWSE)",
+              "source_dataset": "valuation",
+              "source_received_at_utc": null,
+              "unit": "ratio"
+            },
+            "status": "available_by_decision",
+            "value": "29.85"
+          },
+          "revenue_yoy_min_pct": {
+            "data_period": "2026-08",
+            "provenance": {
+              "available_at_utc": "2026-10-04T13:09:22.189587Z",
+              "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+              "data_period": "2026-08",
+              "local_snapshot_at_utc": null,
+              "payload_sha256": "779e4edca1dbbc3cf256b8ada92f39fa600625509e9bf2da067b86a4c21c3357",
+              "revision": 1,
+              "semantic_revision_first_observed_at_utc": null,
+              "snapshot_sha256": null,
+              "source_contract": "mops_t21_sii_monthly_revenue/v1",
+              "source_dataset": "monthly_revenue",
+              "source_received_at_utc": "2026-10-04T13:09:22.189587Z",
+              "unit": "percent"
+            },
+            "status": "available_by_decision",
+            "value": "53.320053714712955"
+          }
+        },
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TWSE:2330",
+        "split": "evaluation"
+      }
+    ],
+    "counts": {
+      "availability_audit_rows": 12,
+      "available_values_by_condition_at_fixed_decisions": {
+        "dividend_yield_min_pct": 2,
+        "institutional_net_min_shares": 2,
+        "pb_max": 2,
+        "pe_max": 2,
+        "revenue_yoy_min_pct": 4
+      },
+      "eligible_selected_signals_with_outcomes": 0,
+      "evaluation_samples": 0,
+      "factor_values_selected_by_condition": {},
+      "input_signals": 12,
+      "minimum_evaluation_samples": 30,
+      "minimum_train_samples": 30,
+      "purged_evaluation_signals": 0,
+      "purged_training_signals": 0,
+      "train_samples_after_purge": 0
+    },
+    "dataset_sha256": "c901010cbcded9ca0c17a5bcac7371441486623dbf654c3e4f976559878da943",
+    "decision_policy": {
+      "calendar_basis": "retained observations; exchange calendar verification required separately",
+      "cost_policy": {
+        "entry_cost_bps": "5",
+        "exit_cost_bps": "5",
+        "interpretation": "sensitivity assumption only; omits TW commissions, tax, minimum fees, lot sizing and impact",
+        "market_rules_supported": false,
+        "unit": "basis_points_per_side"
+      },
+      "decision_time_source": "per-signal timezone-aware decision_at_utc",
+      "entry_rule": "first retained close strictly after decision date",
+      "evaluation_range": {
+        "end": "2026-10-07",
+        "start": "2026-10-07"
+      },
+      "factor_availability": "latest admissible period and semantic version known by decision time; no backdating from report/data period",
+      "outcome_horizon_sessions": 5,
+      "preregistered_at_utc": null,
+      "purge": "drop training outcomes whose exit date is on or after evaluation start",
+      "same_day_close_allowed": false,
+      "thresholds": {},
+      "thresholds_preregistered": false,
+      "train_range": {
+        "end": "2026-10-05",
+        "start": "2026-10-02"
+      },
+      "venue_benchmark_mapping": {
+        "TPEX": "TPEX",
+        "TWSE": "TAIEX"
+      }
+    },
+    "efficacy_claim_allowed": false,
+    "evaluation_mode": "inventory_only",
+    "evaluation_performed": false,
+    "evaluation_policy_sha256": "8c9b194d91457a0f85c1e2bf132954161d6c55f47d3f574680377746fb29eea7",
+    "evaluation_sha256": "51befcfd214874eaff0621678116bc830b6cabbdbbe2b3f7d2492e0c5d45b17b",
+    "evidence_kind": "official_retained_evidence_summary",
+    "exclusions": {
+      "thresholds_not_pre_registered": 12
+    },
+    "insufficient_evidence_reason": "inventory_only_no_preregistered_thresholds_or_forward_outcome_evaluation",
+    "limitations": [
+      "Raw-price outcomes exclude dividends and do not apply corporate actions.",
+      "A retained observation sequence is not a verified exchange-session calendar.",
+      "Fixed selectors are not a point-in-time market universe.",
+      "Basis-point costs omit brokerage minimums, taxes, lot sizing, market impact and execution rules unless separately supported.",
+      "Synthetic evidence can validate code paths but never supports efficacy claims.",
+      "This evaluator reports descriptive samples only; a separate reviewed factor study is required before any efficacy statement."
+    ],
+    "outcome_summary": {
+      "evaluation_entry_dates": [],
+      "evaluation_exit_dates": [],
+      "evaluation_mean_relative_net_percentage_points": null,
+      "interpretation": "descriptive_only; a separate reviewed factor study is required for efficacy claims"
+    },
+    "quality_gates": {
+      "calendar_verified": false,
+      "corporate_action_adjusted_or_complete": false,
+      "market_cost_model_supported": false,
+      "nonempty_preregistered_conditions": false,
+      "point_in_time_universe": false,
+      "real_evidence": true,
+      "thresholds_preregistered": false
+    },
+    "report_sha256": "a922960a971d11a994005b7e49e27745b0c514ab9f58ec612757a17691a21e65",
+    "sample_floor_and_quality_gates_passed": false,
+    "schema_version": "panwatch.pw13.evaluation.v1",
+    "scope": {
+      "instrument_ids": [
+        "TPEX:006201",
+        "TPEX:5347",
+        "TWSE:00878",
+        "TWSE:2330"
+      ],
+      "universe_basis": "fixed selectors observed in PW-05/PW-11; not a historical point-in-time universe"
+    },
+    "signals": [
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TPEX:006201",
+        "selected": null,
+        "split": "train",
+        "venue": "TPEX"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TPEX:5347",
+        "selected": null,
+        "split": "train",
+        "venue": "TPEX"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TWSE:00878",
+        "selected": null,
+        "split": "train",
+        "venue": "TWSE"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-02T09:00:00Z",
+        "decision_date_taipei": "2026-10-02",
+        "instrument_id": "TWSE:2330",
+        "selected": null,
+        "split": "train",
+        "venue": "TWSE"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TPEX:006201",
+        "selected": null,
+        "split": "train",
+        "venue": "TPEX"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TPEX:5347",
+        "selected": null,
+        "split": "train",
+        "venue": "TPEX"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TWSE:00878",
+        "selected": null,
+        "split": "train",
+        "venue": "TWSE"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-05T09:00:00Z",
+        "decision_date_taipei": "2026-10-05",
+        "instrument_id": "TWSE:2330",
+        "selected": null,
+        "split": "train",
+        "venue": "TWSE"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TPEX:006201",
+        "selected": null,
+        "split": "evaluation",
+        "venue": "TPEX"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TPEX:5347",
+        "selected": null,
+        "split": "evaluation",
+        "venue": "TPEX"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TWSE:00878",
+        "selected": null,
+        "split": "evaluation",
+        "venue": "TWSE"
+      },
+      {
+        "conditions": {},
+        "decision_at_utc": "2026-10-07T01:00:00Z",
+        "decision_date_taipei": "2026-10-07",
+        "instrument_id": "TWSE:2330",
+        "selected": null,
+        "split": "evaluation",
+        "venue": "TWSE"
+      }
+    ],
+    "status": "insufficient_evidence"
+  },
+  "evidence_as_of": "2026-10-08",
+  "evidence_kind": "committed_official_service_and_capture_evidence",
+  "financial_statement_revision": {
+    "capture_id": "89d94f31fe7666a3c0854f0aedffda447ce91149bfad72f5d85379b05c79a383",
+    "captured_raw_fixture_sha256": "e234c25cee6df084843d34e9414388310aee038467719d94b216380411bcde68",
+    "document_first_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+    "fiscal_quarter": 4,
+    "fiscal_year": 2024,
+    "instrument_id": "TWSE:2330",
+    "original_received_at_utc": "2026-10-04T13:07:32.532836Z",
+    "point_in_time_eligible_for_2024_decisions": false,
+    "published_at_utc": null,
+    "report_scope": "consolidated",
+    "returned_fact_count": 394,
+    "revision_id": "cd2ed27a046181c2c58e1a73d7620a601745750b180a7d0e2869b634dcb726fe",
+    "ruling": "2024Q4 content first observed/received in Oct 2026 with no publisher time; exclude from 2024 decision-time conditions. Document-first and semantic-revision-first clocks remain separate.",
+    "semantic_revision_first_observed_at_utc": "2026-10-04T13:07:32.532836Z",
+    "source_sha256": "1deba772079ed08cef1ccaf0430f40b4d36819ae5e5405073e793e6dc1932677",
+    "total_fact_count": 394
+  },
+  "fixed_availability_decision_grid_taipei": [
+    "2026-10-02T17:00:00+08:00",
+    "2026-10-05T17:00:00+08:00",
+    "2026-10-07T09:00:00+08:00"
+  ],
+  "fixed_instrument_scope": [
+    "TPEX:006201",
+    "TPEX:5347",
+    "TWSE:00878",
+    "TWSE:2330"
+  ],
+  "home_daily_index_captures": [
+    {
+      "basis": "raw_price_index",
+      "benchmark_id": "TAIEX",
+      "observed_at": "2026-10-07T16:25:27.423675+00:00",
+      "partial": true,
+      "provider": "TWSE",
+      "source_alias": "MI_5MINS_HIST",
+      "spark_observation_count": 20,
+      "spark_observed_dates": [
+        "2026-09-07",
+        "2026-09-08",
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-29",
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "trade_date": "2026-10-06",
+      "truncated": true,
+      "unit": "index_points"
+    },
+    {
+      "basis": "raw_price_index",
+      "benchmark_id": "TPEX",
+      "observed_at": "2026-10-07T16:25:27.423675+00:00",
+      "partial": true,
+      "provider": "TPEx",
+      "source_alias": "tpex_index",
+      "spark_observation_count": 5,
+      "spark_observed_dates": [
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07"
+      ],
+      "trade_date": "2026-10-07",
+      "truncated": false,
+      "unit": "index_points"
+    }
+  ],
+  "input_files": [
+    {
+      "path": "docs/plans/twmd-integration/evidence/PW-05-shared-service-2026-10-07.json",
+      "sha256": "1b1e17a56c88a2e10278ba60f980a852ba6202e46d928d372153360d263c6781"
+    },
+    {
+      "path": "docs/plans/twmd-integration/evidence/PW-10-shared-service-2026-10-07.json",
+      "sha256": "eeec62b940bf3c383eed89f1e0e299a579cb4492f3d70bb9f099cdf57ce9f2ac"
+    },
+    {
+      "path": "docs/plans/twmd-integration/evidence/PW-11-shared-service-2026-10-08.json",
+      "sha256": "71436b0c660327b2913b8cd1973ecd0d3e349580d8e01fe9eb65adc29ddc242e"
+    },
+    {
+      "path": "docs/plans/twmd-integration/evidence/PW-12-shared-service-2026-10-07.json",
+      "sha256": "b654c053d28b261cc323c10547ecd1767463677d21282ae98daae26d820699ec"
+    },
+    {
+      "path": "packages/marketdata/tests/fixtures/twmd/captured/2026-10-06.json",
+      "sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1"
+    },
+    {
+      "path": "packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json.metadata.json",
+      "sha256": "13dc7f2845cd49d04d0609431942a2a2412ce6d1c84126312b2681e82e098c5c"
+    },
+    {
+      "path": "packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json",
+      "sha256": "e234c25cee6df084843d34e9414388310aee038467719d94b216380411bcde68"
+    }
+  ],
+  "input_sha256": "c901010cbcded9ca0c17a5bcac7371441486623dbf654c3e4f976559878da943",
+  "latest_only_profile_observations": [
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-10-03",
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TWSE:2330",
+      "months": [],
+      "publication_time": null,
+      "reason": "selected_profile_present",
+      "report_date": "2026-10-03",
+      "requested_scope": {
+        "instrument_id": "TWSE:2330"
+      },
+      "selected_instrument_presence": "present",
+      "source_contract": "twse_openapi_t187ap03_L/v1",
+      "source_received_at_utc": "2026-10-04T13:07:03.960501Z",
+      "source_served_at": null,
+      "status": "available",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-10-04",
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TPEX:5347",
+      "months": [],
+      "publication_time": null,
+      "reason": "selected_profile_present",
+      "report_date": "2026-10-04",
+      "requested_scope": {
+        "instrument_id": "TPEX:5347"
+      },
+      "selected_instrument_presence": "present",
+      "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+      "source_received_at_utc": "2026-10-04T13:07:07.049244Z",
+      "source_served_at": null,
+      "status": "available",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_unknown",
+      "data_period": null,
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TWSE:00878",
+      "months": [],
+      "publication_time": null,
+      "reason": "catalog_security_type_etf",
+      "report_date": null,
+      "requested_scope": {
+        "instrument_id": "TWSE:00878"
+      },
+      "selected_instrument_presence": "absent",
+      "source_contract": "twse_openapi_t187ap03_L/v1",
+      "source_received_at_utc": null,
+      "source_served_at": null,
+      "status": "unsupported",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_unknown",
+      "data_period": null,
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TPEX:006201",
+      "months": [],
+      "publication_time": null,
+      "reason": "catalog_security_type_etf",
+      "report_date": null,
+      "requested_scope": {
+        "instrument_id": "TPEX:006201"
+      },
+      "selected_instrument_presence": "absent",
+      "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+      "source_received_at_utc": null,
+      "source_served_at": null,
+      "status": "unsupported",
+      "trade_dates": []
+    }
+  ],
+  "monthly_revenue_windows": [
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-08",
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TWSE:2330",
+      "months": [
+        {
+          "data_month": "2026-07",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08",
+          "presence": "present",
+          "retained_row": true
+        }
+      ],
+      "publication_time": null,
+      "reason": "some_requested_months_missing",
+      "report_date": "2026-10-04",
+      "requested_scope": {
+        "end_month": "2026-08",
+        "instrument_id": "TWSE:2330",
+        "start_month": "2026-07"
+      },
+      "selected_instrument_presence": "mixed",
+      "source_contract": "mixed",
+      "source_received_at_utc": "2026-10-04T13:09:22.189587Z",
+      "source_served_at": "2026-10-07T00:16:08.596524Z",
+      "status": "partial",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_known_sla_unknown",
+      "data_period": "2026-08",
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TPEX:5347",
+      "months": [
+        {
+          "data_month": "2026-07",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08",
+          "presence": "present",
+          "retained_row": true
+        }
+      ],
+      "publication_time": null,
+      "reason": "some_requested_months_missing",
+      "report_date": "2026-09-17",
+      "requested_scope": {
+        "end_month": "2026-08",
+        "instrument_id": "TPEX:5347",
+        "start_month": "2026-07"
+      },
+      "selected_instrument_presence": "mixed",
+      "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+      "source_received_at_utc": "2026-10-04T13:09:19.479749Z",
+      "source_served_at": "2026-10-07T00:16:19.504092Z",
+      "status": "partial",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_unknown",
+      "data_period": null,
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TWSE:00878",
+      "months": [
+        {
+          "data_month": "2026-07",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08",
+          "presence": "not_in_captured_report",
+          "retained_row": false
+        }
+      ],
+      "publication_time": null,
+      "reason": "current_catalog_security_type_etf",
+      "report_date": null,
+      "requested_scope": {
+        "end_month": "2026-08",
+        "instrument_id": "TWSE:00878",
+        "start_month": "2026-07"
+      },
+      "selected_instrument_presence": "mixed",
+      "source_contract": "mixed",
+      "source_received_at_utc": null,
+      "source_served_at": "2026-10-07T00:16:30.061414Z",
+      "status": "unsupported",
+      "trade_dates": []
+    },
+    {
+      "age_status": "age_unknown",
+      "data_period": null,
+      "dataset_coverage": "AVAILABLE",
+      "first_observed_at": null,
+      "instrument_id": "TPEX:006201",
+      "months": [
+        {
+          "data_month": "2026-07",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08",
+          "presence": "not_in_captured_report",
+          "retained_row": false
+        }
+      ],
+      "publication_time": null,
+      "reason": "current_catalog_security_type_etf",
+      "report_date": null,
+      "requested_scope": {
+        "end_month": "2026-08",
+        "instrument_id": "TPEX:006201",
+        "start_month": "2026-07"
+      },
+      "selected_instrument_presence": "mixed",
+      "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+      "source_received_at_utc": null,
+      "source_served_at": "2026-10-07T00:16:40.594169Z",
+      "status": "unsupported",
+      "trade_dates": []
+    }
+  ],
+  "raw_price_and_venue_benchmark": [
+    {
+      "benchmark_id": "TAIEX",
+      "benchmark_series": {
+        "basis": "raw_price_index",
+        "capture_receipts": [
+          {
+            "capture_id": "80195474b4297ec48018ed7a9dafe9450aa20e6c7c9f47ade3940d5dbc9508f8",
+            "captured_at": "2026-10-07T15:57:26.776299Z",
+            "payload_sha256": "b6f8cf1552ff55338934e646ca846b54d1b18c0b82919ca78f440174bb605404",
+            "revision": 1
+          },
+          {
+            "capture_id": "10a4e078638d581491a98adde22c78a6c2e4281152a51bb4f3a5a4699f6e186b",
+            "captured_at": "2026-10-07T15:57:26.899093Z",
+            "payload_sha256": "3c9795c379f32ee44d7239c63b058fcdc51b60a1da42106f1bda306f0e41b6b1",
+            "revision": 1
+          }
+        ],
+        "coverage_window": {
+          "available_count": 24,
+          "complete": false,
+          "end_date": "2026-10-06",
+          "evidence_truncated": false,
+          "missing_count": 12,
+          "schema_ready": true,
+          "start_date": "2026-09-01"
+        },
+        "gap_interpretation": "source-reported calendar selectors; not a verified exchange-session gap list",
+        "observed_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-14",
+          "2026-09-15",
+          "2026-09-16",
+          "2026-09-17",
+          "2026-09-18",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-29",
+          "2026-09-30",
+          "2026-10-01",
+          "2026-10-02",
+          "2026-10-05",
+          "2026-10-06"
+        ],
+        "partial": true,
+        "provider": "TWSE",
+        "returned_count": 24,
+        "source_alias": "MI_5MINS_HIST",
+        "source_contract": "TWSE MI_5MINS_HIST daily OHLC",
+        "source_reported_gap_dates": [
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-12",
+          "2026-09-13",
+          "2026-09-19",
+          "2026-09-20",
+          "2026-09-25",
+          "2026-09-26",
+          "2026-09-27",
+          "2026-09-28",
+          "2026-10-03",
+          "2026-10-04"
+        ],
+        "source_url": "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST",
+        "total_count": 24,
+        "truncated": false,
+        "unit": "index_points"
+      },
+      "comparison_observation_count": 24,
+      "instrument_id": "TWSE:2330",
+      "interpretation": "common actual raw-price observations only; source calendar gaps are not a verified exchange calendar",
+      "requested_range": {
+        "end_date": "2026-10-06",
+        "inclusive": true,
+        "start_date": "2026-09-01"
+      },
+      "stock_series": {
+        "adjustment_mode": "raw",
+        "dataset": null,
+        "latest_returned_trade_date": "2026-10-07",
+        "observation_receipts": [
+          {
+            "acquired_at": "2026-10-05T19:00:35+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-01",
+            "trade_date": "2026-09-01"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:36+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-02",
+            "trade_date": "2026-09-02"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:36+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-03",
+            "trade_date": "2026-09-03"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:37+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-04",
+            "trade_date": "2026-09-04"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:41+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-07",
+            "trade_date": "2026-09-07"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:42+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-08",
+            "trade_date": "2026-09-08"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:42+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-09",
+            "trade_date": "2026-09-09"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:43+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-10",
+            "trade_date": "2026-09-10"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:43+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-11",
+            "trade_date": "2026-09-11"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:44+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-14",
+            "trade_date": "2026-09-14"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:45+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-15",
+            "trade_date": "2026-09-15"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:45+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-16",
+            "trade_date": "2026-09-16"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:46+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-17",
+            "trade_date": "2026-09-17"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:47+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-18",
+            "trade_date": "2026-09-18"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:48+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-21",
+            "trade_date": "2026-09-21"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:49+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-22",
+            "trade_date": "2026-09-22"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:50+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-23",
+            "trade_date": "2026-09-23"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:51+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-24",
+            "trade_date": "2026-09-24"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:51+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-29",
+            "trade_date": "2026-09-29"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:52+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-09-30",
+            "trade_date": "2026-09-30"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:53+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-01",
+            "trade_date": "2026-10-01"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:54+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-02",
+            "trade_date": "2026-10-02"
+          },
+          {
+            "acquired_at": "2026-10-05T19:00:55+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-05",
+            "trade_date": "2026-10-05"
+          },
+          {
+            "acquired_at": "2026-10-06T06:30:01+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-06",
+            "trade_date": "2026-10-06"
+          }
+        ],
+        "oldest_returned_trade_date": "2024-01-02",
+        "partial": true,
+        "provider": "TWSE",
+        "requested_period_returned_count": 24,
+        "requested_period_returned_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-14",
+          "2026-09-15",
+          "2026-09-16",
+          "2026-09-17",
+          "2026-09-18",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-29",
+          "2026-09-30",
+          "2026-10-01",
+          "2026-10-02",
+          "2026-10-05",
+          "2026-10-06"
+        ],
+        "returned_count": 669
+      },
+      "venue": "TWSE"
+    },
+    {
+      "benchmark_id": "TPEX",
+      "benchmark_series": {
+        "basis": "raw_price_index",
+        "capture_receipts": [
+          {
+            "capture_id": "e796e77f1e5e174a65c23e6ee272e8b3421a98d8f539e773d67544ef82b123de",
+            "captured_at": "2026-10-07T15:57:27.392311Z",
+            "payload_sha256": "06ac3a76e5cb00f8246d47b2dbd7562a0ee9cac96f7f0de20cb24a6298b0c0a2",
+            "revision": 1
+          }
+        ],
+        "coverage_window": {
+          "available_count": 4,
+          "complete": false,
+          "end_date": "2026-10-06",
+          "evidence_truncated": false,
+          "missing_count": 32,
+          "schema_ready": true,
+          "start_date": "2026-09-01"
+        },
+        "gap_interpretation": "source-reported calendar selectors; not a verified exchange-session gap list",
+        "observed_dates": [
+          "2026-10-01",
+          "2026-10-02",
+          "2026-10-05",
+          "2026-10-06"
+        ],
+        "partial": true,
+        "provider": "TPEx",
+        "returned_count": 4,
+        "source_alias": "tpex_index",
+        "source_contract": "TPEx OpenAPI /openapi/v1/tpex_index latest dated rows",
+        "source_reported_gap_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-12",
+          "2026-09-13",
+          "2026-09-14",
+          "2026-09-15",
+          "2026-09-16",
+          "2026-09-17",
+          "2026-09-18",
+          "2026-09-19",
+          "2026-09-20",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-25",
+          "2026-09-26",
+          "2026-09-27",
+          "2026-09-28",
+          "2026-09-29",
+          "2026-09-30",
+          "2026-10-03",
+          "2026-10-04"
+        ],
+        "source_url": "https://www.tpex.org.tw/openapi/v1/tpex_index",
+        "total_count": 4,
+        "truncated": false,
+        "unit": "index_points"
+      },
+      "comparison_observation_count": 4,
+      "instrument_id": "TPEX:5347",
+      "interpretation": "common actual raw-price observations only; source calendar gaps are not a verified exchange calendar",
+      "requested_range": {
+        "end_date": "2026-10-06",
+        "inclusive": true,
+        "start_date": "2026-09-01"
+      },
+      "stock_series": {
+        "adjustment_mode": "raw",
+        "dataset": null,
+        "latest_returned_trade_date": "2026-10-07",
+        "observation_receipts": [
+          {
+            "acquired_at": "2026-10-05T17:58:52+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-01",
+            "trade_date": "2026-10-01"
+          },
+          {
+            "acquired_at": "2026-10-05T17:58:53+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-02",
+            "trade_date": "2026-10-02"
+          },
+          {
+            "acquired_at": "2026-10-05T17:58:54+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-05",
+            "trade_date": "2026-10-05"
+          },
+          {
+            "acquired_at": "2026-10-06T10:30:08+00:00",
+            "dataset_status": "AVAILABLE",
+            "partition": "2026-10-06",
+            "trade_date": "2026-10-06"
+          }
+        ],
+        "oldest_returned_trade_date": "2024-01-02",
+        "partial": true,
+        "provider": "TPEX",
+        "requested_period_returned_count": 23,
+        "requested_period_returned_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-08",
+          "2026-09-09",
+          "2026-09-10",
+          "2026-09-11",
+          "2026-09-14",
+          "2026-09-15",
+          "2026-09-16",
+          "2026-09-17",
+          "2026-09-18",
+          "2026-09-21",
+          "2026-09-22",
+          "2026-09-23",
+          "2026-09-24",
+          "2026-09-29",
+          "2026-09-30",
+          "2026-10-01",
+          "2026-10-02",
+          "2026-10-05",
+          "2026-10-06"
+        ],
+        "returned_count": 668
+      },
+      "venue": "TPEX"
+    }
+  ],
+  "retained_factor_observations": [
+    {
+      "condition": "institutional_net_min_shares",
+      "data_period": "2026-10-02",
+      "instrument_id": "TWSE:2330",
+      "payload_sha256": "92073057250b7329f67246b108f831e74185b288a3406725564daaa2fd022bd9",
+      "presence": "present",
+      "receipt_binds_content_version": true,
+      "row_first_observed_at_utc": "2026-10-04T13:09:26.439985Z",
+      "source_contract": "twse_t86_v1",
+      "source_dataset": "institutional_flows",
+      "source_received_at_utc": "2026-10-04T13:09:26.439985Z",
+      "unit": "shares",
+      "value": -5343414
+    },
+    {
+      "condition": "institutional_net_min_shares",
+      "data_period": "2026-10-05",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "missing",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "twse_t86_v1",
+      "source_dataset": "institutional_flows",
+      "unit": "shares",
+      "value": null
+    },
+    {
+      "capture_id": "47b1a1177dd656aac4710d6f38dd49e27cd1a66c3c958184c5e65aef1e46bb89",
+      "condition": "institutional_net_min_shares",
+      "data_period": "2026-10-02",
+      "instrument_id": "TPEX:5347",
+      "payload_sha256": "dd5ec8507a75208bd64576f850462c21d4f6d33a909997cc5d0b4c0fcc50cafa",
+      "presence": "present",
+      "receipt_binds_content_version": true,
+      "revision": 1,
+      "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+      "source_dataset": "institutional_flows",
+      "source_received_at_utc": "2026-10-04T13:09:28.555661Z",
+      "unit": "shares",
+      "value": 1232412
+    },
+    {
+      "condition": "institutional_net_min_shares",
+      "data_period": "2026-10-05",
+      "instrument_id": "TPEX:5347",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "missing",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+      "source_dataset": "institutional_flows",
+      "unit": "shares",
+      "value": null
+    },
+    {
+      "condition": "pe_max",
+      "data_period": "2026-10-02",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "present",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TWSE)",
+      "source_dataset": "valuation",
+      "unit": "ratio",
+      "value": "28.98"
+    },
+    {
+      "condition": "pb_max",
+      "data_period": "2026-10-02",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "present",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TWSE)",
+      "source_dataset": "valuation",
+      "unit": "ratio",
+      "value": "10.08"
+    },
+    {
+      "condition": "dividend_yield_min_pct",
+      "data_period": "2026-10-02",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "present",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TWSE)",
+      "source_dataset": "valuation",
+      "unit": "percent",
+      "value": "0.88"
+    },
+    {
+      "condition": "pe_max",
+      "data_period": "2026-10-05",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "present",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TWSE)",
+      "source_dataset": "valuation",
+      "unit": "ratio",
+      "value": "29.85"
+    },
+    {
+      "condition": "pb_max",
+      "data_period": "2026-10-05",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "present",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TWSE)",
+      "source_dataset": "valuation",
+      "unit": "ratio",
+      "value": "10.38"
+    },
+    {
+      "condition": "dividend_yield_min_pct",
+      "data_period": "2026-10-05",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "present",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TWSE)",
+      "source_dataset": "valuation",
+      "unit": "percent",
+      "value": "0.85"
+    },
+    {
+      "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+      "condition": "pe_max",
+      "data_period": "2026-10-02",
+      "instrument_id": "TPEX:5347",
+      "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+      "presence": "present",
+      "receipt_binds_content_version": true,
+      "revision": 1,
+      "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+      "source_dataset": "valuation",
+      "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+      "unit": "ratio",
+      "value": "40.48"
+    },
+    {
+      "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+      "condition": "pb_max",
+      "data_period": "2026-10-02",
+      "instrument_id": "TPEX:5347",
+      "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+      "presence": "present",
+      "receipt_binds_content_version": true,
+      "revision": 1,
+      "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+      "source_dataset": "valuation",
+      "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+      "unit": "ratio",
+      "value": "5.58"
+    },
+    {
+      "capture_id": "6d5f112f3e542a1e3ee1c42b1bd07f6264f3227ec30c976f209ecfe81f603c43",
+      "condition": "dividend_yield_min_pct",
+      "data_period": "2026-10-02",
+      "instrument_id": "TPEX:5347",
+      "payload_sha256": "7f240782db047dcf23efe19fc7648a4c200956635083716961e8e9c7d59ac2a2",
+      "presence": "present",
+      "receipt_binds_content_version": true,
+      "revision": 1,
+      "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+      "source_dataset": "valuation",
+      "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+      "unit": "percent",
+      "value": "2.39"
+    },
+    {
+      "condition": "pe_max",
+      "data_period": "2026-10-05",
+      "instrument_id": "TPEX:5347",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "missing",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TPEX)",
+      "source_dataset": "valuation",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "condition": "pb_max",
+      "data_period": "2026-10-05",
+      "instrument_id": "TPEX:5347",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "missing",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TPEX)",
+      "source_dataset": "valuation",
+      "unit": "ratio",
+      "value": null
+    },
+    {
+      "condition": "dividend_yield_min_pct",
+      "data_period": "2026-10-05",
+      "instrument_id": "TPEX:5347",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "missing",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/valuations (TPEX)",
+      "source_dataset": "valuation",
+      "unit": "percent",
+      "value": null
+    },
+    {
+      "condition": "revenue_yoy_min_pct",
+      "data_period": "2026-07",
+      "instrument_id": "TWSE:2330",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "missing",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/monthly-revenues",
+      "source_dataset": "monthly_revenue",
+      "unit": "percent",
+      "value": null
+    },
+    {
+      "capture_id": "a11776c6e5f83608d4c46920f4b65094b9969da697f877ec8ee9c71c241e12d6",
+      "condition": "revenue_yoy_min_pct",
+      "content_hash": "584e6c8b01bf69035d0807eea6dce36ebc04c4e09a7e2ff7b95c74bdad1f8dda",
+      "data_period": "2026-08",
+      "instrument_id": "TWSE:2330",
+      "payload_sha256": "779e4edca1dbbc3cf256b8ada92f39fa600625509e9bf2da067b86a4c21c3357",
+      "presence": "present",
+      "receipt_binds_content_version": true,
+      "revision": 1,
+      "source_contract": "mops_t21_sii_monthly_revenue/v1",
+      "source_dataset": "monthly_revenue",
+      "source_received_at_utc": "2026-10-04T13:09:22.189587Z",
+      "unit": "percent",
+      "value": "53.320053714712955"
+    },
+    {
+      "condition": "revenue_yoy_min_pct",
+      "data_period": "2026-07",
+      "instrument_id": "TPEX:5347",
+      "local_snapshot_at_utc": "2026-10-06T23:57:48+08:00",
+      "presence": "missing",
+      "snapshot_sha256": "bfb10679a9b0ae9ff5a8644eefeac0ab6f8c7c55499a4f4d0f858f321c46dcd1",
+      "source_contract": "GET /api/v1/monthly-revenues",
+      "source_dataset": "monthly_revenue",
+      "unit": "percent",
+      "value": null
+    },
+    {
+      "capture_id": "b8334dea9e3b160402e0d6ff9438a69a624807217945fcd8d5c9c212e1a691c9",
+      "condition": "revenue_yoy_min_pct",
+      "content_hash": "97c9e2e67ed8e62eea6bfc9cfbc1744c04f899488e2019fd26aa681101b37e54",
+      "data_period": "2026-08",
+      "instrument_id": "TPEX:5347",
+      "payload_sha256": "f00e3fdd7060db0db943b79dc53d732df940d038ef208a1b075363e06660bd92",
+      "presence": "present",
+      "receipt_binds_content_version": true,
+      "revision": 1,
+      "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+      "source_dataset": "monthly_revenue",
+      "source_received_at_utc": "2026-10-04T13:09:19.479749Z",
+      "unit": "percent",
+      "value": "40.47646040957919"
+    }
+  ],
+  "schema_version": "panwatch.pw13.checked-evidence-inventory.v1"
+}

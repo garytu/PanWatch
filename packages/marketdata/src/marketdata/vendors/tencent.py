@@ -1,4 +1,4 @@
-"""腾讯行情 vendor(HTTP,GBK)。移植自 akshare_collector._parse_tencent_line/_fetch_tencent_quotes。"""
+"""騰訊行情 vendor(HTTP,GBK)。移植自 akshare_collector._parse_tencent_line/_fetch_tencent_quotes。"""
 
 from __future__ import annotations
 
@@ -73,12 +73,12 @@ def _parse_line(line: str, market: str) -> Quote | None:
             total_market_value=total,
         )
     except (ValueError, IndexError) as e:
-        logger.debug(f"解析腾讯行情失败: {e}")
+        logger.debug(f"解析騰訊行情失敗: {e}")
         return None
 
 
 def _fetch_lines(tencent_symbols: list[str]) -> list[str]:
-    """按原始腾讯符号批量拉取响应,GBK 解码后按 ';' 切分为行。tencent quote / index 共用取数核。"""
+    """按原始騰訊符號批次拉取回應,GBK 解碼後按 ';' 切分為行。tencent quote / index 共用取數核。"""
     if not tencent_symbols:
         return []
     codes = ",".join(tencent_symbols)
@@ -89,7 +89,7 @@ def _fetch_lines(tencent_symbols: list[str]) -> list[str]:
         timeout=10,
         retries=2,
         parse="content",
-        log_label="腾讯报价",
+        log_label="騰訊報價",
     )
     if not content:
         return []
@@ -98,9 +98,9 @@ def _fetch_lines(tencent_symbols: list[str]) -> list[str]:
 
 
 def fetch_raw(tencent_symbols: list[str]) -> list[dict]:
-    """按原始腾讯符号(sh000001/hkHSI/usDJI…)取行情,不经 Symbol.parse。
+    """按原始騰訊符號(sh000001/hkHSI/usDJI…)取行情,不經 Symbol.parse。
 
-    供指数等显式符号场景复用(指数代码与个股代码可能撞号,如 000001 既是平安银行又是上证指数)。
+    供指數等顯式符號場景複用(指數程式碼與個股程式碼可能撞號,如 000001 既是平安銀行又是上證指數)。
     返回 dict 列表:symbol/name/current_price/change_pct/change_amount/prev_close/volume/turnover。
     """
     out: list[dict] = []

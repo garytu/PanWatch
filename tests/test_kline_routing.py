@@ -3,7 +3,7 @@ from src.platform.marketdata.models import MarketCode
 
 
 def test_fetch_all_sources_uses_marketdata(monkeypatch):
-    """_fetch_all_sources 应走 md.klines 并转成 KlineData。"""
+    """_fetch_all_sources 應走 md.klines 並轉成 KlineData。"""
     from marketdata.types import Bar
 
     class _MD:

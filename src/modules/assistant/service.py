@@ -184,7 +184,7 @@ class AssistantService:
                 .first()
             )
             if model is None:
-                raise ValueError("压缩模型不存在")
+                raise ValueError("壓縮模型不存在")
 
         values = command.model_dump()
         values["compression_model_id"] = (
@@ -281,11 +281,11 @@ class AssistantService:
         findings = self._repository.list_recent_tool_findings(conversation_id)
         if findings:
             lines = [
-                "可信工具执行记录（只以这些记录作为工具已执行的证据；历史助手文本的完成声明不作为工具证据）："
+                "可信工具執行記錄（只以這些記錄作為工具已執行的證據；歷史助手文本的完成宣告不作為工具證據）："
             ]
             for finding in reversed(findings):
                 lines.append(f"- {finding.tool_name}: {finding.summary}")
-            lines.append("如果当前请求要求继续执行操作，必须重新调用工具并等待成功结果。")
+            lines.append("如果當前請求要求繼續執行操作，必須重新呼叫工具並等待成功結果。")
             messages.append(ModelMessage(role="system", content="\n".join(lines)))
         return messages
 
@@ -339,16 +339,16 @@ class AssistantService:
             decided_by="local",
         )
         if approval is None:
-            raise AssistantNotFoundError("审批不存在")
+            raise AssistantNotFoundError("審批不存在")
         if not accepted:
             if approval.status == "pending" and self._is_expired(approval.expires_at):
-                raise AssistantApprovalExpiredError("审批已过期")
-            raise AssistantApprovalConflictError("审批已处理")
+                raise AssistantApprovalExpiredError("審批已過期")
+            raise AssistantApprovalConflictError("審批已處理")
 
         task = self._repository.get_task_run(approval.task_run_id)
         checkpoint = self._repository.get_task_checkpoint(task.id)
         if checkpoint is None:
-            raise AssistantApprovalConflictError("审批任务没有可恢复检查点")
+            raise AssistantApprovalConflictError("審批任務沒有可恢復檢查點")
         approvals = self._repository.list_task_approvals(task.id)
         expected_ids = {pending.call_id for pending in checkpoint.pending_approvals}
         decisions = {
@@ -357,7 +357,7 @@ class AssistantService:
             if row.call_id in expected_ids and row.status in {"approved", "rejected"}
         }
         if not decisions:
-            raise AssistantApprovalConflictError("审批批次没有可执行的决定")
+            raise AssistantApprovalConflictError("審批批次沒有可執行的決定")
         return AssistantApprovalResolution(
             task=task, checkpoint=checkpoint, decisions=decisions
         )
@@ -453,13 +453,13 @@ class AssistantService:
                 ).registered_tools()
             }
             if selector_value not in registered:
-                raise ValueError("未知工具必须携带风险类别")
+                raise ValueError("未知工具必須攜帶風險類別")
             resolved_risk = registered[selector_value].risk
         elif selector_kind != "tool":
-            raise ValueError("不支持的权限选择器")
+            raise ValueError("不支援的權限選擇器")
 
         if resolved_risk is ToolRisk.DESTRUCTIVE and mode is not PermissionMode.DENY:
-            raise ValueError("破坏性工具只能设为禁止")
+            raise ValueError("破壞性工具只能設為禁止")
         self._repository.upsert_tool_permission(
             "local", selector_kind, selector_value, mode
         )
@@ -685,39 +685,39 @@ class AssistantService:
                     display_price = str(arguments["target_price"])
                 if "direction" in arguments:
                     direction = "≥" if arguments.get("direction") == "above" else "≤"
-                    changes.append(f"目标价 {direction} {display_price}")
+                    changes.append(f"目標價 {direction} {display_price}")
                 else:
-                    changes.append(f"目标价改为 {display_price}（方向保持不变）")
+                    changes.append(f"目標價改為 {display_price}（方向保持不變）")
             elif "direction" in arguments:
                 direction = "≥" if arguments.get("direction") == "above" else "≤"
-                changes.append(f"方向改为 {direction}")
+                changes.append(f"方向改為 {direction}")
             if "enabled" in arguments:
-                changes.append("启用" if arguments["enabled"] else "停用")
+                changes.append("啟用" if arguments["enabled"] else "停用")
             if "name" in arguments:
-                changes.append(f"名称改为 {arguments['name']}")
+                changes.append(f"名稱改為 {arguments['name']}")
             if "cooldown_minutes" in arguments:
-                changes.append(f"冷却 {arguments['cooldown_minutes']} 分钟")
+                changes.append(f"冷卻 {arguments['cooldown_minutes']} 分鐘")
             if "max_triggers_per_day" in arguments:
-                changes.append(f"每日最多触发 {arguments['max_triggers_per_day']} 次")
+                changes.append(f"每日最多觸發 {arguments['max_triggers_per_day']} 次")
             if "repeat_mode" in arguments:
-                changes.append(f"重复模式改为 {arguments['repeat_mode']}")
-            summary = "；".join(changes) or "更新规则"
+                changes.append(f"重複模式改為 {arguments['repeat_mode']}")
+            summary = "；".join(changes) or "更新規則"
             return {
-                "tool_title": "修改价格提醒",
-                "summary": f"修改价格提醒 #{rule_id}：{summary}。",
+                "tool_title": "修改價格提醒",
+                "summary": f"修改價格提醒 #{rule_id}：{summary}。",
             }
 
         if pending.tool_name == "delete_price_alert":
             rule_id = arguments.get("rule_id", "?")
             return {
-                "tool_title": "删除价格提醒",
-                "summary": f"删除价格提醒 #{rule_id} 及其历史命中记录。",
+                "tool_title": "刪除價格提醒",
+                "summary": f"刪除價格提醒 #{rule_id} 及其歷史命中記錄。",
             }
 
         if pending.tool_name != "create_price_alert":
             return {
-                "tool_title": "需要授权的操作",
-                "summary": f"将调用 {pending.tool_name}。",
+                "tool_title": "需要授權的操作",
+                "summary": f"將呼叫 {pending.tool_name}。",
             }
 
         market = str(arguments.get("market") or "CN").upper()
@@ -728,16 +728,16 @@ class AssistantService:
         try:
             display_price = f"{float(target_price):g}"
         except (TypeError, ValueError):
-            display_price = str(target_price or "未知价格")
+            display_price = str(target_price or "未知價格")
         try:
             display_cooldown = f"{int(cooldown_minutes)}"
         except (TypeError, ValueError):
             display_cooldown = "30"
         return {
-            "tool_title": "创建价格提醒",
+            "tool_title": "建立價格提醒",
             "summary": (
-                f"为 {market}:{symbol} 创建价格 {direction} {display_price} 的盘中提醒，"
-                f"冷却 {display_cooldown} 分钟。"
+                f"為 {market}:{symbol} 建立價格 {direction} {display_price} 的盤中提醒，"
+                f"冷卻 {display_cooldown} 分鐘。"
             ),
         }
 
@@ -758,7 +758,7 @@ class AssistantService:
     def _require_conversation(self, conversation_id: int):
         conversation = self._repository.get_conversation(conversation_id)
         if not conversation:
-            raise AssistantNotFoundError("对话不存在")
+            raise AssistantNotFoundError("對話不存在")
         return conversation
 
     @staticmethod

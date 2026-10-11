@@ -1,6 +1,8 @@
 import logging
 from dataclasses import dataclass
 
+from marketdata.types import TaiwanDiscoveryPool
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,6 +15,18 @@ class HotStock:
     change_pct: float | None
     turnover: float | None
     volume: float | None
+    price_kind: str | None = None
+    trade_date: str | None = None
+    freshness: dict | None = None
+    provider: str | None = None
+    adjustment_mode: str | None = None
+    change_basis: str | None = None
+    units: dict | None = None
+    availability: dict | None = None
+    instrument_id: str | None = None
+    venue: str | None = None
+    security_type: str | None = None
+    is_active: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -25,14 +39,14 @@ class HotBoard:
 
 
 def get_market_data():
-    """惰性导入,避免模块加载时的循环依赖(便于测试 monkeypatch)。"""
+    """惰性匯入,避免模組載入時的迴圈依賴(便於測試 monkeypatch)。"""
     from src.platform.marketdata.marketdata_client import get_market_data as _g
 
     return _g()
 
 
 class EastMoneyDiscoveryCollector:
-    """Discovery ranks (CN/HK/US),经 marketdata 包统一取数。"""
+    """Discovery ranks (CN/HK/US),經 marketdata 包統一取數。"""
 
     def __init__(self, *, proxy: str | None = None):
         self.proxy = proxy
@@ -62,9 +76,39 @@ class EastMoneyDiscoveryCollector:
                 change_pct=it.change_pct,
                 turnover=it.turnover,
                 volume=it.volume,
+                price_kind=getattr(it, "price_kind", None),
+                trade_date=getattr(it, "trade_date", None),
+                freshness=getattr(it, "freshness", None),
+                provider=getattr(it, "provider", None),
+                adjustment_mode=getattr(it, "adjustment_mode", None),
+                change_basis=getattr(it, "change_basis", None),
+                units=getattr(it, "units", None),
+                availability=getattr(it, "availability", None),
+                instrument_id=getattr(it, "instrument_id", None),
+                venue=getattr(it, "venue", None),
+                security_type=getattr(it, "security_type", None),
+                is_active=getattr(it, "is_active", None),
             )
             for it in pkg_items
         ]
+
+    async def fetch_taiwan_discovery(
+        self,
+        *,
+        mode: str = "turnover",
+        limit: int = 20,
+    ) -> TaiwanDiscoveryPool:
+        """Return the existing bounded TW scan with its captured stage authority."""
+        import asyncio as _aio
+
+        return await _aio.to_thread(
+            get_market_data().taiwan_discovery_pool,
+            mode=mode,
+            limit=limit,
+            # The strategy caller historically used hot_stocks(), which ranks the
+            # full eligible catalog before applying this same top-N limit.
+            max_universe_size=None,
+        )
 
     async def fetch_hot_boards(
         self,
@@ -118,6 +162,14 @@ class EastMoneyDiscoveryCollector:
                 change_pct=it.change_pct,
                 turnover=it.turnover,
                 volume=it.volume,
+                price_kind=getattr(it, "price_kind", None),
+                trade_date=getattr(it, "trade_date", None),
+                freshness=getattr(it, "freshness", None),
+                provider=getattr(it, "provider", None),
+                adjustment_mode=getattr(it, "adjustment_mode", None),
+                change_basis=getattr(it, "change_basis", None),
+                units=getattr(it, "units", None),
+                availability=getattr(it, "availability", None),
             )
             for it in pkg_items
         ]

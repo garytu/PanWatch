@@ -1,12 +1,12 @@
-"""TradingAgents toolkit 并发数据隔离回归测试。
+"""TradingAgents toolkit 併發資料隔離迴歸測試。
 
-根因 bug:_PANWATCH_DATA_CACHE 曾是模块级全局 dict,两只标的并发深度分析时
-(asyncio.to_thread worker 线程)互相覆盖 —— 广汽 601238 的报告混入赛力斯 601127
-的 K线/价格。改成 ContextVar 后,每个并发任务(copy_context)拿独立副本,互不串台。
+根因 bug:_PANWATCH_DATA_CACHE 曾是模組級全域性 dict,兩隻標的併發深度分析時
+(asyncio.to_thread worker 執行緒)互相覆蓋 —— 廣汽 601238 的報告混入賽力斯 601127
+的 K線/價格。改成 ContextVar 後,每個併發任務(copy_context)拿獨立副本,互不串臺。
 
-本测试用 contextvars.copy_context() 模拟两个并发任务,直接复现并验证修复。
-注意:只测 _serve_from_panwatch / _stock_meta_header 的直接路径,不经过
-_patched_route_to_vendor(避免触发 _emit_toolkit_log → log_context/DB)。
+本測試用 contextvars.copy_context() 模擬兩個併發任務,直接復現並驗證修復。
+注意:只測 _serve_from_panwatch / _stock_meta_header 的直接路徑,不經過
+_patched_route_to_vendor(避免觸發 _emit_toolkit_log → log_context/DB)。
 """
 
 from __future__ import annotations
@@ -33,92 +33,92 @@ def _data(symbol: str, name: str, close: float):
     }
 
 
-GAC = _data("601238", "广汽集团", 9.50)        # 广汽
-SERES = _data("601127", "赛力斯", 83.26)        # 赛力斯
+GAC = _data("601238", "廣汽集團", 9.50)        # 廣汽
+SERES = _data("601127", "賽力斯", 83.26)        # 賽力斯
 
 
 def test_stock_meta_header_uses_current_context():
-    """_stock_meta_header 读当前 context 的 stock,而非进程全局。"""
+    """_stock_meta_header 讀當前 context 的 stock,而非程式全域性。"""
     def _run():
         with ta.panwatch_data_context(GAC):
             return ta._stock_meta_header("601238")
     header = contextvars.copy_context().run(_run)
-    assert "广汽集团" in header
-    assert "赛力斯" not in header
+    assert "廣汽集團" in header
+    assert "賽力斯" not in header
     assert "9.50" in header
 
 
 def test_two_concurrent_contexts_do_not_cross_talk():
-    """复现生产 bug:任务A(广汽)运行中,任务B(赛力斯)注入数据,
-    A 后续工具调用必须仍读到广汽 —— 旧的全局 dict 实现这里会串成赛力斯。"""
+    """復現生產 bug:任務A(廣汽)執行中,任務B(賽力斯)注入資料,
+    A 後續工具呼叫必須仍讀到廣汽 —— 舊的全域性 dict 實現這裡會串成賽力斯。"""
     ctx_a = contextvars.copy_context()
     ctx_b = contextvars.copy_context()
 
-    # A 先进入 context(模拟 worker A 开始,数据已注入但还没跑完工具)
+    # A 先進入 context(模擬 worker A 開始,資料已注入但還沒跑完工具)
     ctx_a.run(lambda: ta._PANWATCH_DATA.set(dict(GAC)))
-    # B 随后进入 context(并发任务 B 启动)—— 旧实现此处会覆盖全局
+    # B 隨後進入 context(併發任務 B 啟動)—— 舊實現此處會覆蓋全域性
     ctx_b.run(lambda: ta._PANWATCH_DATA.set(dict(SERES)))
 
-    # A 继续跑工具调用:get_stock_data(601238) 必须返回广汽 K线/价格
+    # A 繼續跑工具呼叫:get_stock_data(601238) 必須返回廣汽 K線/價格
     out_a = ctx_a.run(lambda: ta._serve_from_panwatch("get_stock_data", "601238", {}, args=("601238",)))
     out_b = ctx_b.run(lambda: ta._serve_from_panwatch("get_stock_data", "601127", {}, args=("601127",)))
 
-    assert "广汽集团" in out_a and "赛力斯" not in out_a
-    assert "9.5" in out_a            # 广汽收盘价
-    assert "83.26" not in out_a      # 不含赛力斯价格
+    assert "廣汽集團" in out_a and "賽力斯" not in out_a
+    assert "9.5" in out_a            # 廣汽收盤價
+    assert "83.26" not in out_a      # 不含賽力斯價格
 
-    assert "赛力斯" in out_b and "广汽集团" not in out_b
+    assert "賽力斯" in out_b and "廣汽集團" not in out_b
 
 
 def test_context_restored_after_exit():
-    """panwatch_data_context 退出后,当前 context 的数据还原为空。"""
+    """panwatch_data_context 退出後,當前 context 的資料還原為空。"""
     def _run():
         assert ta._cache() == {}
         with ta.panwatch_data_context(SERES):
             assert ta._cache().get("stock").symbol == "601127"
-        # 退出后还原
+        # 退出後還原
         return ta._cache()
     assert contextvars.copy_context().run(_run) == {}
 
 
 def test_nested_contexts_restore_outer():
-    """嵌套 context:内层退出后外层数据恢复(token reset 语义)。"""
+    """巢狀 context:內層退出後外層資料恢復(token reset 語義)。"""
     def _run():
         with ta.panwatch_data_context(GAC):
             assert ta._cache().get("stock").symbol == "601238"
             with ta.panwatch_data_context(SERES):
                 assert ta._cache().get("stock").symbol == "601127"
-            # 内层退出,外层广汽恢复
+            # 內層退出,外層廣汽恢復
             assert ta._cache().get("stock").symbol == "601238"
     contextvars.copy_context().run(_run)
 
 
 # ---------------------------------------------------------------------------
-# 行业/主题新闻关键词搜索(B 功能:get_news 非 ticker 词 → 实时搜中文新闻)
+# 行業/主題新聞關鍵詞搜尋(B 功能:get_news 非 ticker 詞 → 即時搜中文新聞)
 # ---------------------------------------------------------------------------
 
 def test_keyword_news_formats():
-    """行业/主题词搜中文新闻:格式化含关键词 + 标题"""
+    """行業/主題詞搜中文新聞:格式化含關鍵詞 + 標題"""
     from unittest.mock import patch
     from datetime import datetime
     from src.platform.marketdata.collectors.news_collector import NewsItem
 
     def fake(kw):
-        return [NewsItem(source="em", external_id="1", title=f"{kw}动态", content="", publish_time=datetime(2026, 5, 30))]
+        return [NewsItem(source="em", external_id="1", title=f"{kw}動態", content="", publish_time=datetime(2026, 5, 30))]
     with patch("src.platform.marketdata.marketdata_client.md_news_by_keyword", fake):
-        r = ta._serve_keyword_news("汽车行业")
-    assert "汽车行业" in r and "动态" in r
+        r = ta._serve_keyword_news("汽車行業")
+    assert "汽車行業" in r and "動態" in r
 
 
 def test_keyword_news_empty_warns_no_fabrication():
-    """搜不到行业新闻时返回防编造提示(避免 LLM 凭空编)"""
+    """搜不到行業新聞時返回防編造提示(避免 LLM 憑空編)"""
     from unittest.mock import patch
 
     def fake_empty(kw):
         return []
     with patch("src.platform.marketdata.marketdata_client.md_news_by_keyword", fake_empty):
-        r = ta._serve_keyword_news("某冷门主题")
-    assert "未搜到" in r and "不要编造" in r
+        r = ta._serve_keyword_news("某冷門主題")
+    assert "未搜到" in r and "不要編造" in r
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@ describe('AssistantPermissionsDrawer', () => {
         { risk: 'destructive' as const, mode: 'deny' as const },
       ],
       tools: [
-        { name: 'get_portfolio', title: '查询持仓', risk: 'read' as const, mode: 'allow' as const, confirmation_required: false },
+        { name: 'get_portfolio', title: '查詢持倉', risk: 'read' as const, mode: 'allow' as const, confirmation_required: false },
       ],
     }
     getAgentPermissions.mockResolvedValue(permissions)
@@ -44,8 +44,8 @@ describe('AssistantPermissionsDrawer', () => {
 
     render(<AssistantPermissionsDrawer open onOpenChange={vi.fn()} />)
 
-    await screen.findByLabelText('查询持仓')
-    fireEvent.change(screen.getByLabelText('查询持仓'), { target: { value: 'ask' } })
+    await screen.findByLabelText('查詢持倉')
+    fireEvent.change(screen.getByLabelText('查詢持倉'), { target: { value: 'ask' } })
 
     await waitFor(() => expect(updateAgentPermission).toHaveBeenCalledWith({
       selector_kind: 'tool',

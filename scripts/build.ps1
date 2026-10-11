@@ -27,10 +27,10 @@ $fullImage = "${imageName}:$Version"
 
 Push-Location $projectRoot
 try {
-    Write-Host "🚀 PanWatch 构建脚本"
+    Write-Host "🚀 PanWatch 構建指令碼"
     Write-Host "版本: $Version"
 
-    Write-Host "📦 构建前端..."
+    Write-Host "📦 構建前端..."
     Push-Location "frontend"
     try {
         Invoke-CheckedCommand "pnpm" @("install", "--frozen-lockfile")
@@ -40,20 +40,20 @@ try {
         Pop-Location
     }
 
-    Write-Host "📁 复制静态文件..."
+    Write-Host "📁 複製靜態檔案..."
     Remove-Item -LiteralPath $staticDirectory -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $staticDirectory | Out-Null
     Copy-Item -Path (Join-Path $projectRoot "frontend\dist\*") -Destination $staticDirectory -Recurse -Force
 
-    Write-Host "🐳 构建 Docker 镜像 (linux/amd64)..."
+    Write-Host "🐳 構建 Docker 映象 (linux/amd64)..."
     Invoke-CheckedCommand "docker" @("build", "--platform", "linux/amd64", "--build-arg", "VERSION=$Version", "-t", $fullImage, ".")
 
     if ($Version -ne "latest") {
         Invoke-CheckedCommand "docker" @("tag", $fullImage, "${imageName}:latest")
-        Write-Host "✅ 镜像已构建: $fullImage 和 ${imageName}:latest"
+        Write-Host "✅ 映象已構建: $fullImage 和 ${imageName}:latest"
     }
     else {
-        Write-Host "✅ 镜像已构建: $fullImage"
+        Write-Host "✅ 映象已構建: $fullImage"
     }
 }
 finally {

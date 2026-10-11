@@ -1,6 +1,6 @@
 import { fetchAPI } from './client'
 
-/** 个人访问令牌(PAT)—— MCP 端点专用凭据 */
+/** 個人訪問令牌(PAT)—— MCP 端點專用憑據 */
 export interface PatItem {
   id: number
   name: string
@@ -13,7 +13,7 @@ export interface PatItem {
   revoked: boolean
 }
 
-/** 创建响应:额外带一次性明文 token */
+/** 建立回應:額外帶一次性明文 token */
 export interface PatCreated extends PatItem {
   token: string
 }
@@ -21,7 +21,7 @@ export interface PatCreated extends PatItem {
 export interface CreatePatBody {
   name?: string
   scopes?: string[]
-  /** 过期天数;null = 永不过期 */
+  /** 過期天數;null = 永不過期 */
   expires_in_days?: number | null
 }
 

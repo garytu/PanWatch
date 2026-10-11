@@ -25,8 +25,8 @@ from pan_agent import (
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
-# 助手表由共享持久化平台注册；repository 是其唯一的模块内访问边界，
-# 不需要再经由一个只做 re-export 的 ``assistant.models`` 转发层。
+# 助手錶由共享持久化平臺註冊；repository 是其唯一的模組內訪問邊界，
+# 不需要再經由一個只做 re-export 的 ``assistant.models`` 轉發層。
 from src.platform.persistence.models import (
     AssistantContextSnapshot,
     AssistantTaskEvent,
@@ -703,7 +703,7 @@ class AssistantRepository:
     ) -> ToolPermissionDecision:
         """Apply exact-tool overrides, risk defaults and non-bypassable floors."""
         if tool.risk is ToolRisk.DESTRUCTIVE:
-            return ToolPermissionDecision.deny("破坏性工具默认禁止")
+            return ToolPermissionDecision.deny("破壞性工具預設禁止")
 
         decisions = snapshot if snapshot is not None else self.permission_snapshot(principal_scope)
         mode = decisions.get(("tool", tool.name))
@@ -711,7 +711,7 @@ class AssistantRepository:
             mode = decisions.get(("risk", tool.risk.value), self._default_permission_mode(tool.risk))
 
         if tool.confirmation_required and mode is PermissionMode.ALLOW:
-            return ToolPermissionDecision.ask("该工具需要逐次确认")
+            return ToolPermissionDecision.ask("該工具需要逐次確認")
         return ToolPermissionDecision(mode=mode)
 
     def finish_task(
@@ -864,7 +864,7 @@ class AssistantRepository:
     def _require_task(self, task_run_id: int) -> AssistantTaskRun:
         task = self._session.query(AssistantTaskRun).filter(AssistantTaskRun.id == task_run_id).first()
         if task is None:
-            raise LookupError("助手任务不存在")
+            raise LookupError("助手任務不存在")
         return task
 
     @staticmethod

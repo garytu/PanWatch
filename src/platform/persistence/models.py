@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -18,12 +19,12 @@ from src.platform.persistence.database import Base
 
 
 class AIService(Base):
-    """AI 服务商（base_url + api_key）"""
+    """AI 服務商（base_url + api_key）"""
 
     __tablename__ = "ai_services"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # "OpenAI", "智谱", "DeepSeek"
+    name = Column(String, nullable=False)  # "OpenAI", "智譜", "DeepSeek"
     base_url = Column(String, nullable=False)
     api_key = Column(String, default="")
     created_at = Column(DateTime, server_default=func.now())
@@ -34,16 +35,16 @@ class AIService(Base):
 
 
 class AIModel(Base):
-    """AI 模型（属于某个服务商）"""
+    """AI 模型（屬於某個服務商）"""
 
     __tablename__ = "ai_models"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # 显示名，如 "GLM-4-Flash"
+    name = Column(String, nullable=False)  # 顯示名，如 "GLM-4-Flash"
     service_id = Column(
         Integer, ForeignKey("ai_services.id", ondelete="CASCADE"), nullable=False
     )
-    model = Column(String, nullable=False)  # 实际模型标识，如 "glm-4-flash"
+    model = Column(String, nullable=False)  # 實際模型標識，如 "glm-4-flash"
     is_default = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
@@ -63,13 +64,13 @@ class NotifyChannel(Base):
 
 
 class Account(Base):
-    """交易账户"""
+    """交易帳戶"""
 
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # 账户名称，如 "招商证券"、"华泰证券"
-    available_funds = Column(Float, default=0)  # 可用资金
+    name = Column(String, nullable=False)  # 帳戶名稱，如 "招商證券"、"華泰證券"
+    available_funds = Column(Float, default=0)  # 可用資金
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -86,7 +87,7 @@ class Stock(Base):
     symbol = Column(String, nullable=False)
     name = Column(String, nullable=False)
     market = Column(String, nullable=False)  # CN / HK / US
-    # 以下字段已废弃，持仓信息移至 Position 表
+    # 以下欄位已廢棄，持倉資訊移至 Position 表
     cost_price = Column(Float, nullable=True)
     quantity = Column(Integer, nullable=True)
     invested_amount = Column(Float, nullable=True)
@@ -103,7 +104,7 @@ class Stock(Base):
 
 
 class Position(Base):
-    """持仓记录（多账户多股票）"""
+    """持倉記錄（多帳戶多股票）"""
 
     __tablename__ = "positions"
     __table_args__ = (
@@ -117,13 +118,13 @@ class Position(Base):
     stock_id = Column(
         Integer, ForeignKey("stocks.id", ondelete="CASCADE"), nullable=False
     )
-    cost_price = Column(Float, nullable=False)  # 成本价
-    quantity = Column(Integer, nullable=False)  # 持仓数量
-    invested_amount = Column(Float, nullable=True)  # 投入资金（用于盘中监控）
+    cost_price = Column(Float, nullable=False)  # 成本價
+    quantity = Column(Integer, nullable=False)  # 持倉數量
+    invested_amount = Column(Float, nullable=True)  # 投入資金（用於盤中監控）
     sort_order = Column(Integer, default=0)
     trading_style = Column(
         String, default="swing"
-    )  # short: 短线, swing: 波段, long: 长线
+    )  # short: 短線, swing: 波段, long: 長線
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -132,7 +133,7 @@ class Position(Base):
 
 
 class StockAgent(Base):
-    """多对多: 每只股票可被多个 Agent 监控"""
+    """多對多: 每隻股票可被多個 Agent 監控"""
 
     __tablename__ = "stock_agents"
     __table_args__ = (
@@ -168,7 +169,7 @@ class AgentConfig(Base):
     display_order = Column(Integer, default=0)
     enabled = Column(Boolean, default=True)
     schedule = Column(String, default="")
-    # 执行模式: batch=批量(多只股票一起分析发送) / single=单只(逐只分析发送，实时性高)
+    # 執行模式: batch=批次(多隻股票一起分析傳送) / single=單隻(逐只分析傳送，即時性高)
     execution_mode = Column(String, default="batch")
     ai_model_id = Column(
         Integer, ForeignKey("ai_models.id", ondelete="SET NULL"), nullable=True
@@ -230,26 +231,26 @@ class AppSettings(Base):
 
 
 class DataSource(Base):
-    """数据源配置（新闻、K线图、行情）"""
+    """資料來源配置（新聞、K線圖、行情）"""
 
     __tablename__ = "data_sources"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)  # "雪球资讯"
+    name = Column(String, nullable=False)  # "雪球資訊"
     type = Column(
         String, nullable=False
     )  # "news" / "chart" / "quote" / "kline" / "capital_flow"
     provider = Column(String, nullable=False)  # "xueqiu" / "eastmoney" / "tencent"
-    config = Column(JSON, default={})  # 配置参数
+    config = Column(JSON, default={})  # 配置引數
     enabled = Column(Boolean, default=True)
-    priority = Column(Integer, default=0)  # 越小优先级越高
-    supports_batch = Column(Boolean, default=False)  # 是否支持批量查询
-    test_symbols = Column(JSON, default=[])  # 测试用股票代码列表
+    priority = Column(Integer, default=0)  # 越小優先順序越高
+    supports_batch = Column(Boolean, default=False)  # 是否支援批次查詢
+    test_symbols = Column(JSON, default=[])  # 測試用股票程式碼列表
     created_at = Column(DateTime, server_default=func.now())
 
 
 class NewsCache(Base):
-    """新闻缓存（用于去重）"""
+    """新聞快取（用於去重）"""
 
     __tablename__ = "news_cache"
     __table_args__ = (
@@ -258,17 +259,17 @@ class NewsCache(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(String, nullable=False)  # "cls" / "eastmoney"
-    external_id = Column(String, nullable=False)  # 来源侧 ID
+    external_id = Column(String, nullable=False)  # 來源側 ID
     title = Column(String, nullable=False)
     content = Column(String, default="")
     publish_time = Column(DateTime, nullable=False)
-    symbols = Column(JSON, default=[])  # 关联股票代码列表
+    symbols = Column(JSON, default=[])  # 關聯股票程式碼列表
     importance = Column(Integer, default=0)  # 0-3 重要性
     created_at = Column(DateTime, server_default=func.now())
 
 
 class NotifyThrottle(Base):
-    """通知节流记录（防止同一股票短时间内重复通知）"""
+    """通知節流記錄（防止同一股票短時間內重複通知）"""
 
     __tablename__ = "notify_throttle"
     __table_args__ = (
@@ -279,11 +280,11 @@ class NotifyThrottle(Base):
     agent_name = Column(String, nullable=False)
     stock_symbol = Column(String, nullable=False)
     last_notify_at = Column(DateTime, nullable=False)
-    notify_count = Column(Integer, default=1)  # 当日通知次数
+    notify_count = Column(Integer, default=1)  # 當日通知次數
 
 
 class AnalysisHistory(Base):
-    """分析历史记录（盘后分析、盘前分析等）"""
+    """分析歷史記錄（盤後分析、盤前分析等）"""
 
     __tablename__ = "analysis_history"
     __table_args__ = (
@@ -294,18 +295,18 @@ class AnalysisHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     agent_name = Column(String, nullable=False)  # "daily_report" / "premarket_outlook"
-    stock_symbol = Column(String, nullable=False)  # 股票代码，"*" 表示全部
+    stock_symbol = Column(String, nullable=False)  # 股票程式碼，"*" 表示全部
     analysis_date = Column(String, nullable=False)  # 分析日期 "YYYY-MM-DD"
-    title = Column(String, default="")  # 分析标题
-    content = Column(String, nullable=False)  # AI 分析结果
-    raw_data = Column(JSON, default={})  # 原始数据快照
+    title = Column(String, default="")  # 分析標題
+    content = Column(String, nullable=False)  # AI 分析結果
+    raw_data = Column(JSON, default={})  # 原始資料快照
     agent_kind_snapshot = Column(String, default="workflow")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class StockContextSnapshot(Base):
-    """按股票/日期保存结构化上下文快照（用于跨天记忆）"""
+    """按股票/日期儲存結構化上下文快照（用於跨天記憶）"""
 
     __tablename__ = "stock_context_snapshots"
     __table_args__ = (
@@ -335,7 +336,7 @@ class StockContextSnapshot(Base):
 
 
 class NewsTopicSnapshot(Base):
-    """新闻主题快照（按日期和窗口聚合）"""
+    """新聞主題快照（按日期和視窗聚合）"""
 
     __tablename__ = "news_topic_snapshots"
     __table_args__ = (
@@ -359,7 +360,7 @@ class NewsTopicSnapshot(Base):
 
 
 class AgentContextRun(Base):
-    """每次 Agent 执行时使用的上下文摘要"""
+    """每次 Agent 執行時使用的上下文摘要"""
 
     __tablename__ = "agent_context_runs"
     __table_args__ = (
@@ -377,7 +378,7 @@ class AgentContextRun(Base):
 
 
 class AgentPredictionOutcome(Base):
-    """建议后验评估记录（用于回放与效果统计）"""
+    """建議後驗評估記錄（用於回放與效果統計）"""
 
     __tablename__ = "agent_prediction_outcomes"
     __table_args__ = (
@@ -397,12 +398,12 @@ class AgentPredictionOutcome(Base):
     stock_market = Column(String, nullable=False, default="CN")
     prediction_date = Column(String, nullable=False)  # YYYY-MM-DD
     horizon_days = Column(Integer, nullable=False, default=1)  # 1/5/10...
-    # 同一次建议的各 horizon 共用 UUID；历史记录为空时由查询侧兼容聚合。
+    # 同一次建議的各 horizon 共用 UUID；歷史記錄為空時由查詢側相容聚合。
     prediction_group_id = Column(String, nullable=True)
-    # 旧数据按自然日评估；新写入统一按实际 K 线交易日评估。
+    # 舊資料按自然日評估；新寫入統一按實際 K 線交易日評估。
     horizon_unit = Column(String, nullable=False, default="trading_days")
     action = Column(String, nullable=False, default="watch")
-    action_label = Column(String, nullable=False, default="观望")
+    action_label = Column(String, nullable=False, default="觀望")
     confidence = Column(Float, nullable=True)
     trigger_price = Column(Float, nullable=True)
     outcome_price = Column(Float, nullable=True)
@@ -414,7 +415,7 @@ class AgentPredictionOutcome(Base):
 
 
 class StockSuggestion(Base):
-    """股票建议池 - 汇总各 Agent 建议"""
+    """股票建議池 - 彙總各 Agent 建議"""
 
     __tablename__ = "stock_suggestions"
 
@@ -423,34 +424,34 @@ class StockSuggestion(Base):
     stock_market = Column(String, nullable=False, default="CN", index=True)
     stock_name = Column(String, default="")
 
-    # 建议内容
+    # 建議內容
     action = Column(
         String, nullable=False
     )  # buy/add/reduce/sell/hold/watch/alert/avoid
     action_label = Column(
         String, nullable=False
-    )  # 中文标签：建仓/加仓/减仓/清仓/持有/观望
-    signal = Column(String, default="")  # 信号描述
-    reason = Column(String, default="")  # 建议理由
+    )  # 中文標籤：建倉/加碼/減碼/出清/持有/觀望
+    signal = Column(String, default="")  # 訊號描述
+    reason = Column(String, default="")  # 建議理由
 
-    # 来源追踪
+    # 來源追蹤
     agent_name = Column(
         String, nullable=False
     )  # intraday_monitor/daily_report/premarket_outlook
-    agent_label = Column(String, default="")  # 盘中监测/盘后日报/盘前分析
+    agent_label = Column(String, default="")  # 盤中監測/盤後日報/盤前分析
 
-    # 上下文信息
+    # 上下文資訊
     prompt_context = Column(String, default="")  # Prompt 上下文摘要
-    ai_response = Column(String, default="")  # AI 原始响应
+    ai_response = Column(String, default="")  # AI 原始回應
 
-    # 元数据（输入快照/触发原因等）
+    # 後設資料（輸入快照/觸發原因等）
     meta = Column(JSON, default={})
 
-    # 时间信息
+    # 時間資訊
     created_at = Column(DateTime, server_default=func.now())
-    expires_at = Column(DateTime, nullable=True)  # 建议过期时间
+    expires_at = Column(DateTime, nullable=True)  # 建議過期時間
 
-    # 索引：按市场+股票+时间快速查询
+    # 索引：按市場+股票+時間快速查詢
     __table_args__ = (
         Index(
             "ix_suggestion_market_symbol_time",
@@ -463,7 +464,7 @@ class StockSuggestion(Base):
 
 
 class EntryCandidate(Base):
-    """入场候选榜快照（按天去重，可追溯来源建议与证据）。"""
+    """入場候選榜快照（按天去重，可追溯來源建議與證據）。"""
 
     __tablename__ = "entry_candidates"
     __table_args__ = (
@@ -486,7 +487,7 @@ class EntryCandidate(Base):
     score = Column(Float, nullable=False, default=0)
     confidence = Column(Float, nullable=True)
     action = Column(String, nullable=False, default="watch")
-    action_label = Column(String, nullable=False, default="观望")
+    action_label = Column(String, nullable=False, default="觀望")
     signal = Column(String, default="")
     reason = Column(String, default="")
     candidate_source = Column(String, nullable=False, default="watchlist")  # watchlist / market_scan
@@ -504,12 +505,18 @@ class EntryCandidate(Base):
     evidence = Column(JSON, default=[])
     plan = Column(JSON, default={})
     meta = Column(JSON, default={})
+    instrument_id = Column(String, nullable=True)
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    scan_run_id = Column(Integer, nullable=True)
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class MarketScanSnapshot(Base):
-    """市场池候选快照（用于多源回退与覆盖诊断）。"""
+    """市場池候選快照（用於多源回退與覆蓋診斷）。"""
 
     __tablename__ = "market_scan_snapshots"
     __table_args__ = (
@@ -532,12 +539,144 @@ class MarketScanSnapshot(Base):
     score_seed = Column(Float, nullable=False, default=0.0)
     quote = Column(JSON, default={})
     meta = Column(JSON, default={})
+    instrument_id = Column(String, nullable=True)
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class DiscoveryRun(Base):
+    """Immutable bounded discovery manifest and stage partitions."""
+
+    __tablename__ = "discovery_runs"
+    __table_args__ = (
+        UniqueConstraint("scan_run_key", name="uq_discovery_run_key"),
+        Index("ix_discovery_run_market_completed", "stock_market", "run_completed_at_utc"),
+        Index("ix_discovery_run_retention", "retention_expires_at_utc", "archived"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scan_run_key = Column(String(64), nullable=False, default="")
+    revision = Column(Integer, nullable=False, default=1)
+    stock_market = Column(String, nullable=False, default="TW")
+    requested_venues = Column(JSON, default=["TWSE", "TPEX"])
+    source_mode = Column(String, nullable=False, default="")
+    provider_scope = Column(String, default="")
+    provider_raw_status = Column(String, default="")
+    scan_coverage_state = Column(String, nullable=False, default="UNKNOWN")
+    coverage_scope = Column(String, nullable=False, default="UNKNOWN")
+    run_started_at_utc = Column(DateTime, nullable=True)
+    run_completed_at_utc = Column(DateTime, nullable=True)
+    catalog_source = Column(String, default="")
+    catalog_source_as_of = Column(String, nullable=True)
+    catalog_captured_at_utc = Column(DateTime, nullable=True)
+    catalog_authority_status = Column(String, default="UNKNOWN")
+    catalog_hash = Column(String(64), default="")
+    catalog_response_row_count = Column(Integer, default=0)
+    catalog_unique_count = Column(Integer, default=0)
+    duplicate_catalog_record_count = Column(Integer, default=0)
+    invalid_catalog_record_count = Column(Integer, default=0)
+    eligible_catalog_count = Column(Integer, default=0)
+    requested_universe_count = Column(Integer, default=0)
+    not_requested_due_to_limit_count = Column(Integer, default=0)
+    attempted_instrument_count = Column(Integer, default=0)
+    unattempted_instrument_count = Column(Integer, default=0)
+    valid_price_count = Column(Integer, default=0)
+    invalid_price_count = Column(Integer, default=0)
+    missing_or_failed_price_count = Column(Integer, default=0)
+    pending_price_count = Column(Integer, default=0)
+    ranking_eligible_count = Column(Integer, default=0)
+    ranking_excluded_count = Column(Integer, default=0)
+    pool_selected_count = Column(Integer, default=0)
+    ranked_not_selected_count = Column(Integer, default=0)
+    candidate_selected_count = Column(Integer, default=0)
+    candidate_excluded_count = Column(Integer, default=0)
+    candidate_not_selected_count = Column(Integer, default=0)
+    catalog_request_count = Column(Integer, default=0)
+    price_snapshot_request_count = Column(Integer, default=0)
+    price_snapshot_batches_planned = Column(Integer, default=0)
+    unattempted_price_snapshot_batches = Column(Integer, default=0)
+    pending_price_snapshot_batches = Column(Integer, default=0)
+    failed_request_count = Column(Integer, default=0)
+    price_snapshot_count = Column(Integer, default=0)
+    price_data_dates = Column(JSON, default=[])
+    stage_id_sets = Column(JSON, default={})
+    stage_reason_id_sets = Column(JSON, default={})
+    stage_reason_counts = Column(JSON, default={})
+    scan_limits = Column(JSON, default={})
+    authority_by_instrument_id = Column(JSON, default={})
+    candidate_ids = Column(JSON, default=[])
+    manifest = Column(JSON, default={})
+    manifest_hash = Column(String(64), default="")
+    selection_config_version = Column(String, default="")
+    selection_config = Column(JSON, default={})
+    selection_config_hash = Column(String(64), default="")
+    retention_expires_at_utc = Column(DateTime, nullable=True)
+    archived = Column(Boolean, nullable=False, default=False)
+    archived_at_utc = Column(DateTime, nullable=True)
+    archived_reason = Column(String, default="")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class DiscoveryExclusion(Base):
+    """Bounded per-stage canonical ID sets and primary reason partitions."""
+
+    __tablename__ = "discovery_exclusions"
+    __table_args__ = (
+        UniqueConstraint(
+            "discovery_run_id", "stage", "outcome", "reason_code",
+            name="uq_discovery_exclusion_partition",
+        ),
+        Index("ix_discovery_exclusion_run_stage", "discovery_run_id", "stage"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    discovery_run_id = Column(
+        Integer, ForeignKey("discovery_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    stage = Column(String, nullable=False)
+    outcome = Column(String, nullable=False)
+    reason_code = Column(String, nullable=False, default="")
+    instrument_ids = Column(JSON, default=[])
+    item_count = Column(Integer, nullable=False, default=0)
+    details = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class InstrumentCostAuthority(Base):
+    """Versioned local classification input for dated Taiwan cost policy."""
+
+    __tablename__ = "instrument_cost_authorities"
+    __table_args__ = (
+        UniqueConstraint(
+            "instrument_id", "policy_version", "effective_from",
+            name="uq_instrument_cost_authority_version_date",
+        ),
+        Index("ix_instrument_cost_authority_dates", "instrument_id", "effective_from", "effective_to"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    instrument_id = Column(String, nullable=False)
+    tax_category = Column(String, nullable=False, default="UNKNOWN")
+    classification_authority = Column(String, nullable=False, default="")
+    classification_source = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
+    effective_from = Column(String, nullable=False, default="")
+    effective_to = Column(String, nullable=True)
+    stamp_duty_rate = Column(Float, nullable=True)
+    commission_rate = Column(Float, nullable=True)
+    minimum_commission = Column(Float, nullable=True)
+    transfer_fee_rate = Column(Float, nullable=True)
+    slippage_bps = Column(Float, nullable=True)
+    evidence_hash = Column(String(64), default="")
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class EntryCandidateFeedback(Base):
-    """入场候选反馈（用于策略迭代与质量评估）。"""
+    """入場候選回饋（用於策略迭代與質量評估）。"""
 
     __tablename__ = "entry_candidate_feedback"
     __table_args__ = (
@@ -558,7 +697,7 @@ class EntryCandidateFeedback(Base):
 
 
 class EntryCandidateOutcome(Base):
-    """入场候选后验结果（自动评估）。"""
+    """入場候選後驗結果（自動評估）。"""
 
     __tablename__ = "entry_candidate_outcomes"
     __table_args__ = (
@@ -592,7 +731,7 @@ class EntryCandidateOutcome(Base):
 
 
 class StrategyCatalog(Base):
-    """策略目录（可版本化、可启停、可调权重）。"""
+    """策略目錄（可版本化、可啟停、可調權重）。"""
 
     __tablename__ = "strategy_catalog"
     __table_args__ = (
@@ -615,7 +754,7 @@ class StrategyCatalog(Base):
 
 
 class StrategySignalRun(Base):
-    """策略信号执行快照（按日/股票/策略去重）。"""
+    """策略訊號執行快照（按日/股票/策略去重）。"""
 
     __tablename__ = "strategy_signal_runs"
     __table_args__ = (
@@ -630,6 +769,8 @@ class StrategySignalRun(Base):
         Index("ix_strategy_signal_snapshot_rank", "snapshot_date", "rank_score"),
         Index("ix_strategy_signal_strategy_market", "strategy_code", "stock_market"),
         Index("ix_strategy_signal_status", "status", "updated_at"),
+        Index("ix_strategy_signal_ranker_version", "ranker_version", "snapshot_date"),
+        Index("ix_strategy_signal_selected", "snapshot_date", "selected_for_portfolio"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -646,10 +787,20 @@ class StrategySignalRun(Base):
 
     score = Column(Float, nullable=False, default=0)
     rank_score = Column(Float, nullable=False, default=0)
+    # Legacy score projections stay tagged; new refreshes store ranker-v2 explicitly.
+    ranking_value = Column(Float, nullable=True)
+    score_version = Column(String, nullable=False, default="legacy-score-v1")
+    ranker_version = Column(String, nullable=False, default="ranker-v1")
+    scoring_config_version = Column(String, nullable=False, default="")
+    decision_snapshot_id = Column(String, nullable=True)
+    selected_for_portfolio = Column(Boolean, nullable=False, default=False)
+    constrained = Column(Boolean, nullable=False, default=False)
+    constraint_reasons = Column(JSON, default=[])
+    selection_metadata = Column(JSON, default={})
     confidence = Column(Float, nullable=True)
     status = Column(String, default="active")  # active/inactive/invalidated
     action = Column(String, default="watch")
-    action_label = Column(String, default="观望")
+    action_label = Column(String, default="觀望")
     signal = Column(String, default="")
     reason = Column(String, default="")
     evidence = Column(JSON, default=[])
@@ -665,6 +816,12 @@ class StrategySignalRun(Base):
     source_agent = Column(String, default="")
     source_suggestion_id = Column(Integer, nullable=True)
     source_candidate_id = Column(Integer, nullable=True)
+    instrument_id = Column(String, nullable=True)
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    scan_run_id = Column(Integer, nullable=True)
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
     trace_id = Column(String, default="")
     is_holding_snapshot = Column(Boolean, default=False)
     context_quality_score = Column(Float, nullable=True)
@@ -674,7 +831,7 @@ class StrategySignalRun(Base):
 
 
 class StrategyOutcome(Base):
-    """策略后验结果。"""
+    """策略後驗結果。"""
 
     __tablename__ = "strategy_outcomes"
     __table_args__ = (
@@ -710,8 +867,122 @@ class StrategyOutcome(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class StrategyOutcomeV2(Base):
+    """Versioned, decision-linked signal/candidate/execution outcome projection.
+
+    Stock facts become immutable when evaluation_status reaches COMPLETE or
+    AMBIGUOUS. Benchmark fields are an independently retryable annotation.
+    """
+
+    __tablename__ = "strategy_outcomes_v2"
+    __table_args__ = (
+        UniqueConstraint(
+            "decision_snapshot_id", "outcome_population_id", "horizon_sessions",
+            "evaluation_version", name="uq_strategy_outcome_v2_decision_population_horizon_version",
+        ),
+        Index("ix_strategy_outcome_v2_market_status", "stock_market", "evaluation_status"),
+        Index("ix_strategy_outcome_v2_population_horizon", "outcome_population_id", "horizon_sessions"),
+        Index("ix_strategy_outcome_v2_retry", "stock_retryable", "stock_next_retry_at"),
+        Index("ix_strategy_outcome_v2_decision", "decision_snapshot_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    decision_snapshot_id = Column(
+        String, ForeignKey("ranking_snapshot_items.decision_snapshot_id"), nullable=False
+    )
+    candidate_id = Column(Integer, nullable=True)
+    signal_run_id = Column(Integer, nullable=True)
+    strategy_code = Column(String, nullable=False, default="")
+    stock_symbol = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="")
+    instrument_id = Column(String, nullable=False, default="")
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    session_date = Column(String, nullable=False, default="")
+    decision_at_utc = Column(DateTime, nullable=True)
+    decision_score = Column(Float, nullable=True)
+    decision_capture_hash = Column(String(64), nullable=False, default="")
+    decision_payload = Column(JSON, default={})
+    decision_point_in_time_status = Column(String, nullable=False, default="UNVERIFIABLE")
+    outcome_population_id = Column(String, nullable=False, default="")
+    horizon_sessions = Column(Integer, nullable=False)
+    evaluation_version = Column(String, nullable=False, default="")
+    score_version = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
+    policy_payload = Column(JSON, default={})
+    policy_hash = Column(String(64), nullable=False, default="")
+    calendar_version = Column(String, nullable=False, default="")
+    calendar_source = Column(String, nullable=False, default="")
+    calendar_timezone = Column(String, nullable=False, default="")
+    calendar_confidence = Column(String, nullable=False, default="UNKNOWN")
+    expected_session_dates = Column(JSON, default=[])
+    entry_status = Column(String, nullable=False, default="PENDING")
+    evaluation_status = Column(String, nullable=False, default="PENDING")
+    barrier_order = Column(String, nullable=False, default="NONE")
+    benchmark_status = Column(String, nullable=False, default="PENDING")
+    reason_code = Column(String, nullable=False, default="")
+    cost_reason_code = Column(String, nullable=False, default="")
+    benchmark_reason_code = Column(String, nullable=False, default="")
+    entry_session_date = Column(String, nullable=True)
+    entry_timestamp = Column(DateTime, nullable=True)
+    entry_time_precision = Column(String, nullable=False, default="SESSION_ONLY")
+    exit_session_date = Column(String, nullable=True)
+    entry_price = Column(Float, nullable=True)
+    exit_price = Column(Float, nullable=True)
+    stock_gross_return_pct = Column(Float, nullable=True)
+    stock_net_return_pct = Column(Float, nullable=True)
+    stock_cost_assumption_pct = Column(Float, nullable=True)
+    stock_adjustment_mode = Column(String, nullable=False, default="")
+    quantity = Column(Integer, nullable=True)
+    lot_size = Column(Integer, nullable=True)
+    notional = Column(Float, nullable=True)
+    cost_breakdown = Column(JSON, default={})
+    benchmark_id = Column(String, nullable=True)
+    benchmark_entry_close = Column(Float, nullable=True)
+    benchmark_exit_close = Column(Float, nullable=True)
+    benchmark_gross_return_pct = Column(Float, nullable=True)
+    relative_net_percentage_points = Column(Float, nullable=True)
+    stock_input_hash = Column(String(64), nullable=True)
+    stock_facts_hash = Column(String(64), nullable=True)
+    stock_attempt_count = Column(Integer, nullable=False, default=0)
+    stock_first_attempt_at = Column(DateTime, nullable=True)
+    stock_next_retry_at = Column(DateTime, nullable=True)
+    stock_retry_deadline_at = Column(DateTime, nullable=True)
+    stock_retryable = Column(Boolean, nullable=False, default=True)
+    benchmark_attempt_count = Column(Integer, nullable=False, default=0)
+    benchmark_next_retry_at = Column(DateTime, nullable=True)
+    benchmark_retry_deadline_at = Column(DateTime, nullable=True)
+    benchmark_retryable = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class OutcomeEvaluationAttempt(Base):
+    """Append-only input and result capture for a stock or benchmark attempt."""
+
+    __tablename__ = "outcome_evaluation_attempts"
+    __table_args__ = (
+        Index("ix_outcome_attempt_outcome_kind", "outcome_id", "attempt_kind", "id"),
+        Index("ix_outcome_attempt_input_hash", "input_hash"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    outcome_id = Column(
+        Integer, ForeignKey("strategy_outcomes_v2.id", ondelete="RESTRICT"), nullable=False
+    )
+    attempt_kind = Column(String, nullable=False, default="stock")
+    attempt_number = Column(Integer, nullable=False, default=1)
+    input_hash = Column(String(64), nullable=False, default="")
+    input_snapshot = Column(JSON, default={})
+    result_status = Column(String, nullable=False, default="")
+    reason_code = Column(String, nullable=False, default="")
+    retryable = Column(Boolean, nullable=False, default=True)
+    next_retry_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 class BacktestRun(Base):
-    """一次可回看的策略历史回测。"""
+    """一次可回看的策略歷史回測。"""
 
     __tablename__ = "backtest_runs"
     __table_args__ = (
@@ -736,7 +1007,7 @@ class BacktestRun(Base):
 
 
 class StrategyWeight(Base):
-    """策略权重（当前生效值）。"""
+    """策略權重（當前生效值）。"""
 
     __tablename__ = "strategy_weights"
     __table_args__ = (
@@ -754,6 +1025,9 @@ class StrategyWeight(Base):
     market = Column(String, nullable=False, default="ALL")
     regime = Column(String, nullable=False, default="default")
     weight = Column(Float, nullable=False, default=1.0)
+    # (PR-0A) 手動鎖定,標定跳過 / 關掉則標定跳過
+    is_pinned = Column(Boolean, nullable=False, default=False)  # 手動鎖定,標定跳過
+    auto_calibrate = Column(Boolean, nullable=False, default=True)  # 關掉則標定跳過
     reason = Column(String, default="")
     meta = Column(JSON, default={})
     effective_from = Column(DateTime, server_default=func.now())
@@ -762,7 +1036,7 @@ class StrategyWeight(Base):
 
 
 class StrategyWeightHistory(Base):
-    """策略调权历史。"""
+    """策略調權歷史。"""
 
     __tablename__ = "strategy_weight_history"
     __table_args__ = (
@@ -784,10 +1058,10 @@ class StrategyWeightHistory(Base):
 
 
 class FactorWeight(Base):
-    """因子权重（当前生效值）——每因子 × 市场,由 IC/IR 自动标定 + 可手动覆盖。
+    """因子權重（當前生效值）——每因子 × 市場,由 IC/IR 自動標定 + 可手動覆蓋。
 
-    镜像 StrategyWeight,但作用于因子级(alpha/catalyst/quality/risk/crowd),
-    让信号合成从「隐式权重=1 的黑盒」变成「外置可标定」。
+    映象 StrategyWeight,但作用於因子級(alpha/catalyst/quality/risk/crowd),
+    讓訊號合成從「隱式權重=1 的黑盒」變成「外接可標定」。
     """
 
     __tablename__ = "factor_weights"
@@ -800,8 +1074,8 @@ class FactorWeight(Base):
     factor_code = Column(String, nullable=False)
     market = Column(String, nullable=False, default="CN")  # CN/HK/US
     weight = Column(Float, nullable=False, default=1.0)
-    is_pinned = Column(Boolean, nullable=False, default=False)  # 手动锁定,标定跳过
-    auto_calibrate = Column(Boolean, nullable=False, default=True)  # 关掉则标定跳过
+    is_pinned = Column(Boolean, nullable=False, default=False)  # 手動鎖定,標定跳過
+    auto_calibrate = Column(Boolean, nullable=False, default=True)  # 關掉則標定跳過
     reason = Column(String, default="")
     meta = Column(JSON, default={})
     effective_from = Column(DateTime, server_default=func.now())
@@ -810,7 +1084,7 @@ class FactorWeight(Base):
 
 
 class FactorWeightHistory(Base):
-    """因子调权历史(审计)。"""
+    """因子調權歷史(審計)。"""
 
     __tablename__ = "factor_weight_history"
     __table_args__ = (
@@ -832,7 +1106,7 @@ class FactorWeightHistory(Base):
 
 
 class MarketRegimeSnapshot(Base):
-    """市场状态快照（用于按市场动态调权与解释）。"""
+    """市場狀態快照（用於按市場動態調權與解釋）。"""
 
     __tablename__ = "market_regime_snapshots"
     __table_args__ = (
@@ -862,7 +1136,7 @@ class MarketRegimeSnapshot(Base):
 
 
 class StrategyFactorSnapshot(Base):
-    """每条策略信号的因子分解快照。"""
+    """每條策略訊號的因子分解快照。"""
 
     __tablename__ = "strategy_factor_snapshots"
     __table_args__ = (
@@ -893,7 +1167,7 @@ class StrategyFactorSnapshot(Base):
 
 
 class PortfolioRiskSnapshot(Base):
-    """按快照/市场聚合的组合风险画像。"""
+    """按快照/市場聚合的組合風險畫像。"""
 
     __tablename__ = "portfolio_risk_snapshots"
     __table_args__ = (
@@ -922,7 +1196,7 @@ class PortfolioRiskSnapshot(Base):
 
 
 class SuggestionFeedback(Base):
-    """建议反馈（匿名、轻量）"""
+    """建議回饋（匿名、輕量）"""
 
     __tablename__ = "suggestion_feedback"
 
@@ -938,7 +1212,7 @@ class SuggestionFeedback(Base):
 
 
 class PriceAlertRule(Base):
-    """价格提醒规则"""
+    """價格提醒規則"""
 
     __tablename__ = "price_alert_rules"
     __table_args__ = (
@@ -970,7 +1244,7 @@ class PriceAlertRule(Base):
 
 
 class PriceAlertHit(Base):
-    """价格提醒命中记录"""
+    """價格提醒命中記錄"""
 
     __tablename__ = "price_alert_hits"
     __table_args__ = (
@@ -1001,7 +1275,7 @@ class PriceAlertHit(Base):
 
 
 class PaperTradingAccount(Base):
-    """模拟盘账户（单例）"""
+    """模擬交易帳戶（單例）"""
 
     __tablename__ = "paper_trading_account"
 
@@ -1014,15 +1288,15 @@ class PaperTradingAccount(Base):
     max_drawdown_pct = Column(Float, nullable=False, default=0.0)
     peak_capital = Column(Float, nullable=False, default=1000000.0)
     enabled = Column(Boolean, default=True)
-    excluded_markets = Column(JSON, default=[])  # 排除的市场，如 ["US"]（兼容旧字段，由 market_allocations 派生）
-    # 各市场投资比例 {"CN":0.5,"HK":0.3,"US":0.2}，比例 0~1、合计 ≤ 1；比例 0 表示不投入该市场
+    excluded_markets = Column(JSON, default=[])  # 排除的市場，如 ["US"]（相容舊欄位，由 market_allocations 派生）
+    # 各市場投資比例 {"CN":0.5,"HK":0.3,"US":0.2}，比例 0~1、合計 ≤ 1；比例 0 表示不投入該市場
     market_allocations = Column(JSON, default={})
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class PaperTradingPosition(Base):
-    """模拟盘持仓"""
+    """模擬交易持倉"""
 
     __tablename__ = "paper_trading_positions"
     __table_args__ = (
@@ -1039,7 +1313,7 @@ class PaperTradingPosition(Base):
     stop_loss = Column(Float, nullable=True)
     target_price = Column(Float, nullable=True)
     current_price = Column(Float, nullable=True)
-    highest_price = Column(Float, nullable=True)  # 持仓期最高价(移动止损用)
+    highest_price = Column(Float, nullable=True)  # 持倉期最高價(移動停損用)
     unrealized_pnl = Column(Float, nullable=False, default=0.0)
     status = Column(String, nullable=False, default="open")  # open/closed
     signal_run_id = Column(Integer, nullable=True)
@@ -1052,7 +1326,7 @@ class PaperTradingPosition(Base):
 
 
 class PaperTradingTrade(Base):
-    """模拟盘已平仓记录"""
+    """模擬交易已平倉記錄"""
 
     __tablename__ = "paper_trading_trades"
     __table_args__ = (
@@ -1080,7 +1354,7 @@ class PaperTradingTrade(Base):
 
 
 class ChatConversation(Base):
-    """AI 对话会话"""
+    """AI 對話會話"""
 
     __tablename__ = "chat_conversations"
     __table_args__ = (
@@ -1099,7 +1373,7 @@ class ChatConversation(Base):
 
 
 class ChatMessage(Base):
-    """AI 对话消息"""
+    """AI 對話訊息"""
 
     __tablename__ = "chat_messages"
     __table_args__ = (
@@ -1287,11 +1561,11 @@ class AssistantArtifact(Base):
 
 
 class PersonalAccessToken(Base):
-    """个人访问令牌(PAT)—— MCP 端点专用的独立长期凭据。
+    """個人訪問令牌(PAT)—— MCP 端點專用的獨立長期憑據。
 
-    与登录 JWT 分流:JWT 是单用户会话态(30 天、不可吊销、无 scope),不适合作为
-    分发给外部 MCP client 的长期凭据;PAT 可独立吊销/审计、天然只读 scope。
-    库里只存 sha256(token_hash),明文仅创建时返回一次。单用户应用,不设 user_id。
+    與登入 JWT 分流:JWT 是單使用者會話態(30 天、不可吊銷、無 scope),不適合作為
+    分發給外部 MCP client 的長期憑據;PAT 可獨立吊銷/審計、天然只讀 scope。
+    庫裡只存 sha256(token_hash),明文僅建立時返回一次。單使用者應用,不設 user_id。
     """
 
     __tablename__ = "personal_access_tokens"
@@ -1300,19 +1574,19 @@ class PersonalAccessToken(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False, default="")  # 用户可读的用途备注
+    name = Column(String, nullable=False, default="")  # 使用者可讀的用途備註
     token_hash = Column(String(128), nullable=False, unique=True, index=True)
-    prefix = Column(String(32), nullable=False, default="")  # 明文前缀,列表展示用
+    prefix = Column(String(32), nullable=False, default="")  # 明文字首,列表展示用
     scopes_json = Column(Text, nullable=False, default="[]")  # JSON: ["mcp:read"]
-    expires_at = Column(DateTime, nullable=True)  # None = 永不过期
+    expires_at = Column(DateTime, nullable=True)  # None = 永不過期
     last_used_at = Column(DateTime, nullable=True)
     last_used_ip = Column(String, nullable=True)
-    revoked_at = Column(DateTime, nullable=True)  # 非空即已吊销
+    revoked_at = Column(DateTime, nullable=True)  # 非空即已吊銷
     created_at = Column(DateTime, server_default=func.now())
 
 
 class MCPCallLog(Base):
-    """每次 MCP tool 调用的审计记录(只存元数据,不存参数/结果明文)。"""
+    """每次 MCP tool 呼叫的審計記錄(只存後設資料,不存引數/結果明文)。"""
 
     __tablename__ = "mcp_call_logs"
     __table_args__ = (
@@ -1321,12 +1595,322 @@ class MCPCallLog(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    pat_id = Column(Integer, nullable=True)  # 软引用,PAT 删除后仍保留历史
+    pat_id = Column(Integer, nullable=True)  # 軟引用,PAT 刪除後仍保留歷史
     pat_prefix = Column(String, nullable=True)
     tool_name = Column(String, nullable=False, default="")
     status = Column(String, nullable=False, default="ok")  # ok / error
     error_message = Column(Text, nullable=True)
-    args_summary = Column(Text, nullable=True)  # 脱敏摘要,截断
+    args_summary = Column(Text, nullable=True)  # 脫敏摘要,截斷
     duration_ms = Column(Integer, default=0)
     client_ip = Column(String, nullable=True)
     called_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationModeState(Base):
+    """標定門（PR-0A）：按 kind(factor/strategy) x market 的 persisted mode。
+
+    mode: FROZEN 不改 weight / SHADOW 只產建議與 readiness report / ACTIVE 才能通過門檻後寫。
+    缺行時服務層讀為 FROZEN（fail-safe），never 依 live default 假設可寫。
+    """
+
+    __tablename__ = "calibration_modes"
+    __table_args__ = (
+        UniqueConstraint("kind", "market", name="uq_calibration_mode_kind_market"),
+        Index("ix_calibration_mode_mode", "mode"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String, nullable=False, default="factor")  # factor / strategy
+    market = Column(String, nullable=False, default="ALL")  # ALL / CN / HK / US / TW
+    mode = Column(String, nullable=False, default="FROZEN")  # FROZEN / SHADOW / ACTIVE
+    reason = Column(String, default="")
+    policy_version = Column(String, default="")
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationBaseline(Base):
+    """rollout 基線檔案：rollout 前每 weight/config 的讀取快照與 hash。
+
+    初始保留現 weight,標 unvalidated-baseline;不自動重設為 1.0 或 catalog default。
+    恢復時須選一份具名 versioned config,以獨立 audited restoration 操作完成。
+    """
+
+    __tablename__ = "calibration_baselines"
+    __table_args__ = (
+        UniqueConstraint(
+            "baseline_name", "kind", "market", "target", name="uq_calibration_baseline_key"
+        ),
+        Index("ix_calibration_baseline_name", "baseline_name"),
+        Index("ix_calibration_baseline_created", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    baseline_name = Column(String, nullable=False, default="")  # 具名 rollout baseline
+    kind = Column(String, nullable=False, default="factor")
+    market = Column(String, nullable=False, default="ALL")
+    target = Column(String, nullable=False, default="")  # factor code 或 strategy code|regime
+    weight = Column(Float, nullable=False, default=1.0)
+    config_hash = Column(String(64), nullable=False, default="")  # 該 baseline payload 的 hash
+    status = Column(String, nullable=False, default="unvalidated-baseline")
+    meta = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationApplication(Base):
+    """一次實際標定寫（審計 + 唯一性）。
+
+    unique key = (kind, market, target, calibration_policy_version, cohort_fingerprint)。
+    新 output scoring_config_version 不會解除這個唯一性。
+    """
+
+    __tablename__ = "calibration_applications"
+    __table_args__ = (
+        UniqueConstraint(
+            "kind",
+            "market",
+            "target",
+            "calibration_policy_version",
+            "cohort_fingerprint",
+            name="uq_calibration_application_key",
+        ),
+        Index("ix_calibration_application_time", "created_at"),
+        Index("ix_calibration_application_market_kind", "market", "kind"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String, nullable=False, default="factor")
+    market = Column(String, nullable=False, default="ALL")
+    target = Column(String, nullable=False, default="")
+    regime = Column(String, default="")
+    calibration_policy_version = Column(String, nullable=False, default="")
+    cohort_fingerprint = Column(String(64), nullable=False, default="")
+    population = Column(String, default="")
+    ranker_version = Column(String, default="")
+    evaluation_version = Column(String, default="")
+    primary_horizon_sessions = Column(Integer, nullable=True)
+    source_config_versions = Column(JSON, default={})
+    expected_live_config_hash = Column(String(64), default="")
+    output_config_hash = Column(String(64), default="")
+    sample_units = Column(Integer, default=0)
+    decision_dates = Column(Integer, default=0)
+    valid_ic_periods = Column(Integer, default=0)
+    raw_rows = Column(Integer, default=0)
+    signal_ids = Column(Integer, default=0)
+    old_weight = Column(Float, nullable=True)
+    target_weight = Column(Float, nullable=True)
+    new_weight = Column(Float, nullable=True)
+    mode = Column(String, default="")
+    reason = Column(String, default="")
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class CalibrationProvenance(Base):
+    """標定輸入的 provenance（與 research 的 _factor_provenance 不混）。"""
+
+    __tablename__ = "calibration_provenance"
+    __table_args__ = (
+        UniqueConstraint(
+            "kind", "market", "target", "cohort_fingerprint",
+            name="uq_calibration_provenance_target_cohort",
+        ),
+        Index("ix_calibration_provenance_time", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String, nullable=False, default="factor")
+    market = Column(String, nullable=False, default="ALL")
+    target = Column(String, nullable=False, default="")
+    calibration_policy_version = Column(String, nullable=False, default="")
+    cohort_fingerprint = Column(String(64), nullable=False, default="")
+    population = Column(String, default="")
+    ranker_version = Column(String, default="")
+    evaluation_version = Column(String, default="")
+    primary_horizon_sessions = Column(Integer, nullable=True)
+    decision_snapshot_ids = Column(JSON, default=[])
+    outcome_revisions = Column(JSON, default=[])
+    policy_payload = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class RankingSnapshot(Base):
+    """一次決策 capture（append-only；重試時新 capture,舊 item 永不 upsert）。"""
+
+    __tablename__ = "ranking_snapshots"
+    __table_args__ = (
+        UniqueConstraint("capture_id", name="uq_ranking_snapshot_capture"),
+        Index("ix_ranking_snapshot_market_date", "stock_market", "session_date"),
+        Index("ix_ranking_snapshot_created", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    capture_id = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="CN")
+    session_date = Column(String, nullable=False, default="")  # 市場當地 session YYYY-MM-DD
+    decision_at_utc = Column(DateTime, nullable=True)  # timezone-aware
+    captured_at_utc = Column(DateTime, nullable=True)  # timezone-aware
+    source_pool = Column(String, default="")
+    scan_run_id = Column(Integer, nullable=True)
+    scan_run_ids = Column(JSON, default=[])
+    candidate_ids = Column(JSON, default=[])
+    catalog_authority = Column(JSON, default={})
+    universe_ids = Column(JSON, default=[])
+    universe_hash = Column(String(64), default="")
+    item_count = Column(Integer, default=0)
+    eligibility_reasons = Column(JSON, default=[])
+    ranker_version = Column(String, default="")
+    scoring_config_version = Column(String, default="")
+    evaluation_version = Column(String, default="")
+    calibration_policy_version = Column(String, default="")
+    capture_hash = Column(String(64), default="")
+    ranking_reference = Column(JSON, default={})
+    ranking_reference_hash = Column(String(64), default="")
+    meta = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class RankingSnapshotItem(Base):
+    """capture 中的 instrument x strategy 的 immutable decision（v2 calibration 只 join 這）。
+
+    signal_run_id 與 candidate_id 是軟引用:StrategySignalRun/EntryCandidate 的 UI projection
+    可被 refresh 或 delete,已封存 factor 與 outcome reference 不能 cascade 改變。
+    """
+
+    __tablename__ = "ranking_snapshot_items"
+    __table_args__ = (
+        UniqueConstraint("decision_snapshot_id", name="uq_ranking_decision_snapshot_id"),
+        Index("ix_ranking_item_market_date", "stock_market", "session_date"),
+        Index("ix_ranking_item_strategy_market", "strategy_code", "stock_market"),
+        Index("ix_ranking_item_instrument", "stock_market", "instrument_id", "session_date"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    decision_snapshot_id = Column(String, nullable=False, default="")
+    ranking_snapshot_id = Column(
+        Integer,
+        # 封存 item 必須 survive capture 的 deletion: FK 只指向 capture 的 PK，沒有 cascade。
+        ForeignKey("ranking_snapshots.id", name="fk_ranking_item_capture"),
+        nullable=True,
+    )
+    stock_symbol = Column(String, nullable=False, default="")
+    instrument_id = Column(String, nullable=False, default="")  # canonical instrument identity
+    stock_market = Column(String, nullable=False, default="CN")
+    strategy_code = Column(String, nullable=False, default="")
+    regime = Column(String, default="default")
+    session_date = Column(String, nullable=False, default="")
+    decision_at_utc = Column(DateTime, nullable=True)
+    captured_at_utc = Column(DateTime, nullable=True)
+    quote_source_time = Column(String, default="")  # quote/bar 的 source time
+    bar_source_time = Column(String, default="")
+    available_at_utc = Column(DateTime, nullable=True)  # 輸入的 available time
+    receipt_at_utc = Column(DateTime, nullable=True)  # receipt time（與 available 分開）
+    point_in_time_status = Column(String, default="UNVERIFIABLE")  # VERIFIED / UNVERIFIABLE
+    outcome_population_id = Column(String, default="legacy-unlabelled")
+    evaluation_version = Column(String, default="")
+    ranker_version = Column(String, default="")
+    scoring_config_version = Column(String, default="")
+    calibration_policy_version = Column(String, default="")
+    # A factor the ranker did not emit stays NULL: 0.0 is a real factor value.
+    alpha_score = Column(Float, nullable=True)
+    catalyst_score = Column(Float, nullable=True)
+    quality_score = Column(Float, nullable=True)
+    risk_penalty = Column(Float, nullable=True)
+    crowd_penalty = Column(Float, nullable=True)
+    source_bonus = Column(Float, nullable=True)
+    regime_multiplier = Column(Float, default=1.0)
+    raw_factor_values = Column(JSON, default={})
+    factor_versions = Column(JSON, default={})
+    entry_price = Column(Float, nullable=True)
+    entry_low = Column(Float, nullable=True)
+    entry_high = Column(Float, nullable=True)
+    stop_loss = Column(Float, nullable=True)
+    target_price = Column(Float, nullable=True)
+    action = Column(String, nullable=False, default="watch")
+    is_holding_snapshot = Column(Boolean, nullable=False, default=False)
+    candidate_source = Column(String, nullable=False, default="")
+    score_version = Column(String, nullable=False, default="")
+    eligibility = Column(JSON, default={})
+    ranking_value = Column(Float, nullable=True)
+    ranking_inputs = Column(JSON, default={})
+    primary_horizon_sessions = Column(Integer, nullable=True)
+    exit_session_date = Column(String, default="")
+    exit_session_complete = Column(Boolean, nullable=True)
+    capture_hash = Column(String(64), default="")
+    candidate_id = Column(Integer, nullable=True)  # 軟引用
+    signal_run_id = Column(Integer, nullable=True)  # 軟引用（no FK:projection delete 不 cascade）
+    scan_run_id = Column(Integer, nullable=True)  # only set when exactly one run contributed
+    scan_run_ids = Column(JSON, default=[])
+    scan_run_refs = Column(JSON, default=[])
+    instrument_group = Column(String, nullable=False, default="UNKNOWN")
+    instrument_authority = Column(JSON, default={})
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class PortfolioSelectionRun(Base):
+    """Append-only, versioned record of one market/group portfolio selection."""
+
+    __tablename__ = "portfolio_selection_runs"
+    __table_args__ = (
+        UniqueConstraint("selection_run_id", name="uq_portfolio_selection_run_id"),
+        Index("ix_portfolio_selection_market_date", "stock_market", "snapshot_date"),
+        Index("ix_portfolio_selection_capture", "capture_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    selection_run_id = Column(String, nullable=False, default="")
+    capture_id = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="")
+    instrument_group = Column(String, nullable=False, default="ALL")
+    snapshot_date = Column(String, nullable=False, default="")
+    constraint_unit = Column(String, nullable=False, default="ROW")
+    ranker_version = Column(String, nullable=False, default="ranker-v1")
+    scoring_config_version = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
+    cap = Column(Integer, nullable=True)
+    high_risk_share = Column(Float, nullable=True)
+    strategy_share = Column(Float, nullable=True)
+    before_row_count = Column(Integer, nullable=False, default=0)
+    after_row_count = Column(Integer, nullable=False, default=0)
+    before_instrument_count = Column(Integer, nullable=False, default=0)
+    after_instrument_count = Column(Integer, nullable=False, default=0)
+    quota_metadata = Column(JSON, default={})
+    decision_snapshot_ids = Column(JSON, default=[])
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class PortfolioConstraintLedger(Base):
+    """Append-only per-row selection and constraint evidence for one run."""
+
+    __tablename__ = "portfolio_constraint_ledger"
+    __table_args__ = (
+        UniqueConstraint("selection_run_id", "signal_run_id", name="uq_portfolio_ledger_run_signal"),
+        Index("ix_portfolio_ledger_instrument", "stock_market", "instrument_id", "snapshot_date"),
+        Index("ix_portfolio_ledger_decision", "decision_snapshot_id"),
+        ForeignKeyConstraint(
+            ["selection_run_id"], ["portfolio_selection_runs.selection_run_id"],
+            name="fk_portfolio_ledger_run",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    selection_run_id = Column(String, nullable=False, default="")
+    stock_market = Column(String, nullable=False, default="")
+    snapshot_date = Column(String, nullable=False, default="")
+    instrument_id = Column(String, nullable=False, default="")
+    strategy_code = Column(String, nullable=False, default="")
+    signal_run_id = Column(Integer, nullable=False)
+    decision_snapshot_id = Column(String, nullable=True)
+    is_representative = Column(Boolean, nullable=False, default=False)
+    selected_for_portfolio = Column(Boolean, nullable=False, default=False)
+    constrained = Column(Boolean, nullable=False, default=False)
+    reason_codes = Column(JSON, default=[])
+    constraint_unit = Column(String, nullable=False, default="ROW")
+    before_row_count = Column(Integer, nullable=False, default=0)
+    after_row_count = Column(Integer, nullable=False, default=0)
+    before_instrument_count = Column(Integer, nullable=False, default=0)
+    after_instrument_count = Column(Integer, nullable=False, default=0)
+    quota_metadata = Column(JSON, default={})
+    ranker_version = Column(String, nullable=False, default="ranker-v1")
+    scoring_config_version = Column(String, nullable=False, default="")
+    policy_version = Column(String, nullable=False, default="")
+    created_at = Column(DateTime, server_default=func.now())

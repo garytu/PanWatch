@@ -1,0 +1,254 @@
+{
+  "audit_started_at_utc": "2026-10-07T00:18:01.277675+00:00",
+  "service": {
+    "base": "http://127.0.0.1:8000",
+    "openapi_version": "0.1.0",
+    "health": {
+      "status": "ok",
+      "latency_ms": 11.0,
+      "requested_at_utc": "2026-10-07T00:18:01.277932+00:00",
+      "completed_at_utc": "2026-10-07T00:18:01.288964+00:00"
+    },
+    "readiness": {
+      "status": "ready",
+      "latency_ms": 1708.1,
+      "requested_at_utc": "2026-10-07T00:18:01.292260+00:00",
+      "completed_at_utc": "2026-10-07T00:18:03.000420+00:00",
+      "api_live": true,
+      "storage_readable": true,
+      "data_ready": true,
+      "checked_at": "2026-10-07T08:18:02.992591+08:00",
+      "decimal_storage": "decimal_text",
+      "datasets": [
+        {
+          "dataset": "twse_daily_price",
+          "venue": "TWSE",
+          "latest_trade_date": "2026-10-06",
+          "coverage_status": "AVAILABLE",
+          "assessed_status": "AVAILABLE"
+        },
+        {
+          "dataset": "tpex_daily_price",
+          "venue": "TPEX",
+          "latest_trade_date": "2026-10-06",
+          "coverage_status": "AVAILABLE",
+          "assessed_status": "AVAILABLE"
+        }
+      ]
+    },
+    "instrument_inventory_probe": {
+      "http_status": 200,
+      "latency_ms": 218.0,
+      "requested_at_utc": "2026-10-07T00:18:03.001338+00:00",
+      "response_body_read_bytes": 1,
+      "note": "Body intentionally not parsed: route returns a venue catalog without an exact-ID selector."
+    },
+    "openapi": {
+      "status": 200,
+      "latency_ms": 3.3,
+      "requested_at_utc": "2026-10-07T00:18:01.288982+00:00",
+      "completed_at_utc": "2026-10-07T00:18:01.292250+00:00",
+      "title": "Taiwan Market Data Query API",
+      "version": "0.1.0"
+    }
+  },
+  "monthly_revenue_smoke": [
+    {
+      "instrument_id": "TWSE:2330",
+      "selectors": {
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "http_status": 200,
+      "latency_ms": 26.6,
+      "requested_at_utc": "2026-10-07T00:18:03.219418+00:00",
+      "completed_at_utc": "2026-10-07T00:18:03.246042+00:00",
+      "schema_ready": true,
+      "coverage_status": "AVAILABLE",
+      "qualification": "qualified_historical_filing",
+      "served_at": "2026-10-07T00:18:03.244682Z",
+      "months": [
+        {
+          "data_month": "2026-07-01",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08-01",
+          "presence": "present",
+          "retained_row": true,
+          "row_evidence": {
+            "source": "mops",
+            "source_contract": "mops_t21_sii_monthly_revenue/v1",
+            "report_date": "2026-10-04",
+            "received_at_utc": "2026-10-04T13:09:22.189587Z",
+            "revision": 1
+          }
+        }
+      ],
+      "coverage": [
+        {
+          "source": "mops",
+          "data_month": "2026-08-01",
+          "row_count": 1087,
+          "report_date": "2026-10-04",
+          "received_at_utc": "2026-10-04T13:09:22.189587Z",
+          "selected_issuer_present": true
+        },
+        {
+          "source": "twse",
+          "data_month": "2026-08-01",
+          "row_count": 1086,
+          "report_date": "2026-09-17",
+          "received_at_utc": "2026-10-04T13:09:16.019874Z",
+          "selected_issuer_present": true
+        }
+      ]
+    },
+    {
+      "instrument_id": "TPEX:5347",
+      "selectors": {
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "http_status": 200,
+      "latency_ms": 13.0,
+      "requested_at_utc": "2026-10-07T00:18:03.246143+00:00",
+      "completed_at_utc": "2026-10-07T00:18:03.259129+00:00",
+      "schema_ready": true,
+      "coverage_status": "AVAILABLE",
+      "qualification": "qualified_issuer",
+      "served_at": "2026-10-07T00:18:03.257861Z",
+      "months": [
+        {
+          "data_month": "2026-07-01",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08-01",
+          "presence": "present",
+          "retained_row": true,
+          "row_evidence": {
+            "source": "tpex",
+            "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+            "report_date": "2026-09-17",
+            "received_at_utc": "2026-10-04T13:09:19.479749Z",
+            "revision": 1
+          }
+        }
+      ],
+      "coverage": [
+        {
+          "source": "tpex",
+          "data_month": "2026-08-01",
+          "row_count": 892,
+          "report_date": "2026-09-17",
+          "received_at_utc": "2026-10-04T13:09:19.479749Z",
+          "selected_issuer_present": true
+        }
+      ]
+    },
+    {
+      "instrument_id": "TWSE:00878",
+      "selectors": {
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "http_status": 200,
+      "latency_ms": 14.8,
+      "requested_at_utc": "2026-10-07T00:18:03.259233+00:00",
+      "completed_at_utc": "2026-10-07T00:18:03.274014+00:00",
+      "schema_ready": true,
+      "coverage_status": "AVAILABLE",
+      "qualification": "unsupported_etf",
+      "served_at": "2026-10-07T00:18:03.272978Z",
+      "months": [
+        {
+          "data_month": "2026-07-01",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08-01",
+          "presence": "not_in_captured_report",
+          "retained_row": false
+        }
+      ],
+      "coverage": [
+        {
+          "source": "mops",
+          "data_month": "2026-08-01",
+          "row_count": 1087,
+          "report_date": "2026-10-04",
+          "received_at_utc": "2026-10-04T13:09:22.189587Z",
+          "selected_issuer_present": false
+        },
+        {
+          "source": "twse",
+          "data_month": "2026-08-01",
+          "row_count": 1086,
+          "report_date": "2026-09-17",
+          "received_at_utc": "2026-10-04T13:09:16.019874Z",
+          "selected_issuer_present": false
+        }
+      ]
+    },
+    {
+      "instrument_id": "TPEX:006201",
+      "selectors": {
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "http_status": 200,
+      "latency_ms": 11.3,
+      "requested_at_utc": "2026-10-07T00:18:03.274073+00:00",
+      "completed_at_utc": "2026-10-07T00:18:03.285361+00:00",
+      "schema_ready": true,
+      "coverage_status": "AVAILABLE",
+      "qualification": "unsupported_etf",
+      "served_at": "2026-10-07T00:18:03.284241Z",
+      "months": [
+        {
+          "data_month": "2026-07-01",
+          "presence": "missing",
+          "retained_row": false
+        },
+        {
+          "data_month": "2026-08-01",
+          "presence": "not_in_captured_report",
+          "retained_row": false
+        }
+      ],
+      "coverage": [
+        {
+          "source": "tpex",
+          "data_month": "2026-08-01",
+          "row_count": 892,
+          "report_date": "2026-09-17",
+          "received_at_utc": "2026-10-04T13:09:19.479749Z",
+          "selected_issuer_present": false
+        }
+      ]
+    }
+  ],
+  "correction_to": "PW-05-live-smoke-2026-10-07.json",
+  "corrections": [
+    "The earlier instruments entry labeled error was an unclassified client-side failure before a response document was decoded; no HTTP status was captured, so it is not evidence of an upstream service failure. A later GET probe read one response byte and observed HTTP 200; the body was intentionally not parsed because this route returns the full venue catalog without an exact-ID selector.",
+    "The earlier readiness ready_dataset_count=0 was derived from a field not present in this API schema; it is withdrawn. Readiness is reported only through its documented status/data_ready fields and actual daily-dataset entries.",
+    "This supplemental record contains only whitelisted service and issuer/month evidence. It omits source URLs, raw payloads, credential material, and numeric revenue values."
+  ],
+  "selectors": {
+    "instruments": [
+      "TWSE:2330",
+      "TPEX:5347",
+      "TWSE:00878",
+      "TPEX:006201"
+    ],
+    "months": [
+      "2026-07",
+      "2026-08"
+    ]
+  },
+  "audit_completed_at_utc": "2026-10-07T00:18:03.285391+00:00"
+}

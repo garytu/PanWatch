@@ -15,6 +15,9 @@ from sqlalchemy.engine import Connection, Engine
 
 logger = logging.getLogger(__name__)
 
+# Keep in sync with src/modules/strategy/calibration_gate.py (persistence cannot import modules).
+CALIBRATION_POLICY_VERSION = "calibration-policy-v1"
+
 
 @dataclass(frozen=True)
 class Migration:
@@ -178,9 +181,9 @@ WHERE name IN ('premarket_outlook', 'intraday_monitor', 'daily_report')
         text(
             """
 UPDATE agent_configs
-SET display_name = '收盘复盘'
+SET display_name = '收盤覆盤'
 WHERE name = 'daily_report'
-  AND (display_name IS NULL OR TRIM(display_name) = '' OR display_name = '盘后日报')
+  AND (display_name IS NULL OR TRIM(display_name) = '' OR display_name = '盤後日報')
 """
         )
     )
@@ -369,7 +372,7 @@ def _m107_suggestion_market_dimension(conn: Connection) -> None:
     if not _has_table(conn, "stock_suggestions"):
         return
 
-    # 历史数据平滑回填：优先从 stocks 里推断 market，否则回退 CN。
+    # 歷史資料平滑回填：優先從 stocks 裡推斷 market，否則回退 CN。
     conn.execute(
         text(
             """
@@ -414,7 +417,7 @@ CREATE TABLE IF NOT EXISTS entry_candidates (
   score REAL NOT NULL DEFAULT 0,
   confidence REAL,
   action TEXT NOT NULL DEFAULT 'watch',
-  action_label TEXT NOT NULL DEFAULT '观望',
+  action_label TEXT NOT NULL DEFAULT '觀望',
   signal TEXT DEFAULT '',
   reason TEXT DEFAULT '',
   entry_low REAL,
@@ -446,7 +449,7 @@ CREATE TABLE IF NOT EXISTS entry_candidates (
         "CREATE INDEX ix_entry_candidate_status_updated ON entry_candidates(status, updated_at)",
     )
 
-    # 历史平滑迁移：将每个市场/股票最新建议回填为“今日候选”基线记录。
+    # 歷史平滑遷移：將每個市場/股票最新建議回填為“今日候選”基線記錄。
     today = date.today().strftime("%Y-%m-%d")
     conn.execute(
         text(
@@ -473,7 +476,7 @@ SELECT
     ELSE 30
   END AS score,
   COALESCE(s.action, 'watch'),
-  COALESCE(s.action_label, '观望'),
+  COALESCE(s.action_label, '觀望'),
   COALESCE(s.signal, ''),
   COALESCE(s.reason, ''),
   COALESCE(s.agent_name, ''),
@@ -650,7 +653,7 @@ CREATE TABLE IF NOT EXISTS strategy_signal_runs (
   confidence REAL,
   status TEXT DEFAULT 'active',
   action TEXT DEFAULT 'watch',
-  action_label TEXT DEFAULT '观望',
+  action_label TEXT DEFAULT '觀望',
   signal TEXT DEFAULT '',
   reason TEXT DEFAULT '',
   evidence TEXT DEFAULT '[]',
@@ -803,8 +806,8 @@ VALUES(
     seed_rows = [
         {
             "code": "trend_follow",
-            "name": "趋势延续",
-            "description": "顺势跟随，优先均线多头且动量延续",
+            "name": "趨勢延續",
+            "description": "順勢跟隨，優先均線多頭且動量延續",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -815,7 +818,7 @@ VALUES(
         {
             "code": "macd_golden",
             "name": "MACD金叉",
-            "description": "MACD 金叉确认，偏中短线",
+            "description": "MACD 金叉確認，偏中短線",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -826,7 +829,7 @@ VALUES(
         {
             "code": "volume_breakout",
             "name": "放量突破",
-            "description": "放量突破关键位，偏进攻",
+            "description": "放量突破關鍵位，偏進攻",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -836,8 +839,8 @@ VALUES(
         },
         {
             "code": "pullback",
-            "name": "回踩确认",
-            "description": "回踩支撑后二次启动",
+            "name": "回踩確認",
+            "description": "回踩支撐後二次啟動",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -847,8 +850,8 @@ VALUES(
         },
         {
             "code": "rebound",
-            "name": "超跌反弹",
-            "description": "超跌后的反弹交易",
+            "name": "超跌反彈",
+            "description": "超跌後的反彈交易",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -858,8 +861,8 @@ VALUES(
         },
         {
             "code": "watchlist_agent",
-            "name": "Agent建议",
-            "description": "来自既有 Agent 的综合建议映射",
+            "name": "Agent建議",
+            "description": "來自既有 Agent 的綜合建議對映",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -869,8 +872,8 @@ VALUES(
         },
         {
             "code": "market_scan",
-            "name": "市场扫描",
-            "description": "市场池扫描策略（热门与活跃）",
+            "name": "市場掃描",
+            "description": "市場池掃描策略（熱門與活躍）",
             "version": "v1",
             "enabled": 1,
             "market_scope": "ALL",
@@ -910,13 +913,13 @@ SELECT
     ELSE 'watchlist_agent'
   END AS strategy_code,
   CASE
-    WHEN ec.strategy_tags LIKE '%trend_follow%' THEN '趋势延续'
+    WHEN ec.strategy_tags LIKE '%trend_follow%' THEN '趨勢延續'
     WHEN ec.strategy_tags LIKE '%macd_golden%' THEN 'MACD金叉'
     WHEN ec.strategy_tags LIKE '%volume_breakout%' THEN '放量突破'
-    WHEN ec.strategy_tags LIKE '%pullback%' THEN '回踩确认'
-    WHEN ec.strategy_tags LIKE '%rebound%' THEN '超跌反弹'
-    WHEN ec.candidate_source = 'market_scan' THEN '市场扫描'
-    ELSE 'Agent建议'
+    WHEN ec.strategy_tags LIKE '%pullback%' THEN '回踩確認'
+    WHEN ec.strategy_tags LIKE '%rebound%' THEN '超跌反彈'
+    WHEN ec.candidate_source = 'market_scan' THEN '市場掃描'
+    ELSE 'Agent建議'
   END AS strategy_name,
   'v1' AS strategy_version,
   CASE
@@ -1394,7 +1397,7 @@ WHERE source_pool = 'market_scan'
 
 
 def _m114_paper_trading_tables(conn: Connection) -> None:
-    """创建模拟盘三张表。"""
+    """建立模擬交易三張表。"""
     if not _has_table(conn, "paper_trading_account"):
         conn.execute(
             text(
@@ -1475,7 +1478,7 @@ CREATE TABLE paper_trading_trades (
 
 
 def _m115_paper_trading_excluded_markets(conn: Connection) -> None:
-    """模拟盘账户新增 excluded_markets 字段。"""
+    """模擬交易帳戶新增 excluded_markets 欄位。"""
     _add_column_if_missing(
         conn,
         "paper_trading_account",
@@ -1485,7 +1488,7 @@ def _m115_paper_trading_excluded_markets(conn: Connection) -> None:
 
 
 def _m116_chat_tables(conn: Connection) -> None:
-    """AI 对话表。"""
+    """AI 對話表。"""
     conn.execute(
         text("""
         CREATE TABLE IF NOT EXISTS chat_conversations (
@@ -1533,7 +1536,7 @@ def _m117_chat_initial_context(conn: Connection) -> None:
 
 
 def _m118_paper_trading_market_allocations(conn: Connection) -> None:
-    """模拟盘账户新增 market_allocations（各市场投资比例），并由 excluded_markets 回填。"""
+    """模擬交易帳戶新增 market_allocations（各市場投資比例），並由 excluded_markets 回填。"""
     _add_column_if_missing(
         conn,
         "paper_trading_account",
@@ -1543,7 +1546,7 @@ def _m118_paper_trading_market_allocations(conn: Connection) -> None:
     if not _has_table(conn, "paper_trading_account"):
         return
 
-    # 迁移必须自包含，不能依赖业务模块的运行时代码。
+    # 遷移必須自包含，不能依賴業務模組的執行時程式碼。
     def allocations_from_excluded(excluded: list[str]) -> dict[str, float]:
         markets = ("CN", "HK", "US")
         defaults = {"CN": 0.5, "HK": 0.3, "US": 0.2}
@@ -1560,7 +1563,7 @@ def _m118_paper_trading_market_allocations(conn: Connection) -> None:
     for r in rows:
         row_id = r[0]
 
-        # 已有非空比例则跳过，避免覆盖用户配置
+        # 已有非空比例則跳過，避免覆蓋使用者配置
         raw_alloc = r[2]
         has_alloc = False
         if isinstance(raw_alloc, str) and raw_alloc.strip() and raw_alloc.strip() not in ("{}", "null"):
@@ -1593,7 +1596,7 @@ def _m118_paper_trading_market_allocations(conn: Connection) -> None:
 
 
 def _m119_pat_and_mcp_tables(conn: Connection) -> None:
-    """PAT 令牌表 + MCP 调用日志表(MCP Server 鉴权与审计)。"""
+    """PAT 令牌表 + MCP 呼叫日誌表(MCP Server 鑑權與審計)。"""
     conn.execute(
         text(
             """
@@ -1612,7 +1615,7 @@ def _m119_pat_and_mcp_tables(conn: Connection) -> None:
         """
         )
     )
-    # 与 ORM 模型的自动唯一索引同名(token_hash unique+index),便于 create_all 复核
+    # 與 ORM 模型的自動唯一索引同名(token_hash unique+index),便於 create_all 複核
     _create_index_if_missing(
         conn,
         "ix_personal_access_tokens_token_hash",
@@ -1655,10 +1658,10 @@ def _m119_pat_and_mcp_tables(conn: Connection) -> None:
 
 
 def _m120_agent_prediction_evaluation(conn: Connection) -> None:
-    """建议后验分组与交易日口径。
+    """建議後驗分組與交易日口徑。
 
-    已存在记录保留旧自然日口径，避免升级时把历史结果悄悄改写；新记录由 ORM
-    默认写入 trading_days。
+    已存在記錄保留舊自然日口徑，避免升級時把歷史結果悄悄改寫；新記錄由 ORM
+    預設寫入 trading_days。
     """
     _add_column_if_missing(
         conn,
@@ -1682,7 +1685,7 @@ def _m120_agent_prediction_evaluation(conn: Connection) -> None:
 
 
 def _m121_backtest_runs(conn: Connection) -> None:
-    """可持久化的策略回测运行记录。"""
+    """可持久化的策略回測執行記錄。"""
     conn.execute(
         text(
             """
@@ -1965,6 +1968,752 @@ def _m126_assistant_task_events(conn: Connection) -> None:
     )
 
 
+def _m127_calibration_integrity(conn: Connection) -> None:
+    """PR-0A 標定門控:persisted mode、immutable decision capture、application ledger.
+
+    Only builds structure and initializes FROZEN. Writes no weight, backfills no history.
+    """
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_modes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  mode TEXT NOT NULL DEFAULT 'FROZEN',
+  reason TEXT DEFAULT '',
+  policy_version TEXT DEFAULT '',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_mode_kind_market UNIQUE(kind, market)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_baselines (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  baseline_name TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  target TEXT NOT NULL DEFAULT '',
+  weight REAL NOT NULL DEFAULT 1.0,
+  config_hash TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'unvalidated-baseline',
+  meta TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_baseline_key UNIQUE(baseline_name, kind, market, target)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_provenance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  target TEXT NOT NULL DEFAULT '',
+  calibration_policy_version TEXT NOT NULL DEFAULT '',
+  cohort_fingerprint TEXT NOT NULL DEFAULT '',
+  population TEXT DEFAULT '',
+  ranker_version TEXT DEFAULT '',
+  evaluation_version TEXT DEFAULT '',
+  primary_horizon_sessions INTEGER,
+  decision_snapshot_ids TEXT DEFAULT '[]',
+  outcome_revisions TEXT DEFAULT '[]',
+  policy_payload TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_provenance_target_cohort UNIQUE(kind, market, target, cohort_fingerprint)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS calibration_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL DEFAULT 'factor',
+  market TEXT NOT NULL DEFAULT 'ALL',
+  target TEXT NOT NULL DEFAULT '',
+  regime TEXT DEFAULT '',
+  calibration_policy_version TEXT NOT NULL DEFAULT '',
+  cohort_fingerprint TEXT NOT NULL DEFAULT '',
+  population TEXT DEFAULT '',
+  ranker_version TEXT DEFAULT '',
+  evaluation_version TEXT DEFAULT '',
+  primary_horizon_sessions INTEGER,
+  source_config_versions TEXT DEFAULT '{}',
+  expected_live_config_hash TEXT DEFAULT '',
+  output_config_hash TEXT DEFAULT '',
+  sample_units INTEGER DEFAULT 0,
+  decision_dates INTEGER DEFAULT 0,
+  valid_ic_periods INTEGER DEFAULT 0,
+  raw_rows INTEGER DEFAULT 0,
+  signal_ids INTEGER DEFAULT 0,
+  old_weight REAL,
+  target_weight REAL,
+  new_weight REAL,
+  mode TEXT DEFAULT '',
+  reason TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_calibration_application_key
+    UNIQUE(kind, market, target, calibration_policy_version, cohort_fingerprint)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS ranking_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  capture_id TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT 'CN',
+  session_date TEXT NOT NULL DEFAULT '',
+  decision_at_utc DATETIME,
+  captured_at_utc DATETIME,
+  source_pool TEXT DEFAULT '',
+  scan_run_id INTEGER,
+  candidate_ids TEXT DEFAULT '[]',
+  catalog_authority TEXT DEFAULT '{}',
+  universe_ids TEXT DEFAULT '[]',
+  universe_hash TEXT DEFAULT '',
+  item_count INTEGER DEFAULT 0,
+  eligibility_reasons TEXT DEFAULT '[]',
+  ranker_version TEXT DEFAULT '',
+  scoring_config_version TEXT DEFAULT '',
+  evaluation_version TEXT DEFAULT '',
+  calibration_policy_version TEXT DEFAULT '',
+  capture_hash TEXT DEFAULT '',
+  meta TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_ranking_snapshot_capture UNIQUE(capture_id)
+)
+"""
+        )
+    )
+    conn.execute(
+        text(
+            """
+CREATE TABLE IF NOT EXISTS ranking_snapshot_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  decision_snapshot_id TEXT NOT NULL DEFAULT '',
+  ranking_snapshot_id INTEGER,
+  stock_symbol TEXT NOT NULL DEFAULT '',
+  instrument_id TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT 'CN',
+  strategy_code TEXT NOT NULL DEFAULT '',
+  regime TEXT DEFAULT 'default',
+  session_date TEXT NOT NULL DEFAULT '',
+  decision_at_utc DATETIME,
+  captured_at_utc DATETIME,
+  quote_source_time TEXT DEFAULT '',
+  bar_source_time TEXT DEFAULT '',
+  available_at_utc DATETIME,
+  receipt_at_utc DATETIME,
+  point_in_time_status TEXT DEFAULT 'UNVERIFIABLE',
+  outcome_population_id TEXT DEFAULT 'legacy-unlabelled',
+  evaluation_version TEXT DEFAULT '',
+  ranker_version TEXT DEFAULT '',
+  scoring_config_version TEXT DEFAULT '',
+  calibration_policy_version TEXT DEFAULT '',
+  alpha_score REAL,
+  catalyst_score REAL,
+  quality_score REAL,
+  risk_penalty REAL,
+  crowd_penalty REAL,
+  source_bonus REAL,
+  regime_multiplier REAL DEFAULT 1.0,
+  raw_factor_values TEXT DEFAULT '{}',
+  factor_versions TEXT DEFAULT '{}',
+  entry_price REAL,
+  stop_loss REAL,
+  target_price REAL,
+  eligibility TEXT DEFAULT '{}',
+  ranking_value REAL,
+  primary_horizon_sessions INTEGER,
+  exit_session_date TEXT DEFAULT '',
+  exit_session_complete INTEGER,
+  capture_hash TEXT DEFAULT '',
+  candidate_id INTEGER,
+  signal_run_id INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_ranking_item_capture FOREIGN KEY (ranking_snapshot_id)
+    REFERENCES ranking_snapshots (id),
+  CONSTRAINT uq_ranking_decision_snapshot_id UNIQUE(decision_snapshot_id)
+)
+"""
+        )
+    )
+
+    for index_name, sql in (
+        ("ix_calibration_mode_mode",
+         "CREATE INDEX ix_calibration_mode_mode ON calibration_modes(mode)"),
+        ("ix_calibration_baseline_name",
+         "CREATE INDEX ix_calibration_baseline_name ON calibration_baselines(baseline_name)"),
+        ("ix_calibration_baseline_created",
+         "CREATE INDEX ix_calibration_baseline_created ON calibration_baselines(created_at)"),
+        ("ix_calibration_application_time",
+         "CREATE INDEX ix_calibration_application_time ON calibration_applications(created_at)"),
+        ("ix_calibration_application_market_kind",
+         "CREATE INDEX ix_calibration_application_market_kind ON calibration_applications(market, kind)"),
+        ("ix_calibration_provenance_time",
+         "CREATE INDEX ix_calibration_provenance_time ON calibration_provenance(created_at)"),
+        ("ix_ranking_snapshot_market_date",
+         "CREATE INDEX ix_ranking_snapshot_market_date ON ranking_snapshots(stock_market, session_date)"),
+        ("ix_ranking_snapshot_created",
+         "CREATE INDEX ix_ranking_snapshot_created ON ranking_snapshots(created_at)"),
+        ("ix_ranking_item_market_date",
+         "CREATE INDEX ix_ranking_item_market_date ON ranking_snapshot_items(stock_market, session_date)"),
+        ("ix_ranking_item_strategy_market",
+         "CREATE INDEX ix_ranking_item_strategy_market ON ranking_snapshot_items(strategy_code, stock_market)"),
+        ("ix_ranking_item_instrument",
+         "CREATE INDEX ix_ranking_item_instrument ON ranking_snapshot_items(stock_market, instrument_id, session_date)"),
+    ):
+        _create_index_if_missing(conn, index_name, sql)
+
+    # StrategyWeight gains the same pin/auto-calibrate fields FactorWeight already has.
+    if _has_table(conn, "strategy_weights"):
+        for column, default in (("is_pinned", "0"), ("auto_calibrate", "1")):
+            if not _has_column(conn, "strategy_weights", column):
+                conn.execute(
+                    text(
+                        f"ALTER TABLE strategy_weights "
+                        f"ADD COLUMN {column} BOOLEAN NOT NULL DEFAULT {default}"
+                    )
+                )
+
+    # Persist FROZEN for every market already present plus ALL, before any versioned write.
+    markets: set[str] = {"ALL"}
+    for table, column in (
+        ("factor_weights", "market"),
+        ("strategy_weights", "market"),
+    ):
+        if not _has_table(conn, table):
+            continue
+        for row in conn.execute(text(f"SELECT DISTINCT {column} FROM {table}")):
+            value = str(row[0] or "").strip().upper()
+            if value:
+                markets.add(value)
+    for kind in ("factor", "strategy"):
+        for market in sorted(markets):
+            # Re-entry safe: a rerun of the migration must not collide with the seeded
+            # FROZEN rows, so the default is written only when the pair is absent.
+            existing = conn.execute(
+                text(
+                    """
+SELECT kind, market
+FROM calibration_modes
+WHERE kind = :kind AND market = :market
+LIMIT 1
+"""
+                ),
+                {"kind": kind, "market": market},
+            ).first()
+            if existing:
+                continue
+            conn.execute(
+                text(
+                    """
+INSERT INTO calibration_modes
+  (kind, market, mode, reason, policy_version)
+VALUES(:kind, :market, 'FROZEN', 'pr-0a containment default', :policy)
+"""
+                ),
+                {
+                    "kind": kind,
+                    "market": market,
+                    "policy": CALIBRATION_POLICY_VERSION,
+                },
+            )
+
+
+def _m128_discovery_coverage(conn: Connection) -> None:
+    """PR-0B bounded discovery manifests, captured authority, and cost inputs."""
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS discovery_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scan_run_key TEXT NOT NULL DEFAULT '',
+  revision INTEGER NOT NULL DEFAULT 1,
+  stock_market TEXT NOT NULL DEFAULT 'TW',
+  requested_venues TEXT DEFAULT '["TWSE","TPEX"]',
+  source_mode TEXT NOT NULL DEFAULT '',
+  provider_scope TEXT DEFAULT '',
+  provider_raw_status TEXT DEFAULT '',
+  scan_coverage_state TEXT NOT NULL DEFAULT 'UNKNOWN',
+  coverage_scope TEXT NOT NULL DEFAULT 'UNKNOWN',
+  run_started_at_utc DATETIME,
+  run_completed_at_utc DATETIME,
+  catalog_source TEXT DEFAULT '',
+  catalog_source_as_of TEXT,
+  catalog_captured_at_utc DATETIME,
+  catalog_authority_status TEXT DEFAULT 'UNKNOWN',
+  catalog_hash TEXT DEFAULT '',
+  catalog_response_row_count INTEGER DEFAULT 0,
+  catalog_unique_count INTEGER DEFAULT 0,
+  duplicate_catalog_record_count INTEGER DEFAULT 0,
+  invalid_catalog_record_count INTEGER DEFAULT 0,
+  eligible_catalog_count INTEGER DEFAULT 0,
+  requested_universe_count INTEGER DEFAULT 0,
+  not_requested_due_to_limit_count INTEGER DEFAULT 0,
+  attempted_instrument_count INTEGER DEFAULT 0,
+  unattempted_instrument_count INTEGER DEFAULT 0,
+  valid_price_count INTEGER DEFAULT 0,
+  invalid_price_count INTEGER DEFAULT 0,
+  missing_or_failed_price_count INTEGER DEFAULT 0,
+  pending_price_count INTEGER DEFAULT 0,
+  ranking_eligible_count INTEGER DEFAULT 0,
+  ranking_excluded_count INTEGER DEFAULT 0,
+  pool_selected_count INTEGER DEFAULT 0,
+  ranked_not_selected_count INTEGER DEFAULT 0,
+  candidate_selected_count INTEGER DEFAULT 0,
+  candidate_excluded_count INTEGER DEFAULT 0,
+  candidate_not_selected_count INTEGER DEFAULT 0,
+  catalog_request_count INTEGER DEFAULT 0,
+  price_snapshot_request_count INTEGER DEFAULT 0,
+  price_snapshot_batches_planned INTEGER DEFAULT 0,
+  unattempted_price_snapshot_batches INTEGER DEFAULT 0,
+  pending_price_snapshot_batches INTEGER DEFAULT 0,
+  failed_request_count INTEGER DEFAULT 0,
+  price_snapshot_count INTEGER DEFAULT 0,
+  price_data_dates TEXT DEFAULT '[]',
+  stage_id_sets TEXT DEFAULT '{}',
+  stage_reason_id_sets TEXT DEFAULT '{}',
+  stage_reason_counts TEXT DEFAULT '{}',
+  scan_limits TEXT DEFAULT '{}',
+  authority_by_instrument_id TEXT DEFAULT '{}',
+  candidate_ids TEXT DEFAULT '[]',
+  manifest TEXT DEFAULT '{}',
+  manifest_hash TEXT DEFAULT '',
+  selection_config_version TEXT DEFAULT '',
+  selection_config TEXT DEFAULT '{}',
+  selection_config_hash TEXT DEFAULT '',
+  retention_expires_at_utc DATETIME,
+  archived BOOLEAN NOT NULL DEFAULT 0,
+  archived_at_utc DATETIME,
+  archived_reason TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_discovery_run_key UNIQUE(scan_run_key)
+)
+"""))
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS discovery_exclusions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  discovery_run_id INTEGER NOT NULL,
+  stage TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  reason_code TEXT NOT NULL DEFAULT '',
+  instrument_ids TEXT DEFAULT '[]',
+  item_count INTEGER NOT NULL DEFAULT 0,
+  details TEXT DEFAULT '{}',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_discovery_exclusion_run FOREIGN KEY (discovery_run_id)
+    REFERENCES discovery_runs(id) ON DELETE CASCADE,
+  CONSTRAINT uq_discovery_exclusion_partition UNIQUE(
+    discovery_run_id, stage, outcome, reason_code
+  )
+)
+"""))
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS instrument_cost_authorities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  instrument_id TEXT NOT NULL,
+  tax_category TEXT NOT NULL DEFAULT 'UNKNOWN',
+  classification_authority TEXT NOT NULL DEFAULT '',
+  classification_source TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  effective_from TEXT NOT NULL DEFAULT '',
+  effective_to TEXT,
+  stamp_duty_rate REAL,
+  commission_rate REAL,
+  minimum_commission REAL,
+  transfer_fee_rate REAL,
+  slippage_bps REAL,
+  evidence_hash TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_instrument_cost_authority_version_date
+    UNIQUE(instrument_id, policy_version, effective_from)
+)
+"""))
+
+    for table, fields in {
+        "discovery_runs": (
+            ("requested_venues", "TEXT DEFAULT '[\"TWSE\",\"TPEX\"]'"),
+            ("scan_limits", "TEXT DEFAULT '{}'"),
+            ("selection_config", "TEXT DEFAULT '{}'"),
+            ("selection_config_hash", "TEXT DEFAULT ''"),
+        ),
+        "entry_candidates": (
+            ("instrument_id", "TEXT"), ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"), ("scan_run_id", "INTEGER"),
+            ("scan_run_ids", "TEXT DEFAULT '[]'"), ("scan_run_refs", "TEXT DEFAULT '[]'"),
+        ),
+        "market_scan_snapshots": (
+            ("instrument_id", "TEXT"), ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"), ("scan_run_ids", "TEXT DEFAULT '[]'"),
+            ("scan_run_refs", "TEXT DEFAULT '[]'"),
+        ),
+        "strategy_signal_runs": (
+            ("instrument_id", "TEXT"), ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"), ("scan_run_id", "INTEGER"),
+            ("scan_run_ids", "TEXT DEFAULT '[]'"), ("scan_run_refs", "TEXT DEFAULT '[]'"),
+        ),
+        "ranking_snapshots": (("scan_run_ids", "TEXT DEFAULT '[]'"),),
+        "ranking_snapshot_items": (
+            ("scan_run_id", "INTEGER"), ("scan_run_ids", "TEXT DEFAULT '[]'"),
+            ("scan_run_refs", "TEXT DEFAULT '[]'"),
+            ("instrument_group", "TEXT NOT NULL DEFAULT 'UNKNOWN'"),
+            ("instrument_authority", "TEXT DEFAULT '{}'"),
+        ),
+    }.items():
+        for column, sql_type in fields:
+            _add_column_if_missing(
+                conn,
+                table,
+                column,
+                f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}",
+            )
+
+    for name, statement in (
+        ("ix_discovery_run_market_completed",
+         "CREATE INDEX ix_discovery_run_market_completed ON discovery_runs(stock_market, run_completed_at_utc)"),
+        ("ix_discovery_run_retention",
+         "CREATE INDEX ix_discovery_run_retention ON discovery_runs(retention_expires_at_utc, archived)"),
+        ("ix_discovery_exclusion_run_stage",
+         "CREATE INDEX ix_discovery_exclusion_run_stage ON discovery_exclusions(discovery_run_id, stage)"),
+        ("ix_instrument_cost_authority_dates",
+         "CREATE INDEX ix_instrument_cost_authority_dates ON instrument_cost_authorities(instrument_id, effective_from, effective_to)"),
+    ):
+        _create_index_if_missing(conn, name, statement)
+
+
+def _m129_point_in_time_outcomes(conn: Connection) -> None:
+    """Separate immutable v2 outcome populations and retain every evaluated input."""
+    for column, sql_type in (
+        ("entry_low", "REAL"),
+        ("entry_high", "REAL"),
+        ("action", "TEXT NOT NULL DEFAULT 'watch'"),
+        ("is_holding_snapshot", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("candidate_source", "TEXT NOT NULL DEFAULT ''"),
+        ("score_version", "TEXT NOT NULL DEFAULT ''"),
+    ):
+        _add_column_if_missing(
+            conn,
+            "ranking_snapshot_items",
+            column,
+            f"ALTER TABLE ranking_snapshot_items ADD COLUMN {column} {sql_type}",
+        )
+
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS strategy_outcomes_v2 (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  decision_snapshot_id TEXT NOT NULL,
+  candidate_id INTEGER,
+  signal_run_id INTEGER,
+  strategy_code TEXT NOT NULL DEFAULT '',
+  stock_symbol TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT '',
+  instrument_id TEXT NOT NULL DEFAULT '',
+  instrument_group TEXT NOT NULL DEFAULT 'UNKNOWN',
+  instrument_authority TEXT DEFAULT '{}',
+  session_date TEXT NOT NULL DEFAULT '',
+  decision_at_utc DATETIME,
+  decision_score REAL,
+  decision_capture_hash TEXT NOT NULL DEFAULT '',
+  decision_payload TEXT DEFAULT '{}',
+  decision_point_in_time_status TEXT NOT NULL DEFAULT 'UNVERIFIABLE',
+  outcome_population_id TEXT NOT NULL DEFAULT '',
+  horizon_sessions INTEGER NOT NULL,
+  evaluation_version TEXT NOT NULL DEFAULT '',
+  score_version TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  policy_payload TEXT DEFAULT '{}',
+  policy_hash TEXT NOT NULL DEFAULT '',
+  calendar_version TEXT NOT NULL DEFAULT '',
+  calendar_source TEXT NOT NULL DEFAULT '',
+  calendar_timezone TEXT NOT NULL DEFAULT '',
+  calendar_confidence TEXT NOT NULL DEFAULT 'UNKNOWN',
+  expected_session_dates TEXT DEFAULT '[]',
+  entry_status TEXT NOT NULL DEFAULT 'PENDING',
+  evaluation_status TEXT NOT NULL DEFAULT 'PENDING',
+  barrier_order TEXT NOT NULL DEFAULT 'NONE',
+  benchmark_status TEXT NOT NULL DEFAULT 'PENDING',
+  reason_code TEXT NOT NULL DEFAULT '',
+  cost_reason_code TEXT NOT NULL DEFAULT '',
+  benchmark_reason_code TEXT NOT NULL DEFAULT '',
+  entry_session_date TEXT,
+  entry_timestamp DATETIME,
+  entry_time_precision TEXT NOT NULL DEFAULT 'SESSION_ONLY',
+  exit_session_date TEXT,
+  entry_price REAL,
+  exit_price REAL,
+  stock_gross_return_pct REAL,
+  stock_net_return_pct REAL,
+  stock_cost_assumption_pct REAL,
+  stock_adjustment_mode TEXT NOT NULL DEFAULT '',
+  quantity INTEGER,
+  lot_size INTEGER,
+  notional REAL,
+  cost_breakdown TEXT DEFAULT '{}',
+  benchmark_id TEXT,
+  benchmark_entry_close REAL,
+  benchmark_exit_close REAL,
+  benchmark_gross_return_pct REAL,
+  relative_net_percentage_points REAL,
+  stock_input_hash TEXT,
+  stock_facts_hash TEXT,
+  stock_attempt_count INTEGER NOT NULL DEFAULT 0,
+  stock_first_attempt_at DATETIME,
+  stock_next_retry_at DATETIME,
+  stock_retry_deadline_at DATETIME,
+  stock_retryable BOOLEAN NOT NULL DEFAULT 1,
+  benchmark_attempt_count INTEGER NOT NULL DEFAULT 0,
+  benchmark_next_retry_at DATETIME,
+  benchmark_retry_deadline_at DATETIME,
+  benchmark_retryable BOOLEAN NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_outcome_v2_decision FOREIGN KEY (decision_snapshot_id)
+    REFERENCES ranking_snapshot_items(decision_snapshot_id),
+  CONSTRAINT uq_strategy_outcome_v2_decision_population_horizon_version
+    UNIQUE(decision_snapshot_id, outcome_population_id, horizon_sessions, evaluation_version)
+)
+"""))
+    _add_column_if_missing(
+        conn, "strategy_outcomes_v2", "stock_adjustment_mode",
+        "ALTER TABLE strategy_outcomes_v2 ADD COLUMN stock_adjustment_mode TEXT NOT NULL DEFAULT ''",
+    )
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS outcome_evaluation_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  outcome_id INTEGER NOT NULL,
+  attempt_kind TEXT NOT NULL DEFAULT 'stock',
+  attempt_number INTEGER NOT NULL DEFAULT 1,
+  input_hash TEXT NOT NULL DEFAULT '',
+  input_snapshot TEXT DEFAULT '{}',
+  result_status TEXT NOT NULL DEFAULT '',
+  reason_code TEXT NOT NULL DEFAULT '',
+  retryable BOOLEAN NOT NULL DEFAULT 1,
+  next_retry_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_outcome_attempt_parent FOREIGN KEY (outcome_id)
+    REFERENCES strategy_outcomes_v2(id) ON DELETE RESTRICT
+)
+"""))
+    for name, statement in (
+        ("ix_strategy_outcome_v2_market_status",
+         "CREATE INDEX ix_strategy_outcome_v2_market_status ON strategy_outcomes_v2(stock_market, evaluation_status)"),
+        ("ix_strategy_outcome_v2_population_horizon",
+         "CREATE INDEX ix_strategy_outcome_v2_population_horizon ON strategy_outcomes_v2(outcome_population_id, horizon_sessions)"),
+        ("ix_strategy_outcome_v2_retry",
+         "CREATE INDEX ix_strategy_outcome_v2_retry ON strategy_outcomes_v2(stock_retryable, stock_next_retry_at)"),
+        ("ix_strategy_outcome_v2_decision",
+         "CREATE INDEX ix_strategy_outcome_v2_decision ON strategy_outcomes_v2(decision_snapshot_id)"),
+        ("ix_outcome_attempt_outcome_kind",
+         "CREATE INDEX ix_outcome_attempt_outcome_kind ON outcome_evaluation_attempts(outcome_id, attempt_kind, id)"),
+        ("ix_outcome_attempt_input_hash",
+         "CREATE INDEX ix_outcome_attempt_input_hash ON outcome_evaluation_attempts(input_hash)"),
+    ):
+        _create_index_if_missing(conn, name, statement)
+
+    conn.execute(text("""
+CREATE TRIGGER IF NOT EXISTS trg_outcome_attempt_no_update
+BEFORE UPDATE ON outcome_evaluation_attempts
+BEGIN SELECT RAISE(ABORT, 'outcome attempts are append-only'); END
+"""))
+    conn.execute(text("""
+CREATE TRIGGER IF NOT EXISTS trg_outcome_attempt_no_delete
+BEFORE DELETE ON outcome_evaluation_attempts
+BEGIN SELECT RAISE(ABORT, 'outcome attempts are append-only'); END
+"""))
+    conn.execute(text("""
+CREATE TRIGGER IF NOT EXISTS trg_outcome_v2_terminal_stock_immutable
+BEFORE UPDATE ON strategy_outcomes_v2
+WHEN (OLD.evaluation_status IN ('COMPLETE', 'AMBIGUOUS') OR
+      (OLD.evaluation_status = 'INSUFFICIENT_DATA' AND OLD.stock_retryable = 0)) AND (
+  NEW.decision_snapshot_id IS NOT OLD.decision_snapshot_id OR
+  NEW.candidate_id IS NOT OLD.candidate_id OR
+  NEW.signal_run_id IS NOT OLD.signal_run_id OR
+  NEW.strategy_code IS NOT OLD.strategy_code OR
+  NEW.stock_symbol IS NOT OLD.stock_symbol OR
+  NEW.stock_market IS NOT OLD.stock_market OR
+  NEW.instrument_id IS NOT OLD.instrument_id OR
+  NEW.instrument_group IS NOT OLD.instrument_group OR
+  NEW.instrument_authority IS NOT OLD.instrument_authority OR
+  NEW.session_date IS NOT OLD.session_date OR
+  NEW.decision_at_utc IS NOT OLD.decision_at_utc OR
+  NEW.decision_score IS NOT OLD.decision_score OR
+  NEW.decision_capture_hash IS NOT OLD.decision_capture_hash OR
+  NEW.decision_payload IS NOT OLD.decision_payload OR
+  NEW.decision_point_in_time_status IS NOT OLD.decision_point_in_time_status OR
+  NEW.outcome_population_id IS NOT OLD.outcome_population_id OR
+  NEW.horizon_sessions IS NOT OLD.horizon_sessions OR
+  NEW.evaluation_version IS NOT OLD.evaluation_version OR
+  NEW.score_version IS NOT OLD.score_version OR
+  NEW.policy_version IS NOT OLD.policy_version OR
+  NEW.policy_payload IS NOT OLD.policy_payload OR
+  NEW.policy_hash IS NOT OLD.policy_hash OR
+  NEW.calendar_version IS NOT OLD.calendar_version OR
+  NEW.calendar_source IS NOT OLD.calendar_source OR
+  NEW.calendar_timezone IS NOT OLD.calendar_timezone OR
+  NEW.calendar_confidence IS NOT OLD.calendar_confidence OR
+  NEW.expected_session_dates IS NOT OLD.expected_session_dates OR
+  NEW.entry_status IS NOT OLD.entry_status OR
+  NEW.evaluation_status IS NOT OLD.evaluation_status OR
+  NEW.barrier_order IS NOT OLD.barrier_order OR
+  NEW.reason_code IS NOT OLD.reason_code OR
+  NEW.cost_reason_code IS NOT OLD.cost_reason_code OR
+  NEW.entry_session_date IS NOT OLD.entry_session_date OR
+  NEW.entry_timestamp IS NOT OLD.entry_timestamp OR
+  NEW.entry_time_precision IS NOT OLD.entry_time_precision OR
+  NEW.exit_session_date IS NOT OLD.exit_session_date OR
+  NEW.entry_price IS NOT OLD.entry_price OR
+  NEW.exit_price IS NOT OLD.exit_price OR
+  NEW.stock_gross_return_pct IS NOT OLD.stock_gross_return_pct OR
+  NEW.stock_net_return_pct IS NOT OLD.stock_net_return_pct OR
+  NEW.stock_cost_assumption_pct IS NOT OLD.stock_cost_assumption_pct OR
+  NEW.stock_adjustment_mode IS NOT OLD.stock_adjustment_mode OR
+  NEW.quantity IS NOT OLD.quantity OR
+  NEW.lot_size IS NOT OLD.lot_size OR
+  NEW.notional IS NOT OLD.notional OR
+  NEW.cost_breakdown IS NOT OLD.cost_breakdown OR
+  NEW.stock_input_hash IS NOT OLD.stock_input_hash OR
+  NEW.stock_facts_hash IS NOT OLD.stock_facts_hash OR
+  NEW.stock_attempt_count IS NOT OLD.stock_attempt_count OR
+  NEW.stock_first_attempt_at IS NOT OLD.stock_first_attempt_at OR
+  NEW.stock_retryable IS NOT OLD.stock_retryable OR
+  NEW.stock_next_retry_at IS NOT OLD.stock_next_retry_at OR
+  NEW.stock_retry_deadline_at IS NOT OLD.stock_retry_deadline_at
+)
+BEGIN SELECT RAISE(ABORT, 'terminal stock outcome facts are immutable'); END
+"""))
+
+
+def _m130_ranker_v2_portfolio_selection(conn: Connection) -> None:
+    """Persist uncapped ranker-v2 projections and immutable selection evidence."""
+    _add_column_if_missing(
+        conn, "ranking_snapshots", "ranking_reference",
+        "ALTER TABLE ranking_snapshots ADD COLUMN ranking_reference TEXT NOT NULL DEFAULT '{}'",
+    )
+    _add_column_if_missing(
+        conn, "ranking_snapshots", "ranking_reference_hash",
+        "ALTER TABLE ranking_snapshots ADD COLUMN ranking_reference_hash TEXT NOT NULL DEFAULT ''",
+    )
+    for column, sql_type in (
+        ("ranking_value", "REAL"),
+        ("score_version", "TEXT NOT NULL DEFAULT 'legacy-score-v1'"),
+        ("ranker_version", "TEXT NOT NULL DEFAULT 'ranker-v1'"),
+        ("scoring_config_version", "TEXT NOT NULL DEFAULT ''"),
+        ("decision_snapshot_id", "TEXT"),
+        ("selected_for_portfolio", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("constrained", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("constraint_reasons", "TEXT NOT NULL DEFAULT '[]'"),
+        ("selection_metadata", "TEXT NOT NULL DEFAULT '{}'"),
+    ):
+        _add_column_if_missing(
+            conn,
+            "strategy_signal_runs",
+            column,
+            f"ALTER TABLE strategy_signal_runs ADD COLUMN {column} {sql_type}",
+        )
+    _add_column_if_missing(
+        conn,
+        "ranking_snapshot_items",
+        "ranking_inputs",
+        "ALTER TABLE ranking_snapshot_items ADD COLUMN ranking_inputs TEXT NOT NULL DEFAULT '{}'",
+    )
+
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS portfolio_selection_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  selection_run_id TEXT NOT NULL,
+  capture_id TEXT NOT NULL DEFAULT '',
+  stock_market TEXT NOT NULL DEFAULT '',
+  instrument_group TEXT NOT NULL DEFAULT 'ALL',
+  snapshot_date TEXT NOT NULL DEFAULT '',
+  constraint_unit TEXT NOT NULL DEFAULT 'ROW',
+  ranker_version TEXT NOT NULL DEFAULT 'ranker-v1',
+  scoring_config_version TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  cap INTEGER,
+  high_risk_share REAL,
+  strategy_share REAL,
+  before_row_count INTEGER NOT NULL DEFAULT 0,
+  after_row_count INTEGER NOT NULL DEFAULT 0,
+  before_instrument_count INTEGER NOT NULL DEFAULT 0,
+  after_instrument_count INTEGER NOT NULL DEFAULT 0,
+  quota_metadata TEXT NOT NULL DEFAULT '{}',
+  decision_snapshot_ids TEXT NOT NULL DEFAULT '[]',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_portfolio_selection_run_id UNIQUE(selection_run_id)
+)
+"""))
+    conn.execute(text("""
+CREATE TABLE IF NOT EXISTS portfolio_constraint_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  selection_run_id TEXT NOT NULL,
+  stock_market TEXT NOT NULL DEFAULT '',
+  snapshot_date TEXT NOT NULL DEFAULT '',
+  instrument_id TEXT NOT NULL DEFAULT '',
+  strategy_code TEXT NOT NULL DEFAULT '',
+  signal_run_id INTEGER NOT NULL,
+  decision_snapshot_id TEXT,
+  is_representative BOOLEAN NOT NULL DEFAULT 0,
+  selected_for_portfolio BOOLEAN NOT NULL DEFAULT 0,
+  constrained BOOLEAN NOT NULL DEFAULT 0,
+  reason_codes TEXT NOT NULL DEFAULT '[]',
+  constraint_unit TEXT NOT NULL DEFAULT 'ROW',
+  before_row_count INTEGER NOT NULL DEFAULT 0,
+  after_row_count INTEGER NOT NULL DEFAULT 0,
+  before_instrument_count INTEGER NOT NULL DEFAULT 0,
+  after_instrument_count INTEGER NOT NULL DEFAULT 0,
+  quota_metadata TEXT NOT NULL DEFAULT '{}',
+  ranker_version TEXT NOT NULL DEFAULT 'ranker-v1',
+  scoring_config_version TEXT NOT NULL DEFAULT '',
+  policy_version TEXT NOT NULL DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_portfolio_ledger_run_signal UNIQUE(selection_run_id, signal_run_id),
+  CONSTRAINT fk_portfolio_ledger_run FOREIGN KEY(selection_run_id)
+    REFERENCES portfolio_selection_runs(selection_run_id) ON DELETE RESTRICT
+)
+"""))
+    for name, statement in (
+        ("ix_strategy_signal_ranker_version",
+         "CREATE INDEX ix_strategy_signal_ranker_version ON strategy_signal_runs(ranker_version, snapshot_date)"),
+        ("ix_strategy_signal_selected",
+         "CREATE INDEX ix_strategy_signal_selected ON strategy_signal_runs(snapshot_date, selected_for_portfolio)"),
+        ("ix_portfolio_selection_market_date",
+         "CREATE INDEX ix_portfolio_selection_market_date ON portfolio_selection_runs(stock_market, snapshot_date)"),
+        ("ix_portfolio_selection_capture",
+         "CREATE INDEX ix_portfolio_selection_capture ON portfolio_selection_runs(capture_id)"),
+        ("ix_portfolio_ledger_instrument",
+         "CREATE INDEX ix_portfolio_ledger_instrument ON portfolio_constraint_ledger(stock_market, instrument_id, snapshot_date)"),
+        ("ix_portfolio_ledger_decision",
+         "CREATE INDEX ix_portfolio_ledger_decision ON portfolio_constraint_ledger(decision_snapshot_id)"),
+    ):
+        _create_index_if_missing(conn, name, statement)
+
+    for table, prefix in (
+        ("portfolio_selection_runs", "portfolio selection runs"),
+        ("portfolio_constraint_ledger", "portfolio constraint ledger"),
+    ):
+        conn.execute(text(f"""
+CREATE TRIGGER IF NOT EXISTS trg_{table}_no_update
+BEFORE UPDATE ON {table}
+BEGIN SELECT RAISE(ABORT, '{prefix} are append-only'); END
+"""))
+        conn.execute(text(f"""
+CREATE TRIGGER IF NOT EXISTS trg_{table}_no_delete
+BEFORE DELETE ON {table}
+BEGIN SELECT RAISE(ABORT, '{prefix} are append-only'); END
+"""))
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(101, "agent_config_kind_and_visibility", _m101_agent_config_kind),
     Migration(102, "backfill_agent_kind_data", _m102_backfill_agent_kind),
@@ -1992,6 +2741,10 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(124, "assistant_context_snapshots", _m124_assistant_context_snapshots),
     Migration(125, "assistant_task_protocol", _m125_assistant_task_protocol),
     Migration(126, "assistant_task_events", _m126_assistant_task_events),
+    Migration(127, "calibration_integrity", _m127_calibration_integrity),
+    Migration(128, "discovery_coverage", _m128_discovery_coverage),
+    Migration(129, "point_in_time_outcomes", _m129_point_in_time_outcomes),
+    Migration(130, "ranker_v2_portfolio_selection", _m130_ranker_v2_portfolio_selection),
 )
 
 
@@ -2012,14 +2765,31 @@ LIMIT 1
     return int(row[0]), str(row[1]), int(row[2])
 
 
+def pending_migration_versions(conn: Connection) -> tuple[int, ...]:
+    """Read-only view of the versions that would be applied.
+
+    Unlike has_pending_migrations(), this does not create schema_migrations, so it can
+    be used to decide whether a backup is required before the first mutation.
+    """
+    try:
+        recorded = conn.execute(text("SELECT 1 FROM schema_migrations LIMIT 1")).first()
+    except Exception:
+        recorded = None
+    if recorded is None:
+        # run_versioned_migrations() will create the table and apply every migration.
+        return tuple(m.version for m in MIGRATIONS)
+    pending = []
+    for m in MIGRATIONS:
+        rec = _get_applied(conn, m.version)
+        if not rec or rec[2] != 1 or rec[1] != m.checksum:
+            pending.append(m.version)
+    return tuple(pending)
+
+
 def has_pending_migrations(engine: Engine) -> bool:
     with engine.begin() as conn:
         _ensure_schema_table(conn)
-        for m in MIGRATIONS:
-            rec = _get_applied(conn, m.version)
-            if not rec or rec[2] != 1 or rec[1] != m.checksum:
-                return True
-    return False
+        return bool(pending_migration_versions(conn))
 
 
 def run_versioned_migrations(engine: Engine) -> None:

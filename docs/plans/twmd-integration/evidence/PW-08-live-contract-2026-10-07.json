@@ -1,0 +1,596 @@
+{
+  "service": "http://127.0.0.1:8000",
+  "source_checkout_commit": "3acd67ffd98bbcf1713f9484d8a7b77871db6ade",
+  "deployed_commit": null,
+  "query_only": true,
+  "observations": [
+    {
+      "observed_at_utc": "2026-10-07T09:10:56.762412+00:00",
+      "endpoint": "/api/v1/broker-flow/quantities",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-07-23",
+        "end": "2026-07-24"
+      },
+      "http_status": 200,
+      "latency_ms": 36.531,
+      "row_count": 815,
+      "body_sample": [
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-07-24",
+          "source_branch_key": "twse:1020",
+          "branch_code": "1020",
+          "branch_name": "合　　庫",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 26653,
+          "sell_native": 5578,
+          "net_native": 21075,
+          "buy_vwap": "2353.9339",
+          "sell_vwap": "2353.9943",
+          "revision_id": "9bdec2a5be0fa18a3a3b7269f0dcfda8275a0eb610e25b030de1576d5c8c81c1"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-07-24",
+          "source_branch_key": "twse:1021",
+          "branch_code": "1021",
+          "branch_name": "合庫台中",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 25619,
+          "sell_native": 7346,
+          "net_native": 18273,
+          "buy_vwap": "2357.1804",
+          "sell_vwap": "2355.4683",
+          "revision_id": "9bdec2a5be0fa18a3a3b7269f0dcfda8275a0eb610e25b030de1576d5c8c81c1"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-07-24",
+          "source_branch_key": "twse:1022",
+          "branch_code": "1022",
+          "branch_name": "合庫台南",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 14470,
+          "sell_native": 557,
+          "net_native": 13913,
+          "buy_vwap": "2357.2768",
+          "sell_vwap": "2364.4165",
+          "revision_id": "9bdec2a5be0fa18a3a3b7269f0dcfda8275a0eb610e25b030de1576d5c8c81c1"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-07-24",
+          "source_branch_key": "twse:1023",
+          "branch_code": "1023",
+          "branch_name": "合庫高雄",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 16272,
+          "sell_native": 3231,
+          "net_native": 13041,
+          "buy_vwap": "2356.2297",
+          "sell_vwap": "2355.3513",
+          "revision_id": "9bdec2a5be0fa18a3a3b7269f0dcfda8275a0eb610e25b030de1576d5c8c81c1"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-07-24",
+          "source_branch_key": "twse:1024",
+          "branch_code": "1024",
+          "branch_name": "合庫嘉義",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 6510,
+          "sell_native": 8005,
+          "net_native": -1495,
+          "buy_vwap": "2353.7450",
+          "sell_vwap": "2353.1293",
+          "revision_id": "9bdec2a5be0fa18a3a3b7269f0dcfda8275a0eb610e25b030de1576d5c8c81c1"
+        }
+      ],
+      "response_rows_sha256": "dea4ae89d56e24b5af10aa422219c09ee2ddc15189a70368fd5ecd47b73fc26e",
+      "provider_unit_counts": {
+        "('twse', 'shares')": 815
+      },
+      "totals_by_provider_unit": [
+        {
+          "provider": "twse",
+          "native_unit": "shares",
+          "buy_native": 24585459,
+          "sell_native": 24585509
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:10:56.773927+00:00",
+      "endpoint": "/api/v1/broker-flow/coverage",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-07-23",
+        "end": "2026-07-24"
+      },
+      "http_status": 200,
+      "latency_ms": 11.359,
+      "row_count": 2,
+      "body": [
+        {
+          "provider": "capital",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "trade_date": "2026-07-23",
+          "status": "MISSING",
+          "record_count": 0,
+          "revision_id": null,
+          "failure_reason": null
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "trade_date": "2026-07-24",
+          "status": "AVAILABLE",
+          "record_count": 815,
+          "revision_id": "9bdec2a5be0fa18a3a3b7269f0dcfda8275a0eb610e25b030de1576d5c8c81c1",
+          "failure_reason": null
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:10:56.791298+00:00",
+      "endpoint": "/api/v1/broker-flow/quantities",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-10-02",
+        "end": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 17.352,
+      "row_count": 816,
+      "body_sample": [
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1020",
+          "branch_code": "1020",
+          "branch_name": "合　　庫",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 16016,
+          "sell_native": 761,
+          "net_native": 15255,
+          "buy_vwap": "2500.2032",
+          "sell_vwap": "2501.3141",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1021",
+          "branch_code": "1021",
+          "branch_name": "合庫台中",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 8906,
+          "sell_native": 1512,
+          "net_native": 7394,
+          "buy_vwap": "2500.4250",
+          "sell_vwap": "2504.5271",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1022",
+          "branch_code": "1022",
+          "branch_name": "合庫台南",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 20607,
+          "sell_native": 3159,
+          "net_native": 17448,
+          "buy_vwap": "2499.9685",
+          "sell_vwap": "2501.6999",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1023",
+          "branch_code": "1023",
+          "branch_name": "合庫高雄",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 7165,
+          "sell_native": 741,
+          "net_native": 6424,
+          "buy_vwap": "2500.1347",
+          "sell_vwap": "2498.3873",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "symbol": "2330",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1024",
+          "branch_code": "1024",
+          "branch_name": "合庫嘉義",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 1282,
+          "sell_native": 2740,
+          "net_native": -1458,
+          "buy_vwap": "2500.1248",
+          "sell_vwap": "2504.3248",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        }
+      ],
+      "response_rows_sha256": "e66d0b7bae6ce8d6fe782aab65b564cce1e2daa89becc78fd5ce52fdd15347be",
+      "provider_unit_counts": {
+        "('twse', 'shares')": 816
+      },
+      "totals_by_provider_unit": [
+        {
+          "provider": "twse",
+          "native_unit": "shares",
+          "buy_native": 15101780,
+          "sell_native": 15146780
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:10:56.798267+00:00",
+      "endpoint": "/api/v1/broker-flow/coverage",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "start": "2026-10-02",
+        "end": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 6.948,
+      "row_count": 1,
+      "body": [
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:2330",
+          "trade_date": "2026-10-02",
+          "status": "AVAILABLE",
+          "record_count": 816,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280",
+          "failure_reason": null
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:10:56.801315+00:00",
+      "endpoint": "/api/v1/broker-flow/price-levels",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "trade_date": "2026-10-02"
+      },
+      "http_status": 422,
+      "latency_ms": 3.031,
+      "row_count": null,
+      "body_sample": {
+        "detail": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "date"
+            ],
+            "msg": "Field required",
+            "input": null
+          }
+        ]
+      }
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:10:56.802784+00:00",
+      "endpoint": "/api/v1/broker-flow/price-levels",
+      "selectors": {
+        "instrument_id": "TWSE:2317",
+        "trade_date": "2026-10-02"
+      },
+      "http_status": 422,
+      "latency_ms": 1.452,
+      "row_count": null,
+      "body_sample": {
+        "detail": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "date"
+            ],
+            "msg": "Field required",
+            "input": null
+          }
+        ]
+      }
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:11:26.072812+00:00",
+      "endpoint": "/api/v1/broker-flow/price-levels",
+      "selectors": {
+        "instrument_id": "TWSE:2330",
+        "date": "2026-10-02"
+      },
+      "http_status": 409,
+      "latency_ms": 16.238,
+      "row_count": null,
+      "body_sample": {
+        "detail": "TWSE BSR price levels are not materialized for this symbol/date; add the symbol to the detail watchlist and rerun twse_bsr sync"
+      }
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:11:26.082315+00:00",
+      "endpoint": "/api/v1/broker-flow/price-levels",
+      "selectors": {
+        "instrument_id": "TWSE:2317",
+        "date": "2026-10-02"
+      },
+      "http_status": 409,
+      "latency_ms": 9.34,
+      "row_count": null,
+      "body_sample": {
+        "detail": "TWSE BSR price levels are not materialized for this symbol/date; add the symbol to the detail watchlist and rerun twse_bsr sync"
+      }
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:12:45.627339+00:00",
+      "endpoint": "/api/v1/broker-flow/quantities",
+      "selectors": {
+        "instrument_id": "TWSE:4164",
+        "start": "2026-10-02",
+        "end": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 15.392,
+      "row_count": 98,
+      "body_sample": [
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1021",
+          "branch_code": "1021",
+          "branch_name": "合庫台中",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 150,
+          "sell_native": 0,
+          "net_native": 150,
+          "buy_vwap": "27.0000",
+          "sell_vwap": null,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1029",
+          "branch_code": "1029",
+          "branch_name": "合庫鳳山",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 1000,
+          "sell_native": 1000,
+          "net_native": 0,
+          "buy_vwap": "26.9500",
+          "sell_vwap": "26.9500",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:102E",
+          "branch_code": "102E",
+          "branch_name": "合庫桃園",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 0,
+          "sell_native": 1000,
+          "net_native": -1000,
+          "buy_vwap": null,
+          "sell_vwap": "26.9000",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:104A",
+          "branch_code": "104A",
+          "branch_name": "臺銀臺中",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 0,
+          "sell_native": 3000,
+          "net_native": -3000,
+          "buy_vwap": null,
+          "sell_vwap": "26.8667",
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1262",
+          "branch_code": "1262",
+          "branch_name": "宏遠桃園",
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "buy_native": 50,
+          "sell_native": 0,
+          "net_native": 50,
+          "buy_vwap": "27.0000",
+          "sell_vwap": null,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:12:45.633481+00:00",
+      "endpoint": "/api/v1/broker-flow/coverage",
+      "selectors": {
+        "instrument_id": "TWSE:4164",
+        "start": "2026-10-02",
+        "end": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 5.766,
+      "row_count": 1,
+      "body_sample": [
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "trade_date": "2026-10-02",
+          "status": "AVAILABLE",
+          "record_count": 98,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280",
+          "failure_reason": null
+        }
+      ]
+    },
+    {
+      "observed_at_utc": "2026-10-07T09:12:45.646001+00:00",
+      "endpoint": "/api/v1/broker-flow/price-levels",
+      "selectors": {
+        "instrument_id": "TWSE:4164",
+        "date": "2026-10-02"
+      },
+      "http_status": 200,
+      "latency_ms": 12.508,
+      "row_count": 185,
+      "body_sample": [
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1021",
+          "branch_code": "1021",
+          "branch_name": "合庫台中",
+          "price": "27.00",
+          "buy_native": 150,
+          "sell_native": 0,
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:1029",
+          "branch_code": "1029",
+          "branch_name": "合庫鳳山",
+          "price": "26.95",
+          "buy_native": 1000,
+          "sell_native": 1000,
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:102E",
+          "branch_code": "102E",
+          "branch_name": "合庫桃園",
+          "price": "26.90",
+          "buy_native": 0,
+          "sell_native": 1000,
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:104A",
+          "branch_code": "104A",
+          "branch_name": "臺銀臺中",
+          "price": "26.85",
+          "buy_native": 0,
+          "sell_native": 2000,
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        },
+        {
+          "provider": "twse",
+          "dataset": "broker_flow",
+          "instrument_id": "TWSE:4164",
+          "symbol": "4164",
+          "trade_date": "2026-10-02",
+          "source_branch_key": "twse:104A",
+          "branch_code": "104A",
+          "branch_name": "臺銀臺中",
+          "price": "26.90",
+          "buy_native": 0,
+          "sell_native": 1000,
+          "native_unit": "shares",
+          "precision_shares": 1,
+          "revision_id": "df30f69cc3758d081266b83b0fda33909e1553f2f907bcd1a797f70e31647280"
+        }
+      ]
+    }
+  ],
+  "limits": "Bounded query-only observations. Quantity responses retain counts, grouped totals and first five rows; full response bytes are not retained. Two initial price-level calls used the wrong trade_date parameter (422); corrected date calls follow. No source/deployed commit equivalence, full-market coverage, publisher SLA or trading-session guarantee."
+}

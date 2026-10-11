@@ -1,9 +1,9 @@
-"""时区处理工具 - 统一时间存储和显示。
+"""時區處理工具 - 統一時間儲存和顯示。
 
-默认时区可通过环境变量覆盖：
-- TZ（推荐）
+預設時區可透過環境變數覆蓋：
+- TZ（推薦）
 
-未设置时默认 Asia/Shanghai。
+未設定時預設 Asia/Shanghai。
 """
 
 from datetime import datetime, timezone
@@ -20,44 +20,44 @@ def _get_app_tz() -> ZoneInfo:
 
 
 def utc_now() -> datetime:
-    """获取当前 UTC 时间（带时区信息）"""
+    """獲取當前 UTC 時間（帶時區資訊）"""
     return datetime.now(timezone.utc)
 
 
 def beijing_now() -> datetime:
-    """获取当前默认时区时间（历史命名保留；带时区信息）"""
+    """獲取當前預設時區時間（歷史命名保留；帶時區資訊）"""
     return datetime.now(_get_app_tz())
 
 
 def to_utc(dt: datetime) -> datetime:
-    """将时间转换为 UTC"""
+    """將時間轉換為 UTC"""
     if dt.tzinfo is None:
-        # 假设无时区的时间是默认时区
+        # 假設無時區的時間是預設時區
         dt = dt.replace(tzinfo=_get_app_tz())
     return dt.astimezone(timezone.utc)
 
 
 def to_beijing(dt: datetime) -> datetime:
-    """将时间转换为默认时区（历史命名保留）"""
+    """將時間轉換為預設時區（歷史命名保留）"""
     if dt.tzinfo is None:
-        # 假设无时区的时间是 UTC
+        # 假設無時區的時間是 UTC
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(_get_app_tz())
 
 
 def format_beijing(dt: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-    """格式化为默认时区字符串（历史命名保留）"""
+    """格式化為預設時區字串（歷史命名保留）"""
     return to_beijing(dt).strftime(fmt)
 
 
 def to_iso_utc(dt: datetime) -> str:
-    """转换为 ISO 格式的 UTC 时间字符串（带 Z 后缀）"""
+    """轉換為 ISO 格式的 UTC 時間字串（帶 Z 字尾）"""
     utc_dt = to_utc(dt)
     return utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def to_iso_with_tz(dt: datetime) -> str:
-    """转换为 ISO 格式字符串（带时区偏移）"""
+    """轉換為 ISO 格式字串（帶時區偏移）"""
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.isoformat()

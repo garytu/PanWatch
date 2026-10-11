@@ -1,0 +1,79 @@
+{
+  "task": "PW-11",
+  "authorization": "User explicitly approved exactly these two manual captures in this chat on 2026-10-07 Taipei.",
+  "source_checkout": "78e6e5b103886456434b6ee3032cdd31ce16943b",
+  "deployed_commit": null,
+  "operations": [
+    {
+      "job_id": "twse-benchmark-daily",
+      "scope": {
+        "start_date": "2026-09-01",
+        "end_date": "2026-10-06"
+      },
+      "idempotency_key": "panwatch-pw11-taiex-20260901-20261006-v1",
+      "submitted_at": "2026-10-07T15:57:25.824536+00:00",
+      "http_status": 200,
+      "run_id": "run_71260d6aeb9b464b",
+      "status": "SUCCEEDED",
+      "observed_at": "2026-10-07T15:57:54.757134+00:00",
+      "checkpoints": [
+        {
+          "sequence": 1,
+          "display_summary": {
+            "partition_key": "2026-09-01",
+            "records_written": 20
+          },
+          "checksum": "06c15e7e83192e3cf4bc6e85415341e33988ebec7e6af73ed61c9c04c31f1e83",
+          "committed_at": "2026-10-07T15:57:26.980626+00:00"
+        },
+        {
+          "sequence": 2,
+          "display_summary": {
+            "partition_key": "2026-10-01",
+            "records_written": 4
+          },
+          "checksum": "642d9ac39689995d8835bfd9f99dcbd29fe626975cfd469da56c9c3e7b50668d",
+          "committed_at": "2026-10-07T15:57:26.984582+00:00"
+        }
+      ],
+      "attempt_count": 1
+    },
+    {
+      "job_id": "tpex-benchmark-latest",
+      "scope": {},
+      "idempotency_key": "panwatch-pw11-tpex-latest-v1",
+      "submitted_at": "2026-10-07T15:57:25.828771+00:00",
+      "http_status": 200,
+      "run_id": "run_ba60ae238ae749fc",
+      "status": "SUCCEEDED",
+      "observed_at": "2026-10-07T15:57:54.765114+00:00",
+      "checkpoints": [
+        {
+          "sequence": 1,
+          "display_summary": {
+            "partition_key": "2026-10-07",
+            "records_written": 5
+          },
+          "checksum": "3c6de989a712ac4c3d8c4d6fe628a3d3d4b9cc5ddd966f60865c15178bbc6a90",
+          "committed_at": "2026-10-07T15:57:27.603368+00:00"
+        }
+      ],
+      "attempt_count": 1
+    }
+  ],
+  "preservation": {
+    "schedules?limit=100": {
+      "exact_data_equal": true,
+      "count": 11
+    },
+    "quote-subscriptions": {
+      "exact_data_equal": true,
+      "count": 4
+    },
+    "control_health_http_status": 200
+  },
+  "limitations": [
+    "No recurring schedules enabled or changed; no service deployment or full replay.",
+    "One-off capture acceptance only; ongoing acquisition and whole-history coverage remain external."
+  ]
+}

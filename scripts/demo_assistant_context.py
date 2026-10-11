@@ -9,10 +9,10 @@ from pan_agent import ContextBudget, ContextEngine, ModelMessage
 
 async def main() -> None:
     messages = [
-        ModelMessage(role="system", content="你是一个严谨的研究助手。"),
-        ModelMessage(role="user", content="目标是跟踪组合风险，不能修改提醒。" + " 事实" * 120),
-        ModelMessage(role="assistant", content="已记录目标，下一步需要补充持仓数据。" + " 结果" * 120),
-        ModelMessage(role="user", content="请继续分析当前状态。"),
+        ModelMessage(role="system", content="你是一個嚴謹的研究助手。"),
+        ModelMessage(role="user", content="目標是跟蹤組合風險，不能修改提醒。" + " 事實" * 120),
+        ModelMessage(role="assistant", content="已記錄目標，下一步需要補充持倉資料。" + " 結果" * 120),
+        ModelMessage(role="user", content="請繼續分析當前狀態。"),
     ]
     result = await ContextEngine().prepare(
         messages,

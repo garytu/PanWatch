@@ -1,0 +1,289 @@
+# twmd query contracts for PW-01
+
+Captured API evidence lives in [`2026-10-06.json`](../../../../packages/marketdata/tests/fixtures/twmd/captured/2026-10-06.json). It contains bounded, read-only HTTP GET observations from `http://127.0.0.1:8000`, including the request URL, status, latency, selected response fields, and the successful company-profile bodies. A supplemental [2026-10-07 bars capability projection](../../../../packages/marketdata/tests/fixtures/twmd/captured/bars-capabilities-2026-10-07.json) records `live_collection_supported=true`, `live_collection_configured=false`, and `live_collection=false` (HTTP 200, 16.522 ms, 00:10:54 Taipei). Support, configuration, and verified live delivery are separate capabilities. The synthetic edge cases in [`offline_edge_cases.json`](../../../../packages/marketdata/tests/fixtures/twmd/synthetic/offline_edge_cases.json) are separately labelled and are not live observations.
+
+## Version and observation boundary
+
+The inspected upstream `tw-market-data` checkout was clean at commit `3acd67ffd98bbcf1713f9484d8a7b77871db6ade`. The deployed query API's observed OpenAPI document reported title `Taiwan Market Data Query API` and version `0.1.0`; it did not expose a commit identifier. The checkout commit therefore describes the source reviewed for this contract, not a verified deployed build identity. At 2026-10-06 23:52 Taipei, the readiness response reported `ready`, `data_ready=true`, readable storage, and TWSE/TPEX daily-price partitions through 2026-10-06. These observations apply to this service and date only.
+
+The GET evidence was collected on 2026-10-06 (Asia/Taipei). Regular endpoint reads returned HTTP 200 in 10.875–150.597 ms, except readiness at 9,403.8 ms. Invalid current-day upper bounds and a future revenue month returned HTTP 400. The company-profile endpoint timed out twice per venue with a 10-second request bound. A later bounded read returned complete HTTP 200 responses for `TWSE:2330` in 15,518.640 ms and `TPEX:5347` in 15,595.329 ms. Both profiles were present and qualified. The extended reads establish response shape, not a latency guarantee; PanWatch's current `TWMD_TIMEOUT_SEC` default is 5 seconds, so this endpoint cannot yet be treated as reliably reachable through the existing client default.
+
+The reviewed source entry points were `src/twmd/query/api.py`, `src/twmd/query/service.py`, and the upstream `company-profiles-api.md`, `monthly-revenues-api.md`, `institutional-flows-api.md`, `tpex-flow-valuation-api.md`, and `financial-statements-api.md`. The deployment acceptance document describes the earlier MD-22 release; it is historical evidence, while the dated HTTP fixtures describe the service observed here. The source confirms the endpoint-specific differences below rather than assuming that all datasets share one response or date policy.
+
+## Canonical identity and security type
+
+Use the complete instrument ID as the identity key. `TWSE:2330` and `TPEX:5347` are separate examples; never join or cache on the numeric code alone. The live catalog returned these active records:
+
+| Canonical ID | Venue | Security type | Active | Handling |
+| --- | --- | --- | --- | --- |
+| `TWSE:2330` | `TWSE` | `EQUITY` | `true` | Equity |
+| `TPEX:5347` | `TPEX` | `EQUITY` | `true` | Equity |
+| `TWSE:00878` | `TWSE` | `ETF` | `true` | ETF; keep distinct from an issuer equity |
+| `TPEX:006201` | `TPEX` | `ETF` | `true` | ETF; revenue API returns `qualification=unsupported_etf` |
+| `TPEX:700019` | `TPEX` | `WARRANT` | `true` | Exclude from the equity/ETF issuer workflow |
+
+The `instruments` response, not a symbol pattern or market suffix, determines venue, activity, and security type. Bare symbols that resolve to multiple canonical IDs require an explicit venue. In particular, a broad TPEx catalog must not be interpreted as a list of ordinary shares.
+
+## Endpoint matrix
+
+| Dataset | Read endpoint and selectors | Date bounds | Response values and units | Coverage, presence, provenance, and revisions |
+| --- | --- | --- | --- | --- |
+| Instrument identity | `GET /api/v1/instruments/{canonical_id}`; optional catalog filters `venue`, `security_type`, `is_active` | No date selector | `instrument_id`, `symbol`, `venue`, `security_type`, `is_active` and catalog metadata are typed JSON strings/booleans/dates | A selected instrument record is not a dataset-wide membership guarantee. Keep `TWSE:` and `TPEX:` on every key. |
+| TWSE valuation | `GET /api/v1/valuations?instrument_id=TWSE:2330&start=YYYY-MM-DD&end=YYYY-MM-DD` | Paired inclusive dates, `start <= end`. The inspected TWSE path has no TPEx-style 2024 floor, 366-day cap, or current-Taipei-day cutoff; do not apply those limits by analogy. | List of `ValuationResponse`. `close_price`, `pe_ratio`, `pb_ratio`, and `dividend_yield_pct` serialize as exact decimal strings or `null`; prices are TWD, ratios are multiples, yield is percent. | No coverage header, capture ID, or revision is returned on this branch. `[]` cannot distinguish absent selected issuer from missing dataset coverage. The live Oct 2 and Oct 5 responses both contained rows. |
+| TPEx valuation | Same route with `instrument_id=TPEX:<four digits>` | Paired inclusive dates; product floor 2024-01-01; at most 366 calendar days; `end < current Asia/Taipei date`. | List of `TpexValuationResponse`; decimal values are strings or null. The source's `close_price` is null; dividend currency can be `unspecified`. | `X-TWMD-Schema-Ready` and aggregate `X-TWMD-Coverage` headers describe schema and range-level available/missing counts. A returned row contains source contract/URL, capture ID, receipt, payload hash, and semantic `revision`. The range-level `selected` header collapses dates; retain per-date query scope when interpreting it. |
+| TWSE institutional flow | `GET /api/v1/institutional-flows?instrument_id=TWSE:2330&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` | Paired inclusive dates; floor 2024-01-01; at most 366 calendar days; `end_date < current Asia/Taipei date`. | `InstitutionalFlowsResponse`; share fields are JSON integers or null, in native `shares`. All foreign non-dealer, foreign dealer, trust, dealer, and publisher-total fields remain separate. | One `coverage` entry per calendar date. `coverage.record_count` describes the whole-market report; `data` contains only the selected issuer. `acquired_at` is coverage receipt evidence; `first_observed_at` is row observation evidence, even when their current values coincide. TWSE can report `EMPTY` only for its recognized official no-data response; `MISSING` means no validated partition. Rows have no semantic revision field. |
+| TPEx institutional flow | Same route with `instrument_id=TPEX:...` | Same completed-date bounds as TWSE institutional flow. | `TpexInstitutionalFlowsResponse`; seven buy/sell/net triples and total are JSON integers in shares. Preserve combined and component fields; foreign-dealer values are not added twice. | Per-date coverage includes `status`, market `record_count`, `selected_instrument_presence`, capture/source evidence, receipt, hash, and row revision. An `AVAILABLE` full report with selected presence `absent` is not zero flow. `MISSING` coverage has no receipt or capture. |
+| Company profile | `GET /api/v1/company-profiles?instrument_id=TWSE:...` or `TPEX:...` | Exactly one canonical ID. Latest-only; `as_of`, `report_date`, duplicate, or extra selectors return 400. | One `CompanyProfilesResponse`. Capital and par-value amounts are exact strings; issued/private/preferred share counts are integers or null; units are explicit. The live profile has `report_date`, source contract, receipt and semantic revision. | `schema_ready` and `coverage_status` describe the optional schema and latest whole snapshot. `latest_snapshot_presence` is independently `present`, `absent`, or `missing`. Qualification independently distinguishes `qualified_issuer`, `unsupported_etf`, `unsupported_warrant`, and unresolved issuers. A complete snapshot is not a guarantee that a particular issuer appears. |
+| Monthly revenue | `GET /api/v1/monthly-revenues?instrument_id=TWSE:...&start_month=YYYY-MM&end_month=YYYY-MM` or `TPEX:...` | Exactly one of each selector; duplicates or extra selectors return 400. Required paired inclusive months; floor 2024-01; at most 120 months; future Taipei months are rejected. Current Taipei month is queryable if retained. | One `months` entry per requested month. Publisher amount and percentage fields are strings or null; amounts are interpreted as thousand TWD by source notes (the unit is an inference), and publisher percentages are not recomputed. | `coverage_status=AVAILABLE` means at least one retained source report is in range. Each month independently reports `present`, `not_in_captured_report`, or `missing`; a missing month is not zero. Coverage separates MOPS/TWSE and TPEx captures. Rows preserve source, report period, acquisition date, UTC receipt, content hash, and semantic revision. The response's `served_at` is a separate UTC serving time. TPEx only has latest-snapshot acquisition; a query range does not create historical coverage. |
+| Margin and short sale | `GET /api/v1/margin-short-sale?instrument_id=TWSE:...&start=YYYY-MM-DD&end=YYYY-MM-DD` (also TPEX) | Required inclusive date bounds, `start <= end`; no source-provided maximum was found. PanWatch limits its request to 366 calendar days. | A list of individual `MarginShortSaleResponse` rows. Quantity fields are JSON integers in publisher trading units (`trading_units` / 張); utilization rates are decimal percentages. No cash-balance fields are present. | Rows do not carry coverage, receipt, capture, source contract, or revision. Query `/api/v1/coverage?dataset=twse_margin_short_sale|tpex_margin_short_sale&start=...&end=...` separately for date-partition status; this is whole-dataset coverage and does not prove that a selected issuer was absent. Without usable coverage, an empty row list remains unknown. |
+| TDCC shareholder distribution | `GET /api/v1/shareholder-distribution?instrument_id=TWSE:2330&start=YYYY-MM-DD&end=YYYY-MM-DD[&report_variant=bulk_current|historical_html]` | Required inclusive dates, `start <= end`, at most 366 calendar days. The research panel requests the previous 90 completed Taipei dates. The optional variant selects one source-native report layout. The verified contract covers four-digit TWSE IDs; do not claim TPEx coverage. | List of typed rows with integer `holder_count` (custody accounts), integer `share_count` (shares), and exact decimal percentage points. `bulk_current`: levels 1–15 are buckets, 16 is adjustment, 17 is total. `historical_html`: levels 1–15 are buckets, 16 is total. | Rows contain variant/provider but no receipt, capture, revision, or source contract. Coverage is separate: current partitions use report date; historical partitions use `TWSE:code|report-date`. No comparison may cross variants. When both variants have the latest date, the research block prefers `bulk_current`; comparison still uses only an exact prior week of that same variant. A missing week yields no change. Holder counts describe custody accounts, not beneficial-owner identities. |
+
+## Shared status and evidence rules
+
+Represent each requested block with its own data, status, reason, and evidence. The following vocabulary preserves the distinctions already made by the API:
+
+| Status | Meaning | Example reason |
+| --- | --- | --- |
+| `available` | A validated selected row or usable selected snapshot exists | `selected_record_present` |
+| `partial` | The request has some available periods and at least one missing or omitted period | `some_months_missing` |
+| `missing` | The selected period has no retained dataset partition/report | `coverage_missing` |
+| `absent` | The report is available, but it omits the selected issuer | `issuer_absent_from_available_report` |
+| `empty` | A source explicitly reports a recognized authoritative empty result | `source_report_explicitly_no_data` |
+| `unsupported` | A preflight identifies a selected security type outside the dataset's subject area | `unsupported_etf`, `unsupported_warrant` |
+| `stale` | A value exists but fails the caller's explicit freshness rule | `freshness_window_exceeded` |
+| `error` | The query failed, timed out, or returned an invalid service response | `http_503`, `timeout`, `invalid_response` |
+| `unknown` | The API result does not provide enough evidence to classify coverage or selected presence | `coverage_not_returned`, `selected_presence_unreported` |
+
+PW-01 establishes this research-layer contract for PW-04; no generic framework is added and existing endpoints retain their native statuses. Preserve API-native statuses and reasons in evidence. A block should carry a concrete evidence envelope with explicit nulls for information the endpoint does not provide. For example, this synthetic research-layer shape keeps the API selector and source period separate from receipt and serving times:
+
+```json
+{
+  "data": [{"data_month": "2026-08-01", "monthly_revenue": "514805337"}],
+  "status": "partial",
+  "reason": "some_requested_months_missing",
+  "evidence": {
+    "instrument_id": "TWSE:2330",
+    "endpoint": "/api/v1/monthly-revenues",
+    "selectors": {"start_month": "2026-07", "end_month": "2026-08"},
+    "source_contract": "mops_t21_sii_monthly_revenue/v1",
+    "period": {"data_months": ["2026-07-01", "2026-08-01"]},
+    "source_report_date": "2026-10-04",
+    "publication_time": null,
+    "source_received_at_utc": "2026-10-04T13:09:22.189587Z",
+    "served_at": "2026-10-06T15:52:17.462128Z",
+    "units": {"revenue": "TWD thousands (inferred)"},
+    "dataset_coverage": "AVAILABLE",
+    "selected_instrument_presence": "present",
+    "capture_id": "synthetic-monthly-capture",
+    "revision": 2,
+    "payload_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}
+```
+
+For a range with multiple receipts, revisions or source contracts, preserve provenance on each returned row and coverage entry; the one-capture envelope above is only an example. A block-level scalar must be null or explicitly marked mixed when values differ. Keep per-period presence, acquisition date, and first-observed time where provided; none can be inferred from a block-wide receipt. Profile absence can still supply retained data, with its older report/receipt and newer snapshot evidence both visible.
+
+The captured HTTP fixtures contain complete API responses; constructed research envelopes and edge responses are stored separately and explicitly labelled synthetic. In particular:
+
+- `schema_ready=false` with HTTP 200 and `MISSING` is an optional schema that is wholly absent. A partially present or corrupt schema is an HTTP 503 error, not empty coverage.
+- `AVAILABLE` dataset coverage and selected-issuer presence are independent. The TWSE flow sample has 18,610 market rows and one selected row; the TPEx report has 910 market rows and an explicit selected-presence flag. A future selected-absence case can still have `AVAILABLE` dataset coverage.
+- `absent` is a selected-issuer result over available market coverage; it is not `empty`, `missing`, or zero. A company profile absent from the newest complete snapshot can still return the previously retained issuer profile.
+- `empty` applies only to the recognized TWSE institutional-flow no-data response. TPEx has no proven authoritative empty report; an uncaptured report is `MISSING`.
+- An empty TWSE valuation list has no coverage field or header. Its coverage status and selected presence are `unknown`; do not turn that response into the source-authoritative `empty` state.
+- Unsupported classification belongs in a catalog-aware research preflight. The live monthly-revenue endpoint accepts active `TPEX:006201` and returns `qualification=unsupported_etf`; profile and revenue endpoints document security qualification. A six-digit TPEX warrant does not fit the valuation endpoint's four-digit issuer selector and would be a selector error, not an upstream `unsupported_warrant` result. Preserve HTTP 400 as an error when the API is called directly.
+- A month-range revenue result can have `coverage_status=AVAILABLE` and a missing month. In the captured July–August 2026 range, July is `missing` while August is `present` for both selected issuers.
+- A valid HTTP 200 with `data: []` or `months[].row: null` is an API state. HTTP 400/503 and timeouts are failures. Do not catch a transport exception and relabel it as an empty successful response.
+- Keep a research-level `stale` status separate from API coverage. A retained response can be complete and still exceed a consumer's freshness window; the freshness rule and its clock must be explicit evidence.
+- Keep `trade_date`, `data_month`, profile `report_date`, acquisition date, source receipt (`received_at_utc`/`acquired_at`), first row observation (`first_observed_at`), API `served_at`, and publisher publication time as separate fields. Publication time is unprovided for monthly revenue; the report date is not a publication timestamp. Absence of `served_at` on an endpoint means unknown, not request time.
+- TWSE total is foreign non-dealer + trust + dealer reported net; TPEx total is foreign excluding dealer + trust + combined dealer net. Combined foreign, foreign-dealer, dealer-own and dealer-hedging fields are not extra amounts to add to those totals. Preserve source nulls; do not manufacture a total or a five-trading-day sum from incomplete calendar-date coverage.
+- Keep exact decimal strings and integer share counts at the source boundary. `Fundamentals` has float fields and can provide compatibility values for fields whose source meaning matches (for example P/B and a verified yield); the API's generic `pe_ratio` must not be assumed to mean `pe_ttm`. Do not discard exact source strings from evidence. `CapitalFlow` is the compatibility type for the existing flow surface (`flow_kind="institutional_shares"`, `unit="shares"`, `trade_date` and net-share fields); do not reinterpret large-order cash fields as institutional flow. Preserve venue-specific component fields outside that narrow compatibility mapping. Monthly revenue and profile have no safe one-row mapping into `Fundamentals`; PW-03 should use period-aware profile/revenue types instead of treating issuer revenue as a dated quarterly fact.
+- Margin quantities remain integer trading units and are never cast to shares or currency in the typed research block. Legacy `MarketData.margin` fields remain compatibility projections only; the source integer observation and unit stay in evidence. No absent cash balance is synthesized.
+- TDCC's verified large-holding summary includes bucket levels 12–15, whose combined source ranges start at 400,001 shares (strictly greater than 400,000). Divide by the official total row's share count: bulk level 17 (with level 16 adjustment applied by the upstream total) or historical level 16. Never include the adjustment row in a bucket numerator. If the source buckets or official denominator are incomplete, no percentage may be computed. The two report variants are kept separate; an exact preceding weekly report with the same variant is required for change.
+
+## Fixed date context
+
+Any future-date or completed-period check in PanWatch must use one captured `today_taipei` value from `Asia/Taipei` for the entire request. Do not use UTC's calendar date or a moving wall clock between fields. This applies to both flow branches, TPEx valuation, and revenue's future-month check. Company profiles have no caller-supplied date. The current TWSE valuation path has no matching end-date rule in the inspected source, so its date policy remains endpoint-specific; a TWSE valuation query ending on the current date was not captured. The Oct 6 requests show HTTP 400 for a flow end date and TPEx valuation end date equal to 2026-10-06. A future revenue month also returned HTTP 400.
+
+## Type reuse and downstream prerequisites
+
+PW-01 sets these prerequisites for later work; it does not implement provider routing.
+
+PanWatch's current [`TwmdClient.get`](../../../../packages/marketdata/src/marketdata/vendors/twmd.py)
+calls [`market_get`](../../../../packages/marketdata/src/marketdata/http.py) with
+`parse="json"`. `market_get` returns only the parsed body, catches HTTP/network
+exceptions, and returns `None`; this client therefore cannot expose response
+status or the TPEx valuation coverage headers. Existing call sites commonly
+turn `None` into `{}` or `[]`, which can make a transport failure look like an
+empty dataset. PW-02 must introduce a narrow response/error path before these
+reads are wired into research. PW-03 must also preserve errors and choose an explicit bounded profile timeout/cache policy; the current 5-second default was below both successful response latencies. The contract sample does not imply that this
+transport behavior is already fixed.
+
+| Task | Contract prerequisite |
+| --- | --- |
+| PW-02 valuation and flows | Map valuation values into compatible `Fundamentals` fields and existing flow surfaces into `CapitalFlow`; retain exact strings/integers and native venue evidence. Preserve TPEx response headers and distinguish transport errors from empty responses. |
+| PW-03 profile and revenue | Build separate issuer-profile and month-period types. Respect latest-only profile scope, revenue source differences, exact numeric strings, month coverage, and unknown publication time. |
+| PW-04 research and AI | Return per-block data/status/reason/evidence; never assign one latest date to the whole research result. |
+| PW-05 freshness acceptance | Compare period date, original receipt/acquisition, and serving time separately; measure the profile latency behavior before selecting a client timeout. |
+| PW-06 discovery | Filter the active catalog by venue and security type. Include `EQUITY` and explicitly considered `ETF` candidates; exclude warrants from issuer/equity ranking. |
+| PW-07 margin and shareholders | Define each source's unit and coverage separately; flow contracts here do not establish margin-lot or TDCC shareholder coverage. |
+| PW-08 broker flow | Establish branch coverage, price/quantity availability, and provenance separately; daily institutional flow is not branch trading identity. |
+| PW-09 material information | Keep current and historical announcement sources and publication/receipt times separate. |
+| PW-10 financial statements | Honor the source's supported issuer, consolidated scope, fiscal period, and statement coverage; do not infer completeness from profile or revenue coverage. |
+| PW-11 benchmarks | Verify each benchmark's own source, units, daily coverage, and selected series before using market-wide context. The plan baseline had missing TAIEX/TPEX bars and unconfigured TAIEX live quotes; bounded acquisition and independent daily-bar acceptance were completed on 2026-10-08 (see PW-11 below). Live quote/session acceptance remains PW-14. |
+| PW-12 corporate actions | Treat realized ex-right results as event annotations, not a complete dividend calendar or adjustment stream. |
+| PW-13 historical research | Preserve as-of versus currently retained evidence. Receipt, publication and report dates must not be substituted for one another. |
+| PW-14 live data | Establish trading-session arrival, age and recovery evidence separately; historical EOD samples do not prove live delivery. The supplemental capability sample reports support but unconfigured/disabled collection; enablement and trading-session acceptance remain separate upstream work. |
+
+## Reproducing the bounded audit
+
+Run `.venv/bin/python -m pytest -q packages/marketdata/tests/test_twmd_contracts.py` to validate the retained fixtures without contacting any service. The tests resolve files relative to their own path and use frozen Taipei clock witnesses, including an instant whose UTC calendar date differs. These witnesses specify upstream bounds; PW-02/PW-03 must test their actual provider validators when implemented. For a new smoke audit, use only the exact GET URLs saved in the captured fixture against the configured query API, record observation time, status, latency and safe headers, and retain new dated evidence rather than overwriting the old sample. Profile attempts used an initial 10-second bound and one retry; the independent successful reads used a 60-second upper bound. Never trigger upstream acquisition or consult the live SQLite file to fill a missing result.
+
+## PW-08 canonical broker-flow contract (2026-10-07)
+
+Reviewed `docs/broker_flow.md`, domain models and query API/service in the upstream checkout recorded in [PW-08 query evidence](../evidence/PW-08-live-contract-2026-10-07.json). This source version is separate from the deployed service identity, which is not exposed.
+
+| Product | Selectors and bounds | Source semantics |
+| --- | --- | --- |
+| `/api/v1/broker-flow/quantities` | `instrument_id`, `start`, `end`; at most 31 inclusive calendar days | `TWSE:<four digits>` only; 2024-01-01 through current Taipei date. Before 2026-07-24, Capital native lots and provider-local encoded broker/branch identity; on/after cutover, TWSE exact shares and `twse:<branch code>`. Side-specific VWAP and quantity rows retain revision IDs. |
+| `/api/v1/broker-flow/coverage` | Same selectors; at most 366 inclusive calendar days | One source-selected outcome per date: AVAILABLE, EMPTY, FAILED, CLOSED or MISSING. Record count describes aggregate branch quantity records, not price-detail availability. Failure reason and revision stay attached to their date. |
+| `/api/v1/broker-flow/price-levels` | `instrument_id`, **`date`**; one date | TWSE post-cutover retained execution-price projection only. Absent projection returns HTTP 409. The read does not add a watchlist symbol or queue work. A 200 empty list cannot distinguish EMPTY from FAILED projection closures because projection status is not exposed. |
+
+The provider, source branch key, native unit and precision define separate quantity groups. Matching branch codes across Capital/TWSE do not identify a shared branch. `precision_shares=1000` in Capital metadata is not permission to combine rounded lots with exact-share TWSE data. Top-N concentration must name its observed source-side quantity denominator and coverage limits; partial retained branches/dates do not establish whole-market concentration. Buy/sell VWAP is the source's corresponding execution average, with TWD price units; it is not a holding cost or trader identity.
+
+At 17:10–17:13 Taipei, fixed query-only reads observed TWSE:2330 Jul23 Capital MISSING and Jul24 TWSE AVAILABLE; Oct2 TWSE quantities had 816 rows with exact shares and decimal-string VWAP. Correctly parameterized Oct2 price-detail queries for TWSE:2330 and TWSE:2317 returned 409 (not materialized). The existing configured detail symbol TWSE:4164 had 98 aggregate rows and 185 price rows, all HTTP 200, with AVAILABLE aggregate coverage. The retained evidence includes response counts and selected rows, not full-market claims. Two preliminary detail requests used `trade_date` instead of the documented `date` and returned 422; the corrected requests are recorded separately. No watchlist, queue, producer, ingest, schedule, subscription or database was modified.
+
+
+## PW-09 material-information contract (2026-10-07)
+
+The source checkout remains `3acd67ffd98bbcf1713f9484d8a7b77871db6ade`; no deployed commit is exposed. [Query observations](../evidence/PW-09-live-contract-2026-10-07.json) and [final shared-service observations](../evidence/PW-09-shared-service-2026-10-07.json) keep bounded selectors, HTTP status, clocks and counts.
+
+`GET /api/v1/material-information` accepts one four-digit TWSE issuer, paired inclusive `start_date`/`end_date` (2024-01-01 through Taipei today, at most 366 days), `source=current|history` and `limit=1..1000`. PanWatch's protected `/api/research/taiwan/material-information` preserves this scope and limits product admission to active catalog EQUITY. Its read-only AI tool caps the limit at 100. Both sources use independent identity namespaces; revisions and observations do not create new event IDs.
+
+Current reads are retained snapshot observations only: native PARTIAL/MISSING, never complete history. A latest all-company capture with no retained issuer event does not prove an empty date. History AVAILABLE/EMPTY require positive complete annual acquisitions covering every selected date; annual unverified no-data establishes no coverage. The original minimum of list generation and receipt clocks sets a conservative cutoff; its day remains partial. Query year, coverage-through, publication, event-first observation, content-first observation and latest receipt stay separate. Truncation maps to a partial research block even if the acquisition covers the requested dates.
+
+TWSE:2608/2024 observed 26 history events, January EMPTY inside the complete annual bundle, and limit=1 truncation. TWSE:2330/Oct1..7 current was MISSING despite an Oct4 latest capture. TPEX:5347 and five-digit ETF TWSE:00878 raw queries returned 400; PanWatch preflights unsupported. These retained observations do not establish historical knowledge or future update guarantees.
+
+Exact publisher strings and source IDs accompany the full original text. Current provides no per-event URL; historical MOPS detail selectors reconstruct a POST request, not a navigable permalink. The UI links to the official source and expands retained original text; AI result summaries keep original text, source-local identity and capture evidence. External text is untrusted data, never a tool authorization or instruction. No notification or upstream acquisition is enabled.
+
+## PW-10 financial-statement query contract (2026-10-07)
+
+The PanWatch adapter implements the upstream financial-statements API and
+accepted contract from source checkout
+`5f79d4452b823cf3187fc019c37be909676ce3bd`. A single bounded
+`GET /api/v1/financial-statements` selects `instrument_id`, fiscal year, quarter,
+consolidated report scope, optional statement and limit. PanWatch admits retained
+TWSE industry-24 ordinary equities from 2024. PanWatch preflights TPEX and ETF
+selectors; other industries retain the upstream qualification and unsupported
+reason. Separate-company scope is rejected. Frozen admission remains authoritative
+for retained reports when a later catalog omits or inactivates an issuer.
+
+The typed fact model retains exact Decimal strings alongside source lexical form,
+transform, scale/sign/accuracy, expanded QNames, unit expression, context period
+and dimensions. Comparative periods stay attached to their facts; duration facts
+are never converted from YTD to a single quarter. Report provenance and latest
+discovery are independent, so a retained report survives a later no-report
+discovery. Fact truncation is `partial`; it does not establish a complete report.
+Publication time and amendment status remain unknown. Client cache keys isolate
+endpoint, credentials, canonical issuer, fiscal selectors, statement and limit;
+the research service keeps the read under its aggregate deadline and per-block
+failure isolation.
+
+The [captured TWSE:2330 2024Q4 response](../../../../packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json)
+is one HTTP 200 query observed 2026-10-07T11:26:06.974035Z: 394 facts, qualified
+industry 24, report retained and latest discovery present. Report raw hash
+`1deba772079ed08cef1ccaf0430f40b4d36819ae5e5405073e793e6dc1932677` is distinct
+from profile qualification evidence; [safe query metadata](../../../../packages/marketdata/tests/fixtures/twmd/captured/financial-statements-twse-2330-2024q4.json.metadata.json)
+records selector, latency and receipts. This sample does not establish report
+completeness for other issuers or quarters, a publication timestamp or update SLA.
+
+## PW-12 corporate-action results (2026-10-07)
+
+The TWMD source checkout reviewed for PW-12 is `78e6e5b103886456434b6ee3032cdd31ce16943b`;
+the deployed service does not expose a source commit. `GET
+/api/v1/ex-right-dividend-results` exposes retained TWSE TWT49U results from
+2003-05-05. `GET /api/v1/capital-reduction-results` exposes retained TWTAUU
+recovery results from 2011-01-01. Both accept a canonical TWSE identity and
+paired inclusive date bounds of at most 366 calendar days; `end` must be a
+completed Taipei date. TWSE symbols use the upstream 4–6 character identity
+shape, beginning with a digit and allowing letters.
+
+TWT49U keeps effective date, normalized action kind, observed issuer name,
+prior close, reference price, signed combined rights/dividend value, price
+limits, opening-auction basis, dividend-adjusted reference price, provider and
+currency. TWTAUU keeps recovery date, normalized reduction reason, pre-suspension
+close, recovery reference, price limits, opening-auction basis, nullable
+ex-right reference, provider and currency. PanWatch preserves every monetary
+value as the exact JSON decimal token text. Each product remains a distinct
+identity space and event kind, so a same-day ex-right result and recovery result
+remain separate events.
+
+These endpoint lists have no coverage, revision, acquisition receipt, publisher
+publication time, announcement time or payment time. A populated list confirms
+only the returned realized rows; an empty list has `unknown` coverage and does
+not mean no action. TWT49U's prior close, reference price and combined
+rights/dividend adjustment are price calculations, not cash dividend amounts.
+Neither product is a complete dividend calendar or corporate-action stream.
+
+The shared research block gives UI, assistant and TradingAgents the same event
+rows and caveats. Taiwan screenshot charts draw event markers in daily, weekly
+and monthly buckets, and state when a reference-price comparison can explain a
+visible price gap. Price bars remain as supplied. Backtest results add per-ID
+known event dates, bar range, unknown coverage and an explicit raw-input
+limitation as metadata; trades, costs, holdings, cash and equity calculations
+are unchanged. An unqualified or bare code never supplies a canonical event
+identity to a backtest annotation.
+
+### Contract still required for adjusted-price or total-return backtests
+
+The current realized result lists are insufficient for adjusted or total-return
+history. A future contract must define: (1) a complete, date-partitioned action
+universe including splits, reverse splits, cash/stock dividends, rights issues,
+capital reductions and delistings; (2) exact ratio, amount, currency, ex-date,
+effective date and payment/settlement terms needed by each action; (3) point-in-
+time announcements, first availability, source receipts and revision history so
+an as-of backtest cannot see later corrections; (4) a documented price and
+volume adjustment formula, rounding rules and consistency with exchange limits;
+(5) cash-dividend treatment, reinvestment price/date, rights subscription or
+lapse, returned capital and optional tax/fee policy for total return; and (6)
+tests for same-day actions, missing partitions, corrected records, suspensions,
+delisted instruments and bar/action identity. Until that contract is accepted,
+results may annotate known retained events but must use the input price series
+as-is.
+
+
+## PW-11 official benchmark and raw stock comparison (2026-10-08)
+
+The reviewed TWMD checkout remains `78e6e5b103886456434b6ee3032cdd31ce16943b`;
+the deployed source commit is unknown. `/api/v1/benchmarks` fixes TAIEX to
+TWSE `MI_5MINS_HIST` and TPEX to TPEx `tpex_index`. Their identity space is
+separate from stock IDs. Daily OHLC values are exact decimal strings in
+`index_points`, with `raw_price_index` basis; volume and turnover are absent.
+
+Benchmark bar reads accept paired inclusive bounds of at most 366 calendar days
+or latest-N (limit 1..1000). Latest reads retain a separate calendar coverage
+window: available_count describes the window, not just selected bars; unbounded
+total_count can include older observations. Bounded total_count equals available
+coverage; completeness requires ready schema and no calendar gaps. Partial,
+truncated and evidence_truncated retain their source meanings. Calendar MISSING
+does not establish a holiday or failed acquisition. Each bar retains revision,
+capture ID/time, payload hash, scope and actual publisher URL, including monthly
+TAIEX query selectors; untruncated capture receipts must match selected bars.
+
+Raw stock `/api/v1/bars?timeframe=day` accepts latest-N only, with canonical
+`(?:TWSE|TPEX):[0-9][0-9A-Z]{3,5}`, raw EOD/TWD/share basis. It has no date-range
+selector. PanWatch filters the latest 1000 returned observations by the requested
+completed date range, preserves null/untraded closes, and uses actual common
+dates only. Per-date coverage dataset, partition, status, count, acquisition
+time and nullable checksum remain available; acquisition time is not publication
+time. Relative return is stock raw-price return minus same-date raw-price-index
+return in percentage points, excluding dividends and company-action adjustment.
+
+After explicit user authorization, exactly two existing control jobs succeeded:
+TAIEX Sep1..Oct6 retained 24 bars and TPEx latest retained 5 bars through Oct7.
+Existing benchmark schedules remained disabled; all 11 schedules and four stock
+subscriptions were unchanged. Formal shared-service reads verified 24 common
+dates for TWSE:2330 and four for TPEX:5347 against an independent raw-price
+oracle. This is useful retained evidence, not full TPEx historical coverage,
+publisher timing/SLA, point-in-time knowledge, live-session or deployed PanWatch
+acceptance. See [runbook](../runbooks/PW-11-benchmarks.md) and
+[shared-service evidence](../evidence/PW-11-shared-service-2026-10-08.json).

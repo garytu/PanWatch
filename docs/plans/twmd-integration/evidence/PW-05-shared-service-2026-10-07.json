@@ -1,0 +1,863 @@
+{
+  "started_at_utc": "2026-10-07T00:16:07.769783+00:00",
+  "service": "http://127.0.0.1:8000",
+  "mode": "GET only; actual shared research service; no acquisition or control mutation",
+  "results": [
+    {
+      "instrument_id": "TWSE:2330",
+      "instrument": {
+        "venue": "TWSE",
+        "symbol": "2330",
+        "security_type": "EQUITY",
+        "is_active": true,
+        "name": "台積電"
+      },
+      "selectors": {
+        "start_date": "2026-10-02",
+        "end_date": "2026-10-05",
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "elapsed_seconds": 11.291,
+      "blocks": {
+        "valuation": {
+          "status": "available",
+          "reason": "selected_record_present",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": "2026-10-05",
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": null,
+            "source_receipt_age_seconds": null,
+            "data_period_age_days": 2,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:07.769928Z",
+            "publisher_sla": null,
+            "age_status": "age_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "available",
+              "dataset_coverage": null,
+              "selected_instrument_presence": "present",
+              "requested_scope": {
+                "instrument_id": "TWSE:2330",
+                "start": "2026-10-02",
+                "end": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "observed_row_count": 2,
+              "source_coverage_header": null,
+              "interpretation": "Selector dates are calendar bounds; this response does not establish which dates were trading sessions."
+            }
+          },
+          "period": {
+            "trade_dates": [
+              "2026-10-02",
+              "2026-10-05"
+            ]
+          },
+          "source_contract": null,
+          "months": []
+        },
+        "institutional_flows": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": "2026-10-02",
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:09:26.439985Z",
+            "source_receipt_age_seconds": 212801.33,
+            "data_period_age_days": 5,
+            "first_observed_at": "2026-10-04T13:09:26.439985Z",
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:07.769928Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "partial",
+              "dataset_coverage": [
+                "AVAILABLE",
+                "MISSING",
+                "MISSING",
+                "MISSING"
+              ],
+              "selected_instrument_presence": [
+                "present",
+                "missing",
+                "missing",
+                "missing"
+              ],
+              "requested_scope": {
+                "instrument_id": "TWSE:2330",
+                "start_date": "2026-10-02",
+                "end_date": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "reported_period_count": 4,
+              "reported_status_counts": {
+                "AVAILABLE": 1,
+                "MISSING": 3
+              },
+              "selected_presence_counts": {
+                "missing": 3,
+                "present": 1
+              },
+              "interpretation": "Coverage follows source-reported dates; no exchange-calendar inference is applied, and selected-issuer absence is not zero flow."
+            }
+          },
+          "period": {
+            "trade_dates": [
+              "2026-10-02"
+            ]
+          },
+          "source_contract": "twse_t86_v1",
+          "months": []
+        },
+        "company_profile": {
+          "status": "available",
+          "reason": "selected_profile_present",
+          "freshness": {
+            "frequency": "latest_only_snapshot",
+            "data_period": "2026-10-03",
+            "report_date": "2026-10-03",
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:07:03.960501Z",
+            "source_receipt_age_seconds": 212943.809,
+            "data_period_age_days": 4,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:07.769928Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "最新快照型資料；以所選保留公司列的報表日和原始 receipt 計算年齡。沒有發布 SLA 或歷史快照查詢。",
+            "coverage": {
+              "block_status": "available",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "present",
+              "requested_scope": {
+                "instrument_id": "TWSE:2330"
+              },
+              "calendar_assessed": false,
+              "snapshot_coverage_status": "AVAILABLE",
+              "latest_snapshot_presence": "present",
+              "interpretation": "Latest whole-market snapshot coverage and retained issuer profile are separate observations."
+            },
+            "latest_snapshot": {
+              "report_date": "2026-10-03",
+              "source_received_at_utc": "2026-10-04T13:07:03.960501Z",
+              "source_receipt_age_seconds": 212943.809,
+              "data_period_age_days": 4
+            }
+          },
+          "period": {
+            "profile_report_date": "2026-10-03",
+            "latest_snapshot_report_date": "2026-10-03"
+          },
+          "source_contract": "twse_openapi_t187ap03_L/v1",
+          "months": []
+        },
+        "monthly_revenues": {
+          "status": "partial",
+          "reason": "some_requested_months_missing",
+          "freshness": {
+            "frequency": "monthly",
+            "data_period": "2026-08",
+            "report_date": "2026-10-04",
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:09:22.189587Z",
+            "source_receipt_age_seconds": 212805.58,
+            "data_period_age_days": 37,
+            "first_observed_at": null,
+            "source_served_at": "2026-10-07T00:16:08.596524Z",
+            "evaluated_at_utc": "2026-10-07T00:16:07.769928Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "月資料；資料月份、報表日與 receipt 分開計算。沒有推定發布時間或申報 SLA；missing 不代表零營收或未申報。",
+            "coverage": {
+              "block_status": "partial",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "mixed",
+              "requested_scope": {
+                "instrument_id": "TWSE:2330",
+                "start_month": "2026-07",
+                "end_month": "2026-08"
+              },
+              "calendar_assessed": false,
+              "requested_month_count": 2,
+              "month_presence_counts": {
+                "missing": 1,
+                "present": 1
+              },
+              "retained_row_count": 1,
+              "interpretation": "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
+            }
+          },
+          "period": {
+            "data_months": [
+              "2026-07-01",
+              "2026-08-01"
+            ]
+          },
+          "source_contract": "mixed",
+          "months": [
+            {
+              "data_month": "2026-07-01",
+              "presence": "missing",
+              "retained_row": false
+            },
+            {
+              "data_month": "2026-08-01",
+              "presence": "present",
+              "retained_row": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "instrument_id": "TPEX:5347",
+      "instrument": {
+        "venue": "TPEX",
+        "symbol": "5347",
+        "security_type": "EQUITY",
+        "is_active": true,
+        "name": "世界"
+      },
+      "selectors": {
+        "start_date": "2026-10-02",
+        "end_date": "2026-10-05",
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "elapsed_seconds": 10.762,
+      "blocks": {
+        "valuation": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing_or_absent",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": "2026-10-02",
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:09:33.499001Z",
+            "source_receipt_age_seconds": 212805.563,
+            "data_period_age_days": 5,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:19.061565Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "partial",
+              "dataset_coverage": "available=1;missing=3;selected=present",
+              "selected_instrument_presence": "present",
+              "requested_scope": {
+                "instrument_id": "TPEX:5347",
+                "start": "2026-10-02",
+                "end": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "observed_row_count": 1,
+              "source_coverage_header": "available=1;missing=3;selected=present",
+              "interpretation": "Selector dates are calendar bounds; this response does not establish which dates were trading sessions."
+            }
+          },
+          "period": {
+            "trade_dates": [
+              "2026-10-02"
+            ]
+          },
+          "source_contract": "tpex.mainboard.afterTrading.peQryDate/v1",
+          "months": []
+        },
+        "institutional_flows": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": "2026-10-02",
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:09:28.555661Z",
+            "source_receipt_age_seconds": 212810.506,
+            "data_period_age_days": 5,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:19.061565Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "partial",
+              "dataset_coverage": [
+                "AVAILABLE",
+                "MISSING",
+                "MISSING",
+                "MISSING"
+              ],
+              "selected_instrument_presence": [
+                "present",
+                "missing",
+                "missing",
+                "missing"
+              ],
+              "requested_scope": {
+                "instrument_id": "TPEX:5347",
+                "start_date": "2026-10-02",
+                "end_date": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "reported_period_count": 4,
+              "reported_status_counts": {
+                "AVAILABLE": 1,
+                "MISSING": 3
+              },
+              "selected_presence_counts": {
+                "missing": 3,
+                "present": 1
+              },
+              "interpretation": "Coverage follows source-reported dates; no exchange-calendar inference is applied, and selected-issuer absence is not zero flow."
+            }
+          },
+          "period": {
+            "trade_dates": [
+              "2026-10-02"
+            ]
+          },
+          "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+          "months": []
+        },
+        "company_profile": {
+          "status": "available",
+          "reason": "selected_profile_present",
+          "freshness": {
+            "frequency": "latest_only_snapshot",
+            "data_period": "2026-10-04",
+            "report_date": "2026-10-04",
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:07:07.049244Z",
+            "source_receipt_age_seconds": 212952.012,
+            "data_period_age_days": 3,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:19.061565Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "最新快照型資料；以所選保留公司列的報表日和原始 receipt 計算年齡。沒有發布 SLA 或歷史快照查詢。",
+            "coverage": {
+              "block_status": "available",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "present",
+              "requested_scope": {
+                "instrument_id": "TPEX:5347"
+              },
+              "calendar_assessed": false,
+              "snapshot_coverage_status": "AVAILABLE",
+              "latest_snapshot_presence": "present",
+              "interpretation": "Latest whole-market snapshot coverage and retained issuer profile are separate observations."
+            },
+            "latest_snapshot": {
+              "report_date": "2026-10-04",
+              "source_received_at_utc": "2026-10-04T13:07:07.049244Z",
+              "source_receipt_age_seconds": 212952.012,
+              "data_period_age_days": 3
+            }
+          },
+          "period": {
+            "profile_report_date": "2026-10-04",
+            "latest_snapshot_report_date": "2026-10-04"
+          },
+          "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+          "months": []
+        },
+        "monthly_revenues": {
+          "status": "partial",
+          "reason": "some_requested_months_missing",
+          "freshness": {
+            "frequency": "monthly",
+            "data_period": "2026-08",
+            "report_date": "2026-09-17",
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:09:19.479749Z",
+            "source_receipt_age_seconds": 212819.582,
+            "data_period_age_days": 37,
+            "first_observed_at": null,
+            "source_served_at": "2026-10-07T00:16:19.504092Z",
+            "evaluated_at_utc": "2026-10-07T00:16:19.061565Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "月資料；資料月份、報表日與 receipt 分開計算。沒有推定發布時間或申報 SLA；missing 不代表零營收或未申報。",
+            "coverage": {
+              "block_status": "partial",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "mixed",
+              "requested_scope": {
+                "instrument_id": "TPEX:5347",
+                "start_month": "2026-07",
+                "end_month": "2026-08"
+              },
+              "calendar_assessed": false,
+              "requested_month_count": 2,
+              "month_presence_counts": {
+                "missing": 1,
+                "present": 1
+              },
+              "retained_row_count": 1,
+              "interpretation": "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
+            }
+          },
+          "period": {
+            "data_months": [
+              "2026-07-01",
+              "2026-08-01"
+            ]
+          },
+          "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+          "months": [
+            {
+              "data_month": "2026-07-01",
+              "presence": "missing",
+              "retained_row": false
+            },
+            {
+              "data_month": "2026-08-01",
+              "presence": "present",
+              "retained_row": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "instrument_id": "TWSE:00878",
+      "instrument": {
+        "venue": "TWSE",
+        "symbol": "00878",
+        "security_type": "ETF",
+        "is_active": true,
+        "name": "國泰永續高股息"
+      },
+      "selectors": {
+        "start_date": "2026-10-02",
+        "end_date": "2026-10-05",
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "elapsed_seconds": 10.638,
+      "blocks": {
+        "valuation": {
+          "status": "unknown",
+          "reason": "coverage_not_returned",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": null,
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": null,
+            "source_receipt_age_seconds": null,
+            "data_period_age_days": null,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:29.824192Z",
+            "publisher_sla": null,
+            "age_status": "age_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "unknown",
+              "dataset_coverage": null,
+              "selected_instrument_presence": "unknown",
+              "requested_scope": {
+                "instrument_id": "TWSE:00878",
+                "start": "2026-10-02",
+                "end": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "observed_row_count": 0,
+              "source_coverage_header": null,
+              "interpretation": "Selector dates are calendar bounds; this response does not establish which dates were trading sessions."
+            }
+          },
+          "period": {
+            "trade_dates": []
+          },
+          "source_contract": null,
+          "months": []
+        },
+        "institutional_flows": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": "2026-10-02",
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:09:26.439985Z",
+            "source_receipt_age_seconds": 212823.384,
+            "data_period_age_days": 5,
+            "first_observed_at": "2026-10-04T13:09:26.439985Z",
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:29.824192Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "partial",
+              "dataset_coverage": [
+                "AVAILABLE",
+                "MISSING",
+                "MISSING",
+                "MISSING"
+              ],
+              "selected_instrument_presence": [
+                "present",
+                "missing",
+                "missing",
+                "missing"
+              ],
+              "requested_scope": {
+                "instrument_id": "TWSE:00878",
+                "start_date": "2026-10-02",
+                "end_date": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "reported_period_count": 4,
+              "reported_status_counts": {
+                "AVAILABLE": 1,
+                "MISSING": 3
+              },
+              "selected_presence_counts": {
+                "missing": 3,
+                "present": 1
+              },
+              "interpretation": "Coverage follows source-reported dates; no exchange-calendar inference is applied, and selected-issuer absence is not zero flow."
+            }
+          },
+          "period": {
+            "trade_dates": [
+              "2026-10-02"
+            ]
+          },
+          "source_contract": "twse_t86_v1",
+          "months": []
+        },
+        "company_profile": {
+          "status": "unsupported",
+          "reason": "catalog_security_type_etf",
+          "freshness": {
+            "frequency": "latest_only_snapshot",
+            "data_period": null,
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": null,
+            "source_receipt_age_seconds": null,
+            "data_period_age_days": null,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:29.824192Z",
+            "publisher_sla": null,
+            "age_status": "age_unknown",
+            "frequency_hint": "最新快照型資料；以所選保留公司列的報表日和原始 receipt 計算年齡。沒有發布 SLA 或歷史快照查詢。",
+            "coverage": {
+              "block_status": "unsupported",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "absent",
+              "requested_scope": {
+                "instrument_id": "TWSE:00878"
+              },
+              "calendar_assessed": false,
+              "snapshot_coverage_status": "AVAILABLE",
+              "latest_snapshot_presence": "absent",
+              "interpretation": "Latest whole-market snapshot coverage and retained issuer profile are separate observations."
+            },
+            "latest_snapshot": {
+              "report_date": "2026-10-03",
+              "source_received_at_utc": "2026-10-04T13:07:03.960501Z",
+              "source_receipt_age_seconds": 212965.864,
+              "data_period_age_days": 4
+            }
+          },
+          "period": {
+            "profile_report_date": null,
+            "latest_snapshot_report_date": "2026-10-03"
+          },
+          "source_contract": "twse_openapi_t187ap03_L/v1",
+          "months": []
+        },
+        "monthly_revenues": {
+          "status": "unsupported",
+          "reason": "current_catalog_security_type_etf",
+          "freshness": {
+            "frequency": "monthly",
+            "data_period": null,
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": null,
+            "source_receipt_age_seconds": null,
+            "data_period_age_days": null,
+            "first_observed_at": null,
+            "source_served_at": "2026-10-07T00:16:30.061414Z",
+            "evaluated_at_utc": "2026-10-07T00:16:29.824192Z",
+            "publisher_sla": null,
+            "age_status": "age_unknown",
+            "frequency_hint": "月資料；資料月份、報表日與 receipt 分開計算。沒有推定發布時間或申報 SLA；missing 不代表零營收或未申報。",
+            "coverage": {
+              "block_status": "unsupported",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "mixed",
+              "requested_scope": {
+                "instrument_id": "TWSE:00878",
+                "start_month": "2026-07",
+                "end_month": "2026-08"
+              },
+              "calendar_assessed": false,
+              "requested_month_count": 2,
+              "month_presence_counts": {
+                "missing": 1,
+                "not_in_captured_report": 1
+              },
+              "retained_row_count": 0,
+              "interpretation": "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
+            }
+          },
+          "period": {
+            "data_months": [
+              "2026-07-01",
+              "2026-08-01"
+            ]
+          },
+          "source_contract": "mixed",
+          "months": [
+            {
+              "data_month": "2026-07-01",
+              "presence": "missing",
+              "retained_row": false
+            },
+            {
+              "data_month": "2026-08-01",
+              "presence": "not_in_captured_report",
+              "retained_row": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "instrument_id": "TPEX:006201",
+      "instrument": {
+        "venue": "TPEX",
+        "symbol": "006201",
+        "security_type": "ETF",
+        "is_active": true,
+        "name": "元大富櫃50"
+      },
+      "selectors": {
+        "start_date": "2026-10-02",
+        "end_date": "2026-10-05",
+        "start_month": "2026-07",
+        "end_month": "2026-08"
+      },
+      "elapsed_seconds": 11.738,
+      "blocks": {
+        "valuation": {
+          "status": "unsupported",
+          "reason": "unsupported_valuation_selector",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": null,
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": null,
+            "source_receipt_age_seconds": null,
+            "data_period_age_days": null,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:40.462553Z",
+            "publisher_sla": null,
+            "age_status": "age_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "unsupported",
+              "dataset_coverage": null,
+              "selected_instrument_presence": null,
+              "requested_scope": {
+                "instrument_id": "TPEX:006201",
+                "start": "2026-10-02",
+                "end": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "observed_row_count": 0,
+              "source_coverage_header": null,
+              "interpretation": "Selector dates are calendar bounds; this response does not establish which dates were trading sessions."
+            }
+          },
+          "period": null,
+          "source_contract": null,
+          "months": []
+        },
+        "institutional_flows": {
+          "status": "partial",
+          "reason": "some_requested_dates_missing",
+          "freshness": {
+            "frequency": "daily",
+            "data_period": "2026-10-02",
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": "2026-10-04T13:09:28.555661Z",
+            "source_receipt_age_seconds": 212831.907,
+            "data_period_age_days": 5,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:40.462553Z",
+            "publisher_sla": null,
+            "age_status": "age_known_sla_unknown",
+            "frequency_hint": "日資料；以來源列的交易日和 receipt 計算年齡。未驗證交易日曆或發布 SLA；missing 不代表休市或零值。",
+            "coverage": {
+              "block_status": "partial",
+              "dataset_coverage": [
+                "AVAILABLE",
+                "MISSING",
+                "MISSING",
+                "MISSING"
+              ],
+              "selected_instrument_presence": [
+                "present",
+                "missing",
+                "missing",
+                "missing"
+              ],
+              "requested_scope": {
+                "instrument_id": "TPEX:006201",
+                "start_date": "2026-10-02",
+                "end_date": "2026-10-05"
+              },
+              "calendar_assessed": false,
+              "reported_period_count": 4,
+              "reported_status_counts": {
+                "AVAILABLE": 1,
+                "MISSING": 3
+              },
+              "selected_presence_counts": {
+                "missing": 3,
+                "present": 1
+              },
+              "interpretation": "Coverage follows source-reported dates; no exchange-calendar inference is applied, and selected-issuer absence is not zero flow."
+            }
+          },
+          "period": {
+            "trade_dates": [
+              "2026-10-02"
+            ]
+          },
+          "source_contract": "tpex.mainboard.insti.dailyTrade/v1",
+          "months": []
+        },
+        "company_profile": {
+          "status": "unsupported",
+          "reason": "catalog_security_type_etf",
+          "freshness": {
+            "frequency": "latest_only_snapshot",
+            "data_period": null,
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": null,
+            "source_receipt_age_seconds": null,
+            "data_period_age_days": null,
+            "first_observed_at": null,
+            "source_served_at": null,
+            "evaluated_at_utc": "2026-10-07T00:16:40.462553Z",
+            "publisher_sla": null,
+            "age_status": "age_unknown",
+            "frequency_hint": "最新快照型資料；以所選保留公司列的報表日和原始 receipt 計算年齡。沒有發布 SLA 或歷史快照查詢。",
+            "coverage": {
+              "block_status": "unsupported",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "absent",
+              "requested_scope": {
+                "instrument_id": "TPEX:006201"
+              },
+              "calendar_assessed": false,
+              "snapshot_coverage_status": "AVAILABLE",
+              "latest_snapshot_presence": "absent",
+              "interpretation": "Latest whole-market snapshot coverage and retained issuer profile are separate observations."
+            },
+            "latest_snapshot": {
+              "report_date": "2026-10-04",
+              "source_received_at_utc": "2026-10-04T13:07:07.049244Z",
+              "source_receipt_age_seconds": 212973.413,
+              "data_period_age_days": 3
+            }
+          },
+          "period": {
+            "profile_report_date": null,
+            "latest_snapshot_report_date": "2026-10-04"
+          },
+          "source_contract": "tpex.openapi.mopsfin_t187ap03_O/v1.0.0",
+          "months": []
+        },
+        "monthly_revenues": {
+          "status": "unsupported",
+          "reason": "current_catalog_security_type_etf",
+          "freshness": {
+            "frequency": "monthly",
+            "data_period": null,
+            "report_date": null,
+            "publication_time": null,
+            "source_received_at_utc": null,
+            "source_receipt_age_seconds": null,
+            "data_period_age_days": null,
+            "first_observed_at": null,
+            "source_served_at": "2026-10-07T00:16:40.594169Z",
+            "evaluated_at_utc": "2026-10-07T00:16:40.462553Z",
+            "publisher_sla": null,
+            "age_status": "age_unknown",
+            "frequency_hint": "月資料；資料月份、報表日與 receipt 分開計算。沒有推定發布時間或申報 SLA；missing 不代表零營收或未申報。",
+            "coverage": {
+              "block_status": "unsupported",
+              "dataset_coverage": "AVAILABLE",
+              "selected_instrument_presence": "mixed",
+              "requested_scope": {
+                "instrument_id": "TPEX:006201",
+                "start_month": "2026-07",
+                "end_month": "2026-08"
+              },
+              "calendar_assessed": false,
+              "requested_month_count": 2,
+              "month_presence_counts": {
+                "missing": 1,
+                "not_in_captured_report": 1
+              },
+              "retained_row_count": 0,
+              "interpretation": "Per-month presence is source evidence; no filing deadline, zero revenue, or authoritative empty result is inferred."
+            }
+          },
+          "period": {
+            "data_months": [
+              "2026-07-01",
+              "2026-08-01"
+            ]
+          },
+          "source_contract": "tpex.openapi.mopsfin_t187ap05_O/v1.0.0",
+          "months": [
+            {
+              "data_month": "2026-07-01",
+              "presence": "missing",
+              "retained_row": false
+            },
+            {
+              "data_month": "2026-08-01",
+              "presence": "not_in_captured_report",
+              "retained_row": false
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "completed_at_utc": "2026-10-07T00:16:52.200901+00:00"
+}

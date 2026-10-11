@@ -1,7 +1,7 @@
-"""TA load_ohlcv 接管:A股/港股走 PanWatch K线,美股透传 yfinance。
+"""TA load_ohlcv 接管:A股/港股走 PanWatch K線,美股透傳 yfinance。
 
-新上游 get_verified_market_snapshot → load_ohlcv 直连 yfinance,A股(无 .SS)拉不到
-→ NoMarketDataError 整个分析失败。这里验证 PanWatch 接管能为 A股构建 OHLCV,且不误伤美股。
+新上游 get_verified_market_snapshot → load_ohlcv 直連 yfinance,A股(無 .SS)拉不到
+→ NoMarketDataError 整個分析失敗。這裡驗證 PanWatch 接管能為 A股構建 OHLCV,且不誤傷美股。
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _sample_klines(n: int = 40) -> list[KlineData]:
 
 
 def test_build_df_columns_and_date_filter(monkeypatch):
-    """构建的 DataFrame 含 Date/OHLCV 列,Date 为 datetime,且按 curr_date 截断。"""
+    """構建的 DataFrame 含 Date/OHLCV 列,Date 為 datetime,且按 curr_date 截斷。"""
     monkeypatch.setattr(KlineCollector, "get_klines", lambda self, symbol, days=60: _sample_klines(40))
     df = ta._build_panwatch_ohlcv_df("601238", "2026-04-20")
     assert list(df.columns) == ["Date", "Open", "High", "Low", "Close", "Volume"]
@@ -42,7 +42,7 @@ def test_build_df_columns_and_date_filter(monkeypatch):
 
 
 def test_build_df_reuses_injected_klines_before_fetching_again(monkeypatch):
-    """验证快照应复用采集阶段的 K 线，避免 analyst 再发一轮外部请求。"""
+    """驗證快照應複用採集階段的 K 線，避免 analyst 再發一輪外部請求。"""
     cached = _sample_klines(12)
 
     def unexpected_fetch(*args, **kwargs):
@@ -57,7 +57,7 @@ def test_build_df_reuses_injected_klines_before_fetching_again(monkeypatch):
 
 
 def test_build_df_reuses_empty_injected_klines_without_retrying(monkeypatch):
-    """采集阶段已确认无 K 线时，后续工具不应再次联网重试同一标的。"""
+    """採集階段已確認無 K 線時，後續工具不應再次聯網重試同一標的。"""
     calls = []
 
     def unexpected_fetch(self, symbol, days=60):
@@ -73,7 +73,7 @@ def test_build_df_reuses_empty_injected_klines_without_retrying(monkeypatch):
 
 
 def test_build_df_does_not_reuse_klines_for_another_symbol(monkeypatch):
-    """模型误传其它代码时，不能把当前标的缓存冒充成对方行情。"""
+    """模型誤傳其它程式碼時，不能把當前標的快取冒充成對方行情。"""
     cached = _sample_klines(12)
     fetched = _sample_klines(8)
     calls = []
@@ -92,7 +92,7 @@ def test_build_df_does_not_reuse_klines_for_another_symbol(monkeypatch):
 
 
 def test_cancelled_ta_context_does_not_fetch_another_symbol(monkeypatch):
-    """任务超时后，残留 worker 再调用行情工具时必须立即停止。"""
+    """任務超時後，殘留 worker 再呼叫行情工具時必須立即停止。"""
     calls = []
 
     def unexpected_fetch(self, symbol, days=60):
@@ -120,7 +120,7 @@ def test_cancelled_ta_context_does_not_fetch_another_symbol(monkeypatch):
 
 
 def test_load_ohlcv_routes_a_share_to_panwatch(monkeypatch):
-    """A股调用走 PanWatch,不触发原生 yfinance load_ohlcv。"""
+    """A股呼叫走 PanWatch,不觸發原生 yfinance load_ohlcv。"""
     monkeypatch.setattr(KlineCollector, "get_klines", lambda self, symbol, days=60: _sample_klines(10))
     real_calls = {"n": 0}
 
@@ -131,7 +131,7 @@ def test_load_ohlcv_routes_a_share_to_panwatch(monkeypatch):
     monkeypatch.setattr(ta, "_real_load_ohlcv", fake_real)
     df = ta._panwatch_load_ohlcv("601238", "2026-06-18")
     assert not df.empty
-    assert real_calls["n"] == 0, "A股不应回落到 yfinance"
+    assert real_calls["n"] == 0, "A股不應回落到 yfinance"
 
 
 def test_load_ohlcv_passthrough_for_us(monkeypatch):
@@ -143,7 +143,7 @@ def test_load_ohlcv_passthrough_for_us(monkeypatch):
 
 
 def test_load_ohlcv_us_rate_limit_falls_back_to_marketdata(monkeypatch):
-    """Yahoo 限流时，美股必须使用 MarketData 返回的真实 K 线，而不是中断。"""
+    """Yahoo 限流時，美股必須使用 MarketData 返回的真實 K 線，而不是中斷。"""
     from yfinance.exceptions import YFRateLimitError
 
     calls = []
@@ -165,7 +165,7 @@ def test_load_ohlcv_us_rate_limit_falls_back_to_marketdata(monkeypatch):
 
 
 def test_load_ohlcv_us_service_error_falls_back_to_marketdata(monkeypatch):
-    """Yahoo 503 这类可用性错误也必须走 MarketData，不得中断分析。"""
+    """Yahoo 503 這類可用性錯誤也必須走 MarketData，不得中斷分析。"""
     monkeypatch.setattr(
         ta,
         "_real_load_ohlcv",
@@ -179,7 +179,7 @@ def test_load_ohlcv_us_service_error_falls_back_to_marketdata(monkeypatch):
 
 
 def test_verified_snapshot_returns_unavailable_message_when_all_sources_fail(monkeypatch):
-    """行情源全失败时，验证快照应返回不可用提示而非向 LangGraph 抛异常。"""
+    """行情源全失敗時，驗證快照應返回不可用提示而非向 LangGraph 拋異常。"""
     from tradingagents.dataflows.errors import NoMarketDataError
 
     def no_data(*args, **kwargs):
@@ -194,7 +194,7 @@ def test_verified_snapshot_returns_unavailable_message_when_all_sources_fail(mon
 
 
 def test_verified_snapshot_preserves_indicators_argument_when_degraded(monkeypatch):
-    """安全包装器必须保持上游的 indicators 参数，避免调用方因签名变化中断。"""
+    """安全包裝器必須保持上游的 indicators 引數，避免呼叫方因簽名變化中斷。"""
     from tradingagents.dataflows.errors import NoMarketDataError
 
     seen = {}
@@ -214,7 +214,7 @@ def test_verified_snapshot_preserves_indicators_argument_when_degraded(monkeypat
 
 
 def test_install_load_ohlcv_patch_updates_yfinance_indicator_import(monkeypatch):
-    """技术指标工具持有的 load_ohlcv 引用也必须接入同一个 US fallback。"""
+    """技術指標工具持有的 load_ohlcv 引用也必須接入同一個 US fallback。"""
     from tradingagents.dataflows import market_data_validator, stockstats_utils, y_finance
 
     def upstream_load_ohlcv(*args, **kwargs):
@@ -231,9 +231,9 @@ def test_install_load_ohlcv_patch_updates_yfinance_indicator_import(monkeypatch)
 
 
 def test_load_ohlcv_a_share_no_klines_raises_not_fallback(monkeypatch):
-    """A股取不到 K线时,直接抛 NoMarketDataError 报清晰错,**不回退 yfinance**。
+    """A股取不到 K線時,直接拋 NoMarketDataError 報清晰錯,**不回退 yfinance**。
 
-    A股/港股在 Yahoo 无数据 + 限流,回退只会把"K线获取失败"变成误导的"Yahoo no rows"。
+    A股/港股在 Yahoo 無資料 + 限流,回退只會把"K線獲取失敗"變成誤導的"Yahoo no rows"。
     """
     import pytest
     from tradingagents.dataflows.errors import NoMarketDataError
@@ -248,11 +248,11 @@ def test_load_ohlcv_a_share_no_klines_raises_not_fallback(monkeypatch):
     monkeypatch.setattr(ta, "_real_load_ohlcv", fake_real)
     with pytest.raises(NoMarketDataError):
         ta._panwatch_load_ohlcv("601238", "2026-06-18")
-    assert real_calls["n"] == 0, "A股拉空不应回退 yfinance"
+    assert real_calls["n"] == 0, "A股拉空不應回退 yfinance"
 
 
 def test_route_to_vendor_keeps_numeric_requested_symbol(monkeypatch):
-    """数字股票代码也是合法 ticker，不能因全是数字而复用缓存标的。"""
+    """數字股票程式碼也是合法 ticker，不能因全是數字而複用快取標的。"""
     stock = type("Stock", (), {"symbol": "300624"})()
     monkeypatch.setattr(
         ta,
@@ -267,7 +267,7 @@ def test_route_to_vendor_keeps_numeric_requested_symbol(monkeypatch):
 
 
 def test_route_to_vendor_rejects_cached_snapshot_for_different_numeric_symbol(monkeypatch):
-    """缓存快照与请求标的不一致时，不能静默把万兴科技数据当成其它股票。"""
+    """快取快照與請求標的不一致時，不能靜默把萬興科技資料當成其它股票。"""
     stock = type("Stock", (), {"symbol": "601238"})()
     monkeypatch.setattr(
         ta,
@@ -283,20 +283,20 @@ def test_route_to_vendor_rejects_cached_snapshot_for_different_numeric_symbol(mo
 
 
 def test_route_to_vendor_marks_expected_upstream_outage_as_data_unavailable(monkeypatch):
-    """已知外部数据不可用应给 LLM 明确信号，而不是吞成空字符串。"""
+    """已知外部資料不可用應給 LLM 明確訊號，而不是吞成空字串。"""
 
     def boom(method_name, *a, **k):
         raise RuntimeError("FRED_API_KEY environment variable is not set")
 
     monkeypatch.setattr(ta, "_real_route_to_vendor", boom)
-    # get_macro_indicators:首参是指标名(非 A股/港股) → 走上游 passthrough → 明确数据不可用
+    # get_macro_indicators:首參是指標名(非 A股/港股) → 走上游 passthrough → 明確資料不可用
     out = ta._patched_route_to_vendor("get_macro_indicators", "fed_funds_rate", "2026-06-18", 30)
     assert "DATA_UNAVAILABLE" in out
     assert "FRED_API_KEY" in out
 
 
 def test_route_to_vendor_propagates_programming_errors(monkeypatch):
-    """调用契约/实现错误不能伪装成数据缺失，否则会掩盖升级回归。"""
+    """呼叫契約/實現錯誤不能偽裝成資料缺失，否則會掩蓋升級迴歸。"""
 
     def boom(method_name, *a, **k):
         raise TypeError("unexpected keyword argument 'vendor'")
@@ -309,7 +309,7 @@ def test_route_to_vendor_propagates_programming_errors(monkeypatch):
 
 
 def test_route_to_vendor_does_not_misclassify_generic_not_set_error(monkeypatch):
-    """只有数据源配置缺失才可降级，内部状态未设置仍应暴露。"""
+    """只有資料來源配置缺失才可降級，內部狀態未設定仍應暴露。"""
 
     def boom(method_name, *a, **k):
         raise RuntimeError("internal state not set")

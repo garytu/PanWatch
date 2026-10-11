@@ -1,9 +1,9 @@
-"""港股(阿里健康 00241)数据通路测试。
+"""港股(阿里健康 00241)資料通路測試。
 
 策略:
-1. 港股 ticker(5 位数字)→ 先转 yfinance 格式(0241.HK)试上游
-2. yfinance 拿到真实数据 → 用 yfinance 返回
-3. yfinance 无数据(返回"No data found"或极短)→ fallback 到 PanWatch
+1. 港股 ticker(5 位數字)→ 先轉 yfinance 格式(0241.HK)試上游
+2. yfinance 拿到真實資料 → 用 yfinance 返回
+3. yfinance 無資料(返回"No data found"或極短)→ fallback 到 PanWatch
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class _StockHK:
 
 
 # ============================================================
-# 1. 市场判定
+# 1. 市場判定
 # ============================================================
 
 def test_is_a_share_6_digits():
@@ -52,7 +52,7 @@ def test_is_panwatch_routable_covers_a_and_hk():
 
 
 # ============================================================
-# 2. 港股 ticker 格式转换
+# 2. 港股 ticker 格式轉換
 # ============================================================
 
 def test_hk_symbol_to_yfinance_strips_leading_zero():
@@ -61,13 +61,13 @@ def test_hk_symbol_to_yfinance_strips_leading_zero():
 
 
 def test_hk_symbol_to_yfinance_tencent():
-    """腾讯 00700 → 0700.HK"""
+    """騰訊 00700 → 0700.HK"""
     assert hk_symbol_to_yfinance("00700") == "0700.HK"
 
 
 def test_hk_symbol_to_yfinance_already_4_digits_padded():
-    """4 位数字也加 .HK 后缀"""
-    assert hk_symbol_to_yfinance("0700") == "0700"  # 非 5 位不转
+    """4 位數字也加 .HK 字尾"""
+    assert hk_symbol_to_yfinance("0700") == "0700"  # 非 5 位不轉
 
 
 def test_hk_symbol_to_yfinance_skips_non_hk():
@@ -76,25 +76,25 @@ def test_hk_symbol_to_yfinance_skips_non_hk():
 
 
 # ============================================================
-# 3. yfinance 响应判定
+# 3. yfinance 回應判定
 # ============================================================
 
 def test_yfinance_no_data_detected():
-    """yfinance 返回 "No data found" → 判定无数据"""
+    """yfinance 返回 "No data found" → 判定無資料"""
     assert _yfinance_response_has_data(
         "No data found for symbol '00241' between 2025-11-01 and 2026-05-17"
     ) is False
 
 
 def test_yfinance_empty_response_detected():
-    """空字符串/极短 → 无数据"""
+    """空字串/極短 → 無資料"""
     assert _yfinance_response_has_data("") is False
     assert _yfinance_response_has_data("   ") is False
-    assert _yfinance_response_has_data("date,open,high") is False  # 仅表头
+    assert _yfinance_response_has_data("date,open,high") is False  # 僅表頭
 
 
 def test_yfinance_real_data_detected():
-    """正常 K 线 CSV → 有数据"""
+    """正常 K 線 CSV → 有資料"""
     csv = (
         "date,open,high,low,close,volume\n"
         "2026-05-15,4.50,4.55,4.20,4.24,3.8M\n"
@@ -105,21 +105,21 @@ def test_yfinance_real_data_detected():
 
 
 def test_yfinance_delisted_msg_detected():
-    """yfinance 标记 delisted 也判无数据"""
+    """yfinance 標記 delisted 也判無資料"""
     assert _yfinance_response_has_data(
         "$XXX: possibly delisted; symbol may be delisted"
     ) is False
 
 
 def test_yfinance_unavailable_sentinel_detected():
-    """上游的 NO_DATA_AVAILABLE 哨兵不是有效行情，必须触发 PanWatch fallback。"""
+    """上游的 NO_DATA_AVAILABLE 哨兵不是有效行情，必須觸發 PanWatch fallback。"""
     assert _yfinance_response_has_data(
         "NO_DATA_AVAILABLE: No usable market data for '0700.HK' from any configured vendor"
     ) is False
 
 
 def test_hk_route_propagates_programming_errors(monkeypatch):
-    """港股 yfinance 调用的参数/实现错误不能被伪装成行情缺失。"""
+    """港股 yfinance 呼叫的引數/實現錯誤不能被偽裝成行情缺失。"""
     import pytest
 
     def boom(method_name, *args, **kwargs):

@@ -1,23 +1,23 @@
-"""因子权重存取层(M1):lazy seed + 读取,使用隔离的内存库。"""
+"""因子權重存取層(M1):lazy seed + 讀取,使用隔離的記憶體庫。"""
 
 from __future__ import annotations
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-import src.platform.persistence.models  # noqa: F401  注册所有 ORM 模型到 Base.metadata
+import src.platform.persistence.models  # noqa: F401  註冊所有 ORM 模型到 Base.metadata
 from src.platform.persistence.database import Base
 
 
 def _mem_db():
-    """每个用例一个全新的内存 SQLite 会话,避免污染开发库。"""
+    """每個用例一個全新的記憶體 SQLite 會話,避免汙染開發庫。"""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine)()
 
 
 def test_get_factor_weights_lazy_seeds_defaults():
-    """首次读取某市场:5 个可标定因子全部 lazy seed 为 1.0。"""
+    """首次讀取某市場:5 個可標定因子全部 lazy seed 為 1.0。"""
     from src.modules.strategy.factor_weights import CALIBRATABLE_FACTORS, get_factor_weights
 
     db = _mem_db()
@@ -30,7 +30,7 @@ def test_get_factor_weights_lazy_seeds_defaults():
 
 
 def test_get_factor_weights_idempotent_no_dup_rows():
-    """重复读取不产生重复行(幂等 seed)。"""
+    """重複讀取不產生重複行(冪等 seed)。"""
     from src.modules.strategy.factor_weights import CALIBRATABLE_FACTORS, get_factor_weights
     from src.platform.persistence.models import FactorWeight
 
@@ -45,7 +45,7 @@ def test_get_factor_weights_idempotent_no_dup_rows():
 
 
 def test_get_factor_weights_reads_stored_value():
-    """已存在的非默认权重应被读出,不被 seed 覆盖。"""
+    """已存在的非預設權重應被讀出,不被 seed 覆蓋。"""
     from src.modules.strategy.factor_weights import get_factor_weights
     from src.platform.persistence.models import FactorWeight
 
@@ -55,14 +55,14 @@ def test_get_factor_weights_reads_stored_value():
         db.commit()
         w = get_factor_weights("CN", db=db)
         assert w["alpha_score"] == 1.3
-        # 其余因子仍补齐为默认 1.0
+        # 其餘因子仍補齊為預設 1.0
         assert w["catalyst_score"] == 1.0
     finally:
         db.close()
 
 
 def test_get_all_factor_weights_lists_all_markets():
-    """列出所有市场 × 因子,字段含 weight/is_pinned/auto_calibrate。"""
+    """列出所有市場 × 因子,欄位含 weight/is_pinned/auto_calibrate。"""
     from src.modules.strategy.factor_weights import (
         CALIBRATABLE_FACTORS,
         MARKETS,
@@ -81,26 +81,29 @@ def test_get_all_factor_weights_lists_all_markets():
         db.close()
 
 
-def test_set_factor_weight_manual_writes_history():
-    """手动改权重写 manual 审计,并能同时设 is_pinned。"""
+def test_set_factor_weight_obeys_frozen_gate():
+    """手動覆蓋不能繞過 FROZEN，也不留下成功標定審計。"""
     from src.modules.strategy.factor_weights import set_factor_weight
     from src.platform.persistence.models import FactorWeightHistory
 
     db = _mem_db()
     try:
         res = set_factor_weight("alpha_score", "CN", weight=1.3, is_pinned=True, db=db)
-        assert res["weight"] == 1.3
-        assert res["is_pinned"] is True
+        assert res["weight"] == 1.0
+        assert res["status"] == "MODE_FROZEN"
+        assert res["is_pinned"] is False
         hist = (db.query(FactorWeightHistory)
                 .filter_by(factor_code="alpha_score", market="CN", reason="manual").all())
-        assert len(hist) == 1
-        assert hist[0].new_weight == 1.3
+        assert hist == []
+        pinned = set_factor_weight("alpha_score", "CN", is_pinned=True, db=db)
+        assert pinned["is_pinned"] is True
+        assert pinned["weight"] == 1.0
     finally:
         db.close()
 
 
 def test_set_factor_weight_rejects_unknown_factor():
-    """未知因子抛 ValueError(API 层转 400)。"""
+    """未知因子拋 ValueError(API 層轉 400)。"""
     import pytest
 
     from src.modules.strategy.factor_weights import set_factor_weight

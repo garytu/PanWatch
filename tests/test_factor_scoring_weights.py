@@ -1,4 +1,4 @@
-"""评分集成(M3):_compute_factor_breakdown 按每因子权重加权 + 零回归。"""
+"""評分整合(M3):_compute_factor_breakdown 按每因子權重加權 + 零迴歸。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from src.platform.persistence.models import EntryCandidate
 
 
 def _candidate(**kw):
-    """构造一个内存 EntryCandidate(不入库),score=80 → 原始 alpha_score=13.5。"""
+    """構造一個記憶體 EntryCandidate(不入庫),score=80 → 原始 alpha_score=13.5。"""
     defaults = dict(
         score=80.0, action="watch", status="active", plan_quality=80,
         candidate_source="watchlist", is_holding_snapshot=True,
@@ -25,7 +25,7 @@ def _bd(row, fw):
 
 
 def test_factor_weights_none_equals_empty_zero_regression():
-    """factor_weights = None / {} / 全 1.0 三者输出完全一致(零回归)。"""
+    """factor_weights = None / {} / 全 1.0 三者輸出完全一致(零迴歸)。"""
     row = _candidate()
     a = _bd(row, None)
     b = _bd(row, {})
@@ -38,21 +38,21 @@ def test_factor_weights_none_equals_empty_zero_regression():
 
 
 def test_factor_weight_boost_adds_one_raw_factor():
-    """alpha 权重 1.0→2.0:raw_score 恰好多出一份原始 alpha_score;快照值不受权重影响。"""
+    """alpha 權重 1.0→2.0:raw_score 恰好多出一份原始 alpha_score;快照值不受權重影響。"""
     row = _candidate()
     base = _bd(row, {"alpha_score": 1.0})
     boosted = _bd(row, {"alpha_score": 2.0})
 
-    # 快照存 raw 因子分(IC 测在 raw 上),不随权重变化
+    # 快照存 raw 因子分(IC 測在 raw 上),不隨權重變化
     assert boosted["alpha_score"] == base["alpha_score"]
     assert base["alpha_score"] > 0
-    # 加权只体现在合成的 raw_score 上
+    # 加權只體現在合成的 raw_score 上
     assert abs((boosted["raw_score"] - base["raw_score"]) - base["alpha_score"]) < 1e-6
 
 
 def test_penalty_weight_increases_deduction():
-    """惩罚因子权重升高 → 扣分更多 → raw_score 更低。"""
-    # 制造非零 risk_penalty:status 非 active(+2.5)
+    """懲罰因子權重升高 → 扣分更多 → raw_score 更低。"""
+    # 製造非零 risk_penalty:status 非 active(+2.5)
     row = _candidate(status="inactive")
     base = _bd(row, {"risk_penalty": 1.0})
     heavier = _bd(row, {"risk_penalty": 2.0})

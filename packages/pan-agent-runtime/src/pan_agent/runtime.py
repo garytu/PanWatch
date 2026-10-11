@@ -30,9 +30,18 @@ from .registry import ToolRegistry
 
 _MAX_IDENTICAL_TOOL_CALLS = 2
 _REQUIRED_TOOL_CHOICE = "required"
+
+
+def _tool_timeout(request: RunRequest, tool_name: str, remaining: float) -> float:
+    configured = request.limits.tool_timeout_overrides.get(
+        tool_name, request.limits.tool_timeout_seconds
+    )
+    return min(configured, remaining)
+
+
 _REQUIRED_TOOL_REPAIR_MESSAGE = (
-    "本轮请求需要执行写入操作。不要用自然语言代替操作结果，"
-    "必须调用可用的写入工具；如果缺少必要信息，请明确说明。"
+    "本輪請求需要執行寫入操作。不要用自然語言代替操作結果，"
+    "必須呼叫可用的寫入工具；如果缺少必要資訊，請明確說明。"
 )
 
 
@@ -126,7 +135,7 @@ class AgentRuntime:
                         )
                 else:
                     result = ToolResult.failure(
-                        summary="用户拒绝了此操作",
+                        summary="使用者拒絕了此操作",
                         error_code="approval_rejected",
                     )
                     await self._publish_tool_completed(sink, request, call, result)
@@ -335,7 +344,7 @@ class AgentRuntime:
                         continue
                     if decision.mode is PermissionMode.DENY:
                         result = ToolResult.failure(
-                            summary="工具权限不足", error_code="permission_denied"
+                            summary="工具權限不足", error_code="permission_denied"
                         )
                         await self._publish_tool_completed(sink, request, call, result)
                         self._append_tool_result(messages, call, result)
@@ -514,7 +523,7 @@ class AgentRuntime:
         handler = getattr(extension, "handle_tool_call", None)
         if handler is None:
             return ToolResult.failure(
-                summary="请求的扩展工具不可用", error_code="unknown_tool"
+                summary="請求的擴充套件工具不可用", error_code="unknown_tool"
             ), "unknown_tool"
         await self._publish(
             sink,
@@ -526,7 +535,7 @@ class AgentRuntime:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError
-            async with asyncio.timeout(min(request.limits.tool_timeout_seconds, remaining)):
+            async with asyncio.timeout(_tool_timeout(request, call.name, remaining)):
                 result = await handler(
                     ExtensionToolContext(
                         request=request,
@@ -554,12 +563,12 @@ class AgentRuntime:
                     )
                 )
         except TimeoutError:
-            return ToolResult.failure(summary="扩展工具调用超时", error_code="tool_timeout"), "tool_timeout"
+            return ToolResult.failure(summary="擴充套件工具呼叫超時", error_code="tool_timeout"), "tool_timeout"
         except Exception:  # noqa: BLE001 - extension is an optional boundary
-            return ToolResult.failure(summary="扩展工具调用失败", error_code="tool_failed"), "tool_failed"
+            return ToolResult.failure(summary="擴充套件工具呼叫失敗", error_code="tool_failed"), "tool_failed"
         if result is None:
             return ToolResult.failure(
-                summary="请求的扩展工具不可用", error_code="unknown_tool"
+                summary="請求的擴充套件工具不可用", error_code="unknown_tool"
             ), "unknown_tool"
         await self._publish_tool_completed(sink, request, call, result)
         if not result.ok:
@@ -591,7 +600,7 @@ class AgentRuntime:
             self._tools.get(call.name)
         except UnknownTool:
             return ToolResult.failure(
-                summary="请求的工具不可用", error_code="unknown_tool"
+                summary="請求的工具不可用", error_code="unknown_tool"
             ), "unknown_tool"
 
         await self._publish(
@@ -606,7 +615,7 @@ class AgentRuntime:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError
-                timeout = min(request.limits.tool_timeout_seconds, remaining)
+                timeout = _tool_timeout(request, call.name, remaining)
                 async with asyncio.timeout(timeout):
                     result = await self._tools.execute(
                         call.name, request, call.arguments
@@ -617,12 +626,12 @@ class AgentRuntime:
                     raise
                 if attempt == request.limits.step_retry_count:
                     return ToolResult.failure(
-                        summary="工具调用超时", error_code="tool_timeout"
+                        summary="工具呼叫超時", error_code="tool_timeout"
                     ), "tool_timeout"
             except Exception:  # noqa: BLE001 - tool adapters are untrusted host boundaries
                 if attempt == request.limits.step_retry_count:
                     return ToolResult.failure(
-                        summary="工具调用失败", error_code="tool_failed"
+                        summary="工具呼叫失敗", error_code="tool_failed"
                     ), "tool_failed"
 
         assert result is not None

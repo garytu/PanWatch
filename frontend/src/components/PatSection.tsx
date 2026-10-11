@@ -6,10 +6,10 @@ import { Button } from '@panwatch/base-ui/components/ui/button'
 import { useToast } from '@panwatch/base-ui/components/ui/toast'
 
 /**
- * MCP 访问令牌(PAT)管理。
+ * MCP 訪問令牌(PAT)管理。
  *
- * 令牌用于 Claude 等 MCP client 连接 PanWatch 的 MCP 端点(/mcp)。
- * 明文仅创建时返回一次;列表只显示前缀。
+ * 令牌用於 Claude 等 MCP client 連線 PanWatch 的 MCP 端點(/mcp)。
+ * 明文僅建立時返回一次;列表只顯示字首。
  */
 export default function PatSection() {
   const { toast } = useToast()
@@ -25,7 +25,7 @@ export default function PatSection() {
       const res = await patsApi.list()
       setItems(res.items || [])
     } catch (e) {
-      toast(e instanceof Error ? e.message : '加载令牌失败', 'error')
+      toast(e instanceof Error ? e.message : '載入令牌失敗', 'error')
     } finally {
       setLoading(false)
     }
@@ -35,7 +35,7 @@ export default function PatSection() {
 
   const create = async () => {
     if (!name.trim()) {
-      toast('请填写令牌用途备注', 'error')
+      toast('請填寫令牌用途備註', 'error')
       return
     }
     setCreating(true)
@@ -44,9 +44,9 @@ export default function PatSection() {
       setNewToken(res.token)
       setName('')
       await load()
-      toast('令牌已创建,明文仅显示这一次,请立即保存', 'success')
+      toast('令牌已建立,明文僅顯示這一次,請立即儲存', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '创建失败', 'error')
+      toast(e instanceof Error ? e.message : '建立失敗', 'error')
     } finally {
       setCreating(false)
     }
@@ -56,15 +56,15 @@ export default function PatSection() {
     try {
       await patsApi.revoke(id)
       await load()
-      toast('令牌已吊销', 'success')
+      toast('令牌已吊銷', 'success')
     } catch (e) {
-      toast(e instanceof Error ? e.message : '吊销失败', 'error')
+      toast(e instanceof Error ? e.message : '吊銷失敗', 'error')
     }
   }
 
   const copy = (text: string) => {
     navigator.clipboard?.writeText(text)
-    toast('已复制到剪贴板', 'success')
+    toast('已複製到剪貼簿', 'success')
   }
 
   return (
@@ -72,10 +72,10 @@ export default function PatSection() {
       <div className="flex items-start justify-between mb-4 gap-3">
         <div>
           <h3 className="text-[12px] md:text-[13px] font-semibold text-foreground flex items-center gap-1.5">
-            <KeyRound className="w-3.5 h-3.5" /> MCP 访问令牌
+            <KeyRound className="w-3.5 h-3.5" /> MCP 訪問令牌
           </h3>
           <p className="text-[11px] text-muted-foreground mt-1">
-            供 Claude 等 MCP 客户端连接本站 MCP 端点(<span className="font-mono">/mcp</span>),只读行情与持仓。明文仅创建时显示一次。
+            供 Claude 等 MCP 使用者端連線本站 MCP 端點(<span className="font-mono">/mcp</span>),只讀行情與持倉。明文僅建立時顯示一次。
           </p>
         </div>
       </div>
@@ -85,11 +85,11 @@ export default function PatSection() {
         <Input
           value={name}
           onChange={e => setName(e.target.value)}
-          placeholder="令牌用途备注,如 Claude Desktop"
+          placeholder="令牌用途備註,如 Claude Desktop"
           className="sm:max-w-xs"
         />
         <Button size="sm" className="h-9" onClick={create} disabled={creating}>
-          <Plus className="w-3.5 h-3.5" /> 创建令牌
+          <Plus className="w-3.5 h-3.5" /> 建立令牌
         </Button>
       </div>
 
@@ -97,12 +97,12 @@ export default function PatSection() {
       {newToken ? (
         <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-50/60 dark:bg-amber-950/20 p-3">
           <div className="text-[11px] text-amber-700 dark:text-amber-400 mb-1.5">
-            请立即复制并妥善保存,关闭后无法再次查看:
+            請立即複製並妥善儲存,關閉後無法再次檢視:
           </div>
           <div className="flex items-center gap-2">
             <code className="flex-1 min-w-0 truncate rounded bg-background/70 px-2 py-1 font-mono text-[12px]">{newToken}</code>
             <Button variant="secondary" size="sm" className="h-8" onClick={() => copy(newToken)}>
-              <Copy className="w-3.5 h-3.5" /> 复制
+              <Copy className="w-3.5 h-3.5" /> 複製
             </Button>
             <Button variant="ghost" size="sm" className="h-8" onClick={() => setNewToken(null)}>知道了</Button>
           </div>
@@ -111,9 +111,9 @@ export default function PatSection() {
 
       {/* 列表 */}
       {loading ? (
-        <div className="text-[12px] text-muted-foreground">加载中…</div>
+        <div className="text-[12px] text-muted-foreground">載入中…</div>
       ) : items.length === 0 ? (
-        <div className="text-[12px] text-muted-foreground">还没有令牌。</div>
+        <div className="text-[12px] text-muted-foreground">還沒有令牌。</div>
       ) : (
         <div className="space-y-2">
           {items.map(it => (
@@ -126,19 +126,19 @@ export default function PatSection() {
                   <span className="text-[12px] font-medium text-foreground truncate">{it.name || '未命名'}</span>
                   <code className="font-mono text-[11px] text-muted-foreground">{it.prefix}…</code>
                   {it.revoked ? (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600">已吊销</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600">已吊銷</span>
                   ) : (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">有效</span>
                   )}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {it.last_used_at ? `最近使用 ${it.last_used_at.slice(0, 10)}` : '从未使用'}
-                  {it.expires_at ? ` · 过期 ${it.expires_at.slice(0, 10)}` : ' · 永不过期'}
+                  {it.last_used_at ? `最近使用 ${it.last_used_at.slice(0, 10)}` : '從未使用'}
+                  {it.expires_at ? ` · 過期 ${it.expires_at.slice(0, 10)}` : ' · 永不過期'}
                 </div>
               </div>
               {!it.revoked ? (
                 <Button variant="ghost" size="sm" className="h-8 text-rose-600" onClick={() => revoke(it.id)}>
-                  <Trash2 className="w-3.5 h-3.5" /> 吊销
+                  <Trash2 className="w-3.5 h-3.5" /> 吊銷
                 </Button>
               ) : null}
             </div>

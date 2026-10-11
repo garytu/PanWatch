@@ -1,4 +1,4 @@
-"""因子自校准闭环(M4):calibrate_all_markets 端到端接通评分。"""
+"""因子自校準閉環(M4):calibrate_all_markets 端到端接通評分。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-import src.platform.persistence.models  # noqa: F401  注册 ORM 模型
+import src.platform.persistence.models  # noqa: F401  註冊 ORM 模型
 from src.platform.persistence.database import Base
 
 
@@ -32,25 +32,27 @@ def _seed_pair(db, sid, *, market, snapshot_date, alpha, ret, horizon=5):
     ))
 
 
-def test_calibrate_all_markets_closes_loop_into_scoring():
-    """端到端:快照+outcome → calibrate_all_markets → CN alpha 权重上调 → 评分 raw_score 提升。"""
+def test_calibrate_all_markets_closes_loop_into_scoring(monkeypatch):
+    """端到端:快照+outcome → calibrate_all_markets → CN alpha 權重上調 → 評分 raw_score 提升。"""
     from src.modules.strategy.factor_calibration import calibrate_all_markets
     from src.modules.strategy.factor_weights import get_factor_weights
     from src.modules.strategy.strategy_engine import _compute_factor_breakdown
     from src.platform.persistence.models import EntryCandidate
+    import test_calibration_integrity as ci
+    import src.modules.strategy.calibration_gate as gate
+    monkeypatch.setattr(gate, "SESSION_EVALUATION_VERSIONS", {ci.EVALUATION_VERSION_V2})
 
     db = _mem_db()
     try:
-        d = (date.today() - timedelta(days=30)).strftime("%Y-%m-%d")
-        for i in range(1, 7):  # CN:alpha 与 ret 完全正相关
-            _seed_pair(db, i, market="CN", snapshot_date=d, alpha=float(i), ret=float(i))
-        db.commit()
+        ci._seed_cohort(db, market="CN", dates=32, units=5)
+        ci.set_calibration_mode(db, kind="factor", market="CN", mode=ci.MODE_ACTIVE,
+                                reason="floors met")
 
-        res = calibrate_all_markets(db=db, min_samples=5)
-        assert set(res) == {"CN", "HK", "US"}
+        res = calibrate_all_markets(db=db)
+        assert set(res) == {"CN", "HK", "US", "TW"}
 
         w = get_factor_weights("CN", db=db)
-        assert w["alpha_score"] > 1.0  # IC 闭环把权重抬高
+        assert w["alpha_score"] > 1.0  # IC 閉環把權重抬高
 
         row = EntryCandidate(
             score=80.0, action="watch", status="active", plan_quality=80,

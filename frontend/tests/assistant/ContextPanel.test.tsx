@@ -24,12 +24,12 @@ const detail = {
     version: 2,
     mode: 'balanced' as const,
     summary: {
-      goal: ['分析持仓'],
+      goal: ['分析持倉'],
       constraints: [],
       decisions: [],
       facts: [],
       current_state: '等待下一步',
-      open_items: ['补充风险说明'],
+      open_items: ['補充風險說明'],
       tool_findings: [],
     },
     source_message_count: 8,
@@ -61,11 +61,11 @@ describe('ContextPanel', () => {
     const onCompress = vi.fn()
     render(<ContextPanel detail={detail} loading={false} compressing={false} onCompress={onCompress} />)
 
-    expect(screen.getByText('估算输入 Token：9,000 / 12,000')).toBeTruthy()
-    expect(screen.getByText('历史消息')).toBeTruthy()
-    expect(screen.getByText(/分析持仓/)).toBeTruthy()
+    expect(screen.getByText('估算輸入 Token：9,000 / 12,000')).toBeTruthy()
+    expect(screen.getByText('歷史訊息')).toBeTruthy()
+    expect(screen.getByText(/分析持倉/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '保留细节并压缩' }))
+    fireEvent.click(screen.getByRole('button', { name: '保留細節並壓縮' }))
     expect(onCompress).toHaveBeenCalledWith('preserve_details')
   })
 })
