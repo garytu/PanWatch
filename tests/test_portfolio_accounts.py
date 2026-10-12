@@ -8,6 +8,25 @@ from src.platform.persistence.database import Base
 from src.platform.persistence.models import Account, Position, Stock  # noqa: F401 - 註冊關係模型
 
 
+def _quote_stub(rows: dict[str, float]):
+    """返回 md_quote_rows 替替函式,固定報價,測試不依賴網路行情。"""
+
+    def _fetch(symbols: list[str], market: str) -> list[dict]:
+        return [
+            {
+                "symbol": symbol,
+                "current_price": rows[symbol],
+                "price_kind": "eod",
+                "trade_date": "2026-10-09",
+                "timestamp": None,
+            }
+            for symbol in symbols
+            if symbol in rows
+        ]
+
+    return _fetch
+
+
 def test_delete_position_logs_relationship_names_before_commit():
     """刪除持倉後仍能完成回應，日誌不能訪問已脫離會話的關係物件。"""
     from src.modules.portfolio.api.accounts import delete_position
@@ -102,6 +121,10 @@ def test_portfolio_summary_and_holdings_primary_currency_twd(monkeypatch):
         "src.modules.portfolio.api.accounts.get_usd_twd_rate",
         lambda: 32.0,
     )
+    monkeypatch.setattr(
+        "src.modules.portfolio.api.accounts.md_quote_rows",
+        _quote_stub({"2330": 1100.0, "NVDA": 120.0}),
+    )
 
     engine = create_engine(
         "sqlite://",
@@ -150,13 +173,17 @@ def test_portfolio_summary_and_holdings_primary_currency_twd(monkeypatch):
 
     holdings = _gather_holdings(session)
     assert len(holdings) == 2
+    # 行情 1100 TWD × 100 股 => 市值 110,000 TWD(成本 100,000 => 未實現獲利 10,000)
     h_tw = next(h for h in holdings if h["symbol"] == "2330")
     assert h_tw["fx"] == 1.0
-    assert h_tw["market_value"] == 100000.0
+    assert h_tw["market_value"] == 110000.0
+    assert h_tw["unrealized_pnl"] == 10000.0
 
+    # 行情 120 USD × 10 股 × 32 => 市值 38,400 TWD(成本 32,000 => 未實現獲利 6,400)
     h_us = next(h for h in holdings if h["symbol"] == "NVDA")
     assert h_us["fx"] == 32.0
-    assert h_us["market_value"] == 32000.0
+    assert h_us["market_value"] == 38400.0
+    assert h_us["unrealized_pnl"] == 6400.0
 
     session.close()
     engine.dispose()
@@ -173,6 +200,10 @@ def test_portfolio_summary_and_holdings_primary_currency_cny(monkeypatch):
     monkeypatch.setattr(
         "src.modules.portfolio.api.accounts.get_twd_cny_rate",
         lambda: 0.22,
+    )
+    monkeypatch.setattr(
+        "src.modules.portfolio.api.accounts.md_quote_rows",
+        _quote_stub({"2330": 1100.0}),
     )
 
     engine = create_engine(
@@ -213,7 +244,9 @@ def test_portfolio_summary_and_holdings_primary_currency_cny(monkeypatch):
     assert holdings[0]["symbol"] == "2330"
     assert holdings[0]["market"] == "TW"
     assert holdings[0]["fx"] == 0.22
-    assert holdings[0]["market_value"] == 22000.0
+    # 行情 1100 TWD × 100 股 × 0.22 => 市值 24,200 CNY(成本 22,000 => 未實現獲利 2,200)
+    assert holdings[0]["market_value"] == 24200.0
+    assert holdings[0]["unrealized_pnl"] == 2200.0
 
     session.close()
     engine.dispose()
