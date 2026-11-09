@@ -287,6 +287,9 @@ class TwmdValuationRead:
     reason: str
     schema_ready: bool | None = None
     coverage_header: str | None = None
+    coverage_available_dates: int | None = None
+    coverage_empty_dates: int | None = None
+    coverage_missing_dates: int | None = None
     selected_instrument_presence: str = "unknown"
     response_headers: dict[str, str] = field(default_factory=dict)
 

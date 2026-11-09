@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from marketdata.errors import TwmdReadError
 from marketdata.symbol import Symbol
 from marketdata.types import TwmdFinancialStatementPeriodsRead
-from marketdata.vendors.twmd import TwmdClient
+from marketdata.vendors.twmd import TwmdClient, read_instrument_catalog
 
 from src.modules.research.twmd_profile_revenue import (
     ResearchDataBlock,
@@ -603,6 +603,13 @@ def _valuation_block(read) -> ResearchDataBlock:
                 "dividend_per_share": "source currency; see each observation",
             },
             "dataset_coverage": read.coverage_header,
+            # twmd 0.2.12 reports the requested range as available/empty/missing sessions
+            # and no longer reports a selected presence; empty is not the same as missing.
+            "dataset_coverage_counts": {
+                "available": read.coverage_available_dates,
+                "empty": read.coverage_empty_dates,
+                "missing": read.coverage_missing_dates,
+            },
             "selected_instrument_presence": read.selected_instrument_presence,
             "response_headers": {
                 key.lower(): value for key, value in read.response_headers.items()
@@ -972,9 +979,14 @@ def _instrument_catalog(client: TwmdClient, config: dict) -> list[dict]:
     cached = _cache_get(key)
     if cached is not None:
         return cached
-    payload, _headers = client.get_response("instruments")
-    if not isinstance(payload, list):
-        raise TwmdReadError("twmd instruments response must be a list", reason_code="invalid_response")
+    reader = getattr(client, "instrument_catalog", None)
+    if callable(reader):
+        # The client pages the catalog and keeps one TTL-cached copy per endpoint, so the
+        # research service, the discovery scan and the stock list share the same read.
+        payload = reader()
+    else:
+        # Test doubles and alternative clients expose the HTTP seam only.
+        payload = read_instrument_catalog(client)[0]
     rows = []
     for row in payload:
         if not isinstance(row, dict):
@@ -1263,7 +1275,7 @@ class TaiwanResearchService:
         }
         template = {
             "valuation": ("/api/v1/valuations", {"instrument_id": instrument_id, "start": selectors["start_date"], "end": selectors["end_date"]}),
-            "institutional_flows": ("/api/v1/institutional-flows", {"instrument_id": instrument_id, "start_date": selectors["start_date"], "end_date": selectors["end_date"]}),
+            "institutional_flows": ("/api/v1/institutional-flows", {"instrument_id": instrument_id, "start": selectors["start_date"], "end": selectors["end_date"]}),
             "company_profile": ("/api/v1/company-profiles", {"instrument_id": instrument_id}),
             "monthly_revenues": ("/api/v1/monthly-revenues", {"instrument_id": instrument_id, "start_month": selectors["start_month"], "end_month": selectors["end_month"]}),
             "margin_short_sale": ("/api/v1/margin-short-sale", {"instrument_id": instrument_id, "start": selectors["start_date"], "end": selectors["end_date"]}),

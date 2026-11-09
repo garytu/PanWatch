@@ -833,14 +833,12 @@ class MarketData:
                 catalog_request_count = 1
                 try:
                     configured_timeout = min(float(source.config.get("timeout_sec") or 5), 5.0)
-                    catalog_payload, _headers = client.get_response(
-                        "instruments",
+                    raw_catalog, catalog_pages, _total_count = client.read_instrument_catalog(
                         timeout_sec=min(configured_timeout, remaining),
                         retries=0,
+                        deadline_monotonic=scan_deadline,
                     )
-                    if not isinstance(catalog_payload, list):
-                        raise ValueError("invalid_instruments_response")
-                    raw_catalog = catalog_payload
+                    catalog_request_count = catalog_pages
                     if raw_catalog:
                         raw_response_cache = getattr(twmd, "_catalog_response_cache", None)
                         if raw_response_cache is not None:

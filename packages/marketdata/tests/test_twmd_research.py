@@ -28,10 +28,28 @@ def synthetic(case_id: str) -> dict:
 
 
 def install_response(monkeypatch, response, headers=None):
+    """Serve one canned response and return the recorded (path, params) requests."""
+    requests = []
+
     def get_response(self, path, **params):
+        requests.append((path, params))
         return response, headers or {}
 
     monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    return requests
+
+
+def test_institutional_flow_read_sends_start_and_end_not_start_date(monkeypatch):
+    """twmd 0.2.12 answers start_date/end_date here with 422 unknown_query_parameter."""
+    case = captured("TWSE:2330 institutional flow 2026-10-02 available")
+    requests = install_response(monkeypatch, case["response"])
+
+    twmd.TwmdClient({}).institutional_flows(
+        "TWSE:2330", "2026-10-02", "2026-10-02", today_taipei=date(2026, 10, 6)
+    )
+
+    assert [path for path, _ in requests] == ["institutional-flows"]
+    assert requests[0][1] == {"instrument_id": "TWSE:2330", "start": "2026-10-02", "end": "2026-10-02"}
 
 
 def test_twse_official_flow_keeps_native_categories_and_distinct_receipts(monkeypatch):
@@ -397,3 +415,104 @@ def test_tpex_flow_presence_without_row_is_a_provider_error(monkeypatch):
         twmd.TwmdClient({}).institutional_flows(
             "TPEX:5347", "2026-10-02", "2026-10-02", today_taipei=date(2026, 10, 6)
         )
+
+
+def test_twse_valuation_parses_coverage_without_selected_and_counts_empty_sessions(monkeypatch):
+    """twmd 0.2.12 sends available/empty/missing and no selected for TWSE valuations."""
+    case = captured("TWSE:2330 valuation 2026-10-02")
+    install_response(monkeypatch, case["response"], {
+        "x-twmd-schema-ready": "true",
+        "x-twmd-coverage": "available=1;empty=6;missing=0",
+    })
+
+    result = twmd.TwmdClient({}).valuation_history(
+        "TWSE:2330", "2026-10-01", "2026-10-05", today_taipei=date(2026, 10, 6)
+    )
+
+    assert (result.status, result.reason) == ("available", "selected_record_present")
+    assert (result.coverage_available_dates, result.coverage_empty_dates,
+            result.coverage_missing_dates) == (1, 6, 0)
+    assert result.selected_instrument_presence == "present"
+    assert result.coverage_header == "available=1;empty=6;missing=0"
+
+
+def test_twse_valuation_keeps_missing_dates_partial_beyond_empty_sessions(monkeypatch):
+    case = captured("TWSE:2330 valuation 2026-10-02")
+    install_response(monkeypatch, case["response"], {"x-twmd-coverage": "available=1;empty=6;missing=2"})
+
+    result = twmd.TwmdClient({}).valuation_history(
+        "TWSE:2330", "2026-10-01", "2026-10-05", today_taipei=date(2026, 10, 6)
+    )
+
+    assert result.status == "partial" and result.coverage_missing_dates == 2
+    assert result.coverage_empty_dates == 6  # empty sessions are not counted as uncollected
+
+
+def test_twse_valuation_without_rows_uses_coverage_instead_of_reporting_unknown(monkeypatch):
+    """An uncollected session, an explicitly empty session and an absent issuer differ."""
+    cases = [
+        ("available=0;empty=0;missing=1", ("missing", "coverage_missing")),
+        ("available=0;empty=3;missing=0", ("empty", "source_report_explicitly_no_data")),
+        ("available=3;empty=0;missing=0", ("absent", "issuer_absent_from_available_report")),
+    ]
+    for coverage, expected in cases:
+        install_response(monkeypatch, [], {"x-twmd-coverage": coverage})
+        result = twmd.TwmdClient({}).valuation_history(
+            "TWSE:2330", "2026-10-20", "2026-10-22", today_taipei=date(2026, 11, 9)
+        )
+        assert (result.status, result.reason) == expected, coverage
+
+
+def test_tpex_valuation_coverage_accounts_empty_sessions(monkeypatch):
+    """The 0.2.12 TPEx header adds empty, so accounting is available+empty+missing."""
+    case = captured("TPEX:5347 valuation 2026-10-02 available")
+    install_response(monkeypatch, case["response"], {
+        "x-twmd-schema-ready": "true",
+        "x-twmd-coverage": "available=1;empty=1;missing=1;selected=present",
+    })
+
+    result = twmd.TwmdClient({}).valuation_history(
+        "TPEX:5347", "2026-10-02", "2026-10-04", today_taipei=date(2026, 10, 6)
+    )
+
+    assert result.status == "partial" and result.coverage_empty_dates == 1
+
+
+def test_tpex_valuation_without_selected_presence_reports_unknown_presence(monkeypatch):
+    case = captured("TPEX:5347 valuation 2026-10-02 available")
+    install_response(monkeypatch, case["response"], {
+        "x-twmd-schema-ready": "true",
+        "x-twmd-coverage": "available=1;empty=1;missing=1",
+    })
+
+    result = twmd.TwmdClient({}).valuation_history(
+        "TPEX:5347", "2026-10-02", "2026-10-04", today_taipei=date(2026, 10, 6)
+    )
+
+    assert result.status == "partial"
+    assert result.selected_instrument_presence == "present"  # derived from the returned row
+
+
+@pytest.mark.parametrize("coverage", [
+    "available=x;missing=0", "available=1;missing=-1", "available=1", "selected=present", "garbage",
+])
+def test_malformed_valuation_coverage_header_is_a_provider_error(monkeypatch, coverage):
+    install_response(monkeypatch, [], {
+        "x-twmd-schema-ready": "true", "x-twmd-coverage": coverage,
+    })
+    with pytest.raises(TwmdReadError, match="X-TWMD-Coverage|coverage"):
+        twmd.TwmdClient({}).valuation_history(
+            "TPEX:5347", "2026-10-02", "2026-10-02", today_taipei=date(2026, 10, 6)
+        )
+
+
+def test_unexpected_valuation_coverage_keys_do_not_invalidate_the_read(monkeypatch):
+    """A later server key must not zero a usable valuation read again."""
+    case = captured("TWSE:2330 valuation 2026-10-02")
+    install_response(monkeypatch, case["response"], {"x-twmd-coverage": "available=1;empty=0;missing=0;future_key=7"})
+
+    result = twmd.TwmdClient({}).valuation_history(
+        "TWSE:2330", "2026-10-02", "2026-10-02", today_taipei=date(2026, 10, 6)
+    )
+
+    assert result.status == "available" and result.coverage_header.endswith("future_key=7")
