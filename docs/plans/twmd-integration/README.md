@@ -93,7 +93,7 @@ twmd persisted query API
 
 每次執行一張 implementation task，原始工作階段（主代理）必須先讀取本總計劃、完整任務卡、`AGENTS.md`、相關程式與最新上游契約，再確認依賴已完成、任務狀態為 `ready` 並檢視 `git status`。建立本計劃時已有未提交的 `src/modules/automation/agent_catalog.py` 和其他 untracked 檔，均不屬於本計劃，執行時要重新檢查並保護所有既有修改。
 
-主代理在目前 checkout 將任務狀態更新為 `in_progress`、指定 implementation worker，並依 repository 的 [execute-task 技能](../../../.agents/skills/execute-task/SKILL.md)先提交這項協調狀態；不建立或切換 worktree。然後只能派出一個實作子代理，參數固定為 `model: "gpt-6-luna"`、`reasoning_effort: "xhigh"`。子代理不得繼承或沿用原始工作階段的模型設定。若該模型或 effort 無法使用、代理無法派出，主代理要將任務與卡片恢復 `ready`、提交恢復後的狀態並報告原因；不可靜默換模型、略過子代理，或由主代理接手實作。
+主代理在目前 checkout 將任務狀態更新為 `in_progress`、指定 implementation worker，並先提交這項協調狀態；不建立或切換 worktree。然後只能派出一個實作子代理，參數固定為 `model: "gpt-6-luna"`、`reasoning_effort: "xhigh"`。子代理不得繼承或沿用原始工作階段的模型設定。若該模型或 effort 無法使用、代理無法派出，主代理要將任務與卡片恢復 `ready`、提交恢復後的狀態並報告原因；不可靜默換模型、略過子代理，或由主代理接手實作。
 
 主代理在派工時提供 task ID、checkout、完整卡片與依賴、允許修改的檔案範圍、共用工作區注意事項、驗收條件、預期測試和交接格式。子代理擁有該卡的實作檔案，負責讀取程式、完成實作、執行卡片指定驗證，只能編輯自己卡片的「進度與交接」內容並回報 `review` 或具體 blocker。子代理不可修改總計劃、任務狀態／owner、其他卡片、執行協調提交或建立最終提交。主代理在等待及審查期間不與子代理同時編輯其實作檔案。
 
