@@ -1,0 +1,24 @@
+{
+  "fixture_kind": "synthetic_instrument_catalog_paging",
+  "notice": "Constructed offline contract example for twmd 0.2.12 instrument paging. It is not an HTTP capture and does not claim that a deployed service returned the example state.",
+  "contract": {
+    "endpoint": "/api/v1/instruments",
+    "reference": "tw-market-data docs/reference/api/price.md: Date-aware reads and paging",
+    "default_limit": 1000,
+    "max_limit": 5000,
+    "order": "symbol ascending",
+    "total_count_header": "X-TWMD-Total-Count"
+  },
+  "scenario": {
+    "page_limit": 5000,
+    "filler_count": 12490,
+    "filler_venue": "TWSE",
+    "filler_symbol_format": "00{index:05d}W0",
+    "filler_security_type": "WARRANT",
+    "target_instrument_id": "TWSE:2303",
+    "target_security_type": "EQUITY",
+    "expected_total_count": 12491,
+    "expected_target_page_index": 2,
+    "qualification": "Symbols sort ascending, so every 00-prefixed warrant precedes 2303 and an unpaged default read of 1000 rows cannot contain the target."
+  }
+}

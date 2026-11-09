@@ -1,11 +1,20 @@
+import json
+import time
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
 from marketdata import MarketData, SourceConfig
 from marketdata.defaults import StaticConfigProvider
+from marketdata.errors import TwmdReadError
+from marketdata.http import MarketHttpResponse
 from marketdata.symbol import Symbol
 from marketdata.vendors import twmd
+
+PAGING_FIXTURE = json.loads((
+    Path(__file__).parent / "fixtures" / "twmd" / "synthetic" / "instrument_catalog_paging.json"
+).read_text())
 
 
 @pytest.fixture(autouse=True)
@@ -114,7 +123,14 @@ def test_unknown_and_unsubscribed_quotes_remain_null(monkeypatch):
 
 
 def test_bare_symbol_resolution_does_not_guess_a_venue(monkeypatch):
-    monkeypatch.setattr(twmd, "market_get", lambda *args, **kw: [instrument("TWSE:2330"), instrument("TPEX:2330")])
+    def get(url, **kw):
+        rows = [instrument("TWSE:2330"), instrument("TPEX:2330")]
+        # The catalog read retains response headers, so the transport double answers with one.
+        if url.endswith("instruments"):
+            return MarketHttpResponse(200, {"x-twmd-total-count": "2"}, rows)
+        return rows
+
+    monkeypatch.setattr(twmd, "market_get", get)
     quote = twmd.TwmdQuoteVendor().fetch([Symbol.parse("2330", "TW")], {})[0]
     assert quote.current_price is None and quote.availability == "unknown_instrument"
     assert "explicit" in quote.freshness["reason"]
@@ -124,7 +140,9 @@ def test_bare_etf_uses_instrument_registry_not_hk_autodetection(monkeypatch):
     calls = []
     def get(url, **kw):
         calls.append(url)
-        return [instrument("TWSE:00878")] if url.endswith("instruments") else {"quotes": [live("TWSE:00878")]}
+        if url.endswith("instruments"):
+            return MarketHttpResponse(200, {"x-twmd-total-count": "1"}, [instrument("TWSE:00878")])
+        return {"quotes": [live("TWSE:00878")]}
     monkeypatch.setattr(twmd, "market_get", get)
     quotes = twmd.TwmdQuoteVendor().fetch([Symbol.parse("00878", "TW")], {})
     assert quotes[0].symbol == "00878" and quotes[0].instrument_id == "TWSE:00878"
@@ -483,3 +501,190 @@ def test_conflicting_later_inactive_row_preserves_legacy_requests_but_not_author
     assert pool.stage_id_sets["catalog"]["excluded"] == []
     assert pool.authority_by_instrument_id["TWSE:2330"]["authority_status"] == "CONFLICTING_CATALOG_ROWS"
     assert pool.scan_coverage_state == "PARTIAL"
+
+
+class PagedInstrumentsServer:
+    """Fake twmd 0.2.12 GET /api/v1/instruments that pages by offset and declares a total.
+
+    Row content follows the synthetic contract example; symbols sort ascending, so a
+    catalog of 00-prefixed warrants keeps the target symbol outside the first page.
+    """
+
+    def __init__(self, rows, *, total=None, declare_total=True, clamp_limit=None, honor_offset=True):
+        self.rows = rows
+        self.total = len(rows) if total is None else total
+        self.declare_total = declare_total
+        self.clamp_limit = clamp_limit
+        self.honor_offset = honor_offset
+        self.requests = []
+
+    def handle(self, path, **params):
+        assert path == "instruments", path
+        contract = PAGING_FIXTURE["contract"]
+        requested = int(params.get("limit") or contract["default_limit"])
+        assert requested <= contract["max_limit"], "the client must not exceed the contract page max"
+        size = min(requested, self.clamp_limit or contract["max_limit"])
+        requested_offset = int(params.get("offset") or 0)
+        offset = requested_offset if self.honor_offset else 0
+        self.requests.append((requested_offset, size))
+        headers = {}
+        if self.declare_total:
+            headers[contract["total_count_header"]] = str(self.total)
+        return self.rows[offset:offset + size], headers
+
+    def patch(self, monkeypatch):
+        monkeypatch.setattr(twmd.TwmdClient, "get_response", lambda _self, path, **kw: self.handle(path, **kw))
+
+
+def paged_catalog_rows():
+    scenario = PAGING_FIXTURE["scenario"]
+    rows = [
+        instrument(f"{scenario['filler_venue']}:{scenario['filler_symbol_format'].format(index=index)}",
+                   security_type=scenario["filler_security_type"])
+        for index in range(scenario["filler_count"])
+    ]
+    rows.append(instrument(scenario["target_instrument_id"],
+                           security_type=scenario["target_security_type"], name="聯詠"))
+    return sorted(rows, key=lambda row: row["symbol"])
+
+
+def test_instruments_pages_the_whole_catalog_and_finds_a_symbol_outside_the_first_page(monkeypatch):
+    scenario = PAGING_FIXTURE["scenario"]
+    server = PagedInstrumentsServer(paged_catalog_rows())
+    server.patch(monkeypatch)
+    client = twmd.TwmdClient({"base_url": "http://paged-catalog"})
+
+    rows = client.instruments()
+
+    assert len(rows) == scenario["expected_total_count"]
+    assert server.requests == [(0, 5_000), (5_000, 5_000), (10_000, 5_000)]
+    target = scenario["target_instrument_id"]
+    default_page = {row["instrument_id"] for row in server.rows[:PAGING_FIXTURE["contract"]["default_limit"]]}
+    assert target not in default_page  # the defect this fix removes: an unpaged read truncates
+    assert target in {row["instrument_id"] for row in rows}
+
+    requests_before = len(server.requests)
+    assert client.instruments() == rows  # catalog TTL cache semantics are unchanged
+    assert len(server.requests) == requests_before
+    key = (client.base_url, client.config.get("token"))
+    assert len(twmd._catalog_response_cache.get(key)) == scenario["expected_total_count"]
+    assert twmd._catalog_response_receipts.get(key) is not None
+
+
+def test_bare_symbol_outside_the_first_page_resolves_after_paging(monkeypatch):
+    server = PagedInstrumentsServer(paged_catalog_rows())
+    server.patch(monkeypatch)
+    client = twmd.TwmdClient({"base_url": "http://paged-catalog-resolve"})
+
+    assert client.resolve(Symbol.parse("2303", "TW")) == "TWSE:2303"
+    assert client._canonical_id("2303") == "TWSE:2303"
+    assert len(server.requests) == 3  # one paged catalog serves both readers
+
+
+def test_instrument_catalog_stops_at_the_declared_total_on_an_exact_last_page(monkeypatch):
+    rows = [instrument(f"TWSE:{index:06d}") for index in range(10_000)]
+    server = PagedInstrumentsServer(rows)
+    server.patch(monkeypatch)
+
+    catalog, pages, total = twmd.TwmdClient({"base_url": "http://exact-pages"}).read_instrument_catalog()
+
+    assert (pages, total, len(catalog)) == (2, 10_000, 10_000)
+    # A full last page keeps paging; the declared total ends it without a wasted request.
+    assert server.requests == [(0, 5_000), (5_000, 5_000)]
+
+
+def test_instrument_catalog_reads_one_more_page_until_an_empty_page_without_a_total(monkeypatch):
+    rows = [instrument(f"TWSE:{index:06d}") for index in range(10_000)]
+    server = PagedInstrumentsServer(rows, declare_total=False)
+    server.patch(monkeypatch)
+
+    catalog, pages, total = twmd.TwmdClient({"base_url": "http://exact-pages-legacy"}).read_instrument_catalog()
+
+    assert (pages, total, len(catalog)) == (3, None, 10_000)
+    assert server.requests == [(0, 5_000), (5_000, 5_000), (10_000, 5_000)]
+
+
+def test_instrument_catalog_keeps_paging_when_the_server_clamps_limit(monkeypatch):
+    rows = [instrument(f"TWSE:{index:06d}") for index in range(2_500)]
+    server = PagedInstrumentsServer(rows, clamp_limit=1_000)
+    server.patch(monkeypatch)
+
+    catalog, pages, total = twmd.TwmdClient({"base_url": "http://clamped-limit"}).read_instrument_catalog()
+
+    assert (pages, total, len(catalog)) == (3, 2_500, 2_500)
+    assert server.requests == [(0, 1_000), (1_000, 1_000), (2_000, 1_000)]
+
+
+def test_instrument_catalog_reports_an_incomplete_catalog_instead_of_a_truncated_one(monkeypatch):
+    rows = [instrument(f"TWSE:{index:06d}") for index in range(5_000)]
+    server = PagedInstrumentsServer(rows, total=124_940)  # declares more rows than it can return
+    server.patch(monkeypatch)
+    client = twmd.TwmdClient({"base_url": "http://short-catalog"})
+
+    with pytest.raises(TwmdReadError) as failure:
+        client.instruments()
+
+    assert failure.value.reason_code == "incomplete_catalog"
+    key = (client.base_url, client.config.get("token"))
+    assert twmd._catalog_cache.get(key) is None  # a partial catalog must never be cached
+    assert twmd._catalog_response_cache.get(key) is None
+
+
+def test_instrument_catalog_stops_when_the_server_ignores_offset(monkeypatch):
+    rows = [instrument(f"TWSE:{index:06d}") for index in range(12_000)]
+    server = PagedInstrumentsServer(rows, honor_offset=False, declare_total=False)
+    server.patch(monkeypatch)
+
+    catalog, pages, _total = twmd.TwmdClient({"base_url": "http://offset-ignored"}).read_instrument_catalog()
+
+    assert (pages, len(catalog)) == (2, 5_000)  # a repeated page is not catalog content
+    assert server.requests == [(0, 5_000), (5_000, 5_000)]
+
+
+def test_instrument_catalog_stops_at_the_page_budget(monkeypatch):
+    rows = [instrument(f"TWSE:{index:06d}") for index in range(50_000)]
+    server = PagedInstrumentsServer(rows, declare_total=False)
+    server.patch(monkeypatch)
+    monkeypatch.setattr(twmd, "_INSTRUMENTS_MAX_PAGES", 3)
+
+    with pytest.raises(TwmdReadError) as failure:
+        twmd.TwmdClient({"base_url": "http://never-short"}).read_instrument_catalog()
+
+    assert failure.value.reason_code == "catalog_page_limit"
+    assert len(server.requests) == 3
+
+
+def test_instrument_catalog_rejects_requests_outside_the_paging_contract(monkeypatch):
+    server = PagedInstrumentsServer([])
+    server.patch(monkeypatch)
+    client = twmd.TwmdClient({})
+
+    with pytest.raises(ValueError):
+        client.read_instrument_catalog(limit=5_001)  # contract max is 5000
+    with pytest.raises(ValueError):
+        client.read_instrument_catalog(limit=0)
+    with pytest.raises(TwmdReadError) as failure:
+        client.read_instrument_catalog(deadline_monotonic=time.monotonic() - 1)
+    assert failure.value.reason_code == "timeout"
+    assert server.requests == []  # a spent deadline must not reach the network
+
+
+def test_discovery_pool_pages_the_catalog_and_reports_the_request_count(monkeypatch):
+    rows = [instrument(f"TWSE:{index:06d}") for index in range(12_000)]
+    server = PagedInstrumentsServer(rows)
+
+    def get_response(_self, path, **kw):
+        if path == "instruments":
+            return server.handle(path, **kw)
+        identities = kw["instrument_ids"].split(",")
+        return {"snapshots": [snapshot(identity) for identity in identities]}, {}
+
+    monkeypatch.setattr(twmd.TwmdClient, "get_response", get_response)
+    md = MarketData(StaticConfigProvider({"quote": [SourceConfig(vendor="twmd")]}))
+    pool = md.taiwan_discovery_pool(limit=3, max_universe_size=20)
+
+    assert pool.catalog_response_row_count == 12_000
+    assert pool.catalog_request_count == 3
+    assert len(pool.items) == 3
+    assert pool.stage_id_sets["catalog"]["eligible"] == sorted(row["instrument_id"] for row in rows)
+    assert len(pool.stage_id_sets["universe_bound"]["requested"]) == 20

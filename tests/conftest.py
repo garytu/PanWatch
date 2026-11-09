@@ -68,7 +68,12 @@ def _mock_stock_link_platform(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _clear_market_caches():
-    """清空採集層記憶體快取,避免用例間互相汙染(K線/報價/資金流等現按 TTL 快取)。"""
+    """清空採集層記憶體快取,避免用例間互相汙染(K線/報價/資金流等現按 TTL 快取)。
+
+    twmd 的 instrument catalog 現由 client 層分頁並跨研究/選股/股票清單共用同一份
+    TTL 快取,因此一併清空,否則前一個用例取的目錄會被後一個用例當成已取。
+    """
+    from marketdata.vendors import twmd as twmd_vendor
     from src.platform.marketdata.collectors import (
         capital_flow_collector,
         kline_collector,
@@ -79,6 +84,9 @@ def _clear_market_caches():
         kline_collector.clear_kline_cache()
         capital_flow_collector._FLOW_CACHE.clear()
         market_api.clear_indices_cache()
+        twmd_vendor._catalog_cache.clear()
+        twmd_vendor._catalog_response_cache.clear()
+        twmd_vendor._catalog_response_receipts.clear()
 
     _clear()
     yield

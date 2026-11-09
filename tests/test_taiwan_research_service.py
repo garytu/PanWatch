@@ -482,6 +482,7 @@ def test_etf_preflight_keeps_available_blocks_and_marks_profile_revenue_unsuppor
                 instrument_id="TWSE:00878", endpoint="/api/v1/valuations",
                 start_date="2026-10-02", end_date="2026-10-02", data=[],
                 status="unknown", reason="coverage_not_returned", coverage_header=None,
+                coverage_available_dates=None, coverage_empty_dates=None, coverage_missing_dates=None,
                 selected_instrument_presence="unknown", response_headers={},
             )
 
@@ -721,20 +722,29 @@ def test_catalog_deadline_keeps_actual_read_permits_until_workers_finish(monkeyp
         caller_pool.shutdown(wait=True)
 
 
-def test_valuation_evidence_exports_only_contract_headers():
+@pytest.mark.parametrize("coverage,counts", [
+    # twmd 0.2.10 shape: available/missing/selected, no empty.
+    ("available=0;missing=1;selected=missing", {"available": 0, "empty": None, "missing": 1}),
+    # twmd 0.2.12 shape: available/empty/missing, no selected.
+    ("available=12;empty=6;missing=0", {"available": 12, "empty": 6, "missing": 0}),
+])
+def test_valuation_evidence_exports_only_contract_headers(coverage, counts):
     from src.modules.research.taiwan_research import _valuation_block
 
     read = SimpleNamespace(
         instrument_id="TPEX:5347", data=[], status="missing", reason="coverage_missing",
         endpoint="/api/v1/valuations", start_date="2026-10-02", end_date="2026-10-02",
-        coverage_header="available=0;missing=1;selected=missing",
+        coverage_header=coverage, coverage_available_dates=counts["available"],
+        coverage_empty_dates=counts["empty"], coverage_missing_dates=counts["missing"],
         selected_instrument_presence="missing", response_headers={
-            "x-twmd-schema-ready": "true", "x-twmd-coverage": "available=0;missing=1;selected=missing",
+            "x-twmd-schema-ready": "true", "x-twmd-coverage": coverage,
             "authorization": "Bearer private-token", "set-cookie": "session=private-cookie",
         },
     )
     block = _valuation_block(read)
     assert set(block.evidence["response_headers"]) == {"x-twmd-schema-ready", "x-twmd-coverage"}
+    assert block.evidence["dataset_coverage"] == coverage
+    assert block.evidence["dataset_coverage_counts"] == counts
     assert "private" not in json.dumps(block.evidence)
 
 

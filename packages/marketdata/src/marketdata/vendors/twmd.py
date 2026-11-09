@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import re
+import time
 from dataclasses import asdict, replace
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -73,6 +74,12 @@ from marketdata.vendors.base import (
     QuoteVendor,
 )
 
+# twmd 0.2.12 pages /api/v1/instruments with limit default 1000 and max 5000. Reading one
+# unpaged request returns only the first symbols of a 100k+ catalog, so the client pages.
+_INSTRUMENTS_PAGE_LIMIT = 5000
+# Page budget for a server that clamps limit below the request or never short-pages.
+_INSTRUMENTS_MAX_PAGES = 200
+_INSTRUMENTS_TOTAL_COUNT_HEADER = "x-twmd-total-count"
 # Instrument reference data changes much less often than quotes. Cache only the catalog.
 _catalog_cache = TTLCache(default_ttl_sec=300)
 # Keep the received response alongside the compatibility-filtered catalog so the
@@ -899,6 +906,121 @@ def _monthly_revenue_coverage(value, requested_months: set[str]) -> TwmdMonthlyR
     )
 
 
+def _total_count_header(headers) -> int | None:
+    """Return X-TWMD-Total-Count, or None when the server declares no total."""
+    if not isinstance(headers, dict):
+        return None
+    for name, value in headers.items():
+        if not (isinstance(name, str) and name.lower() == _INSTRUMENTS_TOTAL_COUNT_HEADER):
+            continue
+        try:
+            total = int(str(value).strip())
+        except (TypeError, ValueError):
+            record_error(f"twmd instruments returned an invalid {_INSTRUMENTS_TOTAL_COUNT_HEADER} header")
+            return None
+        if total < 0:
+            record_error(f"twmd instruments returned a negative {_INSTRUMENTS_TOTAL_COUNT_HEADER} header")
+            return None
+        return total
+    return None
+
+
+def _catalog_twex_rows(rows: list) -> list[dict]:
+    """Keep the venues the compatibility catalog consumer supports."""
+    return [
+        row for row in rows
+        if isinstance(row, dict) and isinstance(row.get("venue"), str)
+        and row.get("venue") in {"TWSE", "TPEX"}
+    ]
+
+
+def read_instrument_catalog(
+    client,
+    *,
+    limit: int = _INSTRUMENTS_PAGE_LIMIT,
+    timeout_sec: float | None = None,
+    retries: int | None = None,
+    deadline_monotonic: float | None = None,
+) -> tuple[list, int, int | None]:
+    """Read the whole instrument catalog and return rows, page count and declared total.
+
+    twmd 0.2.12 defaults ``GET /api/v1/instruments`` to ``limit=1000``, so one unpaged
+    request silently returns the first symbols of a catalog with over 100k rows. Pages
+    advance ``offset`` until a page is shorter than ``limit``, the declared
+    ``X-TWMD-Total-Count`` is reached, or a page contributes no new identity.
+
+    Any client exposing ``get_response(path, **params) -> (payload, headers)`` can be paged,
+    which keeps the research service and its test doubles on the same convergence rules.
+    """
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= _INSTRUMENTS_PAGE_LIMIT:
+        raise ValueError(f"instrument catalog limit must be between 1 and {_INSTRUMENTS_PAGE_LIMIT}")
+    if deadline_monotonic is not None and (
+        isinstance(deadline_monotonic, bool)
+        or not isinstance(deadline_monotonic, (int, float))
+        or not math.isfinite(float(deadline_monotonic))
+    ):
+        raise ValueError("instrument catalog deadline must be a finite number")
+
+    rows: list = []
+    identities: set[str] = set()
+    declared_total: int | None = None
+    offset = 0
+    pages = 0
+    while True:
+        page_timeout = timeout_sec
+        if deadline_monotonic is not None:
+            remaining = float(deadline_monotonic) - time.monotonic()
+            if remaining <= 0:
+                raise TwmdReadError(
+                    "twmd instrument catalog paging exceeded its read deadline",
+                    reason_code="timeout",
+                )
+            page_timeout = remaining if timeout_sec is None else min(float(timeout_sec), remaining)
+        payload, headers = client.get_response(
+            "instruments", limit=limit, offset=offset,
+            timeout_sec=page_timeout, retries=retries,
+        )
+        pages += 1
+        if not isinstance(payload, list):
+            raise TwmdReadError("twmd instruments response must be a list", reason_code="invalid_response")
+        if declared_total is None:
+            declared_total = _total_count_header(headers)
+        # Every received row is kept: consumers account for malformed and duplicate records
+        # themselves. Identities only prove that paging advanced.
+        new_identity_count = 0
+        for row in payload:
+            identity = row.get("instrument_id") if isinstance(row, dict) else None
+            if isinstance(identity, str):
+                if identity in identities:
+                    continue
+                identities.add(identity)
+            new_identity_count += 1
+        page_len = len(payload)
+        if page_len and new_identity_count == 0:
+            break  # The server repeats rows it was asked to page past; they are not new content.
+        rows.extend(payload)
+        if page_len == 0:
+            break
+        if declared_total is not None and len(rows) >= declared_total:
+            break
+        if page_len < limit and declared_total is None:
+            # A short page ends the catalog. With a declared total the server still owes rows,
+            # which also covers a server clamping limit below the requested page size.
+            break
+        if pages >= _INSTRUMENTS_MAX_PAGES:
+            raise TwmdReadError(
+                f"twmd instrument catalog exceeded the {_INSTRUMENTS_MAX_PAGES}-page read budget",
+                reason_code="catalog_page_limit",
+            )
+        offset += page_len
+    if declared_total is not None and len(rows) < declared_total:
+        raise TwmdReadError(
+            f"twmd instrument catalog returned {len(rows)} of {declared_total} rows",
+            reason_code="incomplete_catalog",
+        )
+    return rows, pages, declared_total
+
+
 def _header_bool(value: str | None, name: str) -> bool | None:
     if value is None:
         return None
@@ -908,16 +1030,46 @@ def _header_bool(value: str | None, name: str) -> bool | None:
     return lowered == "true"
 
 
-def _valuation_header_coverage(value: str | None) -> tuple[int | None, int | None, str]:
+def _valuation_header_coverage(
+    value: str | None,
+) -> tuple[int | None, int | None, int | None, str | None]:
+    """Parse X-TWMD-Coverage into ``(available, missing, empty, selected)``.
+
+    twmd 0.2.12 reports ``available=12;empty=6;missing=0`` and no longer sends
+    ``selected``; earlier builds reported ``available=N;missing=N;selected=...``. Both
+    shapes parse, and an explicitly empty session is not the same as a missing one.
+    Values that are present must be well formed, while unrecognised keys are ignored so
+    a later server addition cannot invalidate a usable read; the raw header is kept in
+    the read and in the block evidence either way.
+    """
     if value is None:
-        return None, None, "unknown"
-    match = re.fullmatch(
-        r"available=(\d+);missing=(\d+);selected=(present|absent|missing)",
-        value.strip(),
-    )
-    if match is None:
+        return None, None, None, None
+    fields: dict[str, str] = {}
+    for pair in value.strip().split(";"):
+        if not pair:
+            continue
+        key, separator, item = pair.partition("=")
+        if not separator:
+            raise ValueError("invalid X-TWMD-Coverage response header")
+        fields[key.strip().lower()] = item.strip()
+    if not {"available", "missing"} <= set(fields):
         raise ValueError("invalid X-TWMD-Coverage response header")
-    return int(match.group(1)), int(match.group(2)), match.group(3)
+
+    def count(name: str) -> int:
+        try:
+            parsed = int(fields[name])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"X-TWMD-Coverage {name} must be a non-negative integer") from exc
+        if parsed < 0:
+            raise ValueError(f"X-TWMD-Coverage {name} must be a non-negative integer")
+        return parsed
+
+    available, missing = count("available"), count("missing")
+    empty = count("empty") if "empty" in fields else None
+    selected = fields.get("selected")
+    if selected is not None and selected not in {"present", "absent", "missing"}:
+        raise ValueError("X-TWMD-Coverage selected has an unknown value")
+    return available, missing, empty, selected
 
 
 def _validate_source_date(value, field_name: str) -> str:
@@ -1600,7 +1752,7 @@ class TwmdClient:
             raise ValueError("twmd research reads require a Taiwan symbol")
         if parsed.venue:
             return parsed.identity
-        payload, _ = self.get_response("instruments")
+        payload = self.instrument_catalog()
         if not isinstance(payload, list):
             raise TwmdReadError("twmd instruments response must be a list")
         matches = [
@@ -1996,16 +2148,18 @@ class TwmdClient:
                 raise ValueError("valuation response contains duplicate trade dates")
             schema_ready = _header_bool(response_headers.get("x-twmd-schema-ready"), "X-TWMD-Schema-Ready")
             coverage_header = response_headers.get("x-twmd-coverage")
-            available, missing, selected = _valuation_header_coverage(coverage_header)
+            available, missing, empty_dates, selected = _valuation_header_coverage(coverage_header)
             if instrument_id.startswith("TPEX:") and (schema_ready is None or coverage_header is None):
                 raise ValueError("TPEx valuation response is missing coverage headers")
             if instrument_id.startswith("TPEX:"):
-                if available + missing != (end - start).days + 1:
+                if available + (empty_dates or 0) + missing != (end - start).days + 1:
                     raise ValueError("TPEx valuation coverage counts do not match the requested range")
                 if len(rows) > available or (schema_ready is False and available):
                     raise ValueError("TPEx valuation rows conflict with dataset coverage")
                 expected_presence = "present" if rows else "absent" if available else "missing"
-                if selected != expected_presence:
+                # A server that stopped reporting selected presence is not a contract
+                # violation; the read then reports the presence as unknown.
+                if selected is not None and selected != expected_presence:
                     raise ValueError("TPEx valuation rows conflict with selected presence")
             if instrument_id.startswith("TPEX:") and (
                 selected == "present" and not rows or selected in {"absent", "missing"} and rows
@@ -2019,8 +2173,25 @@ class TwmdClient:
             status = "partial" if partial else "available"
             reason = "some_requested_dates_missing_or_absent" if partial else "selected_record_present"
             selected_presence = "present"
-        elif instrument_id.startswith("TWSE:"):
+        elif instrument_id.startswith("TWSE:") and coverage_header is None:
             status, reason, selected_presence = "unknown", "coverage_not_returned", "unknown"
+        elif instrument_id.startswith("TWSE:"):
+            # twmd 0.2.12 returns coverage for TWSE as well, so an empty result is no
+            # longer unknown: an uncollected session is missing, a session the source
+            # reports as empty is not, and available sessions without a row mean this
+            # issuer is absent from an available report.
+            if available:
+                status, reason, selected_presence = (
+                    "absent", "issuer_absent_from_available_report", "absent",
+                )
+            elif missing:
+                status, reason, selected_presence = "missing", "coverage_missing", "missing"
+            elif empty_dates:
+                status, reason, selected_presence = (
+                    "empty", "source_report_explicitly_no_data", "unknown",
+                )
+            else:
+                status, reason, selected_presence = "unknown", "coverage_not_returned", "unknown"
         elif schema_ready is False or (available == 0 and missing and selected == "missing"):
             status, reason, selected_presence = "missing", "coverage_missing", "missing"
         elif available and selected == "absent":
@@ -2041,6 +2212,9 @@ class TwmdClient:
             reason=reason,
             schema_ready=schema_ready,
             coverage_header=coverage_header,
+            coverage_available_dates=available,
+            coverage_empty_dates=empty_dates,
+            coverage_missing_dates=missing,
             selected_instrument_presence=selected_presence,
             response_headers=response_headers,
         )
@@ -2061,9 +2235,11 @@ class TwmdClient:
             raise ValueError("institutional flow history begins on 2024-01-01")
         if (end - start).days + 1 > 366:
             raise ValueError("institutional flow reads are limited to 366 calendar days")
+        # twmd 0.2.12 accepts only start/end here; start_date/end_date answer 422
+        # unknown_query_parameter.
         payload, response_headers = self.get_response(
             "institutional-flows", instrument_id=instrument_id,
-            start_date=start.isoformat(), end_date=end.isoformat(),
+            start=start.isoformat(), end=end.isoformat(),
         )
         if not isinstance(payload, dict):
             raise TwmdReadError("twmd institutional-flows response must be an object")
@@ -2922,21 +3098,52 @@ class TwmdClient:
             reason="detail_rows_present" if rows else "materialized_no_rows_status_unknown",
         )
 
+    def read_instrument_catalog(
+        self,
+        *,
+        limit: int = _INSTRUMENTS_PAGE_LIMIT,
+        timeout_sec: float | None = None,
+        retries: int | None = None,
+        deadline_monotonic: float | None = None,
+    ) -> tuple[list, int, int | None]:
+        """Page this client's whole instrument catalog; see ``read_instrument_catalog``."""
+        return read_instrument_catalog(
+            self,
+            limit=limit,
+            timeout_sec=timeout_sec,
+            retries=retries,
+            deadline_monotonic=deadline_monotonic,
+        )
+
+    def instrument_catalog(
+        self,
+        *,
+        timeout_sec: float | None = None,
+        retries: int | None = None,
+        deadline_monotonic: float | None = None,
+    ) -> list[dict]:
+        """Return the full raw catalog, sharing the catalog TTL caches with consumers."""
+        key = (self.base_url, self.config.get("token"))
+        cached = _catalog_response_cache.get(key)
+        if cached is not None:
+            return cached
+        rows, _pages, _total = self.read_instrument_catalog(
+            timeout_sec=timeout_sec, retries=retries, deadline_monotonic=deadline_monotonic,
+        )
+        if rows:
+            _catalog_response_cache.set(key, rows)
+            _catalog_response_receipts.set(key, datetime.now(timezone.utc).isoformat())
+            filtered = _catalog_twex_rows(rows)
+            if filtered:
+                _catalog_cache.set(key, filtered)
+        return rows
+
     def instruments(self) -> list[dict]:
         key = (self.base_url, self.config.get("token"))
         cached = _catalog_cache.get(key)
         if cached is not None:
             return cached
-        rows = self.get("instruments")
-        if not isinstance(rows, list):
-            return []
-        _catalog_response_cache.set(key, rows)
-        _catalog_response_receipts.set(key, datetime.now(timezone.utc).isoformat())
-        rows = [
-            row for row in rows
-            if isinstance(row, dict) and isinstance(row.get("venue"), str)
-            and row.get("venue") in {"TWSE", "TPEX"}
-        ]
+        rows = _catalog_twex_rows(self.instrument_catalog())
         if rows:
             _catalog_cache.set(key, rows)
         return rows
