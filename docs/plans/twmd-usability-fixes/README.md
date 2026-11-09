@@ -48,7 +48,7 @@ twmd 的 `get_financial_statement_state` 目前先呼叫 `_financial_state_all`�
 
 ## 實作與驗證方式
 
-開始實作前，重讀指定卡片與 AGENTS.md、確認目前程式及上游契約、保護工作目錄既有變更。在 `codex/` 分支交付，提交與 PR 遵守專案約定。若指定使用 execute-task 流程，再依該技能執行；寫計劃本身不啟動派工。
+開始實作前，重讀指定卡片與 AGENTS.md、確認目前程式及上游契約、保護工作目錄既有變更。在 `codex/` 分支交付，提交與 PR 遵守專案約定。需要派工時依 [資料接入計劃](../twmd-integration/README.md)「固定的實作代理流程」執行；寫計劃本身不啟動派工。
 
 每卡以固定時間、離線 fixtures 和可控制的慢速讀取驗證失敗情境；相關測試通過後再做有界唯讀實測。前端變更需執行相關 Vitest、TypeScript 與正式建置；後端變更需執行卡片列出的 pytest 回歸。建立／更新 PR 前執行 `git diff --check`。
 

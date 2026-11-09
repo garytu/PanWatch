@@ -4,7 +4,7 @@
 
 執行前讀取[總計劃](../README.md)與 repository AGENTS.md；共通資料語意、測試與完成規則均適用。
 
-本卡必須遵守總計劃的「固定的實作代理流程」：implementation 一律派給獨立的 `gpt-6-luna`／`xhigh` 子代理，不沿用原工作階段模型；原工作階段負責獨立審查、修正、重跑驗證並提交完成。工作分配及 review／commit 權責以[execute-task 技能](../../../../.agents/skills/execute-task/SKILL.md)為底稿，模型與 effort 固定值以本計劃為準。
+本卡必須遵守總計劃的「固定的實作代理流程」：implementation 一律派給獨立的 `gpt-6-luna`／`xhigh` 子代理，不沿用原工作階段模型；原工作階段負責獨立審查、修正、重跑驗證並提交完成。工作分配及 review／commit 權責以總計劃該節流程為準，模型與 effort 固定值以本計劃為準。
 
 ## 目標
 
@@ -81,4 +81,4 @@ Final checkpoint: **completed**, 2026-10-07 Taipei。Worker：gpt-6-luna／xhigh
 - `.venv/bin/python -m pytest -q tests packages/marketdata/tests`：最終 **1075 passed、3 skipped、14 warnings**（17.33 秒）。先前基線全量一次為 1063 passed、3 skipped、1 failed，失敗是既有 SSE tail 時序測試；單独重跑 `.venv/bin/python -m pytest -q tests/test_sse_endpoints.py` 為 **5 passed**，最終全量也通過，未改動該測試或 runtime。
 - `git diff --check` 與最終 staged whitespace 檢查通過；新 JSON 可離線解析，所有 fixture 已掃描敏感 key。無前端變更，因此本卡未重跑前端測試／build。
 - 未驗證部署 commit、future service availability、全市場完整度、歷史 as-of 或盤中到達；這些是後續卡邊界，不影響本卡的契約／樣本驗收。profile 的 15.5 秒實測與 HTTP headers/error transport gap 是 PW-02／PW-03 明列前提。
-- PW-02／PW-03 更新為 ready；預設唯一下一項是 PW-02，未執行下一卡。原工作區其他修改／未追蹤工具檔保留；本任務提交包含既有總計劃所引用的任務卡與 execute-task 工作流程基線，供 PR 中的連結與狀態可查閱。
+- PW-02／PW-03 更新為 ready；預設唯一下一項是 PW-02，未執行下一卡。原工作區其他修改／未追蹤工具檔保留；本任務提交包含既有總計劃所引用的任務卡與當時的 execute-task 工作流程基線，供 PR 中的連結與狀態可查閱；該技能檔案已在後續提交移除。
